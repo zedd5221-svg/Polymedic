@@ -57,4 +57,54 @@ body
     font-family: "Inter", sans-serif;
     background: linear-gradient(135deg, #eef4ff 0%, #ffffff 50%, #e8f7ff 100%);
     min-height: 100vh;
+    
+}
+
+.hero-header {
+    background-image: url('../images/bg.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+
+    /* Dark overlay */
+    position: relative;
+}
+
+.hero-header::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+}
+
+.hero-header .container {
+    position: relative;
+    z-index: 1;
+}
+
+.hero-header {
+    background:
+        linear-gradient(rgba(0,0,0,.6), rgba(0,0,0,.6)),
+        url('../images/bg.png');
+
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    min-height: 50vh;
+}
+
+.Tutorial{
+    min-height: 50vh;
+}
+
+.submit-btn {
+    display: block;
+    margin: 20px auto;
+    padding: 10px 20px;
+    font-size: 1.2rem;
+    background-color: #04ccab;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
 }

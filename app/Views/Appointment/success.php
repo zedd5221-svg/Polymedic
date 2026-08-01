@@ -395,7 +395,7 @@
                     <div class="detail-item" style="grid-column: 1 / -1; text-align: center; background: linear-gradient(135deg, #f0fdf4, #f0f7ff);">
                         <span class="label"><i class="bi bi-credit-card me-1"></i> Payment Status</span>
                         <span class="value">
-                            <span class="payment-badge">✅ Payment Confirmed</span>
+                            <span class="payment-badge">✅ Booking Confirmed</span>
                         </span>
                     </div>
                 </div>

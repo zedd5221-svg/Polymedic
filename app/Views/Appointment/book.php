@@ -695,8 +695,8 @@
                             <button type="button" class="btn btn-outline-custom" id="step4Prev">
                                 <i class="bi bi-arrow-left"></i> Back
                             </button>
-                            <button type="button" class="btn btn-success-custom" id="confirmPayment" disabled>
-                                <i class="bi bi-shield-check me-2"></i>Confirm Payment
+                            <button type="button" class="btn btn-success-custom" id="confirmBooking" disabled>
+                                <i class="bi bi-shield-check me-2"></i>Confirm Booking
                             </button>
                         </div>
                     </div>
@@ -846,7 +846,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('reviewOthers').textContent = formData.others;
         
         document.getElementById('paymentAgree').checked = false;
-        document.getElementById('confirmPayment').disabled = true;
+        document.getElementById('confirmBooking').disabled = true;
         
         updateStep(4);
     });
@@ -858,11 +858,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // ===== PAYMENT AGREEMENT =====
     document.getElementById('paymentAgree').addEventListener('change', function() {
-        document.getElementById('confirmPayment').disabled = !this.checked;
+        document.getElementById('confirmBooking').disabled = !this.checked;
     });
     
     // ===== CONFIRM PAYMENT =====
-    document.getElementById('confirmPayment').addEventListener('click', function() {
+    document.getElementById('confirmBooking').addEventListener('click', function() {
         document.getElementById('bookingForm').submit();
     });
 });

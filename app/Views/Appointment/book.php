@@ -111,14 +111,14 @@
                                 </label>
                                 <select class="form-select form-select-custom" name="appointment_time" id="appointment_time" required>
                                     <option value="">Select time</option>
-                                    <option value="08:00">🕐 8:00 AM</option>
-                                    <option value="09:00">🕐 9:00 AM</option>
-                                    <option value="10:00">🕐 10:00 AM</option>
-                                    <option value="11:00">🕐 11:00 AM</option>
-                                    <option value="13:00">🕐 1:00 PM</option>
-                                    <option value="14:00">🕐 2:00 PM</option>
-                                    <option value="15:00">🕐 3:00 PM</option>
-                                    <option value="16:00">🕐 4:00 PM</option>
+                                    <option value="08:00"> 8:00 AM</option>
+                                    <option value="09:00"> 9:00 AM</option>
+                                    <option value="10:00"> 10:00 AM</option>
+                                    <option value="11:00"> 11:00 AM</option>
+                                    <option value="13:00"> 1:00 PM</option>
+                                    <option value="14:00"> 2:00 PM</option>
+                                    <option value="15:00"> 3:00 PM</option>
+                                    <option value="16:00"> 4:00 PM</option>
                                 </select>
                             </div>
                         </div>
@@ -161,9 +161,9 @@
                                 </label>
                                 <select class="form-select form-select-custom" name="gender" id="gender" required>
                                     <option value="">Select</option>
-                                    <option value="Male">👨 Male</option>
-                                    <option value="Female">👩 Female</option>
-                                    <option value="Other">👤 Other</option>
+                                    <option value="Male">Male</option>
+                                    <option value="Female">Female</option>
+                                    <option value="Other">Other</option>
                                 </select>
                             </div>
                             <div class="col-md-6">

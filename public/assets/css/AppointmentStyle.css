@@ -1,18 +1,19 @@
 .navbar
 {
     border-bottom: 10px solid #242121 !important;
-
 }
+
 .navbar-logo-wrapper
 {
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 30px;
 }
+
 .navbar-logo-placeholder
 {
-    width: 50px;
-    height: 50px;
+    width: 60px;
+    height: 60px;
     background-color: transparent;
     border-radius: 8px;
     display: flex;
@@ -20,18 +21,21 @@
     justify-content: center;
     flex-shrink: 0;
 }
+
 .navbar-logo
 {
-    width: 100%;
-    height: 100%;
+    width: 110px;
+    height: 120px;
     object-fit: contain;
 }
+
 .navbar-brand-wrapper
 {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
 }
+
 .navbar-brand
 {
     font-size: 1.5rem;
@@ -57,7 +61,6 @@ body
     font-family: "Inter", sans-serif;
     background: linear-gradient(135deg, #eef4ff 0%, #ffffff 50%, #e8f7ff 100%);
     min-height: 100vh;
-    
 }
 
 .hero-header {
@@ -65,8 +68,6 @@ body
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
-
-    /* Dark overlay */
     position: relative;
 }
 
@@ -86,7 +87,6 @@ body
     background:
         linear-gradient(rgba(0,0,0,.6), rgba(0,0,0,.6)),
         url('../images/bg.png');
-
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
@@ -108,3 +108,83 @@ body
     border-radius: 5px;
     cursor: pointer;
 }
+
+/* Booking Form Styles */
+.booking-section {
+    background: #f8faff;
+    min-height: 100vh;
+    padding: 2rem 0;
+}
+
+.step-circle {
+    transition: all 0.3s ease;
+}
+
+.step-indicator small {
+    transition: all 0.3s ease;
+}
+
+.booking-step {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Service cards hover effect */
+.card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.08) !important;
+}
+
+/* Form check styling */
+.form-check-input:checked {
+    background-color: #0148ca;
+    border-color: #0148ca;
+}
+
+.form-check-input:focus {
+    border-color: #0148ca;
+    box-shadow: 0 0 0 0.25rem rgba(1, 72, 202, 0.25);
+}
+
+/* Progress bar animation */
+#progressBar {
+    transition: width 0.5s ease;
+}
+
+.btn-outline-custom {
+    background: transparent;
+    border: 2px solid #e2e8f0;
+    color: #64748b;
+    padding: 0.75rem 2rem;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: var(--transition);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-outline-custom:hover {
+    border-color: var(--primary-blue);
+    color: var(--primary-blue);
+    background: #f8faff;
+}
+
+/*style for booking */
+
+

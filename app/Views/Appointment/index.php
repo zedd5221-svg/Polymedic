@@ -287,40 +287,7 @@
         </div>
     </div>
 
-<!-- Services Section -->
- <!-- Betad nengka e ngini mapya papegkeran lun like ngini offer na hospital antu -->
-<section id="Services" class="Services" data-aos="fade-up">
-    <div class="container px-5 my-5">
-        <div class="row gx-5">
-            <div class="col-lg-4 mb-5 mb-lg-0" data-aos="fade-up">
-                <div class="card h-100 shadow border-0">
-                    <div class="card-body text-center p-4 p-lg-5 pt-0 pt-lg-0">
-                        <div class="feature bg-primary bg-gradient text-white rounded-3 mb-4 mt-n4"><i
-                                class="bi bi-heart-pulse-fill"></i></div>
-                        <h2 class="fs-4 fw-bold">Cardiology</h2>
-                        <p class="mb-0">Comprehensive cardiac care, including diagnostics, treatment, and rehabilitation for heart conditions.</p>
-                    </div
-                </div>
-            </div>
-            <div class="col-lg-4 mb-5 mb-lg-0" data-aos="fade-up" data-aos-delay="100">
-                <div class="card h-100 shadow border-0">
-                    <div class="card-body text-center p-4 p-lg-5 pt-0 pt-lg-0">
-                        <div class="feature bg-primary bg-gradient text-white rounded-3 mb-4 mt-n4"><i
-                                class="bi bi-brain"></i></div>
-                        <h2 class="fs-4 fw-bold">Neurology</h2>
-                        <p class="mb-0">Expert neurological care for conditions affecting the brain, spinal cord, and nervous system.</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-lg-4 mb-5 mb-lg-0" data-aos="fade-up" data-aos-delay="200">
-                <div class="card h-100 shadow border-0">
-                    <div class="card-body text-center p-4 p-lg-5 pt-0 pt-lg-0">
-                        <div class="feature bg-primary bg-gradient text-white rounded-3 mb-4 mt-n4"><i
-                                class="bi bi-x-ray"></i></div>
-                        <h2 class="fs-4 fw-bold">Radiology</h2>
-                        <p class="mb-0">Advanced imaging services, including X-rays, CT scans, and MRIs for accurate diagnosis and treatment planning.</p>
-                    </div>
-                </div>
+
 </section>
 
 <!-- Tutorial Section -->

@@ -14,17 +14,17 @@
 # ENVIRONMENT
 #--------------------------------------------------------------------
 
-# CI_ENVIRONMENT = production
+CI_ENVIRONMENT = development
 
 #--------------------------------------------------------------------
 # APP
 #--------------------------------------------------------------------
 
-# app.baseURL = ''
+app.baseURL = 'http://localhost/polymedic/'
 # If you have trouble with `.`, you could also use `_`.
-# app_baseURL = ''
-# app.forceGlobalSecureRequests = false
-# app.CSPEnabled = false
+# app_baseURL = 'http://localhost/polymedic/'
+app.forceGlobalSecureRequests = false
+app.CSPEnabled = false
 
 #--------------------------------------------------------------------
 # DATABASE
@@ -53,17 +53,17 @@
 # ENCRYPTION
 #--------------------------------------------------------------------
 
-# encryption.key =
+# encryption.key = 
 
 #--------------------------------------------------------------------
 # SESSION
 #--------------------------------------------------------------------
 
-# session.driver = 'CodeIgniter\Session\Handlers\FileHandler'
-# session.savePath = null
+session.driver = 'CodeIgniter\Session\Handlers\FileHandler'
+session.savePath = WRITEPATH . 'session'
 
 #--------------------------------------------------------------------
 # LOGGER
 #--------------------------------------------------------------------
 
-# logger.threshold = 4
+logger.threshold = 4

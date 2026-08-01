@@ -1,16 +1,16 @@
 <?= $this->extend('layouts/AppointmentLayout') ?>
 
 <?= $this->section('AppointmentContent') ?>
-<!-- Appointment Page Content -->
+
 <nav class="navbar navbar-expand-lg bg-light border-bottom">
     <div class="container">
         <div class="navbar-logo-wrapper">
             <div class="navbar-logo-placeholder">
-                <img src="assets/images/logo2.png" alt="Logo" class="navbar-logo">
+               <img src="/polymedic/public/assets/images/logo4.png" alt="Logo" class="navbar-logo">
             </div>
             <div class="navbar-brand-wrapper">
-                <a class="navbar-brand" href="#">COTABATO POLYMEDIC</a>
-                <p class="navbar-text">& Diagnostic Center, inc</p>
+                <a class="navbar-brand" href="<?= base_url() ?>">PolyMedic</a>
+                <p class="navbar-text">Diagnostic & Laboratory Center</p>
             </div>
         </div>
     </div>
@@ -33,7 +33,7 @@
                         <div class="d-grid gap-3 d-sm-flex justify-content-sm-center" data-aos="fade-up" data-aos-delay="150">
                             <a class="btn btn-outline-light btn-lg px-4" href="#Tutorial">How it works</a>
                             <a class="btn btn-light btn-lg px-4" href="#Services">Services</a>
-                            <a class="btn btn-outline-light btn-lg px-4" href="#BookNow">Book Now</a>
+                          <a class="btn btn-success btn-lg px-4" href="/polymedic/public/index.php/appointment/book" style="background: #04ccab; border-color: #04ccab;">Book Now</a>
                         </div>
                     </div>
                 </div>
@@ -42,10 +42,9 @@
     </header>
 </section>
 
-<!-- Clean Services Section -->
+<!-- Services Section -->
 <section id="Services" class="Services py-5" data-aos="fade-up" style="background: #f8faff;">
     <div class="container">
-        <!-- Section Header -->
         <div class="text-center mb-5" data-aos="fade-up">
             <div class="d-flex align-items-center justify-content-center mb-3">
                 <div style="height: 2px; width: 50px; background: #0148ca;"></div>
@@ -73,7 +72,6 @@
                     </div>
                     <div class="card-body p-4">
                         <div class="row g-3">
-                            <!-- CLINICAL CHEMISTRY -->
                             <div class="col-12">
                                 <div class="border-bottom pb-2 mb-2">
                                     <span class="fw-bold text-primary"><i class="bi bi-flask me-2"></i>CLINICAL CHEMISTRY</span>
@@ -86,8 +84,6 @@
                                     <div class="col-6"><span class="text-dark">• HDL / LDL</span></div>
                                 </div>
                             </div>
-
-                            <!-- KIDNEY FUNCTION TESTS -->
                             <div class="col-12">
                                 <div class="border-bottom pb-2 mb-2">
                                     <span class="fw-bold text-success"><i class="bi bi-cpu me-2"></i>KIDNEY FUNCTION TESTS</span>
@@ -98,8 +94,6 @@
                                     <div class="col-6"><span class="text-dark">• BLOOD UREA NITROGEN</span></div>
                                 </div>
                             </div>
-
-                            <!-- LIVER FUNCTION TESTS -->
                             <div class="col-12">
                                 <div class="border-bottom pb-2 mb-2">
                                     <span class="fw-bold" style="color: #ff6b00;"><i class="bi bi-heart-pulse me-2"></i>LIVER FUNCTION TESTS</span>
@@ -109,8 +103,6 @@
                                     <div class="col-6"><span class="text-dark">• SGOT/AST</span></div>
                                 </div>
                             </div>
-
-                            <!-- ELECTROLYTES -->
                             <div class="col-12">
                                 <div class="border-bottom pb-2 mb-2">
                                     <span class="fw-bold text-info"><i class="bi bi-droplet-half me-2"></i>ELECTROLYTES</span>
@@ -122,8 +114,6 @@
                                     <div class="col-6"><span class="text-dark">• CALCIUM (Ca)</span></div>
                                 </div>
                             </div>
-
-                            <!-- CLINICAL MICROSCOPY -->
                             <div class="col-12">
                                 <div class="border-bottom pb-2 mb-2">
                                     <span class="fw-bold text-warning"><i class="bi bi-eye me-2"></i>CLINICAL MICROSCOPY</span>
@@ -134,8 +124,6 @@
                                     <div class="col-6"><span class="text-dark">• SEMENANALYSIS</span></div>
                                 </div>
                             </div>
-
-                            <!-- HEMATOLOGY -->
                             <div class="col-12">
                                 <div class="border-bottom pb-2 mb-2">
                                     <span class="fw-bold text-danger"><i class="bi bi-droplet me-2"></i>HEMATOLOGY</span>
@@ -149,8 +137,6 @@
                                     <div class="col-6"><span class="text-dark">• BLOOD TYPING</span></div>
                                 </div>
                             </div>
-
-                            <!-- SEROLOGY -->
                             <div class="col-12">
                                 <div class="border-bottom pb-2 mb-2">
                                     <span class="fw-bold" style="color: #800080;"><i class="bi bi-shield-plus me-2"></i>SEROLOGY</span>
@@ -191,7 +177,6 @@
                     </div>
                     <div class="card-body p-4">
                         <div class="row g-3">
-                            <!-- CHEST -->
                             <div class="col-12">
                                 <div class="border-bottom pb-2 mb-2">
                                     <span class="fw-bold text-primary"><i class="bi bi-lungs me-2"></i>CHEST</span>
@@ -202,8 +187,6 @@
                                     <div class="col-6"><span class="text-dark">• THORACIC BONY CAGE/TBC</span></div>
                                 </div>
                             </div>
-
-                            <!-- UPPER EXTREMITIES -->
                             <div class="col-12">
                                 <div class="border-bottom pb-2 mb-2">
                                     <span class="fw-bold text-success"><i class="bi bi-hand-index-thumb me-2"></i>UPPER EXTREMITIES</span>
@@ -221,8 +204,6 @@
                                     <div class="col-6"><span class="text-dark">• FINGER</span></div>
                                 </div>
                             </div>
-
-                            <!-- SKULL & FACE -->
                             <div class="col-12">
                                 <div class="border-bottom pb-2 mb-2">
                                     <span class="fw-bold text-warning"><i class="bi bi-person-bounding-box me-2"></i>SKULL &amp; FACE</span>
@@ -232,14 +213,12 @@
                                     <div class="col-6"><span class="text-dark">• SKULL APL/TOWNER</span></div>
                                     <div class="col-6"><span class="text-dark">• ORBIT AP / APL</span></div>
                                     <div class="col-6"><span class="text-dark">• NASAP AP / APL</span></div>
-                                    <div class="col-6"><span class="text-dark">• NECK/CERVICAL APL</span></div>
-                                    <div class="col-6"><span class="text-dark">• NECK/CERVICAL APL/OBLIQUE</span></div>
                                     <div class="col-6"><span class="text-dark">• PARANASAL WATER ONLY</span></div>
                                     <div class="col-6"><span class="text-dark">• PARANASAL (WATER LATERAL CARDWELL)/PNS</span></div>
+                                    <div class="col-6"><span class="text-dark">• NECK/CERVICAL APL</span></div>
+                                    <div class="col-6"><span class="text-dark">• NECK/CERVICAL APL/OBLIQUE</span></div>
                                 </div>
                             </div>
-
-                            <!-- SPINE & PELVIS -->
                             <div class="col-12">
                                 <div class="border-bottom pb-2 mb-2">
                                     <span class="fw-bold text-danger"><i class="bi bi-body-text me-2"></i>SPINE &amp; PELVIS</span>
@@ -256,8 +235,6 @@
                                     <div class="col-6"><span class="text-dark">• WHOLE SPINE APL</span></div>
                                 </div>
                             </div>
-
-                            <!-- LOWER EXTREMITIES & ABDOMEN -->
                             <div class="col-12">
                                 <div class="border-bottom pb-2 mb-2">
                                     <span class="fw-bold text-info"><i class="bi bi-person-walking me-2"></i>LOWER EXTREMITIES &amp; ABDOMEN</span>
@@ -286,34 +263,27 @@
     <div class="container px-5 my-5">
         <div class="row gx-5 align-items-center">
             <div class="col-lg-6 order-lg-2" data-aos="fade-up">
-                <div class="p-5"><img class="img-fluid rounded-circle" src="assets/images/Appointment.png" alt="..." />
-                </div>
-
+                <div class="p-5">
+                      <img class="img-fluid rounded-circle" src="/polymedic/public/assets/images/Appointment2.png" alt="Appointment" />
+                 </div>
             </div>
-
             <div class="col-lg-6 order-lg-1" data-aos="fade-up" data-aos-delay="100">
                 <div class="p-5">
                     <h2 class="display-4">How to book an appointment</h2>
-                    <p>Booking an appointment with us is easy and convenient. Follow these simple steps to schedule your
-                        visit:</p>
+                    <p>Booking an appointment with us is easy and convenient. Follow these simple steps to schedule your visit:</p>
                     <ol data-aos="fade-up" data-aos-delay="150">
-                        
                         <li>Visit our website and navigate to the appointment booking page.</li>
                         <li>Select the date that works best for you.</li>
                         <li>Fill in your personal information and any specific requirements.</li>
                         <li>Review your appointment details and confirm your booking.</li>
-                       
                     </ol>
                 </div>
             </div>
         </div>
     </div>
-
-
 </section>
- <div class="d-flex justify-content-center align-items-center">
-    <button class="btn btn-primary submit-btn">Book Now</button>
-</div>
+
+
 <footer class="py-2 bg-dark text-white">
     <div class="container px-5">
         <p class="text-center mb-0">&copy; 2026 PolyMedic. All rights reserved.</p>

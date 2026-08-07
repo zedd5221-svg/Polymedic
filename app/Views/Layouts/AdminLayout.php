@@ -101,7 +101,7 @@
                                 'Patient Visits' => 'patient.png',
                                 'Diagnostic Requests' => 'stethoscope.png',
                                 'Laboratory Findings' => 'stethoscope.png',
-                                'User Management' => 'person-gear.png'
+                                'User Management' => 'profile.png'
                             ];
                             $iconFile = $iconMap[$pageTitle] ?? 'statisctics.png';
                         ?>

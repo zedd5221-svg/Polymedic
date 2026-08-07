@@ -30,15 +30,6 @@
                 </button>
             </div>
             
-            <div class="sidebar-user">
-                <div class="user-avatar">
-                    <i class="bi bi-person-fill"></i>
-                </div>
-                <div class="user-info">
-                    <span class="user-name">Admin User</span>
-                    <span class="user-role">Administrator</span>
-                </div>
-            </div>
             
             <nav class="sidebar-nav">
                 <ul>

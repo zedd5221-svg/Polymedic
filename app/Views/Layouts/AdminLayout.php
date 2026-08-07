@@ -67,14 +67,7 @@
                             <span>Diagnostic Requests</span>
                         </a>
                     </li>
-                    
-                    <li class="nav-section">CLINICAL</li>
-                    <li class="<?= current_url() == base_url('admin/laboratory') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/admin/laboratory">
-                            <i class="bi bi-micoscope"></i>
-                            <span>Laboratory Findings</span>
-                        </a>
-                    </li>
+                  
                     
                     <li class="nav-section">ADMIN</li>
                     <li class="<?= current_url() == base_url('admin/users') ? 'active' : '' ?>">

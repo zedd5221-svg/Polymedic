@@ -4,7 +4,17 @@
 
 <?= $this->section('adminContent') ?>
 
-<div class="page-header">
+
+
+<div class="table-card">
+    <!-- Search Bar -->
+    <div class="search-container">
+        <div class="search-wrapper">
+            <i class="bi bi-search"></i>
+            <input type="text" class="form-control" placeholder="Search requests..." id="searchRequests">
+        </div>
+        
+    </div>
     
     <div class="header-actions">
         <button class="btn btn-export">
@@ -14,17 +24,6 @@
             <i class="bi bi-plus-circle me-2"></i>New Request
         </button>
     </div>
-</div>
-
-<div class="table-card">
-    <!-- Search Bar -->
-    <div class="search-container">
-        <div class="search-wrapper">
-            <i class="bi bi-search"></i>
-            <input type="text" class="form-control" placeholder="Search requests..." id="searchRequests">
-        </div>
-    </div>
-
     <!-- Status Filter Buttons -->
     <div class="filter-container">
         <div class="filter-buttons" id="statusFilters">

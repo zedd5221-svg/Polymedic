@@ -13,7 +13,7 @@ use CodeIgniter\Debug\Toolbar\Collectors\Views;
 
 /**
  * --------------------------------------------------------------------------
- * Debug Toolbar
+ * Debug Toolbar 
  * --------------------------------------------------------------------------
  *
  * The Debug Toolbar provides a way to see information about the performance

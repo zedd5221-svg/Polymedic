@@ -15,8 +15,14 @@
     
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- AOS for animations -->
+     <script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script> 
 </head>
 <body>
+    <!-- Initialize AOS -->
+    <script> AOS.init({ duration: 800, once: true }); </script>
+    
     <div class="admin-wrapper">
         <!-- Sidebar -->
         <aside class="admin-sidebar" id="adminSidebar">

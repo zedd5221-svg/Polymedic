@@ -1,5 +1,1 @@
-<?= $this->extend('layouts/AdminStaffLayout') ?>
-<?= $this->section('AdminSection') ?>
-
-
-<?= $this->endSection()?> 
+<?= $this->include('Auth/login') ?>

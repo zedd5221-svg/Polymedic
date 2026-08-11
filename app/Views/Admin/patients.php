@@ -4,11 +4,7 @@
 
 <?= $this->section('adminContent') ?>
 
-<div class="page-header">
-    <button class="btn btn-primary-custom">
-        <i class="bi bi-person-plus me-2"></i>Add Patient
-    </button>
-</div>
+
 
 <div class="table-card">
     <div class="table-toolbar">
@@ -21,6 +17,12 @@
         </button>
     </div>
     
+    <div class="page-header">
+    <button class="btn btn-primary-custom">
+        <i class="bi bi-person-plus me-2"></i>Add Patient
+    </button>
+    </div>
+
     <div class="table-responsive">
         <table class="table admin-table">
             <thead>

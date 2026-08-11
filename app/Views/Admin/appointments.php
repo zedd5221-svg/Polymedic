@@ -4,63 +4,6 @@
 
 <?= $this->section('adminContent') ?>
 
-<!-- Stats Cards -->
-<div class="stats-grid" style="margin-bottom: 1.5rem;">
-    <div class="stat-card">
-        <div class="stat-icon" style="background: #e6f0fa; color: #0148ca;">
-            <i class="bi bi-calendar-check"></i>
-        </div>
-        <div class="stat-info">
-            <h3><?= $total ?? 0 ?></h3>
-            <p>Total</p>
-        </div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-icon" style="background: #fff3e0; color: #ff6b00;">
-            <i class="bi bi-clock-history"></i>
-        </div>
-        <div class="stat-info">
-            <h3><?= $pending ?? 0 ?></h3>
-            <p>Pending</p>
-        </div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-icon" style="background: #e3f2fd; color: #0148ca;">
-            <i class="bi bi-check-circle"></i>
-        </div>
-        <div class="stat-info">
-            <h3><?= $approved ?? 0 ?></h3>
-            <p>Approved</p>
-        </div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-icon" style="background: #e8f5e9; color: #28a745;">
-            <i class="bi bi-check2-circle"></i>
-        </div>
-        <div class="stat-info">
-            <h3><?= $completed ?? 0 ?></h3>
-            <p>Completed</p>
-        </div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-icon" style="background: #fce4ec; color: #dc3545;">
-            <i class="bi bi-x-circle"></i>
-        </div>
-        <div class="stat-info">
-            <h3><?= $cancelled ?? 0 ?></h3>
-            <p>Cancelled</p>
-        </div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-icon" style="background: #f5f5f5; color: #6c757d;">
-            <i class="bi bi-clock"></i>
-        </div>
-        <div class="stat-info">
-            <h3><?= $late ?? 0 ?></h3>
-            <p>Late</p>
-        </div>
-    </div>
-</div>
 
 <div class="table-card">
     <!-- Search Bar -->

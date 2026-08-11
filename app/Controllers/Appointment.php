@@ -58,7 +58,16 @@ public function submit()
         
         // Save to database
         $model = new AppointmentModel();
-        $model->save($data);
+        $appointmentId = $model->insert($data);
+        
+        // Trigger Admin Notification
+        \App\Models\NotificationModel::notify(
+            'appointment',
+            'New Appointment Request: ' . $reference,
+            'New appointment request from ' . $data['full_name'] . ' for ' . date('M d, Y', strtotime($data['appointment_date'])),
+            $appointmentId,
+            '/polymedic/public/admin/appointment/view/' . $appointmentId
+        );
         
         // Store in session for success page
         session()->set('appointment_data', $data);

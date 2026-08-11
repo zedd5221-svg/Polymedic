@@ -4,22 +4,24 @@
 
 <?= $this->section('adminContent') ?>
 
-<div class="page-header">
+
+
+<div class="table-card">
+    <div class="page-header">
     <div>
         <h4 class="page-title">User Management</h4>
         <p class="page-subtitle">Manage system users and their roles</p>
     </div>
-    <button class="btn btn-primary-custom">
+    <button class="btn btn-outline-primary">
         <i class="bi bi-person-plus me-2"></i>Add User
     </button>
 </div>
-
-<div class="table-card">
     <div class="table-toolbar">
         <div class="search-wrapper">
             <i class="bi bi-search"></i>
             <input type="text" class="form-control" placeholder="Search users..." id="searchUsers">
         </div>
+        
     </div>
     
     <div class="table-responsive">

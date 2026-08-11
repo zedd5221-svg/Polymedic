@@ -87,7 +87,7 @@
                     </div>
                 <?php endif ?>
                 
-                <form action="http://localhost/polymedic/public/index.php/appointment/submit" method="POST" id="bookingForm">
+                <form action="/polymedic/public/appointment/submit" method="POST" id="bookingForm">
                     <?= csrf_field() ?>
                     
                     <!-- ===== STEP 1: Date & Time ===== -->

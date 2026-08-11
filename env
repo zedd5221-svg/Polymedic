@@ -30,19 +30,19 @@ app.CSPEnabled = false
 # DATABASE
 #--------------------------------------------------------------------
 
-# database.default.hostname = localhost
-# database.default.database = ci4
-# database.default.username = root
-# database.default.password = root
-# database.default.DBDriver = MySQLi
-# database.default.DBPrefix =
-# database.default.port = 3306
+database.default.hostname = localhost
+database.default.database = polymedic_db
+database.default.username = root
+database.default.password = 
+database.default.DBDriver = MySQLi
+database.default.DBPrefix =
+database.default.port = 3306
 
 # If you use MySQLi as tests, first update the values of Config\Database::$tests.
 # database.tests.hostname = localhost
-# database.tests.database = ci4_test
+# database.tests.database = polymedic_db_test
 # database.tests.username = root
-# database.tests.password = root
+# database.tests.password = 
 # database.tests.DBDriver = MySQLi
 # database.tests.DBPrefix =
 # database.tests.charset = utf8mb4

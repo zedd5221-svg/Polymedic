@@ -36,7 +36,6 @@
                 </button>
             </div>
             
-            
             <nav class="sidebar-nav">
                 <ul>
                     <li class="nav-section">MAIN</li>
@@ -44,6 +43,12 @@
                         <a href="/polymedic/public/admin/dashboard">
                             <i class="bi bi-grid-1x2-fill"></i>
                             <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li class="<?= current_url() == base_url('admin/appointments') ? 'active' : '' ?>">
+                        <a href="/polymedic/public/admin/appointments">
+                            <i class="bi bi-calendar-check"></i>
+                            <span>Appointments</span>
                         </a>
                     </li>
                     <li class="<?= current_url() == base_url('admin/patients') ? 'active' : '' ?>">
@@ -64,7 +69,6 @@
                             <span>Diagnostic Requests</span>
                         </a>
                     </li>
-                  
                     
                     <li class="nav-section">ADMIN</li>
                     <li class="<?= current_url() == base_url('admin/users') ? 'active' : '' ?>">
@@ -97,22 +101,23 @@
                     <button class="hamburger-btn" onclick="toggleSidebar()">
                         <i class="bi bi-list"></i>
                     </button>
-                    <!-- Header Icon + Page Title with dynamic icon -->
+                    <!-- Page Title with PNG Icon -->
                     <div class="header-title-group">
                         <?php 
                             $pageTitle = $this->renderSection('pageTitle') ?: 'Dashboard';
                             $iconMap = [
                                 'Dashboard' => 'statisctics.png',
-                                'Patient Management' => 'sick-patient.png',
+                                'Appointments' => 'appointment1.png',
+                                'Patients' => 'sick-patient.png',
                                 'Patient Visits' => 'patient.png',
                                 'Diagnostic Requests' => 'stethoscope.png',
-                                'Laboratory Findings' => 'stethoscope.png',
-                                'User Management' => 'profile.png'
+                                'Laboratory Findings' => 'lab-icon.png',
+                                'User Management' => 'user-management-icon.png'
                             ];
                             $iconFile = $iconMap[$pageTitle] ?? 'statisctics.png';
                         ?>
                         <img src="/polymedic/public/assets/images/<?= $iconFile ?>" alt="<?= $pageTitle ?>" class="header-title-icon">
-                        <span class="page-title-header"><?= $pageTitle ?></span>
+                        <h4 class="page-title-header"><?= $pageTitle ?></h4>
                     </div>
                 </div>
                 <div class="header-right">

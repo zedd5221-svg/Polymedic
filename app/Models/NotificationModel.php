@@ -99,9 +99,6 @@ class NotificationModel extends Model
 
     /**
      * Easy static helper to create notifications from anywhere in the application.
-     * 
-     * Usage:
-     * NotificationModel::notify('appointment', 'New Appointment', 'Patient John booked', 12, 'admin/appointment/view/12');
      */
     public static function notify(string $type, string $title, string $message, $referenceId = null, $link = null)
     {
@@ -157,6 +154,42 @@ class NotificationModel extends Model
     }
 
     /**
+     * Get the appropriate link based on user role (stores only the path)
+     */
+    public function getDynamicLink($appointmentId)
+    {
+        $session = session();
+        $role = $session->get('role');
+        
+        // Store only the path, not the full URL
+        if ($role === 'admin') {
+            return 'admin/appointment/view/' . $appointmentId;
+        } elseif ($role === 'receptionist') {
+            return 'receptionist/appointment/view/' . $appointmentId;
+        }
+        
+        // Default fallback for public (admin)
+        return 'admin/appointment/view/' . $appointmentId;
+    }
+
+    /**
+     * Create notification for new appointment with role-based link
+     */
+    public function createAppointmentNotification($appointmentId, $fullName, $referenceNumber, $appointmentDate)
+    {
+        $link = $this->getDynamicLink($appointmentId);
+        
+        return $this->insert([
+            'type'         => 'appointment',
+            'title'        => 'Pending Appointment: ' . $referenceNumber,
+            'message'      => 'New appointment request from ' . $fullName . ' on ' . date('M d, Y', strtotime($appointmentDate)),
+            'reference_id' => (string)$appointmentId,
+            'link'         => $link,
+            'is_read'      => 0,
+        ]);
+    }
+
+    /**
      * Auto sync existing pending appointments into notifications table if missing.
      */
     public function autoSyncPendingAppointments()
@@ -171,18 +204,20 @@ class NotificationModel extends Model
             $pendingAppts = $apptModel->where('status', 'pending')->findAll();
 
             foreach ($pendingAppts as $appt) {
-                // Check if notification already exists for this appointment
                 $exists = $this->where('type', 'appointment')
                                ->where('reference_id', (string)$appt['id'])
                                ->first();
 
                 if (!$exists) {
+                    // Store only the path
+                    $link = 'admin/appointment/view/' . $appt['id'];
+                    
                     $this->insert([
                         'type'         => 'appointment',
                         'title'        => 'Pending Appointment: ' . ($appt['reference_number'] ?? ('#' . $appt['id'])),
                         'message'      => 'New appointment request from ' . $appt['full_name'] . ' on ' . date('M d, Y', strtotime($appt['appointment_date'])),
                         'reference_id' => (string)$appt['id'],
-                        'link'         => '/polymedic/public/admin/appointment/view/' . $appt['id'],
+                        'link'         => $link,
                         'is_read'      => 0,
                         'created_at'   => $appt['created_at'] ?? date('Y-m-d H:i:s'),
                         'updated_at'   => date('Y-m-d H:i:s')

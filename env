@@ -20,9 +20,9 @@ CI_ENVIRONMENT = development
 # APP
 #--------------------------------------------------------------------
 
-app.baseURL = 'http://localhost/polymedic/'
+app.baseURL = 'http://localhost/polymedic/public/'
 # If you have trouble with `.`, you could also use `_`.
-# app_baseURL = 'http://localhost/polymedic/'
+# app.baseURL = 'http://localhost/polymedic/public/'
 app.forceGlobalSecureRequests = false
 app.CSPEnabled = false
 

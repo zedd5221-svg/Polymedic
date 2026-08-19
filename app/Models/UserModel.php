@@ -6,20 +6,22 @@ use CodeIgniter\Model;
 
 class UserModel extends Model
 {
-    // Reference the users table in user_management database
-    protected $table = 'user_management.users';
+    // =============================================
+    // CHANGED: Removed 'user_management.' prefix
+    // Now uses 'users' table in default database
+    // =============================================
+    protected $table = 'users';  // ← CHANGED: was 'user_management.users'
     protected $primaryKey = 'id';
     protected $allowedFields = ['username', 'password', 'email', 'full_name', 'role', 'status'];
     protected $useTimestamps = true;
     protected $createdField = 'created_at';
     protected $updatedField = 'updated_at';
-    protected $DBGroup = 'default'; // Use default connection (polymedic_db)
+    protected $DBGroup = 'default'; // Uses polymedic_db
 
     public function __construct()
     {
         parent::__construct();
-        // Set the database to use polymedic_db but reference user_management.users
-        // This works because both are on the same MySQL server
+        // No longer need to specify database prefix
         $this->db = \Config\Database::connect();
     }
 
@@ -33,9 +35,22 @@ class UserModel extends Model
     public function verifyLogin($username, $password)
     {
         $user = $this->getUserByUsername($username);
-        if ($user && $user['password'] === md5($password)) {
-            return $user;
+        
+        // Check MD5 (legacy) or bcrypt (new)
+        if ($user) {
+            // Check if password matches MD5 (old users)
+            if ($user['password'] === md5($password)) {
+                // Upgrade to bcrypt on successful login
+                $this->update($user['id'], ['password' => password_hash($password, PASSWORD_DEFAULT)]);
+                return $user;
+            }
+            
+            // Check if password matches bcrypt (new users)
+            if (password_verify($password, $user['password'])) {
+                return $user;
+            }
         }
+        
         return false;
     }
 
@@ -54,20 +69,20 @@ class UserModel extends Model
         return $this->countAll();
     }
 
-    // Create user with MD5 hashed password
+    // Create user with bcrypt hashed password (upgraded from MD5)
     public function createUser($data)
     {
         if (isset($data['password'])) {
-            $data['password'] = md5($data['password']);
+            $data['password'] = password_hash($data['password'], PASSWORD_DEFAULT);
         }
         return $this->insert($data);
     }
 
-    // Update user with MD5 hashed password if provided
+    // Update user with bcrypt hashed password if provided
     public function updateUser($id, $data)
     {
         if (isset($data['password']) && !empty($data['password'])) {
-            $data['password'] = md5($data['password']);
+            $data['password'] = password_hash($data['password'], PASSWORD_DEFAULT);
         } elseif (isset($data['password'])) {
             unset($data['password']);
         }

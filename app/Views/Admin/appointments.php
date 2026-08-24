@@ -86,25 +86,41 @@
                             <span><i class="bi bi-envelope"></i> <?= $appt['email'] ?></span>
                             <span><i class="bi bi-phone"></i> <?= $appt['phone'] ?></span>
                         </div>
+                        <!-- ===== FIXED: Service Type Detection ===== -->
                         <div class="appointment-services">
-                            <span class="service-tag"><?= ucfirst($appt['service_type'] ?? 'N/A') ?></span>
                             <?php 
+                                // Decode services
                                 $labServices = json_decode($appt['lab_services'], true) ?? [];
                                 $xrayServices = json_decode($appt['xray_services'], true) ?? [];
                                 $allServices = array_merge($labServices, $xrayServices);
-                                if (!empty($allServices)):
-                                    foreach (array_slice($allServices, 0, 2) as $service): 
+                                
+                                // Determine service type label
+                                $serviceTypeLabel = 'N/A';
+                                $serviceTypeClass = 'service-tag';
+                                
+                                if (!empty($labServices) && !empty($xrayServices)) {
+                                    $serviceTypeLabel = 'Both';
+                                    $serviceTypeClass = 'service-tag both';
+                                } elseif (!empty($xrayServices)) {
+                                    $serviceTypeLabel = 'X-Ray';
+                                    $serviceTypeClass = 'service-tag xray';
+                                } elseif (!empty($labServices)) {
+                                    $serviceTypeLabel = 'Laboratory';
+                                    $serviceTypeClass = 'service-tag lab';
+                                }
                             ?>
-                                <span class="service-tag"><?= $service ?></span>
-                            <?php 
-                                    endforeach; 
-                                    if (count($allServices) > 2):
-                            ?>
-                                <span class="service-tag more">+<?= count($allServices) - 2 ?> more</span>
-                            <?php 
-                                    endif; 
-                                endif; 
-                            ?>
+                            <span class="<?= $serviceTypeClass ?>"><?= $serviceTypeLabel ?></span>
+                            
+                            <?php if (!empty($allServices)): ?>
+                                <?php foreach (array_slice($allServices, 0, 2) as $service): ?>
+                                    <span class="service-tag"><?= $service ?></span>
+                                <?php endforeach; ?>
+                                <?php if (count($allServices) > 2): ?>
+                                    <span class="service-tag more">+<?= count($allServices) - 2 ?> more</span>
+                                <?php endif; ?>
+                            <?php else: ?>
+                                <span class="service-tag none">No services</span>
+                            <?php endif; ?>
                         </div>
                     </div>
                     <div class="appointment-footer">
@@ -411,6 +427,7 @@
     margin-right: 0.2rem;
 }
 
+/* ===== SERVICE TAGS ===== */
 .appointment-services {
     display: flex;
     gap: 0.4rem;
@@ -428,10 +445,35 @@
     font-weight: 500;
 }
 
+.service-tag.lab {
+    background: #e8f5e9;
+    border-color: #c8e6c9;
+    color: #28a745;
+}
+
+.service-tag.xray {
+    background: #f3e5f5;
+    border-color: #e1bee7;
+    color: #7b1fa2;
+}
+
+.service-tag.both {
+    background: #fff3e0;
+    border-color: #ffccbc;
+    color: #e65100;
+}
+
 .service-tag.more {
     background: #f5f5f5;
     border-color: #e2e8f0;
     color: #64748b;
+}
+
+.service-tag.none {
+    background: #f5f5f5;
+    border-color: #e2e8f0;
+    color: #94a3b8;
+    font-style: italic;
 }
 
 /* ===== APPOINTMENT FOOTER ===== */

@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PolyMedic · Split Login</title>
-    <!-- Bootstrap + Icons + Inter font (same as original) -->
+    <title>PolyMedic · Login</title>
+    <!-- Bootstrap + Icons + Inter font -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -39,170 +39,200 @@
 
         .login-card {
             background: #ffffff;
-            border-radius: 40px;
+            border-radius: 24px;
             box-shadow: 0 40px 80px rgba(0, 20, 50, 0.10), 0 12px 32px rgba(0, 30, 80, 0.04);
             display: grid;
             grid-template-columns: 1fr 1fr;
             overflow: hidden;
-            border: 1px solid rgba(255,255,255,0.4);
+            border: none;
+            min-height: 600px;
         }
 
-        /* ===== LEFT PANEL (brand / feature) ===== */
+        /* ===== LEFT PANEL (brand / feature) - BLUE BACKGROUND ===== */
         .left-panel {
-            background: linear-gradient(145deg, #f8fbff, #f0f6ff);
+            background: linear-gradient(135deg, #1976d2 0%, #1565c0 50%, #0d47a1 100%);
             padding: 3rem 2.5rem 2.5rem;
             display: flex;
             flex-direction: column;
-            border-right: 1px solid rgba(0,40,80,0.04);
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Decorative circles */
+        .left-panel::before {
+            content: '';
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.05);
+            top: -100px;
+            right: -100px;
+        }
+
+        .left-panel::after {
+            content: '';
+            position: absolute;
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.03);
+            bottom: -50px;
+            left: -50px;
         }
 
         .brand-header {
             display: flex;
             align-items: center;
             gap: 0.75rem;
-            margin-bottom: 1.5rem;
+            margin-bottom: 2.5rem;
+            position: relative;
+            z-index: 1;
         }
 
         .brand-header img {
-            height: 44px;
+            height: 40px;
             width: auto;
             object-fit: contain;
+            filter: brightness(0) invert(1); /* Make logo white */
         }
 
         .brand-header h1 {
-            font-size: 1.8rem;
+            font-size: 1.5rem;
             font-weight: 800;
-            color: #0a2b4e;
+            color: #ffffff;
             margin: 0;
             letter-spacing: -0.4px;
         }
 
         .brand-header h1 span {
-            color: #0148ca;
+            color: #90caf9;
         }
 
         .brand-header .badge-sub {
-            font-size: 0.6rem;
-            font-weight: 500;
-            color: #94a3b8;
-            background: #eef3f9;
-            padding: 0.15rem 0.6rem;
-            border-radius: 30px;
-            margin-left: 0.25rem;
+            display: none;
         }
 
         .left-panel .big-tagline {
-            font-size: 2rem;
+            font-size: 1.8rem;
             font-weight: 700;
-            color: #0a2b4e;
-            line-height: 1.2;
-            margin: 0.25rem 0 0.5rem;
-            letter-spacing: -0.5px;
+            color: #ffffff;
+            line-height: 1.3;
+            margin: 0 0 1rem;
+            letter-spacing: -0.3px;
+            position: relative;
+            z-index: 1;
         }
 
         .left-panel .big-tagline span {
-            color: #0148ca;
+            color: #90caf9;
         }
 
         .left-panel .description {
-            color: #475569;
-            font-size: 0.95rem;
+            color: rgba(255,255,255,0.8);
+            font-size: 0.9rem;
             line-height: 1.6;
-            max-width: 90%;
-            margin-bottom: 2rem;
+            max-width: 85%;
+            margin-bottom: 2.5rem;
+            position: relative;
+            z-index: 1;
         }
 
-        /* feature pills (left) */
+        /* feature pills (left) - Glassmorphism style */
         .feature-pills {
             display: flex;
-            flex-wrap: wrap;
-            gap: 0.8rem 1.2rem;
-            margin-bottom: 2.5rem;
+            flex-direction: column;
+            gap: 0.8rem;
+            margin-bottom: auto;
+            position: relative;
+            z-index: 1;
         }
 
-        .feature-pills span {
+        .feature-pills .pill-item {
             display: flex;
             align-items: center;
-            gap: 0.4rem;
-            font-size: 0.8rem;
+            gap: 0.75rem;
+            padding: 0.75rem 1.25rem;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.15);
+            backdrop-filter: blur(10px);
+            font-size: 0.85rem;
             font-weight: 500;
-            color: #1e293b;
-            background: white;
-            padding: 0.3rem 1rem 0.3rem 0.8rem;
-            border-radius: 40px;
-            border: 1px solid #e4ebf5;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.01);
+            color: #ffffff;
         }
 
-        .feature-pills span i {
-            color: #0148ca;
-            font-size: 0.9rem;
-        }
-
-        /* testimonial (northwind style) */
-        .testimonial {
-            margin-top: auto;
-            background: white;
-            border-radius: 24px;
-            padding: 1.5rem 1.8rem;
-            box-shadow: 0 8px 24px rgba(0,40,80,0.04);
-            border: 1px solid #eaf0fa;
-        }
-
-        .testimonial .quote {
+        .feature-pills .pill-item i {
+            color: #90caf9;
             font-size: 1rem;
-            font-weight: 500;
-            color: #0a2b4e;
-            margin-bottom: 0.4rem;
-            line-height: 1.4;
+            width: 24px;
+            text-align: center;
         }
 
-        .testimonial .quote i {
-            color: #0148ca;
-            opacity: 0.5;
-            margin-right: 0.2rem;
+        /* Remove old testimonial styles - not in reference */
+        .testimonial {
+            display: none;
         }
 
-        .testimonial .attribution {
-            font-size: 0.8rem;
-            color: #64748b;
-            display: flex;
-            align-items: center;
-            gap: 0.3rem;
-        }
-
-        .testimonial .attribution i {
-            color: #fbbf24;
-            font-size: 0.75rem;
-        }
-
-        /* ===== RIGHT PANEL (form) ===== */
+        /* ===== RIGHT PANEL (form) - WHITE BACKGROUND ===== */
         .right-panel {
             padding: 3rem 2.8rem 2.5rem;
             background: white;
             display: flex;
             flex-direction: column;
+            justify-content: center;
         }
 
-        .right-panel .welcome-head {
+        /* Logo centered at top of right panel */
+        .right-logo {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .right-logo img {
+            height: 48px;
+            width: auto;
+            object-fit: contain;
+            margin-bottom: 0.5rem;
+        }
+
+        .right-logo h2 {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #0a2b4e;
+            margin: 0 0 0.15rem;
+            letter-spacing: -0.2px;
+        }
+
+        .right-logo p {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            margin: 0;
+        }
+
+        .welcome-head {
             margin-bottom: 1.5rem;
         }
 
-        .right-panel .welcome-head h2 {
-            font-size: 1.6rem;
+        .welcome-head h2 {
+            font-size: 1.3rem;
             font-weight: 700;
             color: #0a2b4e;
             margin: 0 0 0.15rem;
             letter-spacing: -0.3px;
         }
 
-        .right-panel .welcome-head p {
+        .welcome-head p {
             color: #94a3b8;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             margin: 0;
         }
 
-        /* form elements (same structure, refined) */
+        /* form elements */
         .form-group {
             margin-bottom: 0.9rem;
         }
@@ -212,7 +242,7 @@
             color: #0a2b4e;
             font-size: 0.8rem;
             display: block;
-            margin-bottom: 0.25rem;
+            margin-bottom: 0.3rem;
         }
 
         .input-wrapper {
@@ -231,19 +261,20 @@
         .form-control {
             width: 100%;
             padding: 0.7rem 1rem 0.7rem 2.8rem;
-            border: 2px solid #e8edf5;
-            border-radius: 14px;
+            border: 1px solid #e8edf5;
+            border-radius: 10px;
             font-size: 0.9rem;
             transition: all 0.25s ease;
-            background: #f8faff;
+            background: #ffffff;
             color: #0a2b4e;
             font-family: 'Inter', sans-serif;
-            height: 50px;
+            height: 48px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         }
 
         .form-control:focus {
-            border-color: #0148ca;
-            box-shadow: 0 0 0 4px rgba(1,72,202,0.08);
+            border-color: #1976d2;
+            box-shadow: 0 0 0 4px rgba(25, 118, 210, 0.1);
             background: #ffffff;
             outline: none;
         }
@@ -265,10 +296,10 @@
         }
 
         .password-toggle:hover {
-            color: #0148ca;
+            color: #1976d2;
         }
 
-        /* role grid (same as original but preserved) */
+        /* role selection */
         .role-section {
             margin-bottom: 0.9rem;
         }
@@ -278,72 +309,55 @@
             color: #0a2b4e;
             font-size: 0.8rem;
             display: block;
-            margin-bottom: 0.25rem;
+            margin-bottom: 0.3rem;
         }
 
-        .role-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 0.5rem;
-        }
-
-        .role-option {
-            padding: 0.5rem 0.2rem;
-            border: 2px solid #e8edf5;
-            border-radius: 12px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            background: #f8faff;
+        .role-select-wrapper {
             position: relative;
-            height: 46px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.3rem;
         }
 
-        .role-option:hover {
-            border-color: #b3c5db;
-            transform: translateY(-1px);
-        }
-
-        .role-option.active {
-            border-color: #0148ca;
-            background: #f0f7ff;
-            box-shadow: 0 4px 12px rgba(1,72,202,0.06);
-        }
-
-        .role-option .role-icon {
-            font-size: 1rem;
-            display: inline-flex;
-            align-items: center;
-        }
-
-        .role-option .role-name {
-            font-size: 0.65rem;
-            font-weight: 600;
-            color: #0a2b4e;
-            white-space: nowrap;
-        }
-
-        .role-option .check-mark {
+        .role-select-wrapper .input-icon {
             position: absolute;
-            top: -6px;
-            right: -6px;
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            background: #0148ca;
-            color: white;
-            font-size: 0.55rem;
-            display: none;
-            align-items: center;
-            justify-content: center;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #94a3b8;
+            font-size: 1rem;
+            pointer-events: none;
+            z-index: 2;
         }
 
-        .role-option.active .check-mark {
-            display: flex;
+        .role-select-wrapper .form-select {
+            width: 100%;
+            padding: 0.7rem 2.5rem 0.7rem 2.8rem;
+            border: 1px solid #e8edf5;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            transition: all 0.25s ease;
+            background-color: #ffffff;
+            color: #0a2b4e;
+            font-family: 'Inter', sans-serif;
+            height: 48px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            appearance: none;
+            -webkit-appearance: none;
+            cursor: pointer;
+        }
+
+        .role-select-wrapper .form-select:focus {
+            border-color: #1976d2;
+            box-shadow: 0 0 0 4px rgba(25, 118, 210, 0.1);
+            outline: none;
+        }
+
+        .role-select-wrapper .select-arrow {
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #94a3b8;
+            font-size: 0.8rem;
+            pointer-events: none;
         }
 
         /* options row */
@@ -351,7 +365,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin: 0.25rem 0 1rem;
+            margin: 0.5rem 0 1.25rem;
         }
 
         .remember-me {
@@ -366,13 +380,14 @@
         .remember-me input[type="checkbox"] {
             width: 16px;
             height: 16px;
-            accent-color: #0148ca;
+            accent-color: #1976d2;
             cursor: pointer;
             margin: 0;
+            border-radius: 4px;
         }
 
         .forgot-link {
-            color: #0148ca;
+            color: #1976d2;
             text-decoration: none;
             font-size: 0.8rem;
             font-weight: 500;
@@ -380,7 +395,7 @@
         }
 
         .forgot-link:hover {
-            color: #0037a0;
+            color: #1565c0;
             text-decoration: underline;
         }
 
@@ -388,8 +403,8 @@
         .btn-login {
             width: 100%;
             padding: 0.85rem;
-            border-radius: 14px;
-            background: linear-gradient(135deg, #0148ca, #0037a0);
+            border-radius: 10px;
+            background: #1976d2;
             border: none;
             color: white;
             font-weight: 600;
@@ -401,13 +416,13 @@
             gap: 0.5rem;
             font-family: 'Inter', sans-serif;
             cursor: pointer;
-            height: 52px;
+            height: 50px;
             letter-spacing: 0.2px;
         }
 
         .btn-login:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 28px rgba(1,72,202,0.30);
+            background: #1565c0;
+            box-shadow: 0 4px 16px rgba(25, 118, 210, 0.3);
         }
 
         .btn-login:active {
@@ -444,7 +459,7 @@
 
         /* alerts */
         .alert-custom {
-            border-radius: 14px;
+            border-radius: 10px;
             padding: 0.7rem 1rem;
             margin-bottom: 1rem;
             font-size: 0.85rem;
@@ -478,10 +493,8 @@
         .right-footer {
             margin-top: 1.8rem;
             text-align: center;
-            border-top: 1px solid #f0f4ff;
-            padding-top: 1.2rem;
-            font-size: 0.65rem;
-            color: #a8b5c9;
+            font-size: 0.7rem;
+            color: #94a3b8;
             letter-spacing: 0.2px;
         }
 
@@ -489,12 +502,11 @@
         @media (max-width: 820px) {
             .login-card {
                 grid-template-columns: 1fr;
-                border-radius: 28px;
+                border-radius: 16px;
             }
             .left-panel {
-                border-right: none;
-                border-bottom: 1px solid #eaf0fa;
                 padding: 2rem 1.8rem;
+                min-height: auto;
             }
             .left-panel .description {
                 max-width: 100%;
@@ -503,35 +515,26 @@
                 padding: 2rem 1.8rem;
             }
             .left-panel .big-tagline {
-                font-size: 1.6rem;
+                font-size: 1.5rem;
             }
         }
 
         @media (max-width: 480px) {
             .login-card {
-                border-radius: 20px;
+                border-radius: 12px;
             }
             .left-panel, .right-panel {
                 padding: 1.5rem;
             }
-            .brand-header h1 {
-                font-size: 1.4rem;
-            }
             .left-panel .big-tagline {
                 font-size: 1.3rem;
             }
-            .role-grid {
-                grid-template-columns: 1fr 1fr;
-                gap: 0.4rem;
-            }
-            .role-option {
-                height: 40px;
-                padding: 0.3rem 0.2rem;
-            }
-            .role-option .role-name {
-                font-size: 0.6rem;
-            }
             .form-control {
+                height: 44px;
+                padding-left: 2.4rem;
+                font-size: 0.85rem;
+            }
+            .role-select-wrapper .form-select {
                 height: 44px;
                 padding-left: 2.4rem;
                 font-size: 0.85rem;
@@ -545,9 +548,6 @@
                 align-items: flex-start;
                 gap: 0.4rem;
             }
-            .testimonial {
-                padding: 1rem 1.2rem;
-            }
         }
     </style>
 </head>
@@ -556,49 +556,52 @@
 <div class="login-wrapper">
     <div class="login-card">
 
-        <!-- LEFT PANEL : brand + features + testimonial -->
+        <!-- LEFT PANEL : Blue background with brand + features -->
         <div class="left-panel">
             <div class="brand-header">
                 <img src="/polymedic/public/assets/images/logo4.png" alt="PolyMedic">
                 <h1>Poly<span>Medic</span></h1>
-                <span class="badge-sub">v2.4</span>
             </div>
 
             <div class="big-tagline">
-                Start your day with <span>everything</span> in one place.
+                Precision Diagnostics,<br><span>Seamless Care</span>
             </div>
             <p class="description">
-                Projects, docs, and conversations — organized so your team can focus on the work that matters.
+                A comprehensive platform for managing patient records, diagnostic requests, laboratory findings, and billing — all in one place.
             </p>
 
-            <!-- feature pills (northwind style) -->
+            <!-- feature pills (matching reference) -->
             <div class="feature-pills">
-                <span><i class="bi bi-flask"></i> Lab &amp; Radiology</span>
-                <span><i class="bi bi-people"></i> Patient management</span>
-                <span><i class="bi bi-credit-card"></i> Automated billing</span>
-                <span><i class="bi bi-cloud-check"></i> Integrated diagnostics</span>
-            </div>
-
-            <!-- testimonial -->
-            <div class="testimonial">
-                <div class="quote">
-                    <i class="bi bi-quote"></i> The cleanest tool we have ever rolled out.
+                <div class="pill-item">
+                    <i class="bi bi-flask"></i>
+                    Laboratory &amp; Radiology Findings
                 </div>
-                <div class="attribution">
-                    <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
-                    <span>— Dana K., Ops Lead</span>
+                <div class="pill-item">
+                    <i class="bi bi-people"></i>
+                    Integrated Patient Management
+                </div>
+                <div class="pill-item">
+                    <i class="bi bi-credit-card-2-front"></i>
+                    Automated Billing &amp; Payments
                 </div>
             </div>
         </div>
 
-        <!-- RIGHT PANEL : login form -->
+        <!-- RIGHT PANEL : White background with login form -->
         <div class="right-panel">
-            <div class="welcome-head">
-                <h2>Welcome back</h2>
-                <p>Sign in to continue to your workspace.</p>
+            <!-- Centered Logo -->
+            <div class="right-logo">
+                <img src="/polymedic/public/assets/images/logo4.png" alt="PolyMedic">
+                <h2>PolyMedic</h2>
+                <p>Diagnostic Information System</p>
             </div>
 
-            <!-- flash / alert messages (same logic) -->
+            <div class="welcome-head">
+                <h2>Welcome back</h2>
+                <p>Sign in to access the system</p>
+            </div>
+
+            <!-- flash / alert messages -->
             <?php if (session()->getFlashdata('error')): ?>
                 <div class="alert-custom show danger">
                     <i class="bi bi-exclamation-circle me-2"></i>
@@ -624,10 +627,10 @@
 
                 <!-- username -->
                 <div class="form-group">
-                    <label for="username">Email address / Username</label>
+                    <label for="username">Username</label>
                     <div class="input-wrapper">
-                        <span class="input-icon"><i class="bi bi-envelope"></i></span>
-                        <input type="text" class="form-control" id="username" name="username" placeholder="you@company.com" value="admin" required autofocus>
+                        <span class="input-icon"><i class="bi bi-person"></i></span>
+                        <input type="text" class="form-control" id="username" name="username" placeholder="Enter your username" value="admin" required autofocus>
                     </div>
                 </div>
 
@@ -636,39 +639,26 @@
                     <label for="password">Password</label>
                     <div class="input-wrapper">
                         <span class="input-icon"><i class="bi bi-lock"></i></span>
-                        <input type="password" class="form-control" id="password" name="password" placeholder="********" value="admin123" required>
+                        <input type="password" class="form-control" id="password" name="password" placeholder="Enter your password" value="admin123" required>
                         <button type="button" class="password-toggle" onclick="togglePassword()" aria-label="Toggle password visibility">
                             <i class="bi bi-eye" id="passwordIcon"></i>
                         </button>
                     </div>
                 </div>
 
-                <!-- role selection (preserved) -->
+                <!-- role selection (converted to dropdown to match reference) -->
                 <div class="role-section">
                     <label>Role</label>
-                    <div class="role-grid">
-                        <div class="role-option active" data-role="administrator" onclick="selectRole(this)">
-                            <span class="check-mark"><i class="bi bi-check"></i></span>
-                            <span class="role-icon"><i class="bi bi-shield-lock" style="color: #0148ca;"></i></span>
-                            <span class="role-name">Administrator</span>
-                        </div>
-                        <div class="role-option" data-role="receptionist" onclick="selectRole(this)">
-                            <span class="check-mark"><i class="bi bi-check"></i></span>
-                            <span class="role-icon"><i class="bi bi-person-check" style="color: #17a2b8;"></i></span>
-                            <span class="role-name">Receptionist</span>
-                        </div>
-                        <div class="role-option" data-role="technologist" onclick="selectRole(this)">
-                            <span class="check-mark"><i class="bi bi-check"></i></span>
-                            <span class="role-icon"><i class="bi bi-micoscope" style="color: #28a745;"></i></span>
-                            <span class="role-name">Med Tech</span>
-                        </div>
-                        <div class="role-option" data-role="radiologist" onclick="selectRole(this)">
-                            <span class="check-mark"><i class="bi bi-check"></i></span>
-                            <span class="role-icon"><i class="bi bi-x-ray" style="color: #800080;"></i></span>
-                            <span class="role-name">Radiologist</span>
-                        </div>
+                    <div class="role-select-wrapper">
+                        <span class="input-icon"><i class="bi bi-person-badge"></i></span>
+                        <select class="form-select" name="role" id="selectedRole">
+                            <option value="administrator" selected>Administrator</option>
+                            <option value="receptionist">Receptionist</option>
+                            <option value="technologist">Med Tech</option>
+                            <option value="radiologist">Radiologist</option>
+                        </select>
+                        <span class="select-arrow"><i class="bi bi-chevron-down"></i></span>
                     </div>
-                    <input type="hidden" name="role" id="selectedRole" value="administrator">
                 </div>
 
                 <!-- options row -->
@@ -683,7 +673,7 @@
                 <!-- sign in button -->
                 <button type="submit" class="btn-login" id="loginBtn">
                     <span class="spinner"></span>
-                    <span class="btn-text">Sign in</span>
+                    <span class="btn-text">Sign In</span>
                 </button>
             </form>
 
@@ -696,14 +686,10 @@
 </div>
 
 <script>
-    // Role Selection (unchanged)
-    let selectedRole = 'administrator';
-    function selectRole(element) {
-        document.querySelectorAll('.role-option').forEach(el => el.classList.remove('active'));
-        element.classList.add('active');
-        selectedRole = element.dataset.role;
-        document.getElementById('selectedRole').value = selectedRole;
-    }
+    // Role Selection
+    document.getElementById('selectedRole').addEventListener('change', function() {
+        // Value updates automatically with select
+    });
 
     // Toggle Password
     function togglePassword() {

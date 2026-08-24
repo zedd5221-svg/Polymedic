@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PolyMedic - Admin Dashboard</title>
+    <title>PolyMedic - Radiologist Dashboard</title>
 
     <!-- Main CSS -->
     <link href="/polymedic/public/assets/css/AppointmentStyle.css" rel="stylesheet">
@@ -17,7 +17,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <!-- AOS for animations -->
-     <script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script> 
+    <script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script> 
 </head>
 <body>
     <!-- Initialize AOS -->
@@ -25,11 +25,11 @@
     
     <div class="admin-wrapper">
         <!-- Sidebar -->
-        <aside class="admin-sidebar" id="adminSidebar">
+        <aside class="admin-sidebar radiologist-sidebar" id="adminSidebar">
             <div class="sidebar-header">
                 <div class="sidebar-logo">
                     <img src="/polymedic/public/assets/images/logo4.png" alt="PolyMedic">
-                    <span>PolyMedic<small>Diagnostic System</small></span>
+                    <span>PolyMedic<small>Radiology System</small></span>
                 </div>
                 <button class="sidebar-close" onclick="toggleSidebar()">
                     <i class="bi bi-x-lg"></i>
@@ -38,75 +38,47 @@
             
             <nav class="sidebar-nav">
                 <ul>
-                    <li class="nav-section">MAIN</li>
-                    <li class="menu-item <?= current_url() == base_url('admin/dashboard') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/admin/dashboard" class="menu-btn">
-                            <i class="bi bi-grid-1x2-fill menu-icon"></i>
+                    <li class="nav-section">RADIOLOGY</li>
+                    <li class="menu-item <?= current_url() == base_url('radiologist/dashboard') ? 'active' : '' ?>">
+                        <a href="/polymedic/public/radiologist/dashboard" class="menu-btn">
+                            <svg class="menu-icon-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M14,10V22H4a2,2,0,0,1-2-2V10Z"></path>
+                                <path d="M22,10V20a2,2,0,0,1-2,2H16V10Z"></path>
+                                <path d="M22,4V8H2V4A2,2,0,0,1,4,2H20A2,2,0,0,1,22,4Z"></path>
+                            </svg>
                             <span>Dashboard</span>
-                            <?php if (current_url() == base_url('admin/dashboard')): ?>
+                            <?php if (current_url() == base_url('radiologist/dashboard')): ?>
                                 <i class="bi bi-chevron-right menu-arrow"></i>
                             <?php endif; ?>
                         </a>
                     </li>
-                    <li class="menu-item <?= current_url() == base_url('admin/appointments') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/admin/appointments" class="menu-btn">
-                            <i class="bi bi-calendar-check menu-icon"></i>
-                            <span>Appointments</span>
-                            <?php if (current_url() == base_url('admin/appointments')): ?>
+                    <li class="menu-item <?= strpos(current_url(), 'radiologist/examination') !== false ? 'active' : '' ?>">
+                        <a href="/polymedic/public/radiologist/examinations" class="menu-btn">
+                            <svg class="menu-icon-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
+                            </svg>
+                            <span>Examinations</span>
+                            <?php 
+                            $xrayModel = new \App\Models\XrayExaminationModel();
+                            $pendingCount = $xrayModel->where('status', 'pending')->countAllResults();
+                            if ($pendingCount > 0): 
+                            ?>
+                                <span class="badge-notif-xray"><?= $pendingCount ?></span>
+                            <?php endif; ?>
+                            <?php if (strpos(current_url(), 'radiologist/examination') !== false): ?>
                                 <i class="bi bi-chevron-right menu-arrow"></i>
                             <?php endif; ?>
                         </a>
-                    </li>
-                    <li class="menu-item <?= current_url() == base_url('admin/patients') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/admin/patients" class="menu-btn">
-                            <i class="bi bi-people-fill menu-icon"></i>
-                            <span>Patients</span>
-                            <?php if (current_url() == base_url('admin/patients')): ?>
-                                <i class="bi bi-chevron-right menu-arrow"></i>
-                            <?php endif; ?>
-                        </a>
-                    </li>
-                    <li class="menu-item <?= current_url() == base_url('admin/requests') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/admin/requests" class="menu-btn">
-                            <i class="bi bi-file-earmark-medical-fill menu-icon"></i>
-                            <span>Diagnostic Requests</span>
-                            <?php if (current_url() == base_url('admin/requests')): ?>
-                                <i class="bi bi-chevron-right menu-arrow"></i>
-                            <?php endif; ?>
-                        </a>
-                    </li>
-
-                    <li class="menu-item <?= current_url() == base_url('admin/services') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/admin/services" class="menu-btn">
-                             <i class="bi bi-grid-3x3-gap-fill menu-icon"></i>
-                            <span>Services</span>
-                            <?php if (current_url() == base_url('admin/services')): ?>
-                                <i class="bi bi-chevron-right menu-arrow"></i>
-                            <?php endif; ?>
-                         </a>
                     </li>
                     
-                    <li class="nav-section">ADMIN</li>
-                    <li class="menu-item <?= current_url() == base_url('admin/users') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/admin/users" class="menu-btn">
-                            <i class="bi bi-person-gear menu-icon"></i>
-                            <span>User Management</span>
-                            <?php if (current_url() == base_url('admin/users')): ?>
-                                <i class="bi bi-chevron-right menu-arrow"></i>
-                            <?php endif; ?>
-                        </a>
-                    </li>
-                    <li class="menu-item <?= current_url() == base_url('admin/notifications') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/admin/notifications" class="menu-btn">
-                            <i class="bi bi-bell-fill menu-icon"></i>
-                            <span>Notifications</span>
-                            <?php 
-                            $unreadCount = (new \App\Models\NotificationModel())->getUnreadCount();
-                            if ($unreadCount > 0): 
-                            ?>
-                                <span class="badge-notif"><?= $unreadCount ?></span>
-                            <?php endif; ?>
-                            <?php if (current_url() == base_url('admin/notifications')): ?>
+                    <li class="nav-section">REPORTS</li>
+                    <li class="menu-item <?= strpos(current_url(), 'radiologist/reports') !== false ? 'active' : '' ?>">
+                        <a href="/polymedic/public/radiologist/reports" class="menu-btn">
+                            <svg class="menu-icon-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                            </svg>
+                            <span>Reports</span>
+                            <?php if (strpos(current_url(), 'radiologist/reports') !== false): ?>
                                 <i class="bi bi-chevron-right menu-arrow"></i>
                             <?php endif; ?>
                         </a>
@@ -116,7 +88,10 @@
                     
                     <li class="menu-item logout-item">
                         <a href="/polymedic/public/logout" class="menu-btn">
-                            <i class="bi bi-box-arrow-right menu-icon"></i>
+                            <svg class="menu-icon-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M17.2929 14.2929C16.9024 14.6834 16.9024 15.3166 17.2929 15.7071C17.6834 16.0976 18.3166 16.0976 18.7071 15.7071L21.6201 12.7941C21.6351 12.7791 21.6497 12.7637 21.6637 12.748C21.87 12.5648 22 12.2976 22 12C22 11.7024 21.87 11.4352 21.6637 11.252C21.6497 11.2363 21.6351 11.2209 21.6201 11.2059L18.7071 8.29289C18.3166 7.90237 17.6834 7.90237 17.2929 8.29289C16.9024 8.68342 16.9024 9.31658 17.2929 9.70711L18.5858 11H13C12.4477 11 12 11.4477 12 12C12 12.5523 12.4477 13 13 13H18.5858L17.2929 14.2929Z"/>
+                                <path d="M5 2C3.34315 2 2 3.34315 2 5V19C2 20.6569 3.34315 22 5 22H14.5C15.8807 22 17 20.8807 17 19.5V16.7326C16.8519 16.647 16.7125 16.5409 16.5858 16.4142C15.9314 15.7598 15.8253 14.7649 16.2674 14H13C11.8954 14 11 13.1046 11 12C11 10.8954 11.8954 10 13 10H16.2674C15.8253 9.23514 15.9314 8.24015 16.5858 7.58579C16.7125 7.4591 16.8519 7.35296 17 7.26738V4.5C17 3.11929 15.8807 2 14.5 2H5Z"/>
+                            </svg>
                             <span>Logout</span>
                         </a>
                     </li>
@@ -130,7 +105,7 @@
         <!-- Main Content -->
         <main class="admin-main">
             <!-- Top Navbar -->
-            <header class="admin-header">
+            <header class="admin-header radiologist-header">
                 <div class="header-left">
                     <button class="hamburger-btn" onclick="toggleSidebar()">
                         <i class="bi bi-list"></i>
@@ -141,24 +116,11 @@
                             $pageTitle = $this->renderSection('pageTitle') ?: 'Dashboard';
                             $iconMap = [
                                 'Dashboard' => 'statisctics.png',
-                                'Appointments' => 'appointment1.png',
-                                'Patients' => 'sick-patient.png',
-                                'Diagnostic Requests' => 'stethoscope.png',
-                                'Laboratory Findings' => 'lab-icon.png',
-                                'User Management' => 'user-management-icon.png',
-                                'Notifications' => 'appointment1.png',
-                                'Radiologist Dashboard' => 'xray-icon.png',
-                                'X-Ray Examinations' => 'xray-icon.png',
-                                'View X-Ray Examination' => 'xray-icon.png'
+                                'Examinations' => 'xray-icon.png',
+                                'View X-Ray Examination' => 'xray-icon.png',
+                                'Reports' => 'reports-icon.png'
                             ];
-                            // Check if pageTitle contains specific keywords
-                            if (strpos($pageTitle, 'Radiologist') !== false) {
-                                $iconFile = 'xray-icon.png';
-                            } elseif (strpos($pageTitle, 'X-Ray') !== false) {
-                                $iconFile = 'xray-icon.png';
-                            } else {
-                                $iconFile = $iconMap[$pageTitle] ?? 'statisctics.png';
-                            }
+                            $iconFile = $iconMap[$pageTitle] ?? 'xray-icon.png';
                         ?>
                         <img src="/polymedic/public/assets/images/<?= $iconFile ?>" alt="<?= $pageTitle ?>" class="header-title-icon">
                         <h4 class="page-title-header"><?= $pageTitle ?></h4>
@@ -181,21 +143,21 @@
                             <div class="dropdown-menu dropdown-menu-end notif-dropdown-menu shadow-lg border-0" aria-labelledby="notifDropdownBtn">
                                 <div class="notif-dropdown-header d-flex justify-content-between align-items-center">
                                     <div class="d-flex align-items-center gap-2">
-                                        <i class="bi bi-bell text-primary"></i>
+                                        <i class="bi bi-bell text-purple"></i>
                                         <span class="fw-bold text-dark fs-6">Notifications</span>
                                     </div>
-                                    <button type="button" class="btn btn-link btn-sm p-0 text-primary text-decoration-none small" onclick="markAllNotificationsRead(event)">
+                                    <button type="button" class="btn btn-link btn-sm p-0 text-purple text-decoration-none small" onclick="markAllNotificationsRead(event)">
                                         Mark all read
                                     </button>
                                 </div>
                                 <div class="notif-dropdown-body" id="notifDropdownList">
                                     <div class="p-3 text-center text-muted small">
-                                        <div class="spinner-border spinner-border-sm text-primary me-1" role="status"></div>
+                                        <div class="spinner-border spinner-border-sm text-purple me-1" role="status"></div>
                                         Loading notifications...
                                     </div>
                                 </div>
                                 <div class="notif-dropdown-footer text-center">
-                                    <a href="/polymedic/public/admin/notifications" class="text-primary fw-semibold small text-decoration-none">
+                                    <a href="<?= base_url('radiologist/notifications') ?>" class="text-purple fw-semibold small text-decoration-none">
                                         View All Notifications <i class="bi bi-arrow-right ms-1"></i>
                                     </a>
                                 </div>
@@ -204,12 +166,12 @@
                         
                         <span class="divider-icon">|</span>
                         <div class="header-user">
-                            <div class="avatar-small">
+                            <div class="avatar-small radiologist-avatar">
                                 <i class="bi bi-person-fill"></i>
                             </div>
                             <div class="user-details">
-                                <span class="user-name-header">Admin User</span>
-                                <span class="user-role-header">Administrator</span>
+                                <span class="user-name-header"><?= session()->get('full_name') ?? 'Radiologist' ?></span>
+                                <span class="user-role-header radiologist-role">Radiologist</span>
                             </div>
                         </div>
                     </div>
@@ -218,14 +180,14 @@
             
             <!-- Page Content -->
             <div class="admin-content">
-                <?php echo $this->renderSection('adminContent'); ?>
+                <?php echo $this->renderSection('radiologistContent'); ?>
             </div>
         </main>
     </div>
 
     <style>
     /* ============================================
-       ADMIN SIDEBAR - MATCHING REFERENCE DESIGN
+       RADIOLOGIST SIDEBAR - MATCHING REFERENCE
        ============================================ */
     :root {
         --sidebar-width: 280px;
@@ -233,13 +195,13 @@
         --active-blue: #1976d2;
         --active-blue-dark: #1565c0;
         --active-blue-light: #e3f2fd;
-        --text-blue: #1e40af;
-        --icon-gray: #9ca3af;
+        --text-blue: #1e40af; /* Blue text for non-active items */
+        --icon-gray: #9ca3af; /* Gray icons for non-active items */
         --bg-light: #f8fafc;
     }
 
     /* ===== SIDEBAR ===== */
-    .admin-sidebar {
+    .radiologist-sidebar {
         width: var(--sidebar-width);
         min-height: 100vh;
         background: #ffffff !important;
@@ -254,11 +216,11 @@
         border-right: 1px solid #e5e7eb !important;
     }
 
-    .admin-sidebar::-webkit-scrollbar {
+    .radiologist-sidebar::-webkit-scrollbar {
         width: 4px;
     }
 
-    .admin-sidebar::-webkit-scrollbar-thumb {
+    .radiologist-sidebar::-webkit-scrollbar-thumb {
         background: #e5e7eb;
         border-radius: 4px;
     }
@@ -337,31 +299,31 @@
         font-weight: 700;
     }
 
-    /* ===== NON-ACTIVE MENU ITEMS ===== */
-    /* Blue text like reference */
-    .admin-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn,
-    .admin-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn span {
-        color: var(--text-blue) !important;
+    /* ===== NON-ACTIVE MENU ITEMS - MATCHING REFERENCE ===== */
+    /* Blue text like "Patients" and "Patient Visits" */
+    .radiologist-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn,
+    .radiologist-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn span {
+        color: var(--text-blue) !important; /* BLUE TEXT */
     }
 
     /* Gray icons */
-    .admin-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn .menu-icon {
-        color: var(--icon-gray) !important;
+    .radiologist-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn .menu-icon-svg {
+        color: var(--icon-gray) !important; /* GRAY ICON */
     }
 
     /* ===== ACTIVE MENU ITEM ===== */
-    .admin-sidebar .sidebar-nav ul li.menu-item.active a.menu-btn,
-    .admin-sidebar .sidebar-nav ul li.menu-item.active a.menu-btn span {
+    .radiologist-sidebar .sidebar-nav ul li.menu-item.active a.menu-btn,
+    .radiologist-sidebar .sidebar-nav ul li.menu-item.active a.menu-btn span {
         color: #ffffff !important;
     }
 
-    .admin-sidebar .sidebar-nav ul li.menu-item.active a.menu-btn .menu-icon {
+    .radiologist-sidebar .sidebar-nav ul li.menu-item.active a.menu-btn .menu-icon-svg {
         color: #ffffff !important;
     }
 
     /* Remove any old borders */
-    .admin-sidebar .sidebar-nav ul li a,
-    .admin-sidebar .sidebar-nav ul li.active a {
+    .radiologist-sidebar .sidebar-nav ul li a,
+    .radiologist-sidebar .sidebar-nav ul li.active a {
         border: none !important;
         border-left: none !important;
         border-right: none !important;
@@ -393,7 +355,7 @@
         box-shadow: inset 0 1px 3px rgba(25, 118, 210, 0.1) !important;
     }
 
-    .menu-btn:hover .menu-icon {
+    .menu-btn:hover .menu-icon-svg {
         color: var(--active-blue) !important;
     }
 
@@ -403,12 +365,11 @@
         box-shadow: 0 4px 12px rgba(25, 118, 210, 0.3) !important;
     }
 
-    /* Menu Icon */
-    .menu-icon {
-        font-size: 1.1rem;
-        flex-shrink: 0;
+    /* SVG Icon Styles */
+    .menu-icon-svg {
         width: 24px;
-        text-align: center;
+        height: 24px;
+        flex-shrink: 0;
         transition: color 0.2s ease;
     }
 
@@ -421,30 +382,11 @@
     }
 
     /* ===== REMOVE BADGE FROM ACTIVE ITEMS ===== */
-    .menu-item.active .badge-notif {
+    .menu-item.active .badge-notif-xray {
         display: none !important;
     }
 
     /* Badge - only shows on non-active items */
-    .badge-notif {
-        margin-left: auto;
-        background: #ffffff !important;
-        color: var(--text-blue) !important;
-        font-size: 0.65rem;
-        font-weight: 700;
-        padding: 0.15rem 0.5rem;
-        border-radius: 30px;
-        min-width: 20px;
-        height: 20px;
-        text-align: center;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        flex-shrink: 0;
-        line-height: 1;
-    }
-
     .badge-notif-xray {
         margin-left: auto;
         background: #ffffff !important;
@@ -476,7 +418,7 @@
         color: #dc2626 !important;
     }
 
-    .logout-item .menu-btn:hover .menu-icon {
+    .logout-item .menu-btn:hover .menu-icon-svg {
         color: #dc2626 !important;
     }
 
@@ -511,7 +453,7 @@
     }
 
     /* ===== HEADER ===== */
-    .admin-header {
+    .radiologist-header {
         background: #ffffff !important;
         padding: 0.75rem 2rem;
         border-bottom: 1px solid #e5e7eb !important;
@@ -680,6 +622,7 @@
         color: #374151 !important;
         transition: background 0.15s ease;
         position: relative;
+        cursor: pointer;
     }
 
     .notif-item:hover {
@@ -714,17 +657,16 @@
         flex-shrink: 0;
     }
 
-    .notif-icon-box.appointment { background: #e3f2fd !important; color: #1976d2 !important; }
     .notif-icon-box.xray { background: #e3f2fd !important; color: #1976d2 !important; }
+    .notif-icon-box.appointment { background: #e0edff !important; color: #0148ca !important; }
     .notif-icon-box.system { background: #fef3c7 !important; color: #d97706 !important; }
-    .notif-icon-box.lab { background: #e8f5e9 !important; color: #28a745 !important; }
-    .notif-icon-box.billing { background: #fff3e0 !important; color: #ff6b00 !important; }
-    .notif-icon-box.payment { background: #ccfbf1 !important; color: #0d9488 !important; }
-    
+    .notif-icon-box.lab { background: #ccfbf1 !important; color: #0d9488 !important; }
+
     .notif-content {
         flex: 1;
         min-width: 0;
     }
+
     .notif-title {
         font-size: 0.82rem;
         font-weight: 600;
@@ -734,6 +676,7 @@
         overflow: hidden;
         text-overflow: ellipsis;
     }
+
     .notif-msg {
         font-size: 0.75rem;
         color: #6b7280 !important;
@@ -743,16 +686,17 @@
         -webkit-box-orient: vertical;
         overflow: hidden;
     }
+
     .notif-time {
         font-size: 0.68rem;
         color: #9ca3af !important;
     }
 
-    .text-primary {
+    .text-purple {
         color: var(--active-blue) !important;
     }
 
-    .text-primary:hover {
+    .text-purple:hover {
         color: var(--active-blue-dark) !important;
     }
 
@@ -771,7 +715,7 @@
         background: #f8fafc !important;
     }
 
-    .avatar-small {
+    .radiologist-avatar {
         background: var(--active-blue-light) !important;
         color: var(--active-blue) !important;
     }
@@ -794,6 +738,10 @@
         font-weight: 500;
     }
 
+    .radiologist-role {
+        color: var(--active-blue) !important;
+    }
+
     /* ===== CONTENT AREA ===== */
     .admin-content {
         flex: 1;
@@ -802,9 +750,9 @@
 
     /* ============================================
        RESPONSIVE
-    ============================================ */
+       ============================================ */
     @media (max-width: 992px) {
-        .admin-sidebar {
+        .radiologist-sidebar {
             position: fixed;
             top: 0;
             left: -280px;
@@ -815,94 +763,109 @@
             transition: left 0.3s ease;
             box-shadow: none;
         }
-        .admin-sidebar.open {
+        
+        .radiologist-sidebar.open {
             left: 0;
             box-shadow: 4px 0 30px rgba(0,0,0,0.1) !important;
         }
-        .sidebar-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.3);
-            z-index: 1050;
-            display: none;
-        }
-        .sidebar-overlay.active {
-            display: block;
-        }
+        
         .sidebar-close {
             display: flex !important;
         }
-        .admin-header {
+        
+        .admin-main {
+            margin-left: 0;
+        }
+        
+        .hamburger-btn {
+            display: block;
+        }
+        
+        .radiologist-header {
             padding: 0.75rem 1rem;
         }
-        .header-title-group .page-title-header {
-            font-size: 0.9rem !important;
-        }
-        .header-info-group .divider-icon {
-            display: none;
-        }
-        .header-datetime span {
-            font-size: 0.7rem;
-        }
-        .user-details .user-role-header {
-            font-size: 0.6rem !important;
-        }
+        
         .admin-content {
             padding: 1rem;
         }
+        
+        .header-title-group .page-title-header {
+            font-size: 0.9rem !important;
+        }
+        
+        .header-info-group .divider-icon {
+            display: none;
+        }
+        
+        .header-datetime span {
+            font-size: 0.7rem;
+        }
+        
+        .user-details .user-role-header {
+            font-size: 0.6rem !important;
+        }
+        
         .notif-dropdown-menu {
             width: 300px;
         }
     }
 
     @media (max-width: 768px) {
-        .admin-header {
+        .radiologist-header {
             padding: 0.5rem 0.75rem;
         }
+        
         .header-title-group .header-title-icon {
             width: 20px;
             height: 20px;
         }
+        
         .header-title-group .page-title-header {
             font-size: 0.8rem !important;
         }
+        
         .header-datetime span {
             font-size: 0.6rem;
         }
+        
         .user-details {
             display: none;
         }
+        
         .avatar-small {
             width: 30px;
             height: 30px;
             font-size: 0.75rem;
         }
+        
         .admin-content {
             padding: 0.75rem;
         }
+        
         .notif-dropdown-menu {
             width: 280px;
         }
+        
         .hamburger-btn {
             font-size: 1.2rem;
             padding: 0.2rem 0.4rem;
         }
+        
         .notif-btn {
             font-size: 1rem;
             padding: 0.2rem 0.4rem;
         }
+        
         .menu-btn {
             padding: 0.6rem 0.75rem;
             font-size: 0.8rem;
         }
-        .menu-icon {
-            font-size: 0.9rem;
+        
+        .menu-icon-svg {
             width: 20px;
+            height: 20px;
         }
-        .badge-notif,
+        
         .badge-notif-xray {
             font-size: 0.5rem;
             padding: 0.1rem 0.4rem;
@@ -912,26 +875,32 @@
     }
 
     @media (max-width: 576px) {
-        .admin-header {
+        .radiologist-header {
             padding: 0.4rem 0.5rem;
         }
+        
         .header-title-group .header-title-icon {
             width: 18px;
             height: 18px;
         }
+        
         .header-title-group .page-title-header {
             font-size: 0.7rem !important;
         }
+        
         .header-datetime span {
             font-size: 0.5rem;
         }
+        
         .header-datetime i {
             font-size: 0.65rem;
         }
+        
         .notif-btn {
             font-size: 0.9rem;
             padding: 0.15rem 0.3rem;
         }
+        
         .notif-badge {
             width: 14px;
             height: 14px;
@@ -940,29 +909,31 @@
             top: -1px;
             right: -1px;
         }
+        
         .avatar-small {
             width: 26px;
             height: 26px;
             font-size: 0.65rem;
         }
+        
         .admin-content {
             padding: 0.5rem;
         }
+        
         .notif-dropdown-menu {
             width: 260px;
         }
+        
         .notif-item {
             padding: 0.6rem 0.75rem;
         }
+        
         .notif-title {
             font-size: 0.75rem;
         }
+        
         .notif-msg {
             font-size: 0.7rem;
-        }
-        .menu-btn {
-            padding: 0.5rem 0.6rem;
-            font-size: 0.8rem;
         }
     }
 
@@ -970,21 +941,27 @@
         .header-datetime span {
             font-size: 0.45rem;
         }
+        
         .header-title-group .header-title-icon {
             width: 16px;
             height: 16px;
         }
+        
         .header-title-group .page-title-header {
             font-size: 0.65rem !important;
         }
+        
         .notif-dropdown-menu {
             width: 250px;
         }
+        
         .sidebar-nav {
             padding: 0.75rem 0.5rem;
         }
+        
         .menu-btn {
             padding: 0.5rem 0.6rem;
+            font-size: 0.75rem;
             gap: 0.5rem;
         }
     }
@@ -1019,11 +996,11 @@
         });
 
         // ============================================================
-        // NOTIFICATION AJAX FUNCTIONALITY - FIXED
+        // NOTIFICATION FUNCTIONS - FOR RADIOLOGIST
         // ============================================================
 
         function fetchNotifications() {
-            fetch('/polymedic/public/admin/notifications/fetch', {
+            fetch('/polymedic/public/radiologist/notifications/fetch', {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             })
             .then(response => response.json())
@@ -1059,7 +1036,6 @@
             notifications.forEach(item => {
                 const unreadClass = item.is_read == 0 ? 'unread' : '';
                 
-                // Map type to icon and color
                 let iconClass = 'bi-bell-fill';
                 let colorClass = 'system';
                 
@@ -1072,17 +1048,9 @@
                 } else if (item.type === 'lab') {
                     iconClass = 'bi-flask';
                     colorClass = 'lab';
-                } else if (item.type === 'billing') {
-                    iconClass = 'bi-receipt';
-                    colorClass = 'billing';
-                } else if (item.type === 'payment') {
-                    iconClass = 'bi-credit-card';
-                    colorClass = 'payment';
                 }
                 
-                // FIXED: Use the link directly from the notification
-                // The link is already a full URL from the controller
-                const link = item.link || '#';
+                const link = item.link ? '/polymedic/public/' + item.link : '#';
                 
                 html += `
                     <a href="${link}" class="notif-item ${unreadClass}" onclick="markNotificationRead(${item.id}, event)">
@@ -1101,8 +1069,7 @@
         }
 
         function markNotificationRead(id, event) {
-            // Don't prevent default - let the link navigate
-            fetch('/polymedic/public/admin/notifications/mark-read/' + id, {
+            fetch('/polymedic/public/radiologist/notifications/mark-read/' + id, {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             })
             .then(response => response.json())
@@ -1116,7 +1083,7 @@
 
         function markAllNotificationsRead(event) {
             if (event) event.stopPropagation();
-            fetch('/polymedic/public/admin/notifications/mark-all-read', {
+            fetch('/polymedic/public/radiologist/notifications/mark-all-read', {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             })
             .then(response => response.json())

@@ -67,7 +67,6 @@ class AppointmentModel extends Model
         foreach ($appointments as $appt) {
             $apptDateTime = strtotime($appt['appointment_date'] . ' ' . $appt['appointment_time']);
             
-            // If 1 hour has passed since appointment time
             if (($now - $apptDateTime) >= 3600) {
                 $this->update($appt['id'], ['status' => self::STATUS_LATE]);
                 $updated++;
@@ -75,5 +74,35 @@ class AppointmentModel extends Model
         }
         
         return $updated;
+    }
+    
+    /**
+     * Get formatted service names from JSON
+     */
+    public function getFormattedLabServices($appointment)
+    {
+        $services = json_decode($appointment['lab_services'], true) ?? [];
+        return $this->formatServiceNames($services);
+    }
+    
+    public function getFormattedXrayServices($appointment)
+    {
+        $services = json_decode($appointment['xray_services'], true) ?? [];
+        return $this->formatServiceNames($services);
+    }
+    
+    private function formatServiceNames($services)
+    {
+        if (empty($services)) {
+            return [];
+        }
+        
+        return array_map(function($service) {
+            // Remove JSON escape characters
+            $service = str_replace('\/', '/', $service);
+            $service = str_replace('\\/', '/', $service);
+            $service = stripslashes($service);
+            return trim($service);
+        }, $services);
     }
 }

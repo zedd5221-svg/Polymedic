@@ -4,6 +4,9 @@ namespace App\Controllers;
 
 use App\Models\AppointmentModel;
 use App\Models\UserModel;
+use App\Models\XrayExaminationModel;
+use App\Models\NotificationModel;
+use App\Models\ServiceModel;
 
 class Admin extends BaseController
 {
@@ -15,7 +18,6 @@ class Admin extends BaseController
         
         $role = session()->get('role');
         if ($role !== 'admin') {
-            // Redirect based on role
             if ($role === 'receptionist') {
                 return redirect()->to(base_url('receptionist/dashboard'));
             }
@@ -75,7 +77,6 @@ class Admin extends BaseController
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
         
-        // Get POST data
         $username = $this->request->getPost('username');
         $password = $this->request->getPost('password');
         $email = $this->request->getPost('email');
@@ -83,20 +84,17 @@ class Admin extends BaseController
         $role = $this->request->getPost('role');
         $status = $this->request->getPost('status') ?? 'active';
         
-        // Validate
         if (empty($username) || empty($password) || empty($email) || empty($full_name) || empty($role)) {
             return redirect()->to(base_url('admin/users'))
                             ->with('error', 'All fields are required');
         }
         
-        // Check if username exists
         $userModel = new UserModel();
         if ($userModel->getUserByUsername($username)) {
             return redirect()->to(base_url('admin/users'))
                             ->with('error', 'Username already exists');
         }
         
-        // Create user
         $userData = [
             'username' => $username,
             'password' => $password,
@@ -128,14 +126,12 @@ class Admin extends BaseController
                             ->with('error', 'User not found');
         }
         
-        // Get POST data
         $email = $this->request->getPost('email');
         $full_name = $this->request->getPost('full_name');
         $role = $this->request->getPost('role');
         $status = $this->request->getPost('status');
         $password = $this->request->getPost('password');
         
-        // Prepare update data
         $updateData = [
             'email' => $email,
             'full_name' => $full_name,
@@ -143,7 +139,6 @@ class Admin extends BaseController
             'status' => $status
         ];
         
-        // Only update password if provided
         if (!empty($password)) {
             $updateData['password'] = $password;
         }
@@ -170,7 +165,6 @@ class Admin extends BaseController
                             ->with('error', 'User not found');
         }
         
-        // Prevent deleting self
         if ($user['id'] == session()->get('user_id')) {
             return redirect()->to(base_url('admin/users'))
                             ->with('error', 'You cannot delete your own account');
@@ -198,7 +192,6 @@ class Admin extends BaseController
                             ->with('error', 'User not found');
         }
         
-        // Prevent toggling self
         if ($user['id'] == session()->get('user_id')) {
             return redirect()->to(base_url('admin/users'))
                             ->with('error', 'You cannot change your own status');
@@ -224,7 +217,6 @@ class Admin extends BaseController
         $user = $userModel->find($id);
         
         if ($user) {
-            // Remove sensitive data
             unset($user['password']);
             return $this->response->setJSON($user);
         }
@@ -289,6 +281,35 @@ class Admin extends BaseController
         return view('Admin/appointment_view', $data);
     }
     
+    /**
+     * Format X-Ray services to readable string
+     */
+    private function formatXrayServices($services)
+    {
+        if (empty($services)) {
+            return 'X-Ray Examination';
+        }
+        
+        if (is_string($services)) {
+            $decoded = json_decode($services, true);
+            if (is_array($decoded)) {
+                $services = $decoded;
+            }
+        }
+        
+        if (is_array($services)) {
+            $cleaned = array_map(function($service) {
+                $service = str_replace('\/', '/', $service);
+                $service = str_replace('\\/', '/', $service);
+                $service = stripslashes($service);
+                return trim($service);
+            }, $services);
+            return implode(', ', $cleaned);
+        }
+        
+        return $services;
+    }
+    
     public function approveAppointment($id)
     {
         $redirect = $this->checkAuth();
@@ -311,6 +332,37 @@ class Admin extends BaseController
             'status'       => 'approved',
             'arrival_time' => date('Y-m-d H:i:s')
         ]);
+        
+        // ===== CHECK FOR X-RAY SERVICES AND CREATE EXAMINATION =====
+        $xrayServices = json_decode($appointment['xray_services'], true) ?? [];
+        if (!empty($xrayServices)) {
+            $xrayModel = new XrayExaminationModel();
+            $existing = $xrayModel->where('appointment_id', $id)->first();
+            
+            if (!$existing) {
+                // Format exam type properly
+                $examType = $this->formatXrayServices($xrayServices);
+                
+                $xrayModel->insert([
+                    'appointment_id' => $id,
+                    'patient_name' => $appointment['full_name'],
+                    'age' => $appointment['age'],
+                    'gender' => $appointment['gender'],
+                    'exam_type' => $examType,
+                    'exam_date' => $appointment['appointment_date'],
+                    'priority' => 'Routine',
+                    'status' => 'pending'
+                ]);
+                
+                NotificationModel::notify(
+                    'xray',
+                    'New X-Ray Examination',
+                    'New X-Ray examination for ' . $appointment['full_name'],
+                    $id,
+                    'radiologist/examination/view/' . $id
+                );
+            }
+        }
         
         return redirect()->to(base_url('admin/appointments'))
                         ->with('success', 'Appointment approved successfully!');
@@ -382,4 +434,183 @@ class Admin extends BaseController
         return redirect()->to(base_url('admin/appointments'))
                         ->with('success', 'Appointment deleted successfully!');
     }
+    
+    // ===== SYNC X-RAY EXAMINATIONS =====
+    
+    public function syncXrayExaminations()
+    {
+        $redirect = $this->checkAuth();
+        if ($redirect) return $redirect;
+        
+        $appointmentModel = new AppointmentModel();
+        $xrayModel = new XrayExaminationModel();
+        
+        // Get all approved appointments with X-Ray services
+        $appointments = $appointmentModel
+            ->where('status', 'approved')
+            ->findAll();
+        
+        $created = 0;
+        $skipped = 0;
+        
+        foreach ($appointments as $appt) {
+            $xrayServices = json_decode($appt['xray_services'], true) ?? [];
+            
+            if (empty($xrayServices)) {
+                continue;
+            }
+            
+            $existing = $xrayModel->where('appointment_id', $appt['id'])->first();
+            
+            if (!$existing) {
+                // Format exam type properly
+                $examType = $this->formatXrayServices($xrayServices);
+                
+                $xrayModel->insert([
+                    'appointment_id' => $appt['id'],
+                    'patient_name' => $appt['full_name'],
+                    'age' => $appt['age'],
+                    'gender' => $appt['gender'],
+                    'exam_type' => $examType,
+                    'exam_date' => $appt['appointment_date'],
+                    'priority' => 'Routine',
+                    'status' => 'pending'
+                ]);
+                $created++;
+            } else {
+                $skipped++;
+            }
+        }
+        
+        return redirect()->to(base_url('admin/appointments'))
+                        ->with('success', "Synced {$created} X-Ray examinations. Skipped {$skipped} existing.");
+    }
+    
+    // ===== SERVICE MANAGEMENT =====
+
+public function services()
+{
+    $redirect = $this->checkAuth();
+    if ($redirect) return $redirect;
+    
+    $serviceModel = new ServiceModel();
+    $data['services'] = $serviceModel->orderBy('category', 'ASC')
+                                     ->orderBy('service_name', 'ASC')
+                                     ->findAll();
+    
+    $counts = $serviceModel->getCountByCategory();
+    $data['total'] = $counts['total'];
+    $data['lab_count'] = $counts['laboratory'];
+    $data['xray_count'] = $counts['xray'];
+    $data['other_count'] = $counts['other'];
+    
+    return view('Admin/services', $data);
+}
+
+public function createService()
+{
+    $redirect = $this->checkAuth();
+    if ($redirect) return $redirect;
+    
+    $serviceModel = new ServiceModel();
+    
+    $rules = [
+        'service_code' => 'required|is_unique[services.service_code]',
+        'service_name' => 'required',
+        'category' => 'required|in_list[laboratory,xray,other]',
+        'charge' => 'permit_empty|numeric|greater_than_equal_to[0]'
+    ];
+    
+    if (!$this->validate($rules)) {
+        return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
+    }
+    
+    $serviceModel->save([
+        'service_code' => strtoupper($this->request->getPost('service_code')),
+        'service_name' => $this->request->getPost('service_name'),
+        'category' => $this->request->getPost('category'),
+        'description' => $this->request->getPost('description'),
+        'charge' => $this->request->getPost('charge') ?? 0,
+        'is_active' => $this->request->getPost('is_active') ?? 1
+    ]);
+    
+    return redirect()->to(base_url('admin/services'))
+                    ->with('success', 'Service created successfully!');
+}
+
+public function updateService($id)
+{
+    $redirect = $this->checkAuth();
+    if ($redirect) return $redirect;
+    
+    $serviceModel = new ServiceModel();
+    $service = $serviceModel->find($id);
+    
+    if (!$service) {
+        return redirect()->to(base_url('admin/services'))
+                        ->with('error', 'Service not found');
+    }
+    
+    $rules = [
+        'service_code' => "required|is_unique[services.service_code,id,{$id}]",
+        'service_name' => 'required',
+        'category' => 'required|in_list[laboratory,xray,other]',
+        'charge' => 'permit_empty|numeric|greater_than_equal_to[0]'
+    ];
+    
+    if (!$this->validate($rules)) {
+        return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
+    }
+    
+    $serviceModel->update($id, [
+        'service_code' => strtoupper($this->request->getPost('service_code')),
+        'service_name' => $this->request->getPost('service_name'),
+        'category' => $this->request->getPost('category'),
+        'description' => $this->request->getPost('description'),
+        'charge' => $this->request->getPost('charge') ?? 0,
+        'is_active' => $this->request->getPost('is_active') ?? 1
+    ]);
+    
+    return redirect()->to(base_url('admin/services'))
+                    ->with('success', 'Service updated successfully!');
+}
+
+public function deleteService($id)
+{
+    $redirect = $this->checkAuth();
+    if ($redirect) return $redirect;
+    
+    $serviceModel = new ServiceModel();
+    $service = $serviceModel->find($id);
+    
+    if (!$service) {
+        return redirect()->to(base_url('admin/services'))
+                        ->with('error', 'Service not found');
+    }
+    
+    $serviceModel->delete($id);
+    
+    return redirect()->to(base_url('admin/services'))
+                    ->with('success', 'Service deleted successfully!');
+}
+
+public function toggleServiceStatus($id)
+{
+    $redirect = $this->checkAuth();
+    if ($redirect) return $redirect;
+    
+    $serviceModel = new ServiceModel();
+    $service = $serviceModel->find($id);
+    
+    if (!$service) {
+        return redirect()->to(base_url('admin/services'))
+                        ->with('error', 'Service not found');
+    }
+    
+    $newStatus = ($service['is_active'] == 1) ? 0 : 1;
+    $serviceModel->update($id, ['is_active' => $newStatus]);
+    
+    return redirect()->to(base_url('admin/services'))
+                    ->with('success', 'Service status updated successfully!');
+}
 }

@@ -24,6 +24,7 @@ $routes->get('admin/dashboard', 'Admin::dashboard');
 $routes->get('admin/patients', 'Admin::patients');
 $routes->get('admin/requests', 'Admin::requests');
 $routes->get('admin/users', 'Admin::users');
+$routes->get('admin/sync-xray', 'Admin::syncXrayExaminations'); // ← ADD THIS
 
 // ===== APPOINTMENT MANAGEMENT ROUTES =====
 $routes->get('admin/appointments', 'Admin::appointments');
@@ -78,3 +79,30 @@ $routes->post('admin/users/update/(:num)', 'Admin::updateUser/$1');
 $routes->get('admin/users/delete/(:num)', 'Admin::deleteUser/$1');
 $routes->get('admin/users/toggle/(:num)', 'Admin::toggleUserStatus/$1');
 $routes->get('admin/users/data/(:num)', 'Admin::getUserData/$1');
+
+// ===== RADIOLOGIST ROUTES =====
+$routes->get('radiologist/dashboard', 'Radiologist::dashboard');
+$routes->get('radiologist/examinations', 'Radiologist::examinations');
+$routes->get('radiologist/examination/view/(:num)', 'Radiologist::viewExamination/$1');
+$routes->post('radiologist/examination/upload/(:num)', 'Radiologist::uploadImage/$1');
+$routes->post('radiologist/examination/save/(:num)', 'Radiologist::saveFindings/$1');
+$routes->get('radiologist/examination/release/(:num)', 'Radiologist::releaseResult/$1');
+$routes->get('radiologist/examination/print/(:num)', 'Radiologist::printResult/$1');
+
+// ===== RADIOLOGIST NOTIFICATION ROUTES =====
+$routes->get('radiologist/notifications', 'Radiologist::notifications');
+$routes->get('radiologist/notifications/fetch', 'NotificationController::radiologistFetch');
+$routes->get('radiologist/notifications/mark-read/(:num)', 'NotificationController::radiologistMarkRead/$1');
+$routes->get('radiologist/notifications/mark-all-read', 'NotificationController::radiologistMarkAllRead');
+$routes->get('radiologist/notifications/delete/(:num)', 'NotificationController::radiologistDelete/$1');
+
+// ===== RADIOLOGIST REPORTS =====
+$routes->get('radiologist/reports', 'Radiologist::reports');
+
+// ===== SERVICE MANAGEMENT ROUTES =====
+$routes->get('admin/services', 'Admin::services');
+$routes->post('admin/services/create', 'Admin::createService');
+$routes->post('admin/services/update/(:num)', 'Admin::updateService/$1');
+$routes->get('admin/services/delete/(:num)', 'Admin::deleteService/$1');
+$routes->get('admin/services/toggle/(:num)', 'Admin::toggleServiceStatus/$1');
+

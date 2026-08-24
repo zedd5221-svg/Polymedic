@@ -5,7 +5,6 @@
 <!-- Load booking CSS -->
 <link href="http://localhost/polymedic/public/assets/css/booking.css" rel="stylesheet">
 
-
 <!-- ====== BOOKING PAGE ====== -->
 <section class="booking-page">
     <div class="container">
@@ -74,7 +73,6 @@
             
             <div class="card-body-custom">
                 
-                <!-- Display validation errors -->
                 <?php if (session()->getFlashdata('errors')): ?>
                     <div class="alert alert-danger alert-dismissible fade show rounded-3" role="alert">
                         <strong><i class="bi bi-exclamation-triangle-fill me-2"></i>Please fix the following:</strong>
@@ -123,7 +121,6 @@
                             </div>
                         </div>
                         
-                        <!-- Step 1: Home button only (no back needed) -->
                         <div class="btn-group-custom">
                             <a href="/polymedic/public/" class="btn-home">
                                 <i class="bi bi-house me-2"></i>Home
@@ -206,7 +203,6 @@
                             <i class="bi bi-tags me-1"></i> Service Type
                         </label>
                         <div class="service-type-grid">
-                            <!-- Laboratory -->
                             <div class="service-type-card active" data-type="laboratory" id="serviceLab">
                                 <span class="check-mark"><i class="bi bi-check"></i></span>
                                 <span class="icon">
@@ -215,8 +211,6 @@
                                 <div class="title">Laboratory</div>
                                 <div class="desc">Blood tests, urinalysis, etc.</div>
                             </div>
-                            
-                            <!-- X-Ray -->
                             <div class="service-type-card" data-type="xray" id="serviceXray">
                                 <span class="check-mark"><i class="bi bi-check"></i></span>
                                 <span class="icon">
@@ -225,8 +219,6 @@
                                 <div class="title">X-Ray &amp; Imaging</div>
                                 <div class="desc">Chest, skeletal, etc.</div>
                             </div>
-                            
-                            <!-- Both -->
                             <div class="service-type-card" data-type="both" id="serviceBoth">
                                 <span class="check-mark"><i class="bi bi-check"></i></span>
                                 <span class="icon">
@@ -237,371 +229,59 @@
                             </div>
                         </div>
                         
-                        <!-- Laboratory Services -->
-<div id="labServicesContainer">
-    <div class="service-category-title">
-        <i class="bi bi-droplet" style="color: #0148ca;"></i> Laboratory Tests
-    </div>
-    <div class="service-grid">
-        <!-- CLINICAL CHEMISTRY -->
-        <div style="grid-column: 1 / -1; font-weight: 700; color: #0148ca; font-size: 0.85rem; margin-top: 0.25rem; border-bottom: 1px solid #eef2f7; padding-bottom: 0.25rem;">
-            <i class="bi bi-flask me-2"></i>CLINICAL CHEMISTRY
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="Glucose (RBS/FBS)" id="labGlucose">
-            <label for="labGlucose">GLUCOSE (RBS/FBS)</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="HbA1c" id="labHba1c">
-            <label for="labHba1c">HbA1c</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="Cholesterol" id="labCholesterol">
-            <label for="labCholesterol">CHOLESTEROL</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="Triglycerides" id="labTriglycerides">
-            <label for="labTriglycerides">TRIGLYCERIDES</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="HDL/LDL" id="labHdlLdl">
-            <label for="labHdlLdl">HDL / LDL</label>
-        </div>
-
-        <!-- KIDNEY FUNCTION TESTS -->
-        <div style="grid-column: 1 / -1; font-weight: 700; color: #28a745; font-size: 0.85rem; margin-top: 0.5rem; border-bottom: 1px solid #eef2f7; padding-bottom: 0.25rem;">
-            <i class="bi bi-cpu me-2"></i>KIDNEY FUNCTION TESTS
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="Creatinine" id="labCreatinine">
-            <label for="labCreatinine">CREATININE</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="Blood Uric Acid" id="labUricAcid">
-            <label for="labUricAcid">BLOOD URIC ACID</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="Blood Urea Nitrogen" id="labBun">
-            <label for="labBun">BLOOD UREA NITROGEN</label>
-        </div>
-
-        <!-- LIVER FUNCTION TESTS -->
-        <div style="grid-column: 1 / -1; font-weight: 700; color: #ff6b00; font-size: 0.85rem; margin-top: 0.5rem; border-bottom: 1px solid #eef2f7; padding-bottom: 0.25rem;">
-            <i class="bi bi-heart-pulse me-2"></i>LIVER FUNCTION TESTS
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="SGPT/ALT" id="labSgpt">
-            <label for="labSgpt">SGPT/ALT</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="SGOT/AST" id="labSgot">
-            <label for="labSgot">SGOT/AST</label>
-        </div>
-
-        <!-- ELECTROLYTES -->
-        <div style="grid-column: 1 / -1; font-weight: 700; color: #17a2b8; font-size: 0.85rem; margin-top: 0.5rem; border-bottom: 1px solid #eef2f7; padding-bottom: 0.25rem;">
-            <i class="bi bi-droplet-half me-2"></i>ELECTROLYTES
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="Sodium (Na)" id="labSodium">
-            <label for="labSodium">SODIUM (Na)</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="Potassium (K)" id="labPotassium">
-            <label for="labPotassium">POTASSIUM (K)</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="Chloride (Cl)" id="labChloride">
-            <label for="labChloride">CHLORIDE (Cl)</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="Calcium (Ca)" id="labCalcium">
-            <label for="labCalcium">CALCIUM (Ca)</label>
-        </div>
-
-        <!-- CLINICAL MICROSCOPY -->
-        <div style="grid-column: 1 / -1; font-weight: 700; color: #ffc107; font-size: 0.85rem; margin-top: 0.5rem; border-bottom: 1px solid #eef2f7; padding-bottom: 0.25rem;">
-            <i class="bi bi-eye me-2"></i>CLINICAL MICROSCOPY
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="Urinalysis" id="labUrinalysis">
-            <label for="labUrinalysis">URINALYSIS</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="Fecalysis" id="labFecalysis">
-            <label for="labFecalysis">FECALYSIS</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="Semenanalysis" id="labSemenanalysis">
-            <label for="labSemenanalysis">SEMENANALYSIS</label>
-        </div>
-
-        <!-- HEMATOLOGY -->
-        <div style="grid-column: 1 / -1; font-weight: 700; color: #dc3545; font-size: 0.85rem; margin-top: 0.5rem; border-bottom: 1px solid #eef2f7; padding-bottom: 0.25rem;">
-            <i class="bi bi-droplet me-2"></i>HEMATOLOGY
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="Complete Blood Count (CBC)" id="labCbc">
-            <label for="labCbc">COMPLETE BLOOD COUNT (CBC)</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="Platelet Count" id="labPlatelet">
-            <label for="labPlatelet">PLATELET COUNT</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="ESR" id="labEsr">
-            <label for="labEsr">ESR</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="Hemoglobin (Hgb)" id="labHgb">
-            <label for="labHgb">HEMOGLOBIN (Hgb)</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="Hematocrit (Hct)" id="labHct">
-            <label for="labHct">HEMATOCRIT (Hct)</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="Blood Typing" id="labBloodTyping">
-            <label for="labBloodTyping">BLOOD TYPING</label>
-        </div>
-
-        <!-- SEROLOGY -->
-        <div style="grid-column: 1 / -1; font-weight: 700; color: #800080; font-size: 0.85rem; margin-top: 0.5rem; border-bottom: 1px solid #eef2f7; padding-bottom: 0.25rem;">
-            <i class="bi bi-shield-plus me-2"></i>SEROLOGY
-        </div>
-        <div style="grid-column: 1 / -1; font-weight: 600; color: #495057; font-size: 0.8rem; margin-top: 0.25rem;">
-            <i class="bi bi-arrow-right me-1"></i>THYROID PANEL TESTS
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="T3" id="labT3">
-            <label for="labT3">T3</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="T4" id="labT4">
-            <label for="labT4">T4</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="FT3" id="labFt3">
-            <label for="labFt3">FT3</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="FT4" id="labFt4">
-            <label for="labFt4">FT4</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="TSH" id="labTsh">
-            <label for="labTsh">TSH</label>
-        </div>
-        <div style="grid-column: 1 / -1; font-weight: 600; color: #495057; font-size: 0.8rem; margin-top: 0.25rem;">
-            <i class="bi bi-arrow-right me-1"></i>RAPID CARD TESTS
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="HBsAg (Hepatitis B)" id="labHbsag">
-            <label for="labHbsag">HBsAg (HEPATITIS B)</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="HCV (Pregnancy Test)" id="labHcv">
-            <label for="labHcv">HCV (PREGNANCY TEST)</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="HIV (IgG/IgM)" id="labHiv">
-            <label for="labHiv">HIV (IgG/IgM)</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="Salmonella typhi IgG/IgM" id="labSalmonella">
-            <label for="labSalmonella">SALMONELLA TYPHI IgG/IgM</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="lab_services[]" value="Syphilis (T. pallidum)" id="labSyphilis">
-            <label for="labSyphilis">SYPHILIS (T. PALLIDUM)</label>
-        </div>
-    </div>
-</div>
+                        <!-- Laboratory Services (Dynamic from Database) -->
+                        <div id="labServicesContainer">
+                            <div class="service-category-title">
+                                <i class="bi bi-droplet" style="color: #0148ca;"></i> Laboratory Tests
+                            </div>
+                            <div class="service-grid">
+                                <?php if (!empty($labServices)): ?>
+                                    <?php foreach ($labServices as $service): ?>
+                                        <?php if ($service['is_active'] == 1): ?>
+                                            <div class="service-check">
+                                                <input type="checkbox" name="lab_services[]" value="<?= esc($service['service_name']) ?>" 
+                                                       id="lab_<?= esc($service['id']) ?>" 
+                                                       data-price="<?= esc($service['charge']) ?>"
+                                                       class="service-checkbox">
+                                                <label for="lab_<?= esc($service['id']) ?>">
+                                                    <?= esc($service['service_name']) ?>
+                                                    <span class="service-price">₱<?= number_format($service['charge'], 2) ?></span>
+                                                </label>
+                                            </div>
+                                        <?php endif; ?>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <div class="text-muted">No laboratory services available</div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
                         
-                       <!-- X-Ray Services -->
-<div id="xrayServicesContainer" style="display: none;">
-    <div class="service-category-title">
-        <i class="bi bi-x-ray" style="color: #0a2b4e;"></i> X-Ray Services
-    </div>
-    <div class="service-grid">
-        <!-- CHEST -->
-        <div style="grid-column: 1 / -1; font-weight: 700; color: #0148ca; font-size: 0.85rem; margin-top: 0.25rem; border-bottom: 1px solid #eef2f7; padding-bottom: 0.25rem;">
-            <i class="bi bi-lungs me-2"></i>CHEST
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Chest A/P" id="xrayChestAP">
-            <label for="xrayChestAP">CHEST A/P</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Chest APL" id="xrayChestAPL">
-            <label for="xrayChestAPL">CHEST APL</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Thoracic Bony Cage/TBC" id="xrayTbc">
-            <label for="xrayTbc">THORACIC BONY CAGE/TBC</label>
-        </div>
-
-        <!-- UPPER EXTREMITIES -->
-        <div style="grid-column: 1 / -1; font-weight: 700; color: #28a745; font-size: 0.85rem; margin-top: 0.5rem; border-bottom: 1px solid #eef2f7; padding-bottom: 0.25rem;">
-            <i class="bi bi-hand-index-thumb me-2"></i>UPPER EXTREMITIES
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Shoulder AP / APL" id="xrayShoulder">
-            <label for="xrayShoulder">SHOULDER AP / APL</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Humerus AP / APL" id="xrayHumerus">
-            <label for="xrayHumerus">HUMERUS AP / APL</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Arm AP Only" id="xrayArm">
-            <label for="xrayArm">ARM AP ONLY</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Elbow AP / APL" id="xrayElbow">
-            <label for="xrayElbow">ELBOW AP / APL</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Forearm AP / APL" id="xrayForearm">
-            <label for="xrayForearm">FOREARM AP / APL</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Radius/Ulna AP" id="xrayRadius">
-            <label for="xrayRadius">RADIUS/ULNA AP</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Wrist AP / APL" id="xrayWrist">
-            <label for="xrayWrist">WRIST AP / APL</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Hand AP/Metacarpal Only" id="xrayHand">
-            <label for="xrayHand">HAND AP/METACARPAL ONLY</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Hand APL/Oblique/Hand APD" id="xrayHandOblique">
-            <label for="xrayHandOblique">HAND APL/OBLIQUE/HAND APD</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Finger" id="xrayFinger">
-            <label for="xrayFinger">FINGER</label>
-        </div>
-
-        <!-- SKULL & FACE -->
-        <div style="grid-column: 1 / -1; font-weight: 700; color: #ffc107; font-size: 0.85rem; margin-top: 0.5rem; border-bottom: 1px solid #eef2f7; padding-bottom: 0.25rem;">
-            <i class="bi bi-person-bounding-box me-2"></i>SKULL &amp; FACE
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Skull AP / APL" id="xraySkull">
-            <label for="xraySkull">SKULL AP / APL</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Skull APL/Towner" id="xrayTowner">
-            <label for="xrayTowner">SKULL APL/TOWNER</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Orbit AP / APL" id="xrayOrbit">
-            <label for="xrayOrbit">ORBIT AP / APL</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Nasap AP / APL" id="xrayNasap">
-            <label for="xrayNasap">NASAP AP / APL</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Paranasal Water Only" id="xrayPnsWater">
-            <label for="xrayPnsWater">PARANASAL WATER ONLY</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Paranasal (Water Lateral Cardwell)/PNS" id="xrayPnsFull">
-            <label for="xrayPnsFull">PARANASAL (WATER LATERAL CARDWELL)/PNS</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Neck/Cervical APL" id="xrayNeck">
-            <label for="xrayNeck">NECK/CERVICAL APL</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Neck/Cervical APL/Oblique" id="xrayNeckOblique">
-            <label for="xrayNeckOblique">NECK/CERVICAL APL/OBLIQUE</label>
-        </div>
-
-        <!-- SPINE & PELVIS -->
-        <div style="grid-column: 1 / -1; font-weight: 700; color: #dc3545; font-size: 0.85rem; margin-top: 0.5rem; border-bottom: 1px solid #eef2f7; padding-bottom: 0.25rem;">
-            <i class="bi bi-body-text me-2"></i>SPINE &amp; PELVIS
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Cervical APL" id="xrayCervical">
-            <label for="xrayCervical">CERVICAL APL</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Thoracic Vert AP / APL" id="xrayThoracic">
-            <label for="xrayThoracic">THORACIC VERT AP / APL</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Thoracolumbar AP / APL" id="xrayThoracolumbar">
-            <label for="xrayThoracolumbar">THORACOLUMBAR AP / APL</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Thoracolumbar Spine APL/Thigh" id="xrayThoracolumbarThigh">
-            <label for="xrayThoracolumbarThigh">THORACOLUMBAR SPINE APL/THIGH</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Lumbosacral AP / APL" id="xrayLumbosacral">
-            <label for="xrayLumbosacral">LUMBOSACRAL AP / APL</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Lumbosacral APL/Lumbar Vertebrae APL" id="xrayLumbarVertebrae">
-            <label for="xrayLumbarVertebrae">LUMBOSACRAL APL/LUMBAR VERTEBRAE APL</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Pelvis AP / APL" id="xrayPelvis">
-            <label for="xrayPelvis">PELVIS AP / APL</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Frog Leg/View" id="xrayFrogLeg">
-            <label for="xrayFrogLeg">FROG LEG/VIEW</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Whole Spine APL" id="xrayWholeSpine">
-            <label for="xrayWholeSpine">WHOLE SPINE APL</label>
-        </div>
-
-        <!-- LOWER EXTREMITIES & ABDOMEN -->
-        <div style="grid-column: 1 / -1; font-weight: 700; color: #17a2b8; font-size: 0.85rem; margin-top: 0.5rem; border-bottom: 1px solid #eef2f7; padding-bottom: 0.25rem;">
-            <i class="bi bi-person-walking me-2"></i>LOWER EXTREMITIES &amp; ABDOMEN
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Leg APL/Knee" id="xrayLeg">
-            <label for="xrayLeg">LEG APL/KNEE</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Knee APL" id="xrayKnee">
-            <label for="xrayKnee">KNEE APL</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="One Foot AP" id="xrayOneFoot">
-            <label for="xrayOneFoot">ONE FOOT AP</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Foot APL" id="xrayFoot">
-            <label for="xrayFoot">FOOT APL</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Ankle APL" id="xrayAnkle">
-            <label for="xrayAnkle">ANKLE APL</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Abdomen Plain" id="xrayAbdomen">
-            <label for="xrayAbdomen">ABDOMEN PLAIN</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Abdomen APL/Upright" id="xrayAbdomenApl">
-            <label for="xrayAbdomenApl">ABDOMEN APL/UPRIGHT</label>
-        </div>
-        <div class="service-check">
-            <input type="checkbox" name="xray_services[]" value="Abdomen Upright Only" id="xrayAbdomenUpright">
-            <label for="xrayAbdomenUpright">ABDOMEN UPRIGHT ONLY</label>
-        </div>
-    </div>
-</div>
+                        <!-- X-Ray Services (Dynamic from Database) -->
+                        <div id="xrayServicesContainer" style="display: none;">
+                            <div class="service-category-title">
+                                <i class="bi bi-x-ray" style="color: #0a2b4e;"></i> X-Ray Services
+                            </div>
+                            <div class="service-grid">
+                                <?php if (!empty($xrayServices)): ?>
+                                    <?php foreach ($xrayServices as $service): ?>
+                                        <?php if ($service['is_active'] == 1): ?>
+                                            <div class="service-check">
+                                                <input type="checkbox" name="xray_services[]" value="<?= esc($service['service_name']) ?>" 
+                                                       id="xray_<?= esc($service['id']) ?>"
+                                                       data-price="<?= esc($service['charge']) ?>"
+                                                       class="service-checkbox">
+                                                <label for="xray_<?= esc($service['id']) ?>">
+                                                    <?= esc($service['service_name']) ?>
+                                                    <span class="service-price">₱<?= number_format($service['charge'], 2) ?></span>
+                                                </label>
+                                            </div>
+                                        <?php endif; ?>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <div class="text-muted">No X-Ray services available</div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
                         
                         <!-- Other Requests -->
                         <div class="mt-4">
@@ -669,13 +349,13 @@
                                 <span>Consultation Fee</span>
                                 <strong>₱ 500.00</strong>
                             </div>
-                            <div class="payment-row">
+                            <div class="payment-row" id="serviceFeeRow">
                                 <span>Service Fee</span>
-                                <strong>₱ 0.00</strong>
+                                <strong id="serviceFeeDisplay">₱ 0.00</strong>
                             </div>
                             <div class="payment-row payment-total">
                                 <span class="fw-bold">Total</span>
-                                <strong style="color: var(--accent-blue); font-size: 1.3rem;">₱ 500.00</strong>
+                                <strong style="color: var(--accent-blue); font-size: 1.3rem;" id="totalAmountDisplay">₱ 500.00</strong>
                             </div>
                         </div>
                         
@@ -716,12 +396,113 @@
     </div>
 </section>
 
+<style>
+/* ===== SERVICE PRICE STYLES ===== */
+.service-price {
+    color: #0148ca;
+    font-weight: 600;
+    font-size: 0.75rem;
+    margin-left: 0.5rem;
+    background: #e6f0fa;
+    padding: 0.1rem 0.5rem;
+    border-radius: 30px;
+}
+
+.service-check {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0.5rem;
+    border-radius: 6px;
+    transition: background 0.2s ease;
+}
+
+.service-check:hover {
+    background: #f8faff;
+}
+
+.service-check input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: #0148ca;
+    cursor: pointer;
+}
+
+.service-check label {
+    font-size: 0.85rem;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    flex: 1;
+    margin: 0;
+}
+
+/* ===== PAYMENT SUMMARY ===== */
+.payment-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #f0f4ff;
+}
+
+.payment-row.payment-total {
+    border-bottom: none;
+    padding-top: 0.75rem;
+    margin-top: 0.5rem;
+    border-top: 2px solid #0148ca;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+    .service-check {
+        flex-wrap: wrap;
+    }
+    
+    .service-price {
+        font-size: 0.65rem;
+        padding: 0.1rem 0.4rem;
+    }
+    
+    .service-check label {
+        font-size: 0.75rem;
+        flex-wrap: wrap;
+    }
+}
+
+@media (max-width: 480px) {
+    .service-grid {
+        grid-template-columns: 1fr !important;
+    }
+    
+    .service-price {
+        display: block;
+        margin-left: 0;
+        margin-top: 0.2rem;
+        text-align: left;
+    }
+}
+</style>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // ===== STEP NAVIGATION =====
     let currentStep = 1;
     const totalSteps = 4;
     let formData = {};
+    let selectedServices = [];
+    let servicePrices = {};
+    
+    // ===== LOAD SERVICE PRICES =====
+    function loadServicePrices() {
+        // Get prices from data attributes on checkboxes
+        document.querySelectorAll('.service-checkbox').forEach(cb => {
+            const name = cb.value;
+            const price = parseFloat(cb.dataset.price) || 0;
+            servicePrices[name] = price;
+        });
+    }
+    loadServicePrices();
     
     function updateStep(step) {
         document.querySelectorAll('.form-step').forEach((el, index) => {
@@ -751,6 +532,33 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelector('.booking-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
     
+    // ===== CALCULATE TOTAL =====
+    function calculateTotal() {
+        let totalServiceFee = 0;
+        const selectedNames = [];
+        
+        document.querySelectorAll('.service-checkbox:checked').forEach(cb => {
+            const name = cb.value;
+            const price = servicePrices[name] || 0;
+            totalServiceFee += price;
+            selectedNames.push(name);
+        });
+        
+        const consultationFee = 500.00;
+        const total = consultationFee + totalServiceFee;
+        
+        // Update display
+        document.getElementById('serviceFeeDisplay').textContent = '₱ ' + totalServiceFee.toFixed(2);
+        document.getElementById('totalAmountDisplay').textContent = '₱ ' + total.toFixed(2);
+        
+        // Store for review
+        selectedServices = selectedNames;
+        formData.serviceFee = totalServiceFee;
+        formData.totalAmount = total;
+        
+        return total;
+    }
+    
     // ===== SERVICE TYPE SELECTION =====
     const serviceTypeCards = document.querySelectorAll('.service-type-card');
     const labContainer = document.getElementById('labServicesContainer');
@@ -773,6 +581,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 labContainer.style.display = 'block';
                 xrayContainer.style.display = 'block';
             }
+            
+            // Recalculate total
+            calculateTotal();
+        });
+    });
+    
+    // ===== SERVICE CHECKBOX CHANGE =====
+    document.querySelectorAll('.service-checkbox').forEach(cb => {
+        cb.addEventListener('change', function() {
+            calculateTotal();
         });
     });
     
@@ -820,23 +638,36 @@ document.addEventListener('DOMContentLoaded', function() {
         const serviceTypeLabel = activeCard ? activeCard.querySelector('.title').textContent : 'None';
         formData.serviceType = serviceTypeLabel;
         
-        const labChecked = document.querySelectorAll('#labServicesContainer input:checked');
+        const labChecked = document.querySelectorAll('#labServicesContainer .service-checkbox:checked');
+        const xrayChecked = document.querySelectorAll('#xrayServicesContainer .service-checkbox:checked');
+        
         let labServices = [];
-        labChecked.forEach(cb => labServices.push(cb.value));
-        
-        const xrayChecked = document.querySelectorAll('#xrayServicesContainer input:checked');
         let xrayServices = [];
-        xrayChecked.forEach(cb => xrayServices.push(cb.value));
+        let allServices = [];
         
-        const allServices = [...labServices, ...xrayServices];
+        labChecked.forEach(cb => {
+            labServices.push(cb.value);
+            allServices.push(cb.value);
+        });
+        
+        xrayChecked.forEach(cb => {
+            xrayServices.push(cb.value);
+            allServices.push(cb.value);
+        });
         
         if (allServices.length === 0) {
             alert('⚠️ Please select at least one service.');
             return;
         }
         
+        // Calculate total
+        const total = calculateTotal();
+        
+        formData.labServices = labServices;
+        formData.xrayServices = xrayServices;
         formData.services = allServices.join(', ');
         formData.serviceCount = allServices.length;
+        formData.totalAmount = total;
         
         document.getElementById('reviewDateTime').textContent = formData.date + ' at ' + formData.time;
         document.getElementById('reviewContact').textContent = formData.email + ' | ' + formData.phone;

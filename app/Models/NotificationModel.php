@@ -98,24 +98,71 @@ class NotificationModel extends Model
     }
 
     /**
+     * Clean a link - remove base URL and extra slashes
+     */
+    private function cleanLink($link)
+    {
+        if (empty($link)) {
+            return null;
+        }
+        
+        // Remove ALL possible base URL variations
+        $link = str_replace('http://localhost/polymedic/public/', '', $link);
+        $link = str_replace('https://localhost/polymedic/public/', '', $link);
+        $link = str_replace('http://localhost/polymedic/', '', $link);
+        $link = str_replace('https://localhost/polymedic/', '', $link);
+        $link = str_replace('/polymedic/public/', '', $link);
+        $link = str_replace('polymedic/public/', '', $link);
+        $link = str_replace('/public/', '', $link);
+        $link = str_replace('/index.php/', '', $link);
+        $link = str_replace(base_url(), '', $link);
+        $link = ltrim($link, '/');
+        
+        return empty($link) ? null : $link;
+    }
+
+    /**
      * Easy static helper to create notifications from anywhere in the application.
+     * Now cleans links before storing.
      */
     public static function notify(string $type, string $title, string $message, $referenceId = null, $link = null)
     {
         try {
             $model = new self();
+            
+            // Clean the link before storing
+            $cleanLink = $model->cleanLink($link);
+            
             return $model->insert([
                 'type'         => $type,
                 'title'        => $title,
                 'message'      => $message,
                 'reference_id' => $referenceId ? (string)$referenceId : null,
-                'link'         => $link,
+                'link'         => $cleanLink,
                 'is_read'      => 0,
             ]);
         } catch (\Exception $e) {
             log_message('error', 'Failed to create notification: ' . $e->getMessage());
             return false;
         }
+    }
+
+    /**
+     * Get full URL from stored link.
+     */
+    public function getFullLink($link)
+    {
+        if (empty($link)) {
+            return base_url('admin/dashboard');
+        }
+        
+        // Clean the link first
+        $cleaned = $this->cleanLink($link);
+        if (empty($cleaned)) {
+            return base_url('admin/dashboard');
+        }
+        
+        return base_url($cleaned);
     }
 
     /**
@@ -132,9 +179,16 @@ class NotificationModel extends Model
     public function getRecentNotifications(int $limit = 5): array
     {
         $this->autoSyncPendingAppointments();
-        return $this->orderBy('created_at', 'DESC')
-                    ->orderBy('id', 'DESC')
-                    ->findAll($limit);
+        $notifications = $this->orderBy('created_at', 'DESC')
+                              ->orderBy('id', 'DESC')
+                              ->findAll($limit);
+        
+        // Add full links
+        foreach ($notifications as &$notif) {
+            $notif['full_link'] = $this->getFullLink($notif['link'] ?? '');
+        }
+        
+        return $notifications;
     }
 
     /**
@@ -166,9 +220,10 @@ class NotificationModel extends Model
             return 'admin/appointment/view/' . $appointmentId;
         } elseif ($role === 'receptionist') {
             return 'receptionist/appointment/view/' . $appointmentId;
+        } elseif ($role === 'radiologist') {
+            return 'radiologist/examination/view/' . $appointmentId;
         }
         
-        // Default fallback for public (admin)
         return 'admin/appointment/view/' . $appointmentId;
     }
 
@@ -184,6 +239,34 @@ class NotificationModel extends Model
             'title'        => 'Pending Appointment: ' . $referenceNumber,
             'message'      => 'New appointment request from ' . $fullName . ' on ' . date('M d, Y', strtotime($appointmentDate)),
             'reference_id' => (string)$appointmentId,
+            'link'         => $link,
+            'is_read'      => 0,
+        ]);
+    }
+
+    /**
+     * Create notification for X-Ray examination
+     */
+    public function createXrayNotification($examinationId, $patientName, $status, $link = null)
+    {
+        if (!$link) {
+            $link = 'radiologist/examination/view/' . $examinationId;
+        }
+        
+        $statusLabels = [
+            'pending' => 'Pending',
+            'processing' => 'Processing',
+            'completed' => 'Completed',
+            'released' => 'Released'
+        ];
+        
+        $statusLabel = $statusLabels[$status] ?? ucfirst($status);
+        
+        return $this->insert([
+            'type'         => 'xray',
+            'title'        => 'X-Ray Examination: ' . $statusLabel,
+            'message'      => 'X-Ray examination for ' . $patientName . ' is now ' . strtolower($statusLabel),
+            'reference_id' => (string)$examinationId,
             'link'         => $link,
             'is_read'      => 0,
         ]);
@@ -209,7 +292,6 @@ class NotificationModel extends Model
                                ->first();
 
                 if (!$exists) {
-                    // Store only the path
                     $link = 'admin/appointment/view/' . $appt['id'];
                     
                     $this->insert([
@@ -227,5 +309,62 @@ class NotificationModel extends Model
         } catch (\Exception $e) {
             log_message('error', 'Auto sync notifications error: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Get notification type icon class
+     */
+    public function getTypeIcon($type)
+    {
+        $icons = [
+            'appointment' => 'bi-calendar-check',
+            'xray' => 'bi-x-ray',
+            'system' => 'bi-bell-fill',
+            'lab' => 'bi-flask',
+            'billing' => 'bi-receipt',
+            'payment' => 'bi-credit-card'
+        ];
+        return $icons[$type] ?? 'bi-bell-fill';
+    }
+
+    /**
+     * Get notification type color class
+     */
+    public function getTypeColor($type)
+    {
+        $colors = [
+            'appointment' => 'appointment',
+            'xray' => 'xray',
+            'system' => 'system',
+            'lab' => 'lab',
+            'billing' => 'billing',
+            'payment' => 'payment'
+        ];
+        return $colors[$type] ?? 'system';
+    }
+
+    /**
+     * Get notifications with full links for JSON response
+     */
+    public function getNotificationsForJson($limit = 6): array
+    {
+        $notifications = $this->orderBy('created_at', 'DESC')
+                              ->orderBy('id', 'DESC')
+                              ->findAll($limit);
+        
+        $formatted = [];
+        foreach ($notifications as $item) {
+            $formatted[] = [
+                'id'           => $item['id'],
+                'type'         => $item['type'],
+                'title'        => $item['title'],
+                'message'      => $item['message'],
+                'link'         => $this->getFullLink($item['link'] ?? ''),
+                'is_read'      => (int)$item['is_read'],
+                'created_at'   => $item['created_at']
+            ];
+        }
+        
+        return $formatted;
     }
 }

@@ -39,48 +39,66 @@
             <nav class="sidebar-nav">
                 <ul>
                     <li class="nav-section">MAIN</li>
-                    <li class="<?= current_url() == base_url('receptionist/dashboard') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/receptionist/dashboard">
-                            <i class="bi bi-grid-1x2-fill"></i>
+                    <li class="menu-item <?= current_url() == base_url('receptionist/dashboard') ? 'active' : '' ?>">
+                        <a href="/polymedic/public/receptionist/dashboard" class="menu-btn">
+                            <i class="bi bi-grid-1x2-fill menu-icon"></i>
                             <span>Dashboard</span>
+                            <?php if (current_url() == base_url('receptionist/dashboard')): ?>
+                                <i class="bi bi-chevron-right menu-arrow"></i>
+                            <?php endif; ?>
                         </a>
                     </li>
-                    <li class="<?= strpos(current_url(), 'receptionist/appointment') !== false ? 'active' : '' ?>">
-                        <a href="/polymedic/public/receptionist/appointments">
-                            <i class="bi bi-calendar-check"></i>
+                    <li class="menu-item <?= strpos(current_url(), 'receptionist/appointment') !== false ? 'active' : '' ?>">
+                        <a href="/polymedic/public/receptionist/appointments" class="menu-btn">
+                            <i class="bi bi-calendar-check menu-icon"></i>
                             <span>Appointments</span>
+                            <?php if (strpos(current_url(), 'receptionist/appointment') !== false): ?>
+                                <i class="bi bi-chevron-right menu-arrow"></i>
+                            <?php endif; ?>
                         </a>
                     </li>
-                    <li class="<?= current_url() == base_url('receptionist/patients') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/receptionist/patients">
-                            <i class="bi bi-people-fill"></i>
+                    <li class="menu-item <?= current_url() == base_url('receptionist/patients') ? 'active' : '' ?>">
+                        <a href="/polymedic/public/receptionist/patients" class="menu-btn">
+                            <i class="bi bi-people-fill menu-icon"></i>
                             <span>Patients</span>
+                            <?php if (current_url() == base_url('receptionist/patients')): ?>
+                                <i class="bi bi-chevron-right menu-arrow"></i>
+                            <?php endif; ?>
                         </a>
                     </li>
                     
                     <li class="nav-section">FINANCIAL</li>
-                    <li class="<?= current_url() == base_url('receptionist/billing') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/receptionist/billing">
-                            <i class="bi bi-receipt"></i>
+                    <li class="menu-item <?= current_url() == base_url('receptionist/billing') ? 'active' : '' ?>">
+                        <a href="/polymedic/public/receptionist/billing" class="menu-btn">
+                            <i class="bi bi-receipt menu-icon"></i>
                             <span>Billing</span>
+                            <?php if (current_url() == base_url('receptionist/billing')): ?>
+                                <i class="bi bi-chevron-right menu-arrow"></i>
+                            <?php endif; ?>
                         </a>
                     </li>
-                    <li class="<?= current_url() == base_url('receptionist/payments') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/receptionist/payments">
-                            <i class="bi bi-credit-card"></i>
+                    <li class="menu-item <?= current_url() == base_url('receptionist/payments') ? 'active' : '' ?>">
+                        <a href="/polymedic/public/receptionist/payments" class="menu-btn">
+                            <i class="bi bi-credit-card menu-icon"></i>
                             <span>Payments</span>
+                            <?php if (current_url() == base_url('receptionist/payments')): ?>
+                                <i class="bi bi-chevron-right menu-arrow"></i>
+                            <?php endif; ?>
                         </a>
                     </li>
-                    <li class="<?= current_url() == base_url('receptionist/reports') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/receptionist/reports">
-                            <i class="bi bi-bar-chart-fill"></i>
+                    <li class="menu-item <?= current_url() == base_url('receptionist/reports') ? 'active' : '' ?>">
+                        <a href="/polymedic/public/receptionist/reports" class="menu-btn">
+                            <i class="bi bi-bar-chart-fill menu-icon"></i>
                             <span>Reports</span>
+                            <?php if (current_url() == base_url('receptionist/reports')): ?>
+                                <i class="bi bi-chevron-right menu-arrow"></i>
+                            <?php endif; ?>
                         </a>
                     </li>
 
-                    <li class="<?= current_url() == base_url('receptionist/notifications') ? 'active' : '' ?>">
-                        <a href="<?= base_url('receptionist/notifications') ?>">
-                            <i class="bi bi-bell-fill"></i>
+                    <li class="menu-item <?= current_url() == base_url('receptionist/notifications') ? 'active' : '' ?>">
+                        <a href="<?= base_url('receptionist/notifications') ?>" class="menu-btn">
+                            <i class="bi bi-bell-fill menu-icon"></i>
                             <span>Notifications</span>
                             <?php 
                             $unreadCount = (new \App\Models\NotificationModel())->getUnreadCount();
@@ -88,14 +106,17 @@
                             ?>
                                 <span class="badge-notif"><?= $unreadCount ?></span>
                             <?php endif; ?>
+                            <?php if (current_url() == base_url('receptionist/notifications')): ?>
+                                <i class="bi bi-chevron-right menu-arrow"></i>
+                            <?php endif; ?>
                         </a>
                     </li>
                     
                     <li class="nav-divider"></li>
                     
-                    <li class="logout-link">
-                        <a href="/polymedic/public/logout">
-                            <i class="bi bi-box-arrow-right"></i>
+                    <li class="menu-item logout-item">
+                        <a href="/polymedic/public/logout" class="menu-btn">
+                            <i class="bi bi-box-arrow-right menu-icon"></i>
                             <span>Logout</span>
                         </a>
                     </li>
@@ -149,21 +170,21 @@
                             <div class="dropdown-menu dropdown-menu-end notif-dropdown-menu shadow-lg border-0" aria-labelledby="notifDropdownBtn">
                                 <div class="notif-dropdown-header d-flex justify-content-between align-items-center">
                                     <div class="d-flex align-items-center gap-2">
-                                        <i class="bi bi-bell text-teal"></i>
+                                        <i class="bi bi-bell text-primary"></i>
                                         <span class="fw-bold text-dark fs-6">Notifications</span>
                                     </div>
-                                    <button type="button" class="btn btn-link btn-sm p-0 text-teal text-decoration-none small" onclick="markAllNotificationsRead(event)">
+                                    <button type="button" class="btn btn-link btn-sm p-0 text-primary text-decoration-none small" onclick="markAllNotificationsRead(event)">
                                         Mark all read
                                     </button>
                                 </div>
                                 <div class="notif-dropdown-body" id="notifDropdownList">
                                     <div class="p-3 text-center text-muted small">
-                                        <div class="spinner-border spinner-border-sm text-teal me-1" role="status"></div>
+                                        <div class="spinner-border spinner-border-sm text-primary me-1" role="status"></div>
                                         Loading notifications...
                                     </div>
                                 </div>
                                 <div class="notif-dropdown-footer text-center">
-                                    <a href="<?= base_url('receptionist/notifications') ?>" class="text-teal fw-semibold small text-decoration-none">
+                                    <a href="<?= base_url('receptionist/notifications') ?>" class="text-primary fw-semibold small text-decoration-none">
                                         View All Notifications <i class="bi bi-arrow-right ms-1"></i>
                                     </a>
                                 </div>
@@ -192,95 +213,383 @@
     </div>
 
     <style>
-    /* ===== RECEPTIONIST THEME COLORS ===== */
+    /* ============================================
+       RECEPTIONIST SIDEBAR - MATCHING REFERENCE DESIGN
+       ============================================ */
     :root {
-        --receptionist-primary: #0d9488;
-        --receptionist-primary-dark: #0f766e;
-        --receptionist-primary-light: #ccfbf1;
-        --receptionist-primary-bg: #f0fdfa;
-        --receptionist-accent: #14b8a6;
+        --sidebar-width: 280px;
+        --header-height: 64px;
+        --active-blue: #1976d2;
+        --active-blue-dark: #1565c0;
+        --active-blue-light: #e3f2fd;
+        --text-blue: #1e40af;
+        --icon-gray: #9ca3af;
+        --bg-light: #f8fafc;
     }
 
-    /* Sidebar */
+    /* ===== SIDEBAR ===== */
     .receptionist-sidebar {
-        border-right: 1px solid rgba(13, 148, 136, 0.08);
+        width: var(--sidebar-width);
+        min-height: 100vh;
+        background: #ffffff !important;
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        z-index: 1000;
+        overflow-y: auto;
+        transition: transform 0.3s ease;
+        box-shadow: 2px 0 20px rgba(0,0,0,0.06);
+        border-right: 1px solid #e5e7eb !important;
     }
-    
-    .receptionist-sidebar .sidebar-logo span {
-        color: #0d9488;
+
+    .receptionist-sidebar::-webkit-scrollbar {
+        width: 4px;
     }
-    
-    .receptionist-sidebar .sidebar-nav ul li a:hover {
-        background: rgba(13, 148, 136, 0.08);
-        color: #0d9488;
+
+    .receptionist-sidebar::-webkit-scrollbar-thumb {
+        background: #e5e7eb;
+        border-radius: 4px;
     }
-    
+
+    /* Sidebar Header */
+    .sidebar-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1.5rem 1.5rem;
+        border-bottom: 1px solid #f3f4f6 !important;
+    }
+
+    .sidebar-logo {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .sidebar-logo img {
+        height: 40px;
+        width: auto;
+        object-fit: contain;
+    }
+
+    .sidebar-logo span {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #111827 !important;
+        letter-spacing: 0.5px;
+        line-height: 1.2;
+    }
+
+    .sidebar-logo span small {
+        font-weight: 400;
+        font-size: 0.65rem;
+        color: #6b7280 !important;
+        display: block;
+        margin-top: 2px;
+    }
+
+    .sidebar-close {
+        display: none;
+        background: transparent;
+        border: none;
+        color: #6b7280 !important;
+        font-size: 1.2rem;
+        cursor: pointer;
+        padding: 0.25rem;
+    }
+
+    .sidebar-close:hover {
+        color: #111827 !important;
+    }
+
+    /* Sidebar Navigation */
+    .sidebar-nav {
+        padding: 1rem 0.75rem 1.5rem;
+    }
+
+    .sidebar-nav ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .sidebar-nav .nav-section {
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #9ca3af !important;
+        padding: 1rem 0.75rem 0.25rem;
+        font-weight: 700;
+    }
+
+    /* ===== NON-ACTIVE MENU ITEMS ===== */
+    /* Blue text like reference */
+    .receptionist-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn,
+    .receptionist-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn span {
+        color: var(--text-blue) !important;
+    }
+
+    /* Gray icons */
+    .receptionist-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn .menu-icon {
+        color: var(--icon-gray) !important;
+    }
+
+    /* ===== ACTIVE MENU ITEM ===== */
+    .receptionist-sidebar .sidebar-nav ul li.menu-item.active a.menu-btn,
+    .receptionist-sidebar .sidebar-nav ul li.menu-item.active a.menu-btn span {
+        color: #ffffff !important;
+    }
+
+    .receptionist-sidebar .sidebar-nav ul li.menu-item.active a.menu-btn .menu-icon {
+        color: #ffffff !important;
+    }
+
+    /* Remove any old borders */
+    .receptionist-sidebar .sidebar-nav ul li a,
     .receptionist-sidebar .sidebar-nav ul li.active a {
-        background: rgba(13, 148, 136, 0.12);
-        color: #0d9488;
-        border-right: 3px solid #0d9488;
-    }
-    
-    .receptionist-sidebar .sidebar-nav ul li.logout-link a:hover {
-        background: #fce4ec;
-        color: #dc3545;
+        border: none !important;
+        border-left: none !important;
+        border-right: none !important;
+        border-top: none !important;
+        border-bottom: none !important;
+        outline: none !important;
     }
 
-    .receptionist-sidebar .sidebar-nav ul li.nav-section {
-        color: #94a3b8;
+    /* Menu Item Styles */
+    .menu-btn {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        width: 100%;
+        padding: 0.75rem 1rem;
+        border-radius: 8px !important;
+        text-decoration: none;
+        font-size: 0.875rem;
+        font-weight: 600;
+        transition: all 0.2s ease;
+        background: transparent;
+        cursor: pointer;
+        position: relative;
     }
 
-    /* Header */
-    .receptionist-header .header-datetime i {
-        color: #0d9488;
-    }
-    
-    .receptionist-header .divider-icon {
-        color: #e2e8f0;
-    }
-    
-    .receptionist-header .notif-btn {
-        color: #0d9488;
-    }
-    
-    .receptionist-header .notif-btn:hover {
-        background: rgba(13, 148, 136, 0.08);
-    }
-    
-    .receptionist-avatar {
-        background: #ccfbf1 !important;
-        color: #0d9488 !important;
-    }
-    
-    .receptionist-role {
-        color: #0d9488 !important;
-    }
-    
-    .receptionist-header .page-title-header {
-        color: #0f766e;
+    .menu-btn:hover {
+        background: var(--active-blue-light) !important;
+        color: var(--active-blue) !important;
+        box-shadow: inset 0 1px 3px rgba(25, 118, 210, 0.1) !important;
     }
 
-    /* Notification Badge */
+    .menu-btn:hover .menu-icon {
+        color: var(--active-blue) !important;
+    }
+
+    .menu-item.active .menu-btn {
+        background: var(--active-blue) !important;
+        color: #ffffff !important;
+        box-shadow: 0 4px 12px rgba(25, 118, 210, 0.3) !important;
+    }
+
+    /* Menu Icon */
+    .menu-icon {
+        font-size: 1.1rem;
+        flex-shrink: 0;
+        width: 24px;
+        text-align: center;
+        transition: color 0.2s ease;
+    }
+
+    /* Menu Arrow (Chevron) */
+    .menu-arrow {
+        font-size: 0.9rem;
+        color: #ffffff !important;
+        margin-left: auto;
+        flex-shrink: 0;
+    }
+
+    /* ===== REMOVE BADGE FROM ACTIVE ITEMS ===== */
+    .menu-item.active .badge-notif {
+        display: none !important;
+    }
+
+    /* Badge - only shows on non-active items */
+    .badge-notif {
+        margin-left: auto;
+        background: #ffffff !important;
+        color: var(--text-blue) !important;
+        font-size: 0.65rem;
+        font-weight: 700;
+        padding: 0.15rem 0.5rem;
+        border-radius: 30px;
+        min-width: 20px;
+        height: 20px;
+        text-align: center;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        flex-shrink: 0;
+        line-height: 1;
+    }
+
+    /* Logout Item */
+    .logout-item {
+        margin-top: 0.5rem;
+        border-top: 1px solid #f3f4f6 !important;
+        padding-top: 0.5rem;
+    }
+
+    .logout-item .menu-btn:hover {
+        background: #fee2e2 !important;
+        color: #dc2626 !important;
+    }
+
+    .logout-item .menu-btn:hover .menu-icon {
+        color: #dc2626 !important;
+    }
+
+    /* Nav Divider */
+    .nav-divider {
+        height: 1px;
+        background: #f3f4f6 !important;
+        margin: 0.5rem 0;
+    }
+
+    /* ===== SIDEBAR OVERLAY ===== */
+    .sidebar-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.4);
+        z-index: 999;
+        display: none;
+    }
+
+    .sidebar-overlay.active {
+        display: block;
+    }
+
+    /* ===== MAIN CONTENT ===== */
+    .admin-main {
+        flex: 1;
+        margin-left: var(--sidebar-width);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-light);
+    }
+
+    /* ===== HEADER ===== */
+    .receptionist-header {
+        background: #ffffff !important;
+        padding: 0.75rem 2rem;
+        border-bottom: 1px solid #e5e7eb !important;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        min-height: var(--header-height);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+
+    .header-left {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .hamburger-btn {
+        display: none;
+        background: transparent;
+        border: none;
+        font-size: 1.5rem;
+        color: #111827 !important;
+        cursor: pointer;
+        padding: 0.25rem;
+    }
+
+    .header-title-group {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .header-title-icon {
+        width: 24px;
+        height: 24px;
+        object-fit: contain;
+    }
+
+    .page-title-header {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #111827 !important;
+        margin: 0;
+    }
+
+    .header-right {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .header-info-group {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .header-datetime {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        color: #6b7280 !important;
+        font-size: 0.78rem;
+        font-weight: 500;
+        white-space: nowrap;
+    }
+
+    .header-datetime i {
+        color: var(--active-blue) !important;
+        font-size: 0.8rem;
+    }
+
+    .divider-icon {
+        display: flex;
+        align-items: center;
+        color: #d1d5db !important;
+        font-size: 0.8rem;
+        font-weight: 300;
+        padding: 0 0.1rem;
+    }
+
+    /* Notification Button */
     .notif-btn {
         position: relative;
         background: transparent;
         border: none;
         font-size: 1.2rem;
-        color: #0d9488;
+        color: #6b7280 !important;
         cursor: pointer;
         padding: 0.35rem 0.6rem;
         border-radius: 50%;
         transition: all 0.2s ease;
     }
+
     .notif-btn:hover {
-        background: rgba(13, 148, 136, 0.08);
+        color: var(--active-blue) !important;
+        background: var(--active-blue-light) !important;
     }
+
     .notif-badge {
         position: absolute;
         top: 2px;
         right: 2px;
-        background: #dc3545;
-        color: white;
+        background: #dc2626 !important;
+        color: white !important;
         font-size: 0.65rem;
         font-weight: 700;
         min-width: 18px;
@@ -291,16 +600,20 @@
         justify-content: center;
         padding: 0 4px;
         border: 2px solid white;
-        box-shadow: 0 2px 6px rgba(220, 53, 69, 0.4);
+        box-shadow: 0 2px 6px rgba(220, 38, 38, 0.4);
     }
+
     .notif-badge.has-unread {
         animation: pulse-badge 1.8s infinite;
     }
+
     @keyframes pulse-badge {
-        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
-        70% { transform: scale(1.15); box-shadow: 0 0 0 6px rgba(220, 53, 69, 0); }
-        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
+        70% { transform: scale(1.15); box-shadow: 0 0 0 6px rgba(220, 38, 38, 0); }
+        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
     }
+
+    /* Notification Dropdown */
     .notif-dropdown-menu {
         width: 340px;
         max-width: 90vw;
@@ -308,39 +621,47 @@
         padding: 0;
         margin-top: 10px !important;
         overflow: hidden;
+        border: 1px solid #e5e7eb !important;
     }
+
     .notif-dropdown-header {
         padding: 0.85rem 1rem;
-        background: #f8fafc;
-        border-bottom: 1px solid #e2e8f0;
+        background: #f8fafc !important;
+        border-bottom: 1px solid #e5e7eb !important;
     }
+
     .notif-dropdown-body {
         max-height: 320px;
         overflow-y: auto;
     }
+
     .notif-dropdown-footer {
         padding: 0.75rem 1rem;
-        background: #f8fafc;
-        border-top: 1px solid #e2e8f0;
+        background: #f8fafc !important;
+        border-top: 1px solid #e5e7eb !important;
     }
+
     .notif-item {
         display: flex;
         gap: 0.75rem;
         padding: 0.85rem 1rem;
-        border-bottom: 1px solid #f1f5f9;
+        border-bottom: 1px solid #f3f4f6 !important;
         text-decoration: none !important;
-        color: #334155;
+        color: #374151 !important;
         transition: background 0.15s ease;
         position: relative;
         cursor: pointer;
     }
+
     .notif-item:hover {
-        background: #f0fdfa;
+        background: #f8fafc !important;
     }
+
     .notif-item.unread {
-        background: #f8fafc;
+        background: #f8fafc !important;
         font-weight: 500;
     }
+
     .notif-item.unread::before {
         content: '';
         position: absolute;
@@ -349,74 +670,130 @@
         transform: translateY(-50%);
         width: 6px;
         height: 6px;
-        background: #0d9488;
+        background: var(--active-blue) !important;
         border-radius: 50%;
     }
+
     .notif-icon-box {
         width: 34px;
         height: 34px;
         border-radius: 10px;
-        background: #ccfbf1;
-        color: #0d9488;
         display: flex;
         align-items: center;
         justify-content: center;
         font-size: 1rem;
         flex-shrink: 0;
     }
-    .notif-icon-box.appointment { background: #ccfbf1; color: #0d9488; }
-    .notif-icon-box.system { background: #fef3c7; color: #d97706; }
+
+    .notif-icon-box.appointment { background: #e3f2fd !important; color: #1976d2 !important; }
+    .notif-icon-box.system { background: #fef3c7 !important; color: #d97706 !important; }
+    .notif-icon-box.billing { background: #fff3e0 !important; color: #ff6b00 !important; }
+    .notif-icon-box.payment { background: #ccfbf1 !important; color: #0d9488 !important; }
+
     .notif-content {
         flex: 1;
         min-width: 0;
     }
+
     .notif-title {
         font-size: 0.82rem;
         font-weight: 600;
-        color: #0f172a;
+        color: #111827 !important;
         margin-bottom: 2px;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
     }
+
     .notif-msg {
         font-size: 0.75rem;
-        color: #64748b;
+        color: #6b7280 !important;
         margin-bottom: 4px;
         display: -webkit-box;
         -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
         overflow: hidden;
     }
+
     .notif-time {
         font-size: 0.68rem;
-        color: #94a3b8;
+        color: #9ca3af !important;
     }
-    .text-teal {
-        color: #0d9488 !important;
+
+    .text-primary {
+        color: var(--active-blue) !important;
     }
-    .text-teal:hover {
-        color: #0f766e !important;
+
+    .text-primary:hover {
+        color: var(--active-blue-dark) !important;
+    }
+
+    /* Header User */
+    .header-user {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        cursor: pointer;
+        padding: 0.1rem 0.3rem;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
+
+    .header-user:hover {
+        background: #f8fafc !important;
+    }
+
+    .receptionist-avatar {
+        background: var(--active-blue-light) !important;
+        color: var(--active-blue) !important;
+    }
+
+    .user-details {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.15;
+    }
+
+    .user-name-header {
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: #111827 !important;
+    }
+
+    .user-role-header {
+        font-size: 0.58rem;
+        color: #6b7280 !important;
+        font-weight: 500;
+    }
+
+    .receptionist-role {
+        color: var(--active-blue) !important;
+    }
+
+    /* ===== CONTENT AREA ===== */
+    .admin-content {
+        flex: 1;
+        padding: 1.5rem 2rem 2rem;
     }
 
     /* ============================================
        RESPONSIVE
     ============================================ */
     @media (max-width: 992px) {
-        .admin-sidebar {
+        .receptionist-sidebar {
             position: fixed;
             top: 0;
             left: -280px;
             width: 280px;
             height: 100%;
-            background: white;
+            background: #ffffff !important;
             z-index: 1060;
             transition: left 0.3s ease;
             box-shadow: none;
         }
-        .admin-sidebar.open {
+        .receptionist-sidebar.open {
             left: 0;
-            box-shadow: 4px 0 30px rgba(0,0,0,0.08);
+            box-shadow: 4px 0 30px rgba(0,0,0,0.1) !important;
         }
         .sidebar-overlay {
             position: fixed;
@@ -434,11 +811,11 @@
         .sidebar-close {
             display: flex !important;
         }
-        .admin-header {
+        .receptionist-header {
             padding: 0.75rem 1rem;
         }
         .header-title-group .page-title-header {
-            font-size: 1rem !important;
+            font-size: 0.9rem !important;
         }
         .header-info-group .divider-icon {
             display: none;
@@ -452,38 +829,38 @@
         .admin-content {
             padding: 1rem;
         }
+        .notif-dropdown-menu {
+            width: 300px;
+        }
     }
 
-    @media (max-width: 576px) {
-        .admin-header {
+    @media (max-width: 768px) {
+        .receptionist-header {
             padding: 0.5rem 0.75rem;
         }
         .header-title-group .header-title-icon {
-            width: 28px;
-            height: 28px;
+            width: 20px;
+            height: 20px;
         }
         .header-title-group .page-title-header {
-            font-size: 0.85rem !important;
+            font-size: 0.8rem !important;
         }
         .header-datetime span {
             font-size: 0.6rem;
         }
-        .user-details .user-name-header {
-            font-size: 0.7rem !important;
-        }
-        .user-details .user-role-header {
-            font-size: 0.55rem !important;
+        .user-details {
+            display: none;
         }
         .avatar-small {
-            width: 28px;
-            height: 28px;
-            font-size: 0.7rem;
+            width: 30px;
+            height: 30px;
+            font-size: 0.75rem;
         }
         .admin-content {
             padding: 0.75rem;
         }
         .notif-dropdown-menu {
-            width: 300px;
+            width: 280px;
         }
         .hamburger-btn {
             font-size: 1.2rem;
@@ -493,18 +870,58 @@
             font-size: 1rem;
             padding: 0.2rem 0.4rem;
         }
+        .menu-btn {
+            padding: 0.6rem 0.75rem;
+            font-size: 0.8rem;
+        }
+        .menu-icon {
+            font-size: 0.9rem;
+            width: 20px;
+        }
+        .badge-notif {
+            font-size: 0.5rem;
+            padding: 0.1rem 0.4rem;
+            min-width: 16px;
+            height: 16px;
+        }
     }
 
-    @media (max-width: 400px) {
-        .header-datetime span {
-            font-size: 0.5rem;
+    @media (max-width: 576px) {
+        .receptionist-header {
+            padding: 0.4rem 0.5rem;
         }
         .header-title-group .header-title-icon {
-            width: 22px;
-            height: 22px;
+            width: 18px;
+            height: 18px;
         }
         .header-title-group .page-title-header {
             font-size: 0.7rem !important;
+        }
+        .header-datetime span {
+            font-size: 0.5rem;
+        }
+        .header-datetime i {
+            font-size: 0.65rem;
+        }
+        .notif-btn {
+            font-size: 0.9rem;
+            padding: 0.15rem 0.3rem;
+        }
+        .notif-badge {
+            width: 14px;
+            height: 14px;
+            font-size: 0.5rem;
+            min-width: 14px;
+            top: -1px;
+            right: -1px;
+        }
+        .avatar-small {
+            width: 26px;
+            height: 26px;
+            font-size: 0.65rem;
+        }
+        .admin-content {
+            padding: 0.5rem;
         }
         .notif-dropdown-menu {
             width: 260px;
@@ -518,22 +935,33 @@
         .notif-msg {
             font-size: 0.7rem;
         }
+        .menu-btn {
+            padding: 0.5rem 0.6rem;
+            font-size: 0.8rem;
+        }
     }
 
-    .sidebar-close {
-        display: none;
-        background: transparent;
-        border: none;
-        font-size: 1.2rem;
-        color: #64748b;
-        padding: 0.25rem 0.5rem;
-        border-radius: 8px;
-        cursor: pointer;
-        transition: all 0.2s ease;
-    }
-    .sidebar-close:hover {
-        background: #f0f4ff;
-        color: #0a2b4e;
+    @media (max-width: 400px) {
+        .header-datetime span {
+            font-size: 0.45rem;
+        }
+        .header-title-group .header-title-icon {
+            width: 16px;
+            height: 16px;
+        }
+        .header-title-group .page-title-header {
+            font-size: 0.65rem !important;
+        }
+        .notif-dropdown-menu {
+            width: 250px;
+        }
+        .sidebar-nav {
+            padding: 0.75rem 0.5rem;
+        }
+        .menu-btn {
+            padding: 0.5rem 0.6rem;
+            gap: 0.5rem;
+        }
     }
     </style>
 

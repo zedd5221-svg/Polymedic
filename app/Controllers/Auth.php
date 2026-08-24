@@ -72,7 +72,7 @@ class Auth extends BaseController
                 'administrator' => 'admin',
                 'receptionist' => 'receptionist',
                 'technologist' => 'med_tech',
-                'radiologist' => 'radiologist'
+                'radiologist' => 'radiologist'  // ← ADD THIS
             ];
             
             // Get the mapped database role
@@ -138,10 +138,10 @@ class Auth extends BaseController
                 return redirect()->to(base_url('admin/dashboard'));
             case 'receptionist':
                 return redirect()->to(base_url('receptionist/dashboard'));
+            case 'radiologist':  // ← FIXED: Added this case
+                return redirect()->to(base_url('radiologist/dashboard'));
             case 'med_tech':
             case 'technologist':
-                return redirect()->to(base_url('admin/dashboard'));
-            case 'radiologist':
                 return redirect()->to(base_url('admin/dashboard'));
             case 'physician':
                 return redirect()->to(base_url('admin/dashboard'));

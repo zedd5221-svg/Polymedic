@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
     <title>PolyMedic - Receptionist Dashboard</title>
 
     <!-- Main CSS -->
@@ -62,6 +62,24 @@
                             <i class="bi bi-people-fill menu-icon"></i>
                             <span>Patients</span>
                             <?php if (current_url() == base_url('receptionist/patients')): ?>
+                                <i class="bi bi-chevron-right menu-arrow"></i>
+                            <?php endif; ?>
+                        </a>
+                    </li>
+                    <li class="menu-item <?= current_url() == base_url('receptionist/diagnostic-requests') ? 'active' : '' ?>">
+                        <a href="/polymedic/public/receptionist/diagnostic-requests" class="menu-btn">
+                            <i class="bi bi-file-earmark-medical menu-icon"></i>
+                            <span>Diagnostic Requests</span>
+                            <?php 
+                            // Count pending diagnostic requests
+                            $labModel = new \App\Models\LabRequestModel();
+                            $xrayModel = new \App\Models\XrayExaminationModel();
+                            $pendingCount = $labModel->where('status', 'pending')->countAllResults() + $xrayModel->where('status', 'pending')->countAllResults();
+                            if ($pendingCount > 0): 
+                            ?>
+                                <span class="badge-notif"><?= $pendingCount ?></span>
+                            <?php endif; ?>
+                            <?php if (current_url() == base_url('receptionist/diagnostic-requests')): ?>
                                 <i class="bi bi-chevron-right menu-arrow"></i>
                             <?php endif; ?>
                         </a>
@@ -145,7 +163,8 @@
                                 'Patients' => 'sick-patient.png',
                                 'Billing' => 'billing-icon.png',
                                 'Payments' => 'payment-icon.png',
-                                'Reports' => 'reports-icon.png'
+                                'Reports' => 'reports-icon.png',
+                                'Diagnostic Requests' => 'stethoscope.png'
                             ];
                             $iconFile = $iconMap[$pageTitle] ?? 'statisctics.png';
                         ?>
@@ -161,7 +180,7 @@
                         </div>
                         <span class="divider-icon">|</span>
                         
-                        <!-- NOTIFICATION DROPDOWN - UPDATED -->
+                        <!-- NOTIFICATION DROPDOWN -->
                         <div class="dropdown notif-dropdown-wrapper">
                             <button class="notif-btn" type="button" id="notifDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="bi bi-bell-fill"></i>
@@ -214,7 +233,7 @@
 
     <style>
     /* ============================================
-       RECEPTIONIST SIDEBAR - MATCHING REFERENCE DESIGN
+       RECEPTIONIST SIDEBAR - FULLY RESPONSIVE
        ============================================ */
     :root {
         --sidebar-width: 280px;
@@ -327,13 +346,11 @@
     }
 
     /* ===== NON-ACTIVE MENU ITEMS ===== */
-    /* Blue text like reference */
     .receptionist-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn,
     .receptionist-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn span {
         color: var(--text-blue) !important;
     }
 
-    /* Gray icons */
     .receptionist-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn .menu-icon {
         color: var(--icon-gray) !important;
     }
@@ -348,7 +365,6 @@
         color: #ffffff !important;
     }
 
-    /* Remove any old borders */
     .receptionist-sidebar .sidebar-nav ul li a,
     .receptionist-sidebar .sidebar-nav ul li.active a {
         border: none !important;
@@ -478,9 +494,11 @@
         display: flex;
         flex-direction: column;
         background: var(--bg-light);
+        width: calc(100% - var(--sidebar-width));
+        max-width: 100%;
     }
 
-    /* ===== HEADER ===== */
+    /* ===== HEADER - FIXED FOR MOBILE ===== */
     .receptionist-header {
         background: #ffffff !important;
         padding: 0.75rem 2rem;
@@ -493,12 +511,15 @@
         z-index: 100;
         min-height: var(--header-height);
         box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        width: 100%;
+        box-sizing: border-box;
     }
 
     .header-left {
         display: flex;
         align-items: center;
         gap: 1rem;
+        min-width: 0;
     }
 
     .hamburger-btn {
@@ -509,18 +530,21 @@
         color: #111827 !important;
         cursor: pointer;
         padding: 0.25rem;
+        flex-shrink: 0;
     }
 
     .header-title-group {
         display: flex;
         align-items: center;
         gap: 0.5rem;
+        min-width: 0;
     }
 
     .header-title-icon {
         width: 24px;
         height: 24px;
         object-fit: contain;
+        flex-shrink: 0;
     }
 
     .page-title-header {
@@ -528,12 +552,16 @@
         font-weight: 600;
         color: #111827 !important;
         margin: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     .header-right {
         display: flex;
         align-items: center;
         gap: 1rem;
+        flex-shrink: 0;
     }
 
     .header-info-group {
@@ -689,6 +717,8 @@
     .notif-icon-box.system { background: #fef3c7 !important; color: #d97706 !important; }
     .notif-icon-box.billing { background: #fff3e0 !important; color: #ff6b00 !important; }
     .notif-icon-box.payment { background: #ccfbf1 !important; color: #0d9488 !important; }
+    .notif-icon-box.lab { background: #e3f2fd !important; color: #1976d2 !important; }
+    .notif-icon-box.xray { background: #f3e5f5 !important; color: #7b1fa2 !important; }
 
     .notif-content {
         flex: 1;
@@ -746,6 +776,14 @@
     .receptionist-avatar {
         background: var(--active-blue-light) !important;
         color: var(--active-blue) !important;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.75rem;
+        flex-shrink: 0;
     }
 
     .user-details {
@@ -758,12 +796,14 @@
         font-size: 0.78rem;
         font-weight: 600;
         color: #111827 !important;
+        white-space: nowrap;
     }
 
     .user-role-header {
         font-size: 0.58rem;
         color: #6b7280 !important;
         font-weight: 500;
+        white-space: nowrap;
     }
 
     .receptionist-role {
@@ -774,11 +814,235 @@
     .admin-content {
         flex: 1;
         padding: 1.5rem 2rem 2rem;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+        overflow-x: hidden;
+    }
+
+    /* ===== RESPONSIVE GRID FIX FOR RECEPTIONIST PAGES ===== */
+    .stats-row,
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        width: 100%;
+    }
+
+    .stat-card {
+        background: #ffffff;
+        border-radius: 14px;
+        padding: 1.25rem 1.5rem;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+        box-shadow: 0 2px 12px rgba(10, 43, 78, 0.06);
+        border: 1px solid rgba(1, 72, 202, 0.04);
+        transition: all 0.3s ease;
+        width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(10, 43, 78, 0.1);
+    }
+
+    .stat-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        flex-shrink: 0;
+    }
+
+    .stat-info {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .stat-info h3 {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: #0a2b4e;
+        margin: 0;
+        line-height: 1.2;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .stat-info p {
+        color: #64748b;
+        font-size: 0.8rem;
+        margin: 0;
+        font-weight: 500;
+    }
+
+    .stat-info small {
+        font-size: 0.7rem;
+        color: #94a3b8;
+        margin-top: 2px;
+        display: block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .charts-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        width: 100%;
+    }
+
+    .chart-card,
+    .reports-card,
+    .summary-card,
+    .table-card,
+    .queue-card,
+    .tat-card,
+    .appointments-card {
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 1.25rem 1.5rem;
+        box-shadow: 0 2px 12px rgba(10, 43, 78, 0.06);
+        border: 1px solid rgba(1, 72, 202, 0.04);
+        min-width: 0;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .requests-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        width: 100%;
+    }
+
+    .request-card {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 1.25rem;
+        border: 1px solid #eef2f7;
+        transition: all 0.3s ease;
+        width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+
+    /* ===== RESPONSIVE TABLE ===== */
+    .table-responsive {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .receptionist-table,
+    .appointments-table,
+    .patients-table {
+        margin: 0;
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0 8px;
+    }
+
+    .receptionist-table thead th,
+    .appointments-table thead th,
+    .patients-table thead th {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #94A3B8;
+        font-weight: 600;
+        border: none;
+        padding: 0.75rem 1rem;
+        background: transparent;
+        white-space: nowrap;
+    }
+
+    .receptionist-table tbody tr,
+    .appointments-table tbody tr,
+    .patients-table tbody tr {
+        background: #ffffff;
+        border-radius: 12px;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+        border: 1px solid #E5E9ED;
+    }
+
+    .receptionist-table tbody tr:hover,
+    .appointments-table tbody tr:hover,
+    .patients-table tbody tr:hover {
+        background: #F8FAFB;
+        box-shadow: 0 4px 12px rgba(16, 24, 40, 0.08);
+        transform: translateY(-1px);
+    }
+
+    .receptionist-table tbody td,
+    .appointments-table tbody td,
+    .patients-table tbody td {
+        padding: 0.85rem 1rem;
+        vertical-align: middle;
+        font-size: 0.85rem;
+        color: #101828;
+        border: none;
+        white-space: nowrap;
+        background: transparent;
+    }
+
+    .receptionist-table tbody td:first-child,
+    .appointments-table tbody td:first-child,
+    .patients-table tbody td:first-child {
+        border-radius: 12px 0 0 12px;
+    }
+
+    .receptionist-table tbody td:last-child,
+    .appointments-table tbody td:last-child,
+    .patients-table tbody td:last-child {
+        border-radius: 0 12px 12px 0;
     }
 
     /* ============================================
-       RESPONSIVE
-    ============================================ */
+       RESPONSIVE BREAKPOINTS
+       ============================================ */
+
+    @media (max-width: 1400px) {
+        .stats-row,
+        .stats-grid {
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 0.85rem;
+        }
+    }
+
+    @media (max-width: 1200px) {
+        .stats-row,
+        .stats-grid {
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .charts-row,
+        .requests-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .receptionist-header {
+            padding: 0.75rem 1.25rem;
+        }
+
+        .admin-content {
+            padding: 1.25rem;
+        }
+    }
+
     @media (max-width: 992px) {
         .receptionist-sidebar {
             position: fixed;
@@ -791,10 +1055,12 @@
             transition: left 0.3s ease;
             box-shadow: none;
         }
+
         .receptionist-sidebar.open {
             left: 0;
             box-shadow: 4px 0 30px rgba(0,0,0,0.1) !important;
         }
+
         .sidebar-overlay {
             position: fixed;
             top: 0;
@@ -805,30 +1071,48 @@
             z-index: 1050;
             display: none;
         }
+
         .sidebar-overlay.active {
             display: block;
         }
+
         .sidebar-close {
             display: flex !important;
         }
+
+        .admin-main {
+            margin-left: 0;
+            width: 100%;
+        }
+
+        .hamburger-btn {
+            display: block;
+        }
+
         .receptionist-header {
             padding: 0.75rem 1rem;
         }
+
         .header-title-group .page-title-header {
             font-size: 0.9rem !important;
         }
+
         .header-info-group .divider-icon {
             display: none;
         }
+
         .header-datetime span {
             font-size: 0.7rem;
         }
+
         .user-details .user-role-header {
             font-size: 0.6rem !important;
         }
+
         .admin-content {
             padding: 1rem;
         }
+
         .notif-dropdown-menu {
             width: 300px;
         }
@@ -837,76 +1121,201 @@
     @media (max-width: 768px) {
         .receptionist-header {
             padding: 0.5rem 0.75rem;
+            min-height: 50px;
         }
+
         .header-title-group .header-title-icon {
             width: 20px;
             height: 20px;
         }
+
         .header-title-group .page-title-header {
             font-size: 0.8rem !important;
+            max-width: 150px;
         }
+
+        .header-datetime {
+            display: none; /* Hide datetime on mobile */
+        }
+
         .header-datetime span {
             font-size: 0.6rem;
         }
+
+        .header-datetime i {
+            font-size: 0.65rem;
+        }
+
+        .header-info-group .divider-icon {
+            display: none;
+        }
+
         .user-details {
             display: none;
         }
+
         .avatar-small {
             width: 30px;
             height: 30px;
             font-size: 0.75rem;
         }
+
         .admin-content {
             padding: 0.75rem;
         }
+
         .notif-dropdown-menu {
             width: 280px;
         }
+
         .hamburger-btn {
             font-size: 1.2rem;
             padding: 0.2rem 0.4rem;
         }
+
         .notif-btn {
             font-size: 1rem;
             padding: 0.2rem 0.4rem;
         }
+
         .menu-btn {
             padding: 0.6rem 0.75rem;
             font-size: 0.8rem;
         }
+
         .menu-icon {
             font-size: 0.9rem;
             width: 20px;
         }
+
         .badge-notif {
             font-size: 0.5rem;
             padding: 0.1rem 0.4rem;
             min-width: 16px;
             height: 16px;
         }
+
+        .header-user {
+            padding: 0;
+        }
+
+        .header-user .avatar-small {
+            width: 28px;
+            height: 28px;
+            font-size: 0.65rem;
+        }
+
+        .stats-row,
+        .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.6rem;
+        }
+
+        .stat-card {
+            padding: 1rem;
+        }
+
+        .stat-icon {
+            width: 36px;
+            height: 36px;
+            font-size: 1rem;
+        }
+
+        .stat-info h3 {
+            font-size: 1.25rem;
+        }
+
+        .chart-card,
+        .reports-card,
+        .summary-card,
+        .table-card,
+        .queue-card,
+        .tat-card,
+        .appointments-card {
+            padding: 1rem;
+        }
+
+        .page-header {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0.75rem;
+        }
+
+        .header-actions {
+            width: 100%;
+            gap: 0.5rem;
+        }
+
+        .header-actions .btn {
+            flex: 1;
+            justify-content: center;
+            padding: 0.5rem 1rem;
+            font-size: 0.8rem;
+        }
+
+        .table-toolbar,
+        .search-filter-row {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .search-wrapper {
+            max-width: 100%;
+        }
+
+        .filter-buttons {
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .request-header {
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .request-id-section {
+            flex-wrap: wrap;
+        }
+
+        .request-footer {
+            flex-wrap: wrap;
+        }
+
+        .btn-status {
+            flex: 1;
+            justify-content: center;
+        }
     }
 
     @media (max-width: 576px) {
         .receptionist-header {
             padding: 0.4rem 0.5rem;
+            min-height: 44px;
         }
+
         .header-title-group .header-title-icon {
             width: 18px;
             height: 18px;
         }
+
         .header-title-group .page-title-header {
             font-size: 0.7rem !important;
+            max-width: 120px;
         }
-        .header-datetime span {
-            font-size: 0.5rem;
+
+        .header-datetime {
+            display: none;
         }
-        .header-datetime i {
-            font-size: 0.65rem;
+
+        .header-info-group .divider-icon {
+            display: none;
         }
+
         .notif-btn {
             font-size: 0.9rem;
             padding: 0.15rem 0.3rem;
         }
+
         .notif-badge {
             width: 14px;
             height: 14px;
@@ -915,52 +1324,173 @@
             top: -1px;
             right: -1px;
         }
+
         .avatar-small {
             width: 26px;
             height: 26px;
             font-size: 0.65rem;
         }
+
+        .header-user {
+            display: none; /* Hide user entirely on very small screens */
+        }
+
         .admin-content {
             padding: 0.5rem;
         }
+
         .notif-dropdown-menu {
             width: 260px;
         }
+
         .notif-item {
             padding: 0.6rem 0.75rem;
         }
+
         .notif-title {
             font-size: 0.75rem;
         }
+
         .notif-msg {
             font-size: 0.7rem;
         }
+
         .menu-btn {
             padding: 0.5rem 0.6rem;
             font-size: 0.8rem;
         }
+
+        .stats-row,
+        .stats-grid {
+            grid-template-columns: 1fr;
+            gap: 0.5rem;
+        }
+
+        .stat-card {
+            flex-direction: row;
+            align-items: center;
+            padding: 0.85rem 1rem;
+            min-height: auto;
+        }
+
+        .stat-icon {
+            width: 40px;
+            height: 40px;
+            font-size: 1.1rem;
+            margin-bottom: 0;
+        }
+
+        .stat-info {
+            flex: 1;
+        }
+
+        .stat-info h3 {
+            font-size: 1.4rem;
+            white-space: normal;
+        }
+
+        .stat-info p {
+            font-size: 0.75rem;
+        }
+
+        .stat-info small {
+            font-size: 0.65rem;
+            white-space: normal;
+        }
+
+        .requests-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .request-card {
+            padding: 0.75rem;
+        }
+
+        .filter-btn {
+            font-size: 0.6rem;
+            padding: 0.2rem 0.5rem;
+        }
+
+        .request-meta {
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .receptionist-table,
+        .appointments-table,
+        .patients-table {
+            font-size: 0.75rem;
+            border-spacing: 0 6px;
+        }
+
+        .receptionist-table thead th,
+        .receptionist-table tbody td,
+        .appointments-table thead th,
+        .appointments-table tbody td,
+        .patients-table thead th,
+        .patients-table tbody td {
+            padding: 0.5rem;
+            font-size: 0.75rem;
+        }
+
+        .patient-avatar {
+            width: 28px;
+            height: 28px;
+            font-size: 0.55rem;
+        }
+
+        .action-icon-btn {
+            width: 32px;
+            height: 32px;
+            font-size: 0.85rem;
+            border-radius: 8px;
+        }
+
+        .chart-body {
+            height: 220px;
+        }
+
+        .action-grid {
+            grid-template-columns: 1fr;
+        }
     }
 
     @media (max-width: 400px) {
-        .header-datetime span {
-            font-size: 0.45rem;
-        }
         .header-title-group .header-title-icon {
             width: 16px;
             height: 16px;
         }
+
         .header-title-group .page-title-header {
             font-size: 0.65rem !important;
+            max-width: 100px;
         }
+
         .notif-dropdown-menu {
             width: 250px;
         }
+
         .sidebar-nav {
             padding: 0.75rem 0.5rem;
         }
+
         .menu-btn {
             padding: 0.5rem 0.6rem;
             gap: 0.5rem;
+        }
+
+        .notif-btn {
+            font-size: 0.85rem;
+        }
+
+        .notif-badge {
+            width: 12px;
+            height: 12px;
+            font-size: 0.4rem;
+        }
+
+        .chart-body {
+            height: 180px;
         }
     }
     </style>
@@ -1033,14 +1563,32 @@
             let html = '';
             notifications.forEach(item => {
                 const unreadClass = item.is_read == 0 ? 'unread' : '';
-                const iconClass = item.type === 'appointment' ? 'bi-calendar-check' : 'bi-bell-fill';
+                let iconClass = 'bi-bell-fill';
+                let colorClass = 'system';
+                
+                if (item.type === 'appointment') {
+                    iconClass = 'bi-calendar-check';
+                    colorClass = 'appointment';
+                } else if (item.type === 'lab') {
+                    iconClass = 'bi-flask';
+                    colorClass = 'lab';
+                } else if (item.type === 'xray') {
+                    iconClass = 'bi-x-ray';
+                    colorClass = 'xray';
+                } else if (item.type === 'billing') {
+                    iconClass = 'bi-receipt';
+                    colorClass = 'billing';
+                } else if (item.type === 'payment') {
+                    iconClass = 'bi-credit-card';
+                    colorClass = 'payment';
+                }
                 
                 // Use the actual link from the notification
                 const link = item.link || '#';
                 
                 html += `
                     <a href="${link}" class="notif-item ${unreadClass}" onclick="markNotificationRead(${item.id}, event)">
-                        <div class="notif-icon-box ${item.type}">
+                        <div class="notif-icon-box ${colorClass}">
                             <i class="bi ${iconClass}"></i>
                         </div>
                         <div class="notif-content">

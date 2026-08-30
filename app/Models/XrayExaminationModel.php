@@ -11,9 +11,9 @@ class XrayExaminationModel extends Model
     
     protected $allowedFields = [
         'appointment_id', 'patient_name', 'patient_id', 'age', 'gender',
-        'exam_type', 'exam_date', 'doctor_name', 'radiologist_name',
-        'priority', 'status', 'image_path', 'findings', 'interpretation',
-        'released_at'
+        'email', 'phone', 'exam_type', 'exam_date', 'doctor_name', 
+        'radiologist_name', 'priority', 'status', 'image_path', 
+        'findings', 'interpretation', 'released_at'
     ];
     
     protected $useTimestamps = true;
@@ -135,6 +135,8 @@ class XrayExaminationModel extends Model
             'patient_name' => $appointment['full_name'],
             'age' => $appointment['age'],
             'gender' => $appointment['gender'],
+            'email' => $appointment['email'] ?? null,
+            'phone' => $appointment['phone'] ?? null,
             'exam_type' => $examType,
             'exam_date' => $appointment['appointment_date'],
             'priority' => 'Routine',
@@ -181,5 +183,134 @@ class XrayExaminationModel extends Model
             'released' => $this->where('status', self::STATUS_RELEASED)->countAllResults(),
             'total' => $this->countAll()
         ];
+    }
+
+    /**
+     * Get weekly volume data for the last 7 days
+     * Returns data grouped by day and service type
+     */
+    public function getWeeklyVolumeData()
+    {
+        $db = \Config\Database::connect();
+        
+        // Get the start of the week (Monday)
+        $weekStart = date('Y-m-d', strtotime('monday this week'));
+        $weekEnd = date('Y-m-d', strtotime('sunday this week'));
+        
+        // Get all examinations for this week with their exam_type
+        $examinations = $this
+            ->where('DATE(exam_date) >=', $weekStart)
+            ->where('DATE(exam_date) <=', $weekEnd)
+            ->orderBy('exam_date', 'ASC')
+            ->findAll();
+        
+        // Initialize data structure for 7 days (Mon-Sun)
+        $days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        $modalities = [];
+        
+        // Process each examination
+        foreach ($examinations as $exam) {
+            // Get the day of week (0=Mon, 6=Sun)
+            $dayIndex = date('N', strtotime($exam['exam_date'])) - 1;
+            $dayName = $days[$dayIndex];
+            
+            // Determine the modality/service type from exam_type
+            $modality = $this->determineModality($exam['exam_type']);
+            
+            // Initialize modality if not exists
+            if (!isset($modalities[$modality])) {
+                $modalities[$modality] = array_fill(0, 7, 0);
+            }
+            
+            // Increment the count for this day
+            $modalities[$modality][$dayIndex]++;
+        }
+        
+        // Format for Chart.js
+        $datasets = [];
+        $colors = [
+            'X-Ray' => '#1D4ED8',
+            'CT' => '#0E7490',
+            'MRI' => '#7c3aed',
+            'Ultrasound' => '#16a34a',
+            'Mammography' => '#f59e0b',
+            'Other' => '#94A3B8'
+        ];
+        
+        foreach ($modalities as $modality => $data) {
+            $datasets[] = [
+                'label' => $modality,
+                'data' => $data,
+                'backgroundColor' => $colors[$modality] ?? '#94A3B8',
+                'borderRadius' => 4,
+                'barPercentage' => 0.6
+            ];
+        }
+        
+        // If no data, return empty datasets with sample structure
+        if (empty($datasets)) {
+            $datasets = [
+                [
+                    'label' => 'X-Ray',
+                    'data' => [0, 0, 0, 0, 0, 0, 0],
+                    'backgroundColor' => '#1D4ED8',
+                    'borderRadius' => 4,
+                    'barPercentage' => 0.6
+                ]
+            ];
+        }
+        
+        return [
+            'labels' => $days,
+            'datasets' => $datasets
+        ];
+    }
+    
+    /**
+     * Determine modality from exam_type string
+     */
+    public function determineModality($examType)
+    {
+        if (empty($examType)) {
+            return 'Other';
+        }
+        
+        $examTypeLower = strtolower($examType);
+        
+        // Check for specific modalities
+        if (strpos($examTypeLower, 'ct') !== false || strpos($examTypeLower, 'cat scan') !== false) {
+            return 'CT';
+        }
+        if (strpos($examTypeLower, 'mri') !== false) {
+            return 'MRI';
+        }
+        if (strpos($examTypeLower, 'ultrasound') !== false || strpos($examTypeLower, 'us') !== false || strpos($examTypeLower, 'sono') !== false) {
+            return 'Ultrasound';
+        }
+        if (strpos($examTypeLower, 'mammo') !== false) {
+            return 'Mammography';
+        }
+        if (strpos($examTypeLower, 'x-ray') !== false || strpos($examTypeLower, 'xray') !== false || strpos($examTypeLower, 'chest') !== false) {
+            return 'X-Ray';
+        }
+        
+        // Try to find from common service names
+        $commonServices = [
+            'chest' => 'X-Ray',
+            'abdomen' => 'X-Ray',
+            'spine' => 'X-Ray',
+            'extremity' => 'X-Ray',
+            'skull' => 'X-Ray',
+            'bone' => 'X-Ray',
+            'joint' => 'X-Ray'
+        ];
+        
+        foreach ($commonServices as $keyword => $modality) {
+            if (strpos($examTypeLower, $keyword) !== false) {
+                return $modality;
+            }
+        }
+        
+        return 'Other';
     }
 }

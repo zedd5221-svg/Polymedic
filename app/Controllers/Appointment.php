@@ -4,6 +4,9 @@ namespace App\Controllers;
 
 use App\Models\AppointmentModel;
 use App\Models\ServiceModel;
+use App\Models\LabRequestModel;
+use App\Models\XrayExaminationModel;
+use App\Models\NotificationModel;
 
 class Appointment extends BaseController
 {
@@ -66,8 +69,76 @@ class Appointment extends BaseController
             $model = new AppointmentModel();
             $appointmentId = $model->insert($data);
             
+            // ===== OPTIONAL: AUTO-CREATE LAB REQUEST ON BOOKING =====
+            // This creates the lab request immediately when patient books
+            // If you want this, uncomment the code below:
+            /*
+            if (!empty($labServices)) {
+                $labRequestModel = new LabRequestModel();
+                
+                // Clean lab services
+                $cleanedServices = array_map(function($service) {
+                    $service = str_replace('\/', '/', $service);
+                    $service = str_replace('\\/', '/', $service);
+                    $service = stripslashes($service);
+                    return trim($service);
+                }, $labServices);
+                
+                $labData = [
+                    'appointment_id' => $appointmentId,
+                    'patient_name' => $this->request->getPost('full_name'),
+                    'age' => $this->request->getPost('age'),
+                    'gender' => $this->request->getPost('gender'),
+                    'lab_services' => implode(', ', $cleanedServices),
+                    'request_date' => $this->request->getPost('appointment_date'),
+                    'status' => 'pending'
+                ];
+                $labRequestModel->insert($labData);
+                
+                // Notify MedTech
+                NotificationModel::notify(
+                    'lab',
+                    'New Lab Request (Booking)',
+                    'New lab request for patient ' . $this->request->getPost('full_name'),
+                    $labRequestModel->getInsertID(),
+                    '/polymedic/public/medtech/request/view/' . $labRequestModel->getInsertID()
+                );
+            }
+            
+            if (!empty($xrayServices)) {
+                $xrayModel = new XrayExaminationModel();
+                
+                $cleanedServices = array_map(function($service) {
+                    $service = str_replace('\/', '/', $service);
+                    $service = str_replace('\\/', '/', $service);
+                    $service = stripslashes($service);
+                    return trim($service);
+                }, $xrayServices);
+                
+                $xrayData = [
+                    'appointment_id' => $appointmentId,
+                    'patient_name' => $this->request->getPost('full_name'),
+                    'age' => $this->request->getPost('age'),
+                    'gender' => $this->request->getPost('gender'),
+                    'exam_type' => implode(', ', $cleanedServices),
+                    'exam_date' => $this->request->getPost('appointment_date'),
+                    'status' => 'pending'
+                ];
+                $xrayModel->insert($xrayData);
+                
+                // Notify Radiologist
+                NotificationModel::notify(
+                    'xray',
+                    'New X-Ray Request (Booking)',
+                    'New X-Ray request for patient ' . $this->request->getPost('full_name'),
+                    $xrayModel->getInsertID(),
+                    '/polymedic/public/radiologist/examination/view/' . $xrayModel->getInsertID()
+                );
+            }
+            */
+            
             // Trigger Admin Notification
-            \App\Models\NotificationModel::notify(
+            NotificationModel::notify(
                 'appointment',
                 'New Appointment Request: ' . $reference,
                 'New appointment request from ' . $data['full_name'] . ' for ' . date('M d, Y', strtotime($data['appointment_date'])),

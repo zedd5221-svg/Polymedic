@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-    <title>PolyMedic - Admin Dashboard</title>
+    <title>PolyMedic - Medical Technologist Dashboard</title>
 
     <!-- Main CSS -->
     <link href="/polymedic/public/assets/css/AppointmentStyle.css" rel="stylesheet">
@@ -17,7 +17,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <!-- AOS for animations -->
-     <script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script> 
+    <script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script> 
 </head>
 <body>
     <!-- Initialize AOS -->
@@ -25,11 +25,11 @@
     
     <div class="admin-wrapper">
         <!-- Sidebar -->
-        <aside class="admin-sidebar" id="adminSidebar">
+        <aside class="admin-sidebar medtech-sidebar" id="adminSidebar">
             <div class="sidebar-header">
                 <div class="sidebar-logo">
                     <img src="/polymedic/public/assets/images/logo4.png" alt="PolyMedic">
-                    <span>PolyMedic<small>Diagnostic System</small></span>
+                    <span>PolyMedic<small>Laboratory System</small></span>
                 </div>
                 <button class="sidebar-close" onclick="toggleSidebar()">
                     <i class="bi bi-x-lg"></i>
@@ -38,66 +38,43 @@
             
             <nav class="sidebar-nav">
                 <ul>
-                    <li class="nav-section">MAIN</li>
-                    <li class="menu-item <?= current_url() == base_url('admin/dashboard') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/admin/dashboard" class="menu-btn">
+                    <li class="nav-section">LABORATORY</li>
+                    <li class="menu-item <?= current_url() == base_url('medtech/dashboard') ? 'active' : '' ?>">
+                        <a href="/polymedic/public/medtech/dashboard" class="menu-btn">
                             <i class="bi bi-grid-1x2-fill menu-icon"></i>
                             <span>Dashboard</span>
-                            <?php if (current_url() == base_url('admin/dashboard')): ?>
+                            <?php if (current_url() == base_url('medtech/dashboard')): ?>
                                 <i class="bi bi-chevron-right menu-arrow"></i>
                             <?php endif; ?>
                         </a>
                     </li>
-                    <li class="menu-item <?= current_url() == base_url('admin/appointments') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/admin/appointments" class="menu-btn">
-                            <i class="bi bi-calendar-check menu-icon"></i>
-                            <span>Appointments</span>
-                            <?php if (current_url() == base_url('admin/appointments')): ?>
+                    <li class="menu-item <?= strpos(current_url(), 'medtech/requests') !== false || strpos(current_url(), 'medtech/request') !== false ? 'active' : '' ?>">
+                        <a href="/polymedic/public/medtech/requests" class="menu-btn">
+                            <svg class="menu-icon-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2" />
+                                <path d="M6.453 15h11.094" />
+                                <path d="M8.5 2h7" />
+                            </svg>
+                            <span>Lab Requests</span>
+                            <?php 
+                            $labModel = new \App\Models\LabRequestModel();
+                            $pendingCount = $labModel->where('status', 'pending')->countAllResults();
+                            if ($pendingCount > 0): 
+                            ?>
+                                <span class="badge-notif-med"><?= $pendingCount ?></span>
+                            <?php endif; ?>
+                            <?php if (strpos(current_url(), 'medtech/requests') !== false || strpos(current_url(), 'medtech/request') !== false): ?>
                                 <i class="bi bi-chevron-right menu-arrow"></i>
                             <?php endif; ?>
                         </a>
-                    </li>
-                    <li class="menu-item <?= current_url() == base_url('admin/patients') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/admin/patients" class="menu-btn">
-                            <i class="bi bi-people-fill menu-icon"></i>
-                            <span>Patients</span>
-                            <?php if (current_url() == base_url('admin/patients')): ?>
-                                <i class="bi bi-chevron-right menu-arrow"></i>
-                            <?php endif; ?>
-                        </a>
-                    </li>
-
-                    <li class="menu-item <?= current_url() == base_url('admin/services') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/admin/services" class="menu-btn">
-                             <i class="bi bi-grid-3x3-gap-fill menu-icon"></i>
-                            <span>Services</span>
-                            <?php if (current_url() == base_url('admin/services')): ?>
-                                <i class="bi bi-chevron-right menu-arrow"></i>
-                            <?php endif; ?>
-                         </a>
                     </li>
                     
-                    <li class="nav-section">ADMIN</li>
-                    <li class="menu-item <?= current_url() == base_url('admin/users') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/admin/users" class="menu-btn">
-                            <i class="bi bi-person-gear menu-icon"></i>
-                            <span>User Management</span>
-                            <?php if (current_url() == base_url('admin/users')): ?>
-                                <i class="bi bi-chevron-right menu-arrow"></i>
-                            <?php endif; ?>
-                        </a>
-                    </li>
-                    <li class="menu-item <?= current_url() == base_url('admin/notifications') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/admin/notifications" class="menu-btn">
-                            <i class="bi bi-bell-fill menu-icon"></i>
-                            <span>Notifications</span>
-                            <?php 
-                            $unreadCount = (new \App\Models\NotificationModel())->getUnreadCount();
-                            if ($unreadCount > 0): 
-                            ?>
-                                <span class="badge-notif"><?= $unreadCount ?></span>
-                            <?php endif; ?>
-                            <?php if (current_url() == base_url('admin/notifications')): ?>
+                    <li class="nav-section">REPORTS</li>
+                    <li class="menu-item <?= strpos(current_url(), 'medtech/reports') !== false ? 'active' : '' ?>">
+                        <a href="/polymedic/public/medtech/reports" class="menu-btn">
+                            <i class="bi bi-file-earmark-text menu-icon"></i>
+                            <span>Reports</span>
+                            <?php if (strpos(current_url(), 'medtech/reports') !== false): ?>
                                 <i class="bi bi-chevron-right menu-arrow"></i>
                             <?php endif; ?>
                         </a>
@@ -121,35 +98,22 @@
         <!-- Main Content -->
         <main class="admin-main">
             <!-- Top Navbar -->
-            <header class="admin-header">
+            <header class="admin-header medtech-header">
                 <div class="header-left">
                     <button class="hamburger-btn" onclick="toggleSidebar()">
                         <i class="bi bi-list"></i>
                     </button>
-                    <!-- Page Title with PNG Icon -->
                     <div class="header-title-group">
                         <?php 
                             $pageTitle = $this->renderSection('pageTitle') ?: 'Dashboard';
                             $iconMap = [
                                 'Dashboard' => 'statisctics.png',
-                                'Appointments' => 'appointment1.png',
-                                'Patients' => 'sick-patient.png',
-                                'Diagnostic Requests' => 'stethoscope.png',
-                                'Laboratory Findings' => 'lab-icon.png',
-                                'User Management' => 'user-management-icon.png',
-                                'Notifications' => 'appointment1.png',
-                                'Radiologist Dashboard' => 'xray-icon.png',
-                                'X-Ray Examinations' => 'xray-icon.png',
-                                'View X-Ray Examination' => 'xray-icon.png'
+                                'Laboratory Requests' => 'lab-icon.png',
+                                'Lab Requests' => 'lab-icon.png',
+                                'View Lab Request' => 'lab-icon.png',
+                                'Reports' => 'reports-icon.png'
                             ];
-                            // Check if pageTitle contains specific keywords
-                            if (strpos($pageTitle, 'Radiologist') !== false) {
-                                $iconFile = 'xray-icon.png';
-                            } elseif (strpos($pageTitle, 'X-Ray') !== false) {
-                                $iconFile = 'xray-icon.png';
-                            } else {
-                                $iconFile = $iconMap[$pageTitle] ?? 'statisctics.png';
-                            }
+                            $iconFile = $iconMap[$pageTitle] ?? 'lab-icon.png';
                         ?>
                         <img src="/polymedic/public/assets/images/<?= $iconFile ?>" alt="<?= $pageTitle ?>" class="header-title-icon">
                         <h4 class="page-title-header"><?= $pageTitle ?></h4>
@@ -186,7 +150,7 @@
                                     </div>
                                 </div>
                                 <div class="notif-dropdown-footer text-center">
-                                    <a href="/polymedic/public/admin/notifications" class="text-primary fw-semibold small text-decoration-none">
+                                    <a href="<?= base_url('medtech/notifications') ?>" class="text-primary fw-semibold small text-decoration-none">
                                         View All Notifications <i class="bi bi-arrow-right ms-1"></i>
                                     </a>
                                 </div>
@@ -195,12 +159,12 @@
                         
                         <span class="divider-icon">|</span>
                         <div class="header-user">
-                            <div class="avatar-small">
+                            <div class="avatar-small medtech-avatar">
                                 <i class="bi bi-person-fill"></i>
                             </div>
                             <div class="user-details">
-                                <span class="user-name-header">Admin User</span>
-                                <span class="user-role-header">Administrator</span>
+                                <span class="user-name-header"><?= session()->get('full_name') ?? 'Med Tech' ?></span>
+                                <span class="user-role-header medtech-role">Medical Technologist</span>
                             </div>
                         </div>
                     </div>
@@ -209,14 +173,14 @@
             
             <!-- Page Content -->
             <div class="admin-content">
-                <?php echo $this->renderSection('adminContent'); ?>
+                <?php echo $this->renderSection('medtechContent'); ?>
             </div>
         </main>
     </div>
 
     <style>
     /* ============================================
-       ADMIN SIDEBAR - FULLY RESPONSIVE
+       MED TECH SIDEBAR - FULLY RESPONSIVE
        ============================================ */
     :root {
         --sidebar-width: 280px;
@@ -230,7 +194,7 @@
     }
 
     /* ===== SIDEBAR ===== */
-    .admin-sidebar {
+    .medtech-sidebar {
         width: var(--sidebar-width);
         min-height: 100vh;
         background: #ffffff !important;
@@ -245,11 +209,11 @@
         border-right: 1px solid #e5e7eb !important;
     }
 
-    .admin-sidebar::-webkit-scrollbar {
+    .medtech-sidebar::-webkit-scrollbar {
         width: 4px;
     }
 
-    .admin-sidebar::-webkit-scrollbar-thumb {
+    .medtech-sidebar::-webkit-scrollbar-thumb {
         background: #e5e7eb;
         border-radius: 4px;
     }
@@ -329,30 +293,29 @@
     }
 
     /* ===== NON-ACTIVE MENU ITEMS ===== */
-    /* Blue text like reference */
-    .admin-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn,
-    .admin-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn span {
+    .medtech-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn,
+    .medtech-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn span {
         color: var(--text-blue) !important;
     }
 
-    /* Gray icons */
-    .admin-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn .menu-icon {
+    .medtech-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn .menu-icon,
+    .medtech-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn .menu-icon-svg {
         color: var(--icon-gray) !important;
     }
 
     /* ===== ACTIVE MENU ITEM ===== */
-    .admin-sidebar .sidebar-nav ul li.menu-item.active a.menu-btn,
-    .admin-sidebar .sidebar-nav ul li.menu-item.active a.menu-btn span {
+    .medtech-sidebar .sidebar-nav ul li.menu-item.active a.menu-btn,
+    .medtech-sidebar .sidebar-nav ul li.menu-item.active a.menu-btn span {
         color: #ffffff !important;
     }
 
-    .admin-sidebar .sidebar-nav ul li.menu-item.active a.menu-btn .menu-icon {
+    .medtech-sidebar .sidebar-nav ul li.menu-item.active a.menu-btn .menu-icon,
+    .medtech-sidebar .sidebar-nav ul li.menu-item.active a.menu-btn .menu-icon-svg {
         color: #ffffff !important;
     }
 
-    /* Remove any old borders */
-    .admin-sidebar .sidebar-nav ul li a,
-    .admin-sidebar .sidebar-nav ul li.active a {
+    .medtech-sidebar .sidebar-nav ul li a,
+    .medtech-sidebar .sidebar-nav ul li.active a {
         border: none !important;
         border-left: none !important;
         border-right: none !important;
@@ -384,7 +347,8 @@
         box-shadow: inset 0 1px 3px rgba(25, 118, 210, 0.1) !important;
     }
 
-    .menu-btn:hover .menu-icon {
+    .menu-btn:hover .menu-icon,
+    .menu-btn:hover .menu-icon-svg {
         color: var(--active-blue) !important;
     }
 
@@ -403,6 +367,13 @@
         transition: color 0.2s ease;
     }
 
+    .menu-icon-svg {
+        width: 24px;
+        height: 24px;
+        flex-shrink: 0;
+        transition: color 0.2s ease;
+    }
+
     /* Menu Arrow (Chevron) */
     .menu-arrow {
         font-size: 0.9rem;
@@ -412,31 +383,12 @@
     }
 
     /* ===== REMOVE BADGE FROM ACTIVE ITEMS ===== */
-    .menu-item.active .badge-notif {
+    .menu-item.active .badge-notif-med {
         display: none !important;
     }
 
     /* Badge - only shows on non-active items */
-    .badge-notif {
-        margin-left: auto;
-        background: #ffffff !important;
-        color: var(--text-blue) !important;
-        font-size: 0.65rem;
-        font-weight: 700;
-        padding: 0.15rem 0.5rem;
-        border-radius: 30px;
-        min-width: 20px;
-        height: 20px;
-        text-align: center;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        flex-shrink: 0;
-        line-height: 1;
-    }
-
-    .badge-notif-xray {
+    .badge-notif-med {
         margin-left: auto;
         background: #ffffff !important;
         color: var(--text-blue) !important;
@@ -504,7 +456,7 @@
     }
 
     /* ===== HEADER - FIXED FOR MOBILE ===== */
-    .admin-header {
+    .medtech-header {
         background: #ffffff !important;
         padding: 0.75rem 2rem;
         border-bottom: 1px solid #e5e7eb !important;
@@ -648,45 +600,74 @@
 
     /* Notification Dropdown */
     .notif-dropdown-menu {
-        width: 340px;
+        width: 380px;
         max-width: 90vw;
         border-radius: 14px !important;
         padding: 0;
         margin-top: 10px !important;
         overflow: hidden;
         border: 1px solid #e5e7eb !important;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.15) !important;
     }
 
     .notif-dropdown-header {
-        padding: 0.85rem 1rem;
+        padding: 0.85rem 1.25rem;
         background: #f8fafc !important;
         border-bottom: 1px solid #e5e7eb !important;
     }
 
     .notif-dropdown-body {
-        max-height: 320px;
+        max-height: 380px;
         overflow-y: auto;
+        padding: 0;
+    }
+
+    .notif-dropdown-body::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    .notif-dropdown-body::-webkit-scrollbar-thumb {
+        background: #d1d5db;
+        border-radius: 4px;
     }
 
     .notif-dropdown-footer {
-        padding: 0.75rem 1rem;
+        padding: 0.75rem 1.25rem;
         background: #f8fafc !important;
         border-top: 1px solid #e5e7eb !important;
     }
 
+    .notif-dropdown-footer .text-primary {
+        color: var(--active-blue) !important;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+
+    .notif-dropdown-footer .text-primary:hover {
+        color: var(--active-blue-dark) !important;
+        text-decoration: underline;
+    }
+
+    /* Notification Items */
     .notif-item {
         display: flex;
         gap: 0.75rem;
-        padding: 0.85rem 1rem;
+        padding: 0.85rem 1.25rem;
         border-bottom: 1px solid #f3f4f6 !important;
         text-decoration: none !important;
         color: #374151 !important;
         transition: background 0.15s ease;
         position: relative;
+        cursor: pointer;
     }
 
     .notif-item:hover {
-        background: #f8fafc !important;
+        background: #e3f2fd !important;
+    }
+
+    .notif-item:last-child {
+        border-bottom: none !important;
     }
 
     .notif-item.unread {
@@ -697,7 +678,7 @@
     .notif-item.unread::before {
         content: '';
         position: absolute;
-        left: 6px;
+        left: 8px;
         top: 50%;
         transform: translateY(-50%);
         width: 6px;
@@ -707,27 +688,27 @@
     }
 
     .notif-icon-box {
-        width: 34px;
-        height: 34px;
+        width: 36px;
+        height: 36px;
         border-radius: 10px;
         display: flex;
         align-items: center;
         justify-content: center;
         font-size: 1rem;
         flex-shrink: 0;
+        margin-top: 2px;
     }
 
-    .notif-icon-box.appointment { background: #e3f2fd !important; color: #1976d2 !important; }
-    .notif-icon-box.xray { background: #e3f2fd !important; color: #1976d2 !important; }
+    .notif-icon-box.lab { background: #e3f2fd !important; color: #1976d2 !important; }
+    .notif-icon-box.appointment { background: #e0edff !important; color: #0148ca !important; }
     .notif-icon-box.system { background: #fef3c7 !important; color: #d97706 !important; }
-    .notif-icon-box.lab { background: #e8f5e9 !important; color: #28a745 !important; }
-    .notif-icon-box.billing { background: #fff3e0 !important; color: #ff6b00 !important; }
-    .notif-icon-box.payment { background: #ccfbf1 !important; color: #0d9488 !important; }
-    
+    .notif-icon-box.xray { background: #f3e5f5 !important; color: #7b1fa2 !important; }
+
     .notif-content {
         flex: 1;
         min-width: 0;
     }
+
     .notif-title {
         font-size: 0.82rem;
         font-weight: 600;
@@ -737,6 +718,7 @@
         overflow: hidden;
         text-overflow: ellipsis;
     }
+
     .notif-msg {
         font-size: 0.75rem;
         color: #6b7280 !important;
@@ -745,10 +727,19 @@
         -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
         overflow: hidden;
+        line-height: 1.4;
     }
+
     .notif-time {
         font-size: 0.68rem;
         color: #9ca3af !important;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    .notif-time i {
+        font-size: 0.6rem;
     }
 
     .text-primary {
@@ -774,7 +765,7 @@
         background: #f8fafc !important;
     }
 
-    .avatar-small {
+    .medtech-avatar {
         background: var(--active-blue-light) !important;
         color: var(--active-blue) !important;
         width: 32px;
@@ -807,6 +798,10 @@
         white-space: nowrap;
     }
 
+    .medtech-role {
+        color: var(--active-blue) !important;
+    }
+
     /* ===== CONTENT AREA ===== */
     .admin-content {
         flex: 1;
@@ -817,21 +812,138 @@
         overflow-x: hidden;
     }
 
+    /* ===== RESPONSIVE GRID FIX FOR MEDTECH PAGES ===== */
+    .stats-row,
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        width: 100%;
+    }
+
+    .stat-card {
+        background: #ffffff;
+        border-radius: 14px;
+        padding: 1.25rem 1.5rem;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+        box-shadow: 0 2px 12px rgba(10, 43, 78, 0.06);
+        border: 1px solid rgba(1, 72, 202, 0.04);
+        transition: all 0.3s ease;
+        width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(10, 43, 78, 0.1);
+    }
+
+    .stat-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        flex-shrink: 0;
+    }
+
+    .stat-info {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .stat-info h3 {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: #0a2b4e;
+        margin: 0;
+        line-height: 1.2;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .stat-info p {
+        color: #64748b;
+        font-size: 0.8rem;
+        margin: 0;
+        font-weight: 500;
+    }
+
+    .stat-info small {
+        font-size: 0.7rem;
+        color: #94a3b8;
+        margin-top: 2px;
+        display: block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .charts-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        width: 100%;
+    }
+
+    .chart-card,
+    .reports-card,
+    .summary-card,
+    .queue-card,
+    .tat-card {
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 1.25rem 1.5rem;
+        box-shadow: 0 2px 12px rgba(10, 43, 78, 0.06);
+        border: 1px solid rgba(1, 72, 202, 0.04);
+        min-width: 0;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
     /* ============================================
-       RESPONSIVE - FIXED FOR MOBILE
+       RESPONSIVE BREAKPOINTS
        ============================================ */
+
+    @media (max-width: 1400px) {
+        .stats-row,
+        .stats-grid {
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 0.85rem;
+        }
+    }
+
     @media (max-width: 1200px) {
-        .admin-header {
+        .stats-row,
+        .stats-grid {
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .charts-row {
+            grid-template-columns: 1fr;
+        }
+
+        .medtech-header {
             padding: 0.75rem 1.25rem;
         }
-        
+
         .admin-content {
             padding: 1.25rem;
         }
     }
 
     @media (max-width: 992px) {
-        .admin-sidebar {
+        .medtech-sidebar {
             position: fixed;
             top: 0;
             left: -280px;
@@ -842,10 +954,12 @@
             transition: left 0.3s ease;
             box-shadow: none;
         }
-        .admin-sidebar.open {
+
+        .medtech-sidebar.open {
             left: 0;
             box-shadow: 4px 0 30px rgba(0,0,0,0.1) !important;
         }
+
         .sidebar-overlay {
             position: fixed;
             top: 0;
@@ -856,165 +970,200 @@
             z-index: 1050;
             display: none;
         }
+
         .sidebar-overlay.active {
             display: block;
         }
+
         .sidebar-close {
             display: flex !important;
         }
-        
+
         .admin-main {
             margin-left: 0;
             width: 100%;
         }
-        
+
         .hamburger-btn {
             display: block;
         }
-        
-        .admin-header {
+
+        .medtech-header {
             padding: 0.75rem 1rem;
         }
-        
+
         .header-title-group .page-title-header {
             font-size: 0.9rem !important;
         }
-        
+
         .header-info-group .divider-icon {
             display: none;
         }
-        
+
         .header-datetime span {
             font-size: 0.7rem;
         }
-        
+
         .user-details .user-role-header {
             font-size: 0.6rem !important;
         }
-        
+
         .admin-content {
             padding: 1rem;
         }
-        
+
         .notif-dropdown-menu {
             width: 300px;
         }
     }
 
     @media (max-width: 768px) {
-        .admin-header {
+        .medtech-header {
             padding: 0.5rem 0.75rem;
             min-height: 50px;
         }
-        
+
         .header-title-group .header-title-icon {
             width: 20px;
             height: 20px;
         }
-        
+
         .header-title-group .page-title-header {
             font-size: 0.8rem !important;
             max-width: 150px;
         }
-        
-        .header-datetime span {
-            font-size: 0.6rem;
-        }
-        
+
         .header-datetime {
             display: none; /* Hide datetime on mobile */
         }
-        
+
+        .header-datetime span {
+            font-size: 0.6rem;
+        }
+
+        .header-datetime i {
+            font-size: 0.65rem;
+        }
+
         .header-info-group .divider-icon {
             display: none;
         }
-        
+
         .user-details {
             display: none;
         }
-        
+
         .avatar-small {
             width: 30px;
             height: 30px;
             font-size: 0.75rem;
         }
-        
+
         .admin-content {
             padding: 0.75rem;
         }
-        
+
         .notif-dropdown-menu {
             width: 280px;
         }
-        
+
         .hamburger-btn {
             font-size: 1.2rem;
             padding: 0.2rem 0.4rem;
         }
-        
+
         .notif-btn {
             font-size: 1rem;
             padding: 0.2rem 0.4rem;
         }
-        
+
         .menu-btn {
             padding: 0.6rem 0.75rem;
             font-size: 0.8rem;
         }
-        
-        .menu-icon {
+
+        .menu-icon,
+        .menu-icon-svg {
             font-size: 0.9rem;
-            width: 20px;
+            width: 20px !important;
+            height: 20px !important;
         }
-        
-        .badge-notif,
-        .badge-notif-xray {
+
+        .badge-notif-med {
             font-size: 0.5rem;
             padding: 0.1rem 0.4rem;
             min-width: 16px;
             height: 16px;
         }
-        
+
         .header-user {
             padding: 0;
         }
-        
+
         .header-user .avatar-small {
             width: 28px;
             height: 28px;
             font-size: 0.65rem;
         }
+
+        .stats-row,
+        .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.6rem;
+        }
+
+        .stat-card {
+            padding: 1rem;
+        }
+
+        .stat-icon {
+            width: 36px;
+            height: 36px;
+            font-size: 1rem;
+        }
+
+        .stat-info h3 {
+            font-size: 1.25rem;
+        }
+
+        .chart-card,
+        .reports-card,
+        .summary-card,
+        .queue-card,
+        .tat-card {
+            padding: 1rem;
+        }
     }
 
     @media (max-width: 576px) {
-        .admin-header {
+        .medtech-header {
             padding: 0.4rem 0.5rem;
             min-height: 44px;
         }
-        
+
         .header-title-group .header-title-icon {
             width: 18px;
             height: 18px;
         }
-        
+
         .header-title-group .page-title-header {
             font-size: 0.7rem !important;
             max-width: 120px;
         }
-        
+
         .header-datetime {
             display: none;
         }
-        
+
         .header-info-group .divider-icon {
             display: none;
         }
-        
+
         .notif-btn {
             font-size: 0.9rem;
             padding: 0.15rem 0.3rem;
         }
-        
+
         .notif-badge {
             width: 14px;
             height: 14px;
@@ -1023,40 +1172,94 @@
             top: -1px;
             right: -1px;
         }
-        
+
         .avatar-small {
             width: 26px;
             height: 26px;
             font-size: 0.65rem;
         }
-        
+
+        .header-user {
+            display: none; /* Hide user entirely on very small screens */
+        }
+
         .admin-content {
             padding: 0.5rem;
         }
-        
+
         .notif-dropdown-menu {
             width: 260px;
         }
-        
+
         .notif-item {
             padding: 0.6rem 0.75rem;
         }
-        
+
         .notif-title {
             font-size: 0.75rem;
         }
-        
+
         .notif-msg {
             font-size: 0.7rem;
         }
-        
+
         .menu-btn {
             padding: 0.5rem 0.6rem;
             font-size: 0.8rem;
         }
-        
-        .header-user {
-            display: none; /* Hide user entirely on very small screens */
+
+        .stats-row,
+        .stats-grid {
+            grid-template-columns: 1fr;
+            gap: 0.5rem;
+        }
+
+        .stat-card {
+            flex-direction: row;
+            align-items: center;
+            padding: 0.85rem 1rem;
+            min-height: auto;
+        }
+
+        .stat-icon {
+            width: 40px;
+            height: 40px;
+            font-size: 1.1rem;
+            margin-bottom: 0;
+        }
+
+        .stat-info {
+            flex: 1;
+        }
+
+        .stat-info h3 {
+            font-size: 1.4rem;
+            white-space: normal;
+        }
+
+        .stat-info p {
+            font-size: 0.75rem;
+        }
+
+        .stat-info small {
+            font-size: 0.65rem;
+            white-space: normal;
+        }
+
+        .charts-row {
+            gap: 0.5rem;
+        }
+
+        .chart-card,
+        .reports-card,
+        .summary-card,
+        .queue-card,
+        .tat-card {
+            padding: 0.75rem;
+        }
+
+        .chart-body {
+            height: 200px;
         }
     }
 
@@ -1065,33 +1268,37 @@
             width: 16px;
             height: 16px;
         }
-        
+
         .header-title-group .page-title-header {
             font-size: 0.65rem !important;
             max-width: 100px;
         }
-        
+
         .notif-dropdown-menu {
             width: 250px;
         }
-        
+
         .sidebar-nav {
             padding: 0.75rem 0.5rem;
         }
-        
+
         .menu-btn {
             padding: 0.5rem 0.6rem;
             gap: 0.5rem;
         }
-        
+
         .notif-btn {
             font-size: 0.85rem;
         }
-        
+
         .notif-badge {
             width: 12px;
             height: 12px;
             font-size: 0.4rem;
+        }
+
+        .chart-body {
+            height: 180px;
         }
     }
     </style>
@@ -1099,7 +1306,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js"></script>
     <script>
-        // Sidebar toggle
         function toggleSidebar() {
             const sidebar = document.getElementById('adminSidebar');
             const overlay = document.getElementById('sidebarOverlay');
@@ -1107,7 +1313,6 @@
             overlay.classList.toggle('active');
         }
 
-        // Close sidebar on resize to desktop
         window.addEventListener('resize', function() {
             const sidebar = document.getElementById('adminSidebar');
             const overlay = document.getElementById('sidebarOverlay');
@@ -1117,7 +1322,6 @@
             }
         });
 
-        // Active link highlighting
         document.querySelectorAll('.sidebar-nav a').forEach(link => {
             if (link.href === window.location.href) {
                 link.closest('li').classList.add('active');
@@ -1125,11 +1329,11 @@
         });
 
         // ============================================================
-        // NOTIFICATION AJAX FUNCTIONALITY - FIXED
+        // NOTIFICATION FUNCTIONS
         // ============================================================
 
         function fetchNotifications() {
-            fetch('/polymedic/public/admin/notifications/fetch', {
+            fetch('/polymedic/public/medtech/notifications/fetch', {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             })
             .then(response => response.json())
@@ -1164,30 +1368,20 @@
             let html = '';
             notifications.forEach(item => {
                 const unreadClass = item.is_read == 0 ? 'unread' : '';
-                
-                // Map type to icon and color
                 let iconClass = 'bi-bell-fill';
                 let colorClass = 'system';
                 
                 if (item.type === 'appointment') {
                     iconClass = 'bi-calendar-check';
                     colorClass = 'appointment';
-                } else if (item.type === 'xray') {
-                    iconClass = 'bi-x-ray';
-                    colorClass = 'xray';
                 } else if (item.type === 'lab') {
                     iconClass = 'bi-flask';
                     colorClass = 'lab';
-                } else if (item.type === 'billing') {
-                    iconClass = 'bi-receipt';
-                    colorClass = 'billing';
-                } else if (item.type === 'payment') {
-                    iconClass = 'bi-credit-card';
-                    colorClass = 'payment';
+                } else if (item.type === 'xray') {
+                    iconClass = 'bi-x-ray';
+                    colorClass = 'xray';
                 }
                 
-                // FIXED: Use the link directly from the notification
-                // The link is already a full URL from the controller
                 const link = item.link || '#';
                 
                 html += `
@@ -1207,8 +1401,7 @@
         }
 
         function markNotificationRead(id, event) {
-            // Don't prevent default - let the link navigate
-            fetch('/polymedic/public/admin/notifications/mark-read/' + id, {
+            fetch('/polymedic/public/medtech/notifications/mark-read/' + id, {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             })
             .then(response => response.json())
@@ -1222,7 +1415,7 @@
 
         function markAllNotificationsRead(event) {
             if (event) event.stopPropagation();
-            fetch('/polymedic/public/admin/notifications/mark-all-read', {
+            fetch('/polymedic/public/medtech/notifications/mark-all-read', {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             })
             .then(response => response.json())
@@ -1245,7 +1438,6 @@
                 .replace(/'/g, "&#039;");
         }
 
-        // Initialize and poll notifications every 15s
         document.addEventListener('DOMContentLoaded', function() {
             fetchNotifications();
             setInterval(fetchNotifications, 15000);

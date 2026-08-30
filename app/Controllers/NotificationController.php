@@ -50,6 +50,33 @@ class NotificationController extends BaseController
 
     /**
      * ============================================================
+     * HELPER - Time Ago
+     * ============================================================
+     */
+    private function timeAgo($datetime)
+    {
+        if (!$datetime) return 'Just now';
+        $timestamp = strtotime($datetime);
+        $diff      = time() - $timestamp;
+
+        if ($diff < 60) {
+            return 'Just now';
+        } elseif ($diff < 3600) {
+            $mins = floor($diff / 60);
+            return $mins . ($mins == 1 ? ' min ago' : ' mins ago');
+        } elseif ($diff < 86400) {
+            $hours = floor($diff / 3600);
+            return $hours . ($hours == 1 ? ' hour ago' : ' hours ago');
+        } elseif ($diff < 604800) {
+            $days = floor($diff / 86400);
+            return $days . ($days == 1 ? ' day ago' : ' days ago');
+        } else {
+            return date('M d, Y', $timestamp);
+        }
+    }
+
+    /**
+     * ============================================================
      * ADMIN NOTIFICATION METHODS
      * ============================================================
      */
@@ -519,29 +546,146 @@ class NotificationController extends BaseController
 
     /**
      * ============================================================
-     * HELPER METHODS
+     * MED TECH NOTIFICATION METHODS
      * ============================================================
      */
 
-    private function timeAgo($datetime)
+    public function medtechIndex()
     {
-        if (!$datetime) return 'Just now';
-        $timestamp = strtotime($datetime);
-        $diff      = time() - $timestamp;
-
-        if ($diff < 60) {
-            return 'Just now';
-        } elseif ($diff < 3600) {
-            $mins = floor($diff / 60);
-            return $mins . ($mins == 1 ? ' min ago' : ' mins ago');
-        } elseif ($diff < 86400) {
-            $hours = floor($diff / 3600);
-            return $hours . ($hours == 1 ? ' hour ago' : ' hours ago');
-        } elseif ($diff < 604800) {
-            $days = floor($diff / 86400);
-            return $days . ($days == 1 ? ' day ago' : ' days ago');
-        } else {
-            return date('M d, Y', $timestamp);
+        if (!session()->get('is_logged_in') || session()->get('role') !== 'med_tech') {
+            return redirect()->to(base_url('login'));
         }
+
+        $model = new NotificationModel();
+        $notifications = $model
+            ->orderBy('created_at', 'DESC')
+            ->findAll();
+        
+        $data['notifications'] = $notifications;
+        $data['unread_count'] = $model->getUnreadCount();
+        $data['total_count'] = count($notifications);
+
+        return view('MedTech/notifications', $data);
+    }
+
+    public function medtechFetch()
+    {
+        if (!session()->get('is_logged_in') || session()->get('role') !== 'med_tech') {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Unauthorized']);
+        }
+
+        $model = new NotificationModel();
+        $unreadCount = $model->getUnreadCount();
+        $recent = $model
+            ->orderBy('created_at', 'DESC')
+            ->findAll(6);
+
+        $formatted = array_map(function ($item) {
+            $link = $item['link'] ?? '';
+            $link = str_replace('/polymedic/public/', '', $link);
+            $link = str_replace('polymedic/public/', '', $link);
+            $link = ltrim($link, '/');
+            
+            if (empty($link)) {
+                $link = 'medtech/dashboard';
+            }
+            
+            return [
+                'id' => $item['id'],
+                'type' => $item['type'],
+                'title' => $item['title'],
+                'message' => $item['message'],
+                'link' => base_url($link),
+                'is_read' => (int)$item['is_read'],
+                'time_ago' => $this->timeAgo($item['created_at'])
+            ];
+        }, $recent);
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'unread_count' => $unreadCount,
+            'notifications' => $formatted
+        ]);
+    }
+
+    public function medtechMarkRead($id)
+    {
+        if (!session()->get('is_logged_in') || session()->get('role') !== 'med_tech') {
+            if ($this->request->isAJAX()) {
+                return $this->response->setJSON(['status' => 'error', 'message' => 'Unauthorized']);
+            }
+            return redirect()->to(base_url('login'));
+        }
+
+        $model = new NotificationModel();
+        $notification = $model->find($id);
+
+        if ($notification) {
+            $model->markAsRead($id);
+            $link = $notification['link'] ?? '';
+            $link = str_replace('/polymedic/public/', '', $link);
+            $link = str_replace('polymedic/public/', '', $link);
+            $link = ltrim($link, '/');
+            
+            if (empty($link)) {
+                $targetLink = base_url('medtech/dashboard');
+            } else {
+                $targetLink = base_url($link);
+            }
+        } else {
+            $targetLink = base_url('medtech/dashboard');
+        }
+
+        if ($this->request->isAJAX()) {
+            return $this->response->setJSON([
+                'status' => 'success',
+                'unread_count' => $model->getUnreadCount(),
+                'target_link' => $targetLink
+            ]);
+        }
+
+        return redirect()->to($targetLink);
+    }
+
+    public function medtechMarkAllRead()
+    {
+        if (!session()->get('is_logged_in') || session()->get('role') !== 'med_tech') {
+            if ($this->request->isAJAX()) {
+                return $this->response->setJSON(['status' => 'error', 'message' => 'Unauthorized']);
+            }
+            return redirect()->to(base_url('login'));
+        }
+
+        $model = new NotificationModel();
+        $model->markAllAsRead();
+
+        if ($this->request->isAJAX()) {
+            return $this->response->setJSON([
+                'status' => 'success',
+                'unread_count' => 0,
+                'message' => 'All notifications marked as read'
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'All notifications marked as read');
+    }
+
+    public function medtechDelete($id)
+    {
+        if (!session()->get('is_logged_in') || session()->get('role') !== 'med_tech') {
+            return redirect()->to(base_url('login'));
+        }
+
+        $model = new NotificationModel();
+        $model->delete($id);
+
+        if ($this->request->isAJAX()) {
+            return $this->response->setJSON([
+                'status' => 'success',
+                'message' => 'Notification deleted successfully'
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Notification deleted successfully');
     }
 }

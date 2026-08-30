@@ -25,7 +25,7 @@ abstract class BaseController extends Controller
      * The creation of dynamic property is deprecated in PHP 8.2.
      */
 
-    // protected $session;
+    protected $session; // ← UNCOMMENTED THIS LINE
 
     /**
      * @return void
@@ -40,6 +40,6 @@ abstract class BaseController extends Controller
         parent::initController($request, $response, $logger);
 
         // Preload any models, libraries, etc, here.
-        // $this->session = service('session');
+        $this->session = service('session'); // ← UNCOMMENTED THIS LINE
     }
 }

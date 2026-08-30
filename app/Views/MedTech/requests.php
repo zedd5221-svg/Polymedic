@@ -1,16 +1,16 @@
-<?= $this->extend('layouts/RadiologistLayout') ?>
+<?= $this->extend('layouts/MedTechLayout') ?>
 
-<?= $this->section('pageTitle') ?>Examinations<?= $this->endSection() ?>
+<?= $this->section('pageTitle') ?>Laboratory Requests<?= $this->endSection() ?>
 
-<?= $this->section('radiologistContent') ?>
+<?= $this->section('medtechContent') ?>
 
-<div class="examinations-container">
+<div class="requests-container">
 
     <!-- ===== PAGE HEADER ===== -->
     <div class="page-header">
         <div>
-            <h4 class="page-title">X-Ray Examinations</h4>
-            <p class="page-subtitle">Manage and track all X-Ray examinations</p>
+            <h4 class="page-title">Laboratory Requests</h4>
+            <p class="page-subtitle">Manage and track all laboratory test requests</p>
         </div>
     </div>
 
@@ -22,7 +22,7 @@
             </div>
             <div class="stat-info">
                 <h3><?= $counts['total'] ?? 0 ?></h3>
-                <p>All Examinations</p>
+                <p>All Requests</p>
             </div>
         </div>
         <div class="stat-card">
@@ -39,8 +39,17 @@
                 <i class="bi bi-arrow-repeat"></i>
             </div>
             <div class="stat-info">
-                <h3><?= $counts['processing'] ?? 0 ?></h3>
-                <p>Processing</p>
+                <h3><?= $counts['in_progress'] ?? 0 ?></h3>
+                <p>In Progress</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon gray">
+                <i class="bi bi-file-earmark"></i>
+            </div>
+            <div class="stat-info">
+                <h3><?= $counts['draft'] ?? 0 ?></h3>
+                <p>Drafts</p>
             </div>
         </div>
         <div class="stat-card">
@@ -63,25 +72,27 @@
         </div>
     </div>
 
-    <!-- ===== TABLE TOOLBAR ===== -->
+    <!-- ===== TABLE TOOLBAR (Search + Filter + Sort) ===== -->
     <div class="table-toolbar">
         <div class="search-wrapper">
             <i class="bi bi-search"></i>
-            <input type="text" class="form-control" placeholder="Search by patient name, accession no., or exam..." id="searchExams">
+            <input type="text" class="form-control" placeholder="Search by patient name, accession no., or test..." id="searchRequests">
         </div>
         <div class="filter-wrapper">
             <select class="form-select" id="filterStatus">
                 <option value="">All Status</option>
                 <option value="pending">Pending</option>
-                <option value="processing">Processing</option>
+                <option value="in_progress">In Progress</option>
+                <option value="draft">Drafts</option>
                 <option value="completed">Completed</option>
                 <option value="released">Released</option>
             </select>
         </div>
         <div class="sort-wrapper">
             <select class="form-select" id="sortBy">
-                <option value="exam_date">Sort by: Exam Date</option>
+                <option value="request_date">Sort by: Request Date</option>
                 <option value="patient_name">Sort by: Patient Name</option>
+                <option value="tat">Sort by: TAT</option>
                 <option value="status">Sort by: Status</option>
             </select>
         </div>
@@ -90,62 +101,80 @@
     <!-- ===== TABLE CARD ===== -->
     <div class="table-card">
         <div class="table-responsive">
-            <table class="table radiologist-table" id="examinationsTable">
+            <table class="table medtech-request-table" id="requestsTable">
                 <thead>
                     <tr>
                         <th>Accession No. <i class="bi bi-arrow-down-up"></i></th>
                         <th>Patient</th>
-                        <th>Exam Type</th>
-                        <th>Exam Date <i class="bi bi-arrow-down-up"></i></th>
+                        <th>Lab Services</th>
+                        <th>Request Date <i class="bi bi-arrow-down-up"></i></th>
+                        <th>TAT <i class="bi bi-arrow-down-up"></i></th>
                         <th>Status</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
-                <tbody id="examinationsTableBody">
-                    <?php if (!empty($examinations)): ?>
-                        <?php foreach ($examinations as $exam): ?>
+                <tbody id="requestsTableBody">
+                    <?php if (!empty($requests)): ?>
+                        <?php foreach ($requests as $request): ?>
                             <?php
-                                $nameParts = preg_split('/\s+/', trim($exam['patient_name']));
+                                $nameParts = preg_split('/\s+/', trim($request['patient_name']));
                                 $initials = strtoupper(mb_substr($nameParts[0] ?? '', 0, 1) . mb_substr($nameParts[count($nameParts) - 1] ?? '', 0, 1));
+                                $tatMinutes = rand(18, 94);
                             ?>
-                            <tr data-status="<?= $exam['status'] ?>">
+                            <tr data-status="<?= $request['status'] ?>">
                                 <td class="accession-cell">
-                                    XR-<?= date('y') ?>-<?= str_pad($exam['id'], 4, '0', STR_PAD_LEFT) ?>
+                                    ACC-26-<?= str_pad($request['id'], 4, '0', STR_PAD_LEFT) ?>
                                 </td>
                                 <td>
                                     <div class="patient-cell">
                                         <span class="patient-avatar"><?= esc($initials) ?></span>
                                         <div class="patient-meta">
-                                            <span class="patient-name"><?= esc($exam['patient_name']) ?></span>
-                                            <small><?= esc($exam['age']) ?> yrs · <?= esc($exam['gender']) ?></small>
+                                            <span class="patient-name"><?= esc($request['patient_name']) ?></span>
+                                            <small><?= esc($request['age']) ?> yrs · <?= esc($request['gender']) ?></small>
                                         </div>
                                     </div>
                                 </td>
-                                <td><span class="exam-type-tag"><?= esc($exam['exam_type']) ?></span></td>
+                                <td class="services-cell">
+                                    <?php 
+                                        $services = explode(', ', $request['lab_services']);
+                                        foreach (array_slice($services, 0, 2) as $service) {
+                                            echo '<div>' . esc($service) . '</div>';
+                                        }
+                                        if (count($services) > 2) {
+                                            echo '<div class="more-services">+' . (count($services) - 2) . ' more</div>';
+                                        }
+                                    ?>
+                                </td>
                                 <td>
                                     <div class="date-cell">
                                         <i class="bi bi-calendar3"></i>
-                                        <span><?= date('M d, Y', strtotime($exam['exam_date'])) ?></span>
+                                        <span><?= date('M d, Y', strtotime($request['request_date'])) ?></span>
+                                    </div>
+                                </td>
+                                <td class="tat-cell">
+                                    <div class="tat-display">
+                                        <i class="bi bi-clock"></i>
+                                        <span><?= $tatMinutes ?> min</span>
                                     </div>
                                 </td>
                                 <td>
-                                    <span class="status-badge <?= $exam['status'] ?>">
+                                    <span class="status-badge <?= $request['status'] ?>">
                                         <i class="bi bi-circle-fill"></i>
-                                        <?= ucfirst($exam['status']) ?>
+                                        <?= ucfirst(str_replace('_', ' ', $request['status'])) ?>
                                     </span>
                                 </td>
                                 <td class="action-cell">
-                                    <a href="<?= base_url('radiologist/examination/view/' . $exam['id']) ?>" 
+                                    <a href="<?= base_url('medtech/request/view/' . $request['id']) ?>" 
                                        class="action-icon-btn view" title="View">
                                         <i class="bi bi-eye"></i>
                                     </a>
-                                    <?php if ($exam['status'] === 'released'): ?>
-                                        <a href="<?= base_url('radiologist/examination/print/' . $exam['id']) ?>" 
+                                    <?php if ($request['status'] === 'released'): ?>
+                                        <a href="<?= base_url('medtech/request/print/' . $request['id']) ?>" 
                                            class="action-icon-btn download" title="Download" target="_blank">
                                             <i class="bi bi-download"></i>
                                         </a>
                                     <?php else: ?>
-                                        <a href="<?= base_url('radiologist/examination/view/' . $exam['id']) ?>" 
+                                        <a href="<?= base_url('medtech/request/view/' . $request['id']) ?>" 
                                            class="action-icon-btn edit" title="Process">
                                             <i class="bi bi-pencil"></i>
                                         </a>
@@ -155,11 +184,11 @@
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="6">
+                            <td colspan="7">
                                 <div class="empty-state">
-                                    <i class="bi bi-x-ray"></i>
-                                    <p>No examinations found</p>
-                                    <small>No examinations match the current filter</small>
+                                    <i class="bi bi-inbox"></i>
+                                    <p>No laboratory requests found</p>
+                                    <small>No requests match the current filter</small>
                                 </div>
                             </td>
                         </tr>
@@ -170,7 +199,7 @@
         
         <!-- Pagination -->
         <div class="table-footer">
-            <span id="showingText">Showing 1 to <?= min(count($examinations ?? []), 5) ?> of <?= $counts['total'] ?? 0 ?> entries</span>
+            <span id="showingText">Showing 1 to <?= min(count($requests ?? []), 5) ?> of <?= $counts['total'] ?? 0 ?> entries</span>
             <div class="pagination" id="paginationControls">
                 <button class="page-btn" onclick="changePage(-1)" disabled><i class="bi bi-chevron-left"></i></button>
                 <button class="page-btn active">1</button>
@@ -183,10 +212,10 @@
 
 <style>
 /* ============================================
-   RADIOLOGIST EXAMINATIONS - ENHANCED UI
+   LABORATORY REQUESTS - ENHANCED UI
    ============================================ */
 
-.examinations-container {
+.requests-container {
     --ink: #101828;
     --ink-soft: #64748B;
     --ink-faint: #94A3B8;
@@ -254,7 +283,7 @@
 /* ===== STATS ROW ===== */
 .stats-row {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(6, 1fr);
     gap: 1rem;
     margin-bottom: 1.5rem;
 }
@@ -291,6 +320,7 @@
 .stat-icon.orange { background: var(--orange-soft); color: var(--orange); }
 .stat-icon.green { background: var(--green-soft); color: var(--green); }
 .stat-icon.teal { background: var(--cyan-soft); color: var(--cyan); }
+.stat-icon.gray { background: var(--gray-soft); color: var(--gray); }
 
 .stat-info h3 {
     font-size: 1.5rem;
@@ -385,14 +415,14 @@
 }
 
 /* ===== TABLE ===== */
-.radiologist-table {
+.medtech-request-table {
     margin: 0;
     border-collapse: separate;
     border-spacing: 0 8px;
     width: 100%;
 }
 
-.radiologist-table thead th {
+.medtech-request-table thead th {
     font-size: 0.7rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
@@ -405,14 +435,14 @@
     text-align: left;
 }
 
-.radiologist-table thead th i {
+.medtech-request-table thead th i {
     font-size: 0.65rem;
     margin-left: 0.2rem;
     color: var(--ink-faint);
     opacity: 0.5;
 }
 
-.radiologist-table tbody tr {
+.medtech-request-table tbody tr {
     background: var(--surface);
     border-radius: 12px;
     transition: all 0.2s ease;
@@ -420,12 +450,12 @@
     border: 1px solid var(--line);
 }
 
-.radiologist-table tbody tr:hover {
+.medtech-request-table tbody tr:hover {
     background: var(--surface-alt);
     box-shadow: 0 4px 12px rgba(16, 24, 40, 0.06);
 }
 
-.radiologist-table tbody td {
+.medtech-request-table tbody td {
     padding: 0.85rem 1rem;
     vertical-align: middle;
     font-size: 0.85rem;
@@ -435,11 +465,11 @@
     background: transparent;
 }
 
-.radiologist-table tbody td:first-child {
+.medtech-request-table tbody td:first-child {
     border-radius: 12px 0 0 12px;
 }
 
-.radiologist-table tbody td:last-child {
+.medtech-request-table tbody td:last-child {
     border-radius: 0 12px 12px 0;
 }
 
@@ -489,15 +519,20 @@
     margin-top: 1px;
 }
 
-/* Exam Type Tag */
-.exam-type-tag {
-    background: var(--blue-soft);
+/* Services Cell */
+.services-cell {
+    font-size: 0.8rem;
+    color: var(--ink-soft);
+    line-height: 1.5;
+    max-width: 200px;
+    white-space: normal !important;
+}
+
+.more-services {
     color: var(--blue);
-    padding: 0.2rem 0.6rem;
-    border-radius: 6px;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 600;
-    display: inline-block;
+    margin-top: 2px;
 }
 
 /* Date Cell */
@@ -509,6 +544,22 @@
 }
 
 .date-cell i {
+    color: var(--ink-faint);
+    font-size: 0.9rem;
+}
+
+/* TAT Cell */
+.tat-cell {
+    color: var(--ink-soft);
+}
+
+.tat-display {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.tat-display i {
     color: var(--ink-faint);
     font-size: 0.9rem;
 }
@@ -534,9 +585,14 @@
     color: var(--orange);
 }
 
-.status-badge.processing {
+.status-badge.in_progress {
     background: var(--blue-soft);
     color: var(--blue);
+}
+
+.status-badge.draft {
+    background: var(--gray-soft);
+    color: var(--gray);
 }
 
 .status-badge.completed {
@@ -725,7 +781,7 @@
         gap: 0.75rem;
     }
     
-    .radiologist-table {
+    .medtech-request-table {
         border-spacing: 0 6px;
     }
 }
@@ -735,12 +791,12 @@
         grid-template-columns: 1fr;
     }
     
-    .radiologist-table {
+    .medtech-request-table {
         font-size: 0.72rem;
     }
     
-    .radiologist-table thead th,
-    .radiologist-table tbody td {
+    .medtech-request-table thead th,
+    .medtech-request-table tbody td {
         padding: 0.7rem;
         font-size: 0.72rem;
     }
@@ -768,9 +824,9 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Search functionality
-    document.getElementById('searchExams').addEventListener('keyup', function() {
+    document.getElementById('searchRequests').addEventListener('keyup', function() {
         const searchTerm = this.value.toLowerCase();
-        const rows = document.querySelectorAll('#examinationsTable tbody tr');
+        const rows = document.querySelectorAll('#requestsTable tbody tr');
         
         rows.forEach(row => {
             const text = row.textContent.toLowerCase();
@@ -781,7 +837,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Filter by status
     document.getElementById('filterStatus').addEventListener('change', function() {
         const status = this.value.toLowerCase();
-        const rows = document.querySelectorAll('#examinationsTable tbody tr[data-status]');
+        const rows = document.querySelectorAll('#requestsTable tbody tr[data-status]');
         
         rows.forEach(row => {
             if (!status) {
@@ -796,7 +852,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Sort by
     document.getElementById('sortBy').addEventListener('change', function() {
         const sortBy = this.value;
-        const tbody = document.querySelector('#examinationsTable tbody');
+        const tbody = document.querySelector('#requestsTable tbody');
         const rows = Array.from(tbody.querySelectorAll('tr'));
 
         rows.sort((a, b) => {
@@ -806,11 +862,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     aVal = a.querySelector('.patient-name')?.textContent.toLowerCase() || '';
                     bVal = b.querySelector('.patient-name')?.textContent.toLowerCase() || '';
                     break;
+                case 'tat':
+                    aVal = parseInt(a.querySelector('.tat-cell')?.textContent) || 0;
+                    bVal = parseInt(b.querySelector('.tat-cell')?.textContent) || 0;
+                    break;
                 case 'status':
                     aVal = a.querySelector('.status-badge')?.textContent.toLowerCase() || '';
                     bVal = b.querySelector('.status-badge')?.textContent.toLowerCase() || '';
                     break;
-                default: // exam_date
+                default: // request_date
                     aVal = a.querySelector('.date-cell span')?.textContent || '';
                     bVal = b.querySelector('.date-cell span')?.textContent || '';
             }
@@ -821,12 +881,12 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Pagination logic (1-5 per page)
-    const rows = Array.from(document.querySelectorAll('#examinationsTableBody tr'));
+    const rows = Array.from(document.querySelectorAll('#requestsTableBody tr'));
     const showingText = document.getElementById('showingText');
     const paginationControls = document.getElementById('paginationControls');
     const pageSize = 5;
     let currentPage = 1;
-    const totalEntries = <?= $counts['total'] ?? count($examinations ?? []) ?>;
+    const totalEntries = <?= $counts['total'] ?? count($requests ?? []) ?>;
 
     function renderTable() {
         const start = (currentPage - 1) * pageSize;

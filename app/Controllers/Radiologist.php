@@ -261,10 +261,12 @@ class Radiologist extends BaseController
         }
         
         $data['appointment'] = $appointmentModel->find($data['examination']['appointment_id']);
-        $data['xray_services'] = json_decode($data['appointment']['xray_services'] ?? '[]', true) ?? [];
+        $settingsModel = new \App\Models\SettingsModel();
+        $data['settings'] = $settingsModel->getAllSettings();
         
         return view('Radiologist/print_result', $data);
     }
+
 
     // =============================================
     // NOTIFICATIONS
@@ -347,4 +349,34 @@ class Radiologist extends BaseController
         
         return view('Radiologist/reports', $data);
     }
-}
+
+    public function settings()
+    {
+        $redirect = $this->checkAuth();
+        if ($redirect) return $redirect;
+
+        $settingsModel = new \App\Models\SettingsModel();
+        $data['settings'] = $settingsModel->getAllSettings();
+
+        return view('Radiologist/settings', $data);
+    }
+
+    public function savePrintTemplate()
+    {
+        $redirect = $this->checkAuth();
+        if ($redirect) return $redirect;
+
+        $settingsModel = new \App\Models\SettingsModel();
+        
+        $settingsModel->setSetting('print_header_title', $this->request->getPost('print_header_title'));
+        $settingsModel->setSetting('print_header_subtitle', $this->request->getPost('print_header_subtitle'));
+        $settingsModel->setSetting('print_contact_info', $this->request->getPost('print_contact_info'));
+        $settingsModel->setSetting('print_accent_color', $this->request->getPost('print_accent_color'));
+        $settingsModel->setSetting('print_signature_title', $this->request->getPost('print_signature_title'));
+        $settingsModel->setSetting('print_footer_note', $this->request->getPost('print_footer_note'));
+        $settingsModel->setSetting('print_layout_style', $this->request->getPost('print_layout_style'));
+
+        return redirect()->to(base_url('radiologist/settings'))
+                        ->with('success', 'Print layout template settings saved successfully!');
+    }
+}

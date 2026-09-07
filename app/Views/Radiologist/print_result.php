@@ -4,6 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>X-Ray Result - <?= esc($examination['patient_name']) ?></title>
+    <?php
+        $headerTitle    = esc($settings['print_header_title'] ?? 'PolyMedic');
+        $headerSubtitle = esc($settings['print_header_subtitle'] ?? 'Diagnostic & Laboratory Center');
+        $contactInfo    = esc($settings['print_contact_info'] ?? 'Gov. Gutierrez Ave, Cotabato City 9600 | Tel: (064) 123-4567');
+        $accentColor    = esc($settings['print_accent_color'] ?? '#0148ca');
+        $signatureTitle = esc($settings['print_signature_title'] ?? 'Radiologist / Attending Physician');
+        $footerNote     = esc($settings['print_footer_note'] ?? 'This is a computer-generated report. PolyMedic Diagnostic & Laboratory Center.');
+    ?>
     <style>
         * {
             margin: 0;
@@ -25,13 +33,13 @@
         }
         .header {
             text-align: center;
-            border-bottom: 2px solid #0148ca;
+            border-bottom: 2px solid <?= $accentColor ?>;
             padding-bottom: 20px;
             margin-bottom: 30px;
         }
         .header h1 {
             font-size: 28px;
-            color: #0148ca;
+            color: <?= $accentColor ?>;
             letter-spacing: 2px;
             margin: 0;
         }
@@ -76,8 +84,8 @@
         }
         .findings-section h3 {
             font-size: 16px;
-            color: #0148ca;
-            border-bottom: 1px solid #0148ca;
+            color: <?= $accentColor ?>;
+            border-bottom: 1px solid <?= $accentColor ?>;
             padding-bottom: 5px;
             margin-bottom: 10px;
         }
@@ -137,9 +145,9 @@
     <div class="container">
         <!-- Header -->
         <div class="header">
-            <h1>PolyMedic</h1>
-            <p>Diagnostic &amp; Laboratory Center</p>
-            <p style="font-size: 12px; margin-top: 5px;">Gov. Gutierez Ave, Cotabato City 9600 | Tel: (064) 123-4567</p>
+            <h1><?= $headerTitle ?></h1>
+            <p><?= $headerSubtitle ?></p>
+            <p style="font-size: 12px; margin-top: 5px;"><?= $contactInfo ?></p>
         </div>
 
         <div class="report-title">
@@ -181,7 +189,7 @@
             </div>
             <div class="item">
                 <span class="label">Released On:</span>
-                <span class="value"><?= date('F d, Y h:i A', strtotime($examination['released_at'])) ?></span>
+                <span class="value"><?= date('F d, Y h:i A', strtotime($examination['released_at'] ?? date('Y-m-d H:i:s'))) ?></span>
             </div>
         </div>
 
@@ -201,11 +209,11 @@
         <div class="footer">
             <div>
                 <p><strong>Prepared by:</strong></p>
-                <p style="font-size: 12px; color: #888;">Radiologist</p>
+                <p style="font-size: 12px; color: #888;">Radiology Staff</p>
             </div>
             <div class="signature">
                 <div class="line"></div>
-                <p style="font-size: 12px;">Signature / Date</p>
+                <p style="font-size: 12px;"><?= $signatureTitle ?></p>
             </div>
             <div>
                 <p><strong>Generated:</strong></p>
@@ -214,13 +222,12 @@
         </div>
 
         <div style="text-align: center; margin-top: 30px; font-size: 11px; color: #999;">
-            <p>This is a computer-generated report. No signature required.</p>
-            <p>PolyMedic Diagnostic &amp; Laboratory Center</p>
+            <p><?= $footerNote ?></p>
         </div>
     </div>
 
     <div style="text-align: center; margin-top: 20px;" class="no-print">
-        <button onclick="window.print()" style="padding: 10px 30px; background: #0148ca; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px;">
+        <button onclick="window.print()" style="padding: 10px 30px; background: <?= $accentColor ?>; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px;">
             <i class="bi bi-printer"></i> Print Report
         </button>
         <button onclick="window.close()" style="padding: 10px 30px; background: #e2e8f0; color: #333; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; margin-left: 10px;">

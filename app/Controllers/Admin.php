@@ -7,6 +7,7 @@ use App\Models\UserModel;
 use App\Models\XrayExaminationModel;
 use App\Models\NotificationModel;
 use App\Models\ServiceModel;
+use App\Models\SettingsModel;
 
 class Admin extends BaseController
 {
@@ -613,4 +614,121 @@ public function toggleServiceStatus($id)
     return redirect()->to(base_url('admin/services'))
                     ->with('success', 'Service status updated successfully!');
 }
+
+// ===== SETTINGS & PRINT TEMPLATE MANAGEMENT =====
+
+public function settings()
+{
+    $redirect = $this->checkAuth();
+    if ($redirect) return $redirect;
+
+    $settingsModel = new SettingsModel();
+    $data['settings'] = $settingsModel->getAllSettings();
+    $data['clientIp'] = $this->request->getIPAddress();
+
+    return view('Admin/settings', $data);
 }
+
+public function updateIpSettings()
+{
+    $redirect = $this->checkAuth();
+    if ($redirect) return $redirect;
+
+    $settingsModel = new SettingsModel();
+    $enabled = $this->request->getPost('ip_restriction_enabled') ? '1' : '0';
+    $allowedIps = $this->request->getPost('allowed_ips') ?? '';
+
+    $settingsModel->setSetting('ip_restriction_enabled', $enabled);
+    $settingsModel->setSetting('allowed_ips', $allowedIps);
+
+    return redirect()->to(base_url('admin/settings'))
+                    ->with('success', 'IP restriction settings updated successfully!');
+}
+
+public function savePrintTemplate()
+{
+    $redirect = $this->checkAuth();
+    if ($redirect) return $redirect;
+
+    $settingsModel = new SettingsModel();
+    
+    $settingsModel->setSetting('print_header_title', $this->request->getPost('print_header_title'));
+    $settingsModel->setSetting('print_header_subtitle', $this->request->getPost('print_header_subtitle'));
+    $settingsModel->setSetting('print_contact_info', $this->request->getPost('print_contact_info'));
+    $settingsModel->setSetting('print_accent_color', $this->request->getPost('print_accent_color'));
+    $settingsModel->setSetting('print_signature_title', $this->request->getPost('print_signature_title'));
+    $settingsModel->setSetting('print_footer_note', $this->request->getPost('print_footer_note'));
+    $settingsModel->setSetting('print_layout_style', $this->request->getPost('print_layout_style'));
+
+    return redirect()->to(base_url('admin/settings'))
+                    ->with('success', 'Print layout template settings saved successfully!');
+}
+
+public function uploadLogo()
+{
+    $redirect = $this->checkAuth();
+    if ($redirect) return $redirect;
+
+    $settingsModel = new SettingsModel();
+    $file = $this->request->getFile('facility_logo');
+
+    if (!$file || !$file->isValid() || $file->hasMoved()) {
+        return redirect()->to(base_url('admin/settings'))
+                        ->with('error', 'Please select a valid image file for the logo.');
+    }
+
+    // Validate file type
+    $allowedMime = ['image/jpeg', 'image/png', 'image/gif', 'image/svg+xml', 'image/webp'];
+    if (!in_array($file->getMimeType(), $allowedMime)) {
+        return redirect()->to(base_url('admin/settings'))
+                        ->with('error', 'Only JPG, PNG, GIF, SVG, and WebP image files are allowed for the logo.');
+    }
+
+    // Validate file size (max 2MB)
+    if ($file->getSize() > 2 * 1024 * 1024) {
+        return redirect()->to(base_url('admin/settings'))
+                        ->with('error', 'Logo file size must be less than 2MB.');
+    }
+
+    $uploadPath = ROOTPATH . 'public/uploads/logos/';
+    if (!is_dir($uploadPath)) {
+        mkdir($uploadPath, 0777, true);
+    }
+
+    // Remove old logo if it exists
+    $oldLogoPath = $settingsModel->getSetting('print_logo_path', '');
+    if (!empty($oldLogoPath)) {
+        $oldFile = ROOTPATH . 'public' . $oldLogoPath;
+        if (file_exists($oldFile)) {
+            @unlink($oldFile);
+        }
+    }
+
+    $newName = 'facility_logo_' . time() . '.' . $file->getExtension();
+    $file->move($uploadPath, $newName);
+
+    $settingsModel->setSetting('print_logo_path', '/uploads/logos/' . $newName);
+
+    return redirect()->to(base_url('admin/settings'))
+                    ->with('success', 'Facility logo uploaded successfully!');
+}
+
+public function removeLogo()
+{
+    $redirect = $this->checkAuth();
+    if ($redirect) return $redirect;
+
+    $settingsModel = new SettingsModel();
+    $oldLogoPath = $settingsModel->getSetting('print_logo_path', '');
+    if (!empty($oldLogoPath)) {
+        $oldFile = ROOTPATH . 'public' . $oldLogoPath;
+        if (file_exists($oldFile)) {
+            @unlink($oldFile);
+        }
+    }
+    $settingsModel->setSetting('print_logo_path', '');
+
+    return redirect()->to(base_url('admin/settings'))
+                    ->with('success', 'Facility logo removed successfully.');
+}
+}

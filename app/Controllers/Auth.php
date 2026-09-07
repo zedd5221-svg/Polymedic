@@ -150,6 +150,26 @@ class Auth extends BaseController
         }
     }
     
+    public function saveTheme()
+    {
+        $theme = $this->request->getPost('theme') ?? 'light';
+        if (!in_array($theme, ['light', 'dark'])) {
+            $theme = 'light';
+        }
+
+        session()->set('user_theme', $theme);
+
+        if ($this->request->isAJAX()) {
+            return $this->response->setJSON([
+                'status'  => 'success',
+                'theme'   => $theme,
+                'message' => 'Theme updated successfully'
+            ]);
+        }
+
+        return redirect()->back();
+    }
+
     // For testing purposes - check if database connection works
     public function testConnection()
     {
@@ -166,4 +186,4 @@ class Auth extends BaseController
             echo "Line: " . $e->getLine();
         }
     }
-}
+}

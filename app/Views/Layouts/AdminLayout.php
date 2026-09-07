@@ -17,7 +17,15 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <!-- AOS for animations -->
-     <script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script> 
+    <script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script> 
+
+    <!-- Day/Night Theme Loader -->
+    <script>
+        (function() {
+            const savedTheme = localStorage.getItem('polymedic_theme') || '<?= session()->get('user_theme') ?? 'light' ?>';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
 </head>
 <body>
     <!-- Initialize AOS -->
@@ -40,7 +48,7 @@
                 <ul>
                     <li class="nav-section">MAIN</li>
                     <li class="menu-item <?= current_url() == base_url('admin/dashboard') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/admin/dashboard" class="menu-btn">
+                        <a href="<?= base_url('admin/dashboard') ?>" class="menu-btn">
                             <i class="bi bi-grid-1x2-fill menu-icon"></i>
                             <span>Dashboard</span>
                             <?php if (current_url() == base_url('admin/dashboard')): ?>
@@ -49,7 +57,7 @@
                         </a>
                     </li>
                     <li class="menu-item <?= current_url() == base_url('admin/appointments') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/admin/appointments" class="menu-btn">
+                        <a href="<?= base_url('admin/appointments') ?>" class="menu-btn">
                             <i class="bi bi-calendar-check menu-icon"></i>
                             <span>Appointments</span>
                             <?php if (current_url() == base_url('admin/appointments')): ?>
@@ -58,7 +66,7 @@
                         </a>
                     </li>
                     <li class="menu-item <?= current_url() == base_url('admin/patients') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/admin/patients" class="menu-btn">
+                        <a href="<?= base_url('admin/patients') ?>" class="menu-btn">
                             <i class="bi bi-people-fill menu-icon"></i>
                             <span>Patients</span>
                             <?php if (current_url() == base_url('admin/patients')): ?>
@@ -67,7 +75,7 @@
                         </a>
                     </li>
                     <li class="menu-item <?= current_url() == base_url('admin/requests') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/admin/requests" class="menu-btn">
+                        <a href="<?= base_url('admin/requests') ?>" class="menu-btn">
                             <i class="bi bi-file-earmark-medical-fill menu-icon"></i>
                             <span>Diagnostic Requests</span>
                             <?php if (current_url() == base_url('admin/requests')): ?>
@@ -77,7 +85,7 @@
                     </li>
 
                     <li class="menu-item <?= current_url() == base_url('admin/services') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/admin/services" class="menu-btn">
+                        <a href="<?= base_url('admin/services') ?>" class="menu-btn">
                              <i class="bi bi-grid-3x3-gap-fill menu-icon"></i>
                             <span>Services</span>
                             <?php if (current_url() == base_url('admin/services')): ?>
@@ -88,7 +96,7 @@
                     
                     <li class="nav-section">ADMIN</li>
                     <li class="menu-item <?= current_url() == base_url('admin/users') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/admin/users" class="menu-btn">
+                        <a href="<?= base_url('admin/users') ?>" class="menu-btn">
                             <i class="bi bi-person-gear menu-icon"></i>
                             <span>User Management</span>
                             <?php if (current_url() == base_url('admin/users')): ?>
@@ -97,7 +105,7 @@
                         </a>
                     </li>
                     <li class="menu-item <?= current_url() == base_url('admin/notifications') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/admin/notifications" class="menu-btn">
+                        <a href="<?= base_url('admin/notifications') ?>" class="menu-btn">
                             <i class="bi bi-bell-fill menu-icon"></i>
                             <span>Notifications</span>
                             <?php 
@@ -111,6 +119,16 @@
                             <?php endif; ?>
                         </a>
                     </li>
+                    <li class="menu-item <?= current_url() == base_url('admin/settings') ? 'active' : '' ?>">
+                        <a href="<?= base_url('admin/settings') ?>" class="menu-btn">
+                            <i class="bi bi-gear-fill menu-icon"></i>
+                            <span>Settings</span>
+                            <?php if (current_url() == base_url('admin/settings')): ?>
+                                <i class="bi bi-chevron-right menu-arrow"></i>
+                            <?php endif; ?>
+                        </a>
+                    </li>
+
                     
                     <li class="nav-divider"></li>
                     
@@ -170,7 +188,11 @@
                             <i class="bi bi-clock"></i>
                             <span><?= date('D, M j · h:i:s A') ?></span>
                         </div>
-                        <span class="divider-icon">|</span>
+                        <!-- DAY/NIGHT THEME TOGGLE -->
+                        <button class="theme-toggle-btn me-1" type="button" onclick="toggleThemeMode()" title="Toggle Day/Night Theme">
+                            <i class="bi bi-sun-fill text-warning" id="themeSunIcon" style="display:none;"></i>
+                            <i class="bi bi-moon-stars-fill text-info" id="themeMoonIcon"></i>
+                        </button>
                         
                         <!-- NOTIFICATION DROPDOWN -->
                         <div class="dropdown notif-dropdown-wrapper">
@@ -195,7 +217,7 @@
                                     </div>
                                 </div>
                                 <div class="notif-dropdown-footer text-center">
-                                    <a href="/polymedic/public/admin/notifications" class="text-primary fw-semibold small text-decoration-none">
+                                    <a href="<?= base_url('admin/notifications') ?>" class="text-primary fw-semibold small text-decoration-none">
                                         View All Notifications <i class="bi bi-arrow-right ms-1"></i>
                                     </a>
                                 </div>
@@ -237,6 +259,94 @@
         --icon-gray: #9ca3af;
         --bg-light: #f8fafc;
     }
+
+    /* ============================================
+       DAY & NIGHT DARK MODE STYLING
+       ============================================ */
+    .theme-toggle-btn {
+        background: transparent;
+        border: none;
+        font-size: 1.25rem;
+        cursor: pointer;
+        padding: 0.35rem 0.6rem;
+        border-radius: 50%;
+        transition: all 0.2s ease;
+    }
+    .theme-toggle-btn:hover {
+        background: rgba(125, 125, 125, 0.15);
+    }
+
+    [data-theme="dark"] {
+        color-scheme: dark;
+    }
+    [data-theme="dark"] body,
+    [data-theme="dark"] .admin-main {
+        background-color: #0f172a !important;
+        color: #f8fafc !important;
+    }
+    [data-theme="dark"] .admin-sidebar,
+    [data-theme="dark"] .admin-header,
+    [data-theme="dark"] .card,
+    [data-theme="dark"] .stat-card,
+    [data-theme="dark"] .chart-card,
+    [data-theme="dark"] .activity-card,
+    [data-theme="dark"] .patient-info-card,
+    [data-theme="dark"] .image-viewer-card,
+    [data-theme="dark"] .findings-card,
+    [data-theme="dark"] .notif-dropdown-menu,
+    [data-theme="dark"] .modal-content {
+        background-color: #1e293b !important;
+        border-color: #334155 !important;
+        color: #f8fafc !important;
+    }
+    [data-theme="dark"] .sidebar-header,
+    [data-theme="dark"] .card-header-custom,
+    [data-theme="dark"] .notif-dropdown-header,
+    [data-theme="dark"] .notif-dropdown-footer,
+    [data-theme="dark"] .modal-header,
+    [data-theme="dark"] .modal-footer {
+        background-color: #1e293b !important;
+        border-color: #334155 !important;
+        color: #f8fafc !important;
+    }
+    [data-theme="dark"] .sidebar-logo span,
+    [data-theme="dark"] .page-title-header,
+    [data-theme="dark"] .user-name-header,
+    [data-theme="dark"] h1, [data-theme="dark"] h2, [data-theme="dark"] h3,
+    [data-theme="dark"] h4, [data-theme="dark"] h5, [data-theme="dark"] h6,
+    [data-theme="dark"] .stat-info h3,
+    [data-theme="dark"] .info-value,
+    [data-theme="dark"] label,
+    [data-theme="dark"] .table {
+        color: #f8fafc !important;
+    }
+    [data-theme="dark"] .form-control,
+    [data-theme="dark"] .form-select,
+    [data-theme="dark"] .interpretation-textarea {
+        background-color: #0f172a !important;
+        border-color: #334155 !important;
+        color: #f8fafc !important;
+    }
+    [data-theme="dark"] .table {
+        background-color: #1e293b !important;
+    }
+    [data-theme="dark"] .table th,
+    [data-theme="dark"] .table td {
+        border-color: #334155 !important;
+        color: #cbd5e1 !important;
+    }
+    [data-theme="dark"] .notif-item {
+        color: #cbd5e1 !important;
+        border-color: #334155 !important;
+    }
+    [data-theme="dark"] .notif-item:hover,
+    [data-theme="dark"] .notif-item.unread {
+        background-color: #334155 !important;
+    }
+    [data-theme="dark"] .notif-title {
+        color: #f8fafc !important;
+    }
+
 
     /* ===== SIDEBAR ===== */
     .admin-sidebar {
@@ -1019,11 +1129,49 @@
         });
 
         // ============================================================
-        // NOTIFICATION AJAX FUNCTIONALITY - FIXED
+        // DAY / NIGHT THEME SWITCHER
+        // ============================================================
+        function applyTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('polymedic_theme', theme);
+            
+            const sunIcon = document.getElementById('themeSunIcon');
+            const moonIcon = document.getElementById('themeMoonIcon');
+            
+            if (sunIcon && moonIcon) {
+                if (theme === 'dark') {
+                    sunIcon.style.display = 'inline-block';
+                    moonIcon.style.display = 'none';
+                } else {
+                    sunIcon.style.display = 'none';
+                    moonIcon.style.display = 'inline-block';
+                }
+            }
+
+            // Persist to user session via AJAX
+            const formData = new FormData();
+            formData.append('theme', theme);
+            fetch('<?= base_url('user/settings/save-theme') ?>', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            }).catch(err => console.log('Theme sync error:', err));
+        }
+
+        window.applyTheme = applyTheme;
+
+        function toggleThemeMode() {
+            const current = document.documentElement.getAttribute('data-theme') || 'light';
+            const next = current === 'dark' ? 'light' : 'dark';
+            applyTheme(next);
+        }
+
+        // ============================================================
+        // NOTIFICATION AJAX FUNCTIONALITY
         // ============================================================
 
         function fetchNotifications() {
-            fetch('/polymedic/public/admin/notifications/fetch', {
+            fetch('<?= base_url('admin/notifications/fetch') ?>', {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             })
             .then(response => response.json())
@@ -1080,8 +1228,6 @@
                     colorClass = 'payment';
                 }
                 
-                // FIXED: Use the link directly from the notification
-                // The link is already a full URL from the controller
                 const link = item.link || '#';
                 
                 html += `
@@ -1101,8 +1247,7 @@
         }
 
         function markNotificationRead(id, event) {
-            // Don't prevent default - let the link navigate
-            fetch('/polymedic/public/admin/notifications/mark-read/' + id, {
+            fetch('<?= base_url('admin/notifications/mark-read/') ?>' + id, {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             })
             .then(response => response.json())
@@ -1116,7 +1261,7 @@
 
         function markAllNotificationsRead(event) {
             if (event) event.stopPropagation();
-            fetch('/polymedic/public/admin/notifications/mark-all-read', {
+            fetch('<?= base_url('admin/notifications/mark-all-read') ?>', {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             })
             .then(response => response.json())
@@ -1139,8 +1284,21 @@
                 .replace(/'/g, "&#039;");
         }
 
-        // Initialize and poll notifications every 15s
+        // Initialize theme icon and poll notifications every 15s
         document.addEventListener('DOMContentLoaded', function() {
+            const currentTheme = localStorage.getItem('polymedic_theme') || 'light';
+            const sunIcon = document.getElementById('themeSunIcon');
+            const moonIcon = document.getElementById('themeMoonIcon');
+            if (sunIcon && moonIcon) {
+                if (currentTheme === 'dark') {
+                    sunIcon.style.display = 'inline-block';
+                    moonIcon.style.display = 'none';
+                } else {
+                    sunIcon.style.display = 'none';
+                    moonIcon.style.display = 'inline-block';
+                }
+            }
+
             fetchNotifications();
             setInterval(fetchNotifications, 15000);
         });

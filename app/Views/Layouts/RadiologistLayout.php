@@ -18,6 +18,14 @@
 
     <!-- AOS for animations -->
     <script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script> 
+
+    <!-- Day/Night Theme Loader -->
+    <script>
+        (function() {
+            const savedTheme = localStorage.getItem('polymedic_theme') || '<?= session()->get('user_theme') ?? 'light' ?>';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
 </head>
 <body>
     <!-- Initialize AOS -->
@@ -40,7 +48,7 @@
                 <ul>
                     <li class="nav-section">RADIOLOGY</li>
                     <li class="menu-item <?= current_url() == base_url('radiologist/dashboard') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/radiologist/dashboard" class="menu-btn">
+                        <a href="<?= base_url('radiologist/dashboard') ?>" class="menu-btn">
                             <svg class="menu-icon-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M14,10V22H4a2,2,0,0,1-2-2V10Z"></path>
                                 <path d="M22,10V20a2,2,0,0,1-2,2H16V10Z"></path>
@@ -53,7 +61,7 @@
                         </a>
                     </li>
                     <li class="menu-item <?= strpos(current_url(), 'radiologist/examination') !== false ? 'active' : '' ?>">
-                        <a href="/polymedic/public/radiologist/examinations" class="menu-btn">
+                        <a href="<?= base_url('radiologist/examinations') ?>" class="menu-btn">
                             <svg class="menu-icon-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
                             </svg>
@@ -71,9 +79,9 @@
                         </a>
                     </li>
                     
-                    <li class="nav-section">REPORTS</li>
+                    <li class="nav-section">REPORTS &amp; SETTINGS</li>
                     <li class="menu-item <?= strpos(current_url(), 'radiologist/reports') !== false ? 'active' : '' ?>">
-                        <a href="/polymedic/public/radiologist/reports" class="menu-btn">
+                        <a href="<?= base_url('radiologist/reports') ?>" class="menu-btn">
                             <svg class="menu-icon-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
                             </svg>
@@ -83,6 +91,16 @@
                             <?php endif; ?>
                         </a>
                     </li>
+                    <li class="menu-item <?= strpos(current_url(), 'radiologist/settings') !== false ? 'active' : '' ?>">
+                        <a href="<?= base_url('radiologist/settings') ?>" class="menu-btn">
+                            <i class="bi bi-gear-fill menu-icon" style="font-size: 1.2rem;"></i>
+                            <span>Settings</span>
+                            <?php if (strpos(current_url(), 'radiologist/settings') !== false): ?>
+                                <i class="bi bi-chevron-right menu-arrow"></i>
+                            <?php endif; ?>
+                        </a>
+                    </li>
+
                     
                     <li class="nav-divider"></li>
                     
@@ -133,6 +151,12 @@
                             <span><?= date('D, M j · h:i:s A') ?></span>
                         </div>
                         <span class="divider-icon">|</span>
+                        
+                        <!-- DAY/NIGHT THEME TOGGLE -->
+                        <button class="theme-toggle-btn me-1" type="button" onclick="toggleThemeMode()" title="Toggle Day/Night Theme">
+                            <i class="bi bi-sun-fill text-warning" id="themeSunIcon" style="display:none;"></i>
+                            <i class="bi bi-moon-stars-fill text-info" id="themeMoonIcon"></i>
+                        </button>
                         
                         <!-- NOTIFICATION DROPDOWN -->
                         <div class="dropdown notif-dropdown-wrapper">
@@ -1000,7 +1024,7 @@
         // ============================================================
 
         function fetchNotifications() {
-            fetch('/polymedic/public/radiologist/notifications/fetch', {
+            fetch('<?= base_url("radiologist/notifications/fetch") ?>', {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             })
             .then(response => response.json())
@@ -1050,7 +1074,8 @@
                     colorClass = 'lab';
                 }
                 
-                const link = item.link ? '/polymedic/public/' + item.link : '#';
+                // item.link already contains full URL from server (base_url applied)
+                const link = item.link || '#';
                 
                 html += `
                     <a href="${link}" class="notif-item ${unreadClass}" onclick="markNotificationRead(${item.id}, event)">
@@ -1069,7 +1094,7 @@
         }
 
         function markNotificationRead(id, event) {
-            fetch('/polymedic/public/radiologist/notifications/mark-read/' + id, {
+            fetch('<?= base_url("radiologist/notifications/mark-read/") ?>' + id, {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             })
             .then(response => response.json())
@@ -1083,7 +1108,7 @@
 
         function markAllNotificationsRead(event) {
             if (event) event.stopPropagation();
-            fetch('/polymedic/public/radiologist/notifications/mark-all-read', {
+            fetch('<?= base_url("radiologist/notifications/mark-all-read") ?>', {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             })
             .then(response => response.json())
@@ -1106,8 +1131,20 @@
                 .replace(/'/g, "&#039;");
         }
 
-        // Initialize and poll notifications every 15s
+        // Initialize theme icon and poll notifications every 15s
         document.addEventListener('DOMContentLoaded', function() {
+            const currentTheme = localStorage.getItem('polymedic_theme') || 'light';
+            const sunIcon = document.getElementById('themeSunIcon');
+            const moonIcon = document.getElementById('themeMoonIcon');
+            if (sunIcon && moonIcon) {
+                if (currentTheme === 'dark') {
+                    sunIcon.style.display = 'inline-block';
+                    moonIcon.style.display = 'none';
+                } else {
+                    sunIcon.style.display = 'none';
+                    moonIcon.style.display = 'inline-block';
+                }
+            }
             fetchNotifications();
             setInterval(fetchNotifications, 15000);
         });

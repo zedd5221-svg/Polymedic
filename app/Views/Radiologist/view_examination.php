@@ -175,18 +175,26 @@
                               method="POST">
                             <?= csrf_field() ?>
                             <div class="mb-3">
-                                <textarea class="form-control interpretation-textarea" name="findings" rows="6" 
-                                          placeholder="Enter radiological interpretation and findings here..."><?= $examination['findings'] ?? '' ?></textarea>
+                                <label class="form-label fw-semibold text-secondary" style="font-size:0.82rem; text-transform:uppercase; letter-spacing:0.5px;">Findings</label>
+                                <textarea class="form-control interpretation-textarea" name="findings" rows="5" 
+                                          placeholder="Enter radiological findings here..."><?= esc($examination['findings'] ?? '') ?></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold text-secondary" style="font-size:0.82rem; text-transform:uppercase; letter-spacing:0.5px;">Interpretation / Impression</label>
+                                <textarea class="form-control interpretation-textarea" name="interpretation" rows="4" 
+                                          placeholder="Enter interpretation and clinical impression here..."><?= esc($examination['interpretation'] ?? '') ?></textarea>
                             </div>
                             <div class="action-buttons d-flex justify-content-between align-items-center flex-wrap gap-2">
                                 <div class="d-flex gap-2">
                                     <button type="submit" class="btn btn-primary-custom">
-                                        <i class="bi bi-download"></i> Generate PDF
+                                        <i class="bi bi-save"></i> Save Findings
                                     </button>
+                                    <?php if (!empty($examination['findings'])): ?>
                                     <a href="<?= base_url('radiologist/examination/print/' . $examination['id']) ?>" 
                                        class="btn btn-outline-custom" target="_blank">
                                         <i class="bi bi-printer"></i> Print
                                     </a>
+                                    <?php endif; ?>
                                 </div>
                                 <?php if ($examination['status'] === 'processing' || $examination['status'] === 'completed'): ?>
                                     <a href="<?= base_url('radiologist/examination/release/' . $examination['id']) ?>" 

@@ -106,3 +106,16 @@ $routes->post('admin/services/update/(:num)', 'Admin::updateService/$1');
 $routes->get('admin/services/delete/(:num)', 'Admin::deleteService/$1');
 $routes->get('admin/services/toggle/(:num)', 'Admin::toggleServiceStatus/$1');
 
+// ===== SETTINGS & PRINT TEMPLATE ROUTES =====
+$routes->get('admin/settings', 'Admin::settings');
+$routes->post('admin/settings/update-ip', 'Admin::updateIpSettings');
+$routes->post('admin/settings/save-print-template', 'Admin::savePrintTemplate');
+
+$routes->get('receptionist/settings', 'Receptionist::settings');
+$routes->post('receptionist/settings/save-print-template', 'Receptionist::savePrintTemplate');
+
+$routes->get('radiologist/settings', 'Radiologist::settings');
+$routes->post('radiologist/settings/save-print-template', 'Radiologist::savePrintTemplate');
+
+$routes->post('user/settings/save-theme', 'Auth::saveTheme');
+

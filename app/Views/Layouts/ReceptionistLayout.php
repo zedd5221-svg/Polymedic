@@ -18,6 +18,14 @@
 
     <!-- AOS for animations -->
     <script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script> 
+
+    <!-- Day/Night Theme Loader -->
+    <script>
+        (function() {
+            const savedTheme = localStorage.getItem('polymedic_theme') || '<?= session()->get('user_theme') ?? 'light' ?>';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
 </head>
 <body>
     <!-- Initialize AOS -->
@@ -40,7 +48,7 @@
                 <ul>
                     <li class="nav-section">MAIN</li>
                     <li class="menu-item <?= current_url() == base_url('receptionist/dashboard') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/receptionist/dashboard" class="menu-btn">
+                        <a href="<?= base_url('receptionist/dashboard') ?>" class="menu-btn">
                             <i class="bi bi-grid-1x2-fill menu-icon"></i>
                             <span>Dashboard</span>
                             <?php if (current_url() == base_url('receptionist/dashboard')): ?>
@@ -49,7 +57,7 @@
                         </a>
                     </li>
                     <li class="menu-item <?= strpos(current_url(), 'receptionist/appointment') !== false ? 'active' : '' ?>">
-                        <a href="/polymedic/public/receptionist/appointments" class="menu-btn">
+                        <a href="<?= base_url('receptionist/appointments') ?>" class="menu-btn">
                             <i class="bi bi-calendar-check menu-icon"></i>
                             <span>Appointments</span>
                             <?php if (strpos(current_url(), 'receptionist/appointment') !== false): ?>
@@ -58,7 +66,7 @@
                         </a>
                     </li>
                     <li class="menu-item <?= current_url() == base_url('receptionist/patients') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/receptionist/patients" class="menu-btn">
+                        <a href="<?= base_url('receptionist/patients') ?>" class="menu-btn">
                             <i class="bi bi-people-fill menu-icon"></i>
                             <span>Patients</span>
                             <?php if (current_url() == base_url('receptionist/patients')): ?>
@@ -69,7 +77,7 @@
                     
                     <li class="nav-section">FINANCIAL</li>
                     <li class="menu-item <?= current_url() == base_url('receptionist/billing') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/receptionist/billing" class="menu-btn">
+                        <a href="<?= base_url('receptionist/billing') ?>" class="menu-btn">
                             <i class="bi bi-receipt menu-icon"></i>
                             <span>Billing</span>
                             <?php if (current_url() == base_url('receptionist/billing')): ?>
@@ -78,7 +86,7 @@
                         </a>
                     </li>
                     <li class="menu-item <?= current_url() == base_url('receptionist/payments') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/receptionist/payments" class="menu-btn">
+                        <a href="<?= base_url('receptionist/payments') ?>" class="menu-btn">
                             <i class="bi bi-credit-card menu-icon"></i>
                             <span>Payments</span>
                             <?php if (current_url() == base_url('receptionist/payments')): ?>
@@ -87,7 +95,7 @@
                         </a>
                     </li>
                     <li class="menu-item <?= current_url() == base_url('receptionist/reports') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/receptionist/reports" class="menu-btn">
+                        <a href="<?= base_url('receptionist/reports') ?>" class="menu-btn">
                             <i class="bi bi-bar-chart-fill menu-icon"></i>
                             <span>Reports</span>
                             <?php if (current_url() == base_url('receptionist/reports')): ?>
@@ -111,6 +119,16 @@
                             <?php endif; ?>
                         </a>
                     </li>
+                    <li class="menu-item <?= current_url() == base_url('receptionist/settings') ? 'active' : '' ?>">
+                        <a href="<?= base_url('receptionist/settings') ?>" class="menu-btn">
+                            <i class="bi bi-gear-fill menu-icon"></i>
+                            <span>Settings</span>
+                            <?php if (current_url() == base_url('receptionist/settings')): ?>
+                                <i class="bi bi-chevron-right menu-arrow"></i>
+                            <?php endif; ?>
+                        </a>
+                    </li>
+
                     
                     <li class="nav-divider"></li>
                     
@@ -160,6 +178,12 @@
                             <span><?= date('D, M j · h:i:s A') ?></span>
                         </div>
                         <span class="divider-icon">|</span>
+                        
+                        <!-- DAY/NIGHT THEME TOGGLE -->
+                        <button class="theme-toggle-btn me-1" type="button" onclick="toggleThemeMode()" title="Toggle Day/Night Theme">
+                            <i class="bi bi-sun-fill text-warning" id="themeSunIcon" style="display:none;"></i>
+                            <i class="bi bi-moon-stars-fill text-info" id="themeMoonIcon"></i>
+                        </button>
                         
                         <!-- NOTIFICATION DROPDOWN - UPDATED -->
                         <div class="dropdown notif-dropdown-wrapper">
@@ -994,11 +1018,48 @@
         });
 
         // ============================================================
+        // DAY / NIGHT THEME SWITCHER
+        // ============================================================
+        function applyTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('polymedic_theme', theme);
+            
+            const sunIcon = document.getElementById('themeSunIcon');
+            const moonIcon = document.getElementById('themeMoonIcon');
+            
+            if (sunIcon && moonIcon) {
+                if (theme === 'dark') {
+                    sunIcon.style.display = 'inline-block';
+                    moonIcon.style.display = 'none';
+                } else {
+                    sunIcon.style.display = 'none';
+                    moonIcon.style.display = 'inline-block';
+                }
+            }
+
+            const formData = new FormData();
+            formData.append('theme', theme);
+            fetch('<?= base_url('user/settings/save-theme') ?>', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            }).catch(err => console.log('Theme sync error:', err));
+        }
+
+        window.applyTheme = applyTheme;
+
+        function toggleThemeMode() {
+            const current = document.documentElement.getAttribute('data-theme') || 'light';
+            const next = current === 'dark' ? 'light' : 'dark';
+            applyTheme(next);
+        }
+
+        // ============================================================
         // NOTIFICATION FUNCTIONS - UPDATED FOR RECEPTIONIST
         // ============================================================
 
         function fetchNotifications() {
-            fetch('/polymedic/public/receptionist/notifications/fetch', {
+            fetch('<?= base_url('receptionist/notifications/fetch') ?>', {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             })
             .then(response => response.json())
@@ -1035,7 +1096,6 @@
                 const unreadClass = item.is_read == 0 ? 'unread' : '';
                 const iconClass = item.type === 'appointment' ? 'bi-calendar-check' : 'bi-bell-fill';
                 
-                // Use the actual link from the notification
                 const link = item.link || '#';
                 
                 html += `
@@ -1055,16 +1115,13 @@
         }
 
         function markNotificationRead(id, event) {
-            // Don't prevent default - let the link navigate
-            // Just mark as read in the background
-            fetch('/polymedic/public/receptionist/notifications/mark-read/' + id, {
+            fetch('<?= base_url('receptionist/notifications/mark-read/') ?>' + id, {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             })
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
                     updateNotificationBadge(data.unread_count);
-                    // Update the unread count in sidebar if needed
                     const sidebarBadge = document.querySelector('.sidebar-nav .badge-notif');
                     if (sidebarBadge) {
                         const newCount = data.unread_count;
@@ -1082,7 +1139,7 @@
 
         function markAllNotificationsRead(event) {
             if (event) event.stopPropagation();
-            fetch('/polymedic/public/receptionist/notifications/mark-all-read', {
+            fetch('<?= base_url('receptionist/notifications/mark-all-read') ?>', {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             })
             .then(response => response.json())
@@ -1090,7 +1147,6 @@
                 if (data.status === 'success') {
                     updateNotificationBadge(0);
                     fetchNotifications();
-                    // Update sidebar badge
                     const sidebarBadge = document.querySelector('.sidebar-nav .badge-notif');
                     if (sidebarBadge) {
                         sidebarBadge.style.display = 'none';
@@ -1110,8 +1166,20 @@
                 .replace(/'/g, "&#039;");
         }
 
-        // Initialize and poll notifications every 15s
         document.addEventListener('DOMContentLoaded', function() {
+            const currentTheme = localStorage.getItem('polymedic_theme') || 'light';
+            const sunIcon = document.getElementById('themeSunIcon');
+            const moonIcon = document.getElementById('themeMoonIcon');
+            if (sunIcon && moonIcon) {
+                if (currentTheme === 'dark') {
+                    sunIcon.style.display = 'inline-block';
+                    moonIcon.style.display = 'none';
+                } else {
+                    sunIcon.style.display = 'none';
+                    moonIcon.style.display = 'inline-block';
+                }
+            }
+
             fetchNotifications();
             setInterval(fetchNotifications, 15000);
         });

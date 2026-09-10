@@ -4,744 +4,1114 @@
 
 <?= $this->section('receptionistContent') ?>
 
-<div class="page-header">
-    <div class="header-actions">
-        <a href="<?= base_url('receptionist/appointments') ?>" class="btn-secondary">
-            <i class="bi bi-arrow-left me-1"></i>Back to List
-        </a>
-        <a href="<?= base_url('receptionist/dashboard') ?>" class="btn-secondary">
-            <i class="bi bi-grid-1x2 me-1"></i>Dashboard
-        </a>
-    </div>
-</div>
+<?php
+    $appointment = $appointment ?? [];
 
-<?php if (isset($appointment)): ?>
+    // PNG avatar filenames inside public/assets/images/.
+    // Change these two strings if your files are named differently.
+    $maleAvatar   = 'man-avatar.png';
+    $femaleAvatar = 'woman-avatar.png';
 
-<!-- Status Banner -->
-<div class="status-banner status-<?= $appointment['status'] ?>">
-    <div class="status-banner-icon">
-        <?php if ($appointment['status'] == 'pending'): ?>
-            <i class="bi bi-clock-history"></i>
-        <?php elseif ($appointment['status'] == 'approved'): ?>
-            <i class="bi bi-check-circle"></i>
-        <?php elseif ($appointment['status'] == 'completed'): ?>
-            <i class="bi bi-check2-circle"></i>
-        <?php elseif ($appointment['status'] == 'cancelled'): ?>
-            <i class="bi bi-x-circle"></i>
-        <?php elseif ($appointment['status'] == 'late'): ?>
-            <i class="bi bi-exclamation-triangle"></i>
-        <?php endif; ?>
-    </div>
-    <div>
-        <div class="status-banner-title"><?= ucfirst($appointment['status']) ?></div>
-        <div class="status-banner-subtitle">
-            <?php if ($appointment['status'] == 'pending'): ?>
-                This appointment is waiting for approval
-            <?php elseif ($appointment['status'] == 'approved'): ?>
-                This appointment has been approved and confirmed
-            <?php elseif ($appointment['status'] == 'completed'): ?>
-                This appointment has been completed successfully
-            <?php elseif ($appointment['status'] == 'cancelled'): ?>
-                This appointment has been cancelled
-            <?php elseif ($appointment['status'] == 'late'): ?>
-                Patient is 1+ hour late for their appointment
-            <?php endif; ?>
-        </div>
-    </div>
-</div>
+    // Two-letter initials fallback, same rule the appointments list uses.
+    $initialsOf = static function ($name) {
+        $parts = preg_split('/\s+/', trim((string) $name));
+        $first = mb_substr($parts[0] ?? '', 0, 1);
+        $last  = count($parts) > 1 ? mb_substr(end($parts), 0, 1) : '';
+        return mb_strtoupper($first . $last);
+    };
 
-<div class="row g-4">
-    <!-- Main Appointment Info -->
-    <div class="col-lg-8">
-        <!-- Patient Profile Card -->
-        <div class="chart-card">
-            <div class="chart-header">
-                <h5><i class="bi bi-person-circle me-2"></i>Patient Information</h5>
-                <span class="badge-year">Ref: <?= $appointment['reference_number'] ?></span>
-            </div>
-            <div class="chart-body">
-                <div class="profile-row">
-                    <div class="profile-avatar">
-                        <?php 
-                            $initials = '';
-                            $nameParts = explode(' ', $appointment['full_name']);
-                            foreach ($nameParts as $part) {
-                                $initials .= strtoupper(substr($part, 0, 1));
-                            }
-                            $initials = substr($initials, 0, 2);
-                        ?>
-                        <span><?= $initials ?></span>
-                    </div>
-                    <div class="profile-info">
-                        <h3><?= esc($appointment['full_name']) ?></h3>
-                        <div class="profile-meta">
-                            <span><i class="bi bi-gender-ambiguous"></i> <?= esc($appointment['gender']) ?></span>
-                            <span><i class="bi bi-cake2"></i> <?= esc($appointment['age']) ?> years old</span>
-                            <span><i class="bi bi-calendar3"></i> <?= date('M d, Y', strtotime($appointment['appointment_date'])) ?></span>
-                            <span><i class="bi bi-clock"></i> <?= esc($appointment['appointment_time']) ?></span>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="info-grid">
-                    <div class="info-item">
-                        <span class="info-label"><i class="bi bi-envelope"></i> Email Address</span>
-                        <span class="info-value"><?= esc($appointment['email']) ?></span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label"><i class="bi bi-phone"></i> Phone Number</span>
-                        <span class="info-value"><?= esc($appointment['phone']) ?></span>
-                    </div>
-                    <?php if ($appointment['arrival_time']): ?>
-                    <div class="info-item">
-                        <span class="info-label"><i class="bi bi-check-circle-fill text-success"></i> Arrival Time</span>
-                        <span class="info-value"><?= date('M d, Y h:i A', strtotime($appointment['arrival_time'])) ?></span>
-                    </div>
-                    <?php endif; ?>
-                    <div class="info-item">
-                        <span class="info-label"><i class="bi bi-calendar-plus"></i> Created At</span>
-                        <span class="info-value"><?= date('M d, Y h:i A', strtotime($appointment['created_at'])) ?></span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Services Card -->
-        <div class="chart-card mt-3">
-            <div class="chart-header">
-                <h5><i class="bi bi-clipboard2-pulse me-2"></i>Selected Services</h5>
-                <span class="badge-year"><?= ucfirst($appointment['service_type']) ?></span>
-            </div>
-            <div class="chart-body">
-                <?php if (!empty($lab_services) || !empty($xray_services)): ?>
-                    <div class="row g-2">
-                        <?php if (!empty($lab_services)): ?>
-                        <div class="col-md-6">
-                            <h6 class="fw-bold text-teal"><i class="bi bi-droplet me-1"></i> Laboratory Tests</h6>
-                            <ul class="service-list">
-                                <?php foreach ($lab_services as $service): ?>
-                                    <li><i class="bi bi-check-circle-fill text-teal me-1"></i> <?= esc($service) ?></li>
-                                <?php endforeach; ?>
-                            </ul>
-                        </div>
-                        <?php endif; ?>
-                        <?php if (!empty($xray_services)): ?>
-                        <div class="col-md-6">
-                            <h6 class="fw-bold" style="color: #0a2b4e;"><i class="bi bi-x-ray me-1"></i> X-Ray Services</h6>
-                            <ul class="service-list">
-                                <?php foreach ($xray_services as $service): ?>
-                                    <li><i class="bi bi-check-circle-fill text-teal me-1"></i> <?= esc($service) ?></li>
-                                <?php endforeach; ?>
-                            </ul>
-                        </div>
-                        <?php endif; ?>
-                    </div>
+    $statusKey = (string) ($appointment['status'] ?? 'pending');
+    $genderRaw = strtolower(trim((string) ($appointment['gender'] ?? '')));
+    $isMale    = $genderRaw === 'male'   || $genderRaw === 'm';
+    $isFemale  = $genderRaw === 'female' || $genderRaw === 'f';
+    $avatarKind = $isMale ? 'male' : ($isFemale ? 'female' : 'neutral');
+
+    $statusCopy = [
+        'pending'   => ['label' => 'Pending',   'tone' => 'pending',   'note' => 'This appointment is waiting for approval.'],
+        'approved'  => ['label' => 'Approved',  'tone' => 'approved',  'note' => 'This appointment has been approved and confirmed.'],
+        'completed' => ['label' => 'Completed', 'tone' => 'completed', 'note' => 'This appointment has been completed successfully.'],
+        'cancelled' => ['label' => 'Cancelled', 'tone' => 'cancelled', 'note' => 'This appointment has been cancelled.'],
+        'late'      => ['label' => 'Late',      'tone' => 'late',      'note' => 'Patient is one hour or more late for their appointment.'],
+    ];
+    $status = $statusCopy[$statusKey] ?? ['label' => ucfirst($statusKey), 'tone' => 'pending', 'note' => ''];
+?>
+
+<div class="av">
+
+    <?php if (!empty($appointment)): ?>
+
+        <!-- =========================================================
+             STATUS BANNER
+             ========================================================= -->
+        <div class="av-banner av-banner--<?= esc($status['tone'], 'attr') ?>">
+            <div class="av-banner-icon" aria-hidden="true">
+                <?php if ($statusKey === 'pending'): ?>
+                    <i class="bi bi-clock-history"></i>
+                <?php elseif ($statusKey === 'approved'): ?>
+                    <i class="bi bi-check-circle"></i>
+                <?php elseif ($statusKey === 'completed'): ?>
+                    <i class="bi bi-check2-circle"></i>
+                <?php elseif ($statusKey === 'cancelled'): ?>
+                    <i class="bi bi-x-circle"></i>
+                <?php elseif ($statusKey === 'late'): ?>
+                    <i class="bi bi-exclamation-triangle"></i>
                 <?php else: ?>
-                    <div class="text-center py-3">
-                        <i class="bi bi-inbox text-muted" style="font-size: 2rem; display: block;"></i>
-                        <p class="text-muted mt-2">No services selected</p>
-                    </div>
+                    <i class="bi bi-info-circle"></i>
                 <?php endif; ?>
-                
-                <?php if ($appointment['other_requests']): ?>
-                    <div class="mt-3 p-3 bg-light rounded-3">
-                        <h6 class="fw-bold"><i class="bi bi-chat-quote me-1"></i> Other Requests</h6>
-                        <p class="mb-0 text-muted"><?= esc($appointment['other_requests']) ?></p>
-                    </div>
-                <?php endif; ?>
+            </div>
+
+            <div class="av-banner-copy">
+                <div class="av-banner-title"><?= esc($status['label']) ?></div>
+                <div class="av-banner-sub"><?= esc($status['note']) ?></div>
+            </div>
+
+            <div class="av-banner-ref">
+                <span class="av-banner-ref-label">Reference</span>
+                <span class="av-banner-ref-value"><?= esc($appointment['reference_number'] ?? '—') ?></span>
             </div>
         </div>
-    </div>
-    
-    <!-- Actions Sidebar -->
-    <div class="col-lg-4">
-        <div class="chart-card">
-            <div class="chart-header">
-                <h5><i class="bi bi-gear me-2"></i>Actions</h5>
-            </div>
-            <div class="chart-body">
-                <div class="action-buttons">
-                    <?php if ($appointment['status'] == 'pending' || $appointment['status'] == 'late'): ?>
-                        <a href="<?= base_url('receptionist/appointment/approve/' . $appointment['id']) ?>" 
-                           class="btn btn-success btn-action w-100 mb-2" 
-                           onclick="return confirm('Approve this appointment?')">
-                            <i class="bi bi-check-circle me-2"></i>Approve
-                        </a>
-                        <a href="<?= base_url('receptionist/appointment/cancel/' . $appointment['id']) ?>" 
-                           class="btn btn-danger btn-action w-100 mb-2" 
-                           onclick="return confirm('Cancel this appointment?')">
-                            <i class="bi bi-x-circle me-2"></i>Cancel
-                        </a>
-                    <?php elseif ($appointment['status'] == 'approved'): ?>
-                        <a href="<?= base_url('receptionist/appointment/complete/' . $appointment['id']) ?>" 
-                           class="btn btn-info btn-action w-100 mb-2" 
-                           onclick="return confirm('Mark this appointment as completed?')">
-                            <i class="bi bi-check2-circle me-2"></i>Complete
-                        </a>
-                        <a href="<?= base_url('receptionist/appointment/cancel/' . $appointment['id']) ?>" 
-                           class="btn btn-danger btn-action w-100 mb-2" 
-                           onclick="return confirm('Cancel this appointment?')">
-                            <i class="bi bi-x-circle me-2"></i>Cancel
-                        </a>
-                    <?php elseif ($appointment['status'] == 'completed'): ?>
-                        <div class="alert alert-success text-center">
-                            <i class="bi bi-check-circle-fill me-2"></i>
-                            This appointment has been completed
+
+
+        <!-- =========================================================
+             MAIN GRID
+             ========================================================= -->
+        <div class="av-grid">
+
+            <!-- LEFT COLUMN -->
+            <div class="av-col-main">
+
+                <!-- PATIENT CARD -->
+                <section class="av-card">
+                    <header class="av-card-head">
+                        <h5 class="av-card-title">
+                            <i class="bi bi-person-circle" aria-hidden="true"></i>
+                            Patient information
+                        </h5>
+                    </header>
+
+                    <div class="av-patient">
+                        <span class="av-avatar av-avatar--<?= esc($avatarKind, 'attr') ?>" aria-hidden="true">
+                            <?php if ($isMale): ?>
+                                <img src="<?= esc(base_url('assets/images/' . $maleAvatar), 'attr') ?>"
+                                     alt=""
+                                     class="av-avatar-img"
+                                     loading="lazy"
+                                     decoding="async">
+                            <?php elseif ($isFemale): ?>
+                                <img src="<?= esc(base_url('assets/images/' . $femaleAvatar), 'attr') ?>"
+                                     alt=""
+                                     class="av-avatar-img"
+                                     loading="lazy"
+                                     decoding="async">
+                            <?php else: ?>
+                                <span class="av-avatar-initials"><?= esc($initialsOf($appointment['full_name'] ?? '')) ?></span>
+                            <?php endif; ?>
+                        </span>
+
+                        <div class="av-patient-body">
+                            <h3 class="av-patient-name"><?= esc($appointment['full_name'] ?? 'Unknown') ?></h3>
+
+                            <div class="av-patient-meta">
+                                <span class="av-meta-item">
+                                    <i class="bi bi-gender-ambiguous" aria-hidden="true"></i>
+                                    <?= esc($appointment['gender'] ?? '—') ?>
+                                </span>
+                                <span class="av-meta-item">
+                                    <i class="bi bi-cake2" aria-hidden="true"></i>
+                                    <?= esc($appointment['age'] ?? '—') ?> years old
+                                </span>
+                                <span class="av-meta-item">
+                                    <i class="bi bi-calendar3" aria-hidden="true"></i>
+                                    <?= !empty($appointment['appointment_date']) ? esc(date('M d, Y', strtotime($appointment['appointment_date']))) : '—' ?>
+                                </span>
+                                <span class="av-meta-item">
+                                    <i class="bi bi-clock" aria-hidden="true"></i>
+                                    <?= esc($appointment['appointment_time'] ?? '—') ?>
+                                </span>
+                            </div>
                         </div>
-                    <?php elseif ($appointment['status'] == 'cancelled'): ?>
-                        <div class="alert alert-danger text-center">
-                            <i class="bi bi-x-circle-fill me-2"></i>
-                            This appointment has been cancelled
+                    </div>
+
+                    <dl class="av-facts">
+                        <div>
+                            <dt><i class="bi bi-envelope" aria-hidden="true"></i> Email</dt>
+                            <dd>
+                                <?php if (!empty($appointment['email'])): ?>
+                                    <a class="av-link" href="mailto:<?= esc($appointment['email'], 'attr') ?>"><?= esc($appointment['email']) ?></a>
+                                <?php else: ?>
+                                    <span class="av-muted">Not provided</span>
+                                <?php endif; ?>
+                            </dd>
+                        </div>
+
+                        <div>
+                            <dt><i class="bi bi-phone" aria-hidden="true"></i> Phone</dt>
+                            <dd>
+                                <?php if (!empty($appointment['phone'])): ?>
+                                    <a class="av-link" href="tel:<?= esc($appointment['phone'], 'attr') ?>"><?= esc($appointment['phone']) ?></a>
+                                <?php else: ?>
+                                    <span class="av-muted">Not provided</span>
+                                <?php endif; ?>
+                            </dd>
+                        </div>
+
+                        <?php if (!empty($appointment['arrival_time'])): ?>
+                            <div>
+                                <dt><i class="bi bi-check-circle" aria-hidden="true"></i> Arrival</dt>
+                                <dd><?= esc(date('M d, Y h:i A', strtotime($appointment['arrival_time']))) ?></dd>
+                            </div>
+                        <?php endif; ?>
+
+                        <div>
+                            <dt><i class="bi bi-calendar-plus" aria-hidden="true"></i> Requested</dt>
+                            <dd><?= !empty($appointment['created_at']) ? esc(date('M d, Y h:i A', strtotime($appointment['created_at']))) : '—' ?></dd>
+                        </div>
+                    </dl>
+                </section>
+
+                <!-- SERVICES CARD -->
+                <section class="av-card">
+                    <header class="av-card-head">
+                        <h5 class="av-card-title">
+                            <i class="bi bi-clipboard2-pulse" aria-hidden="true"></i>
+                            Selected services
+                        </h5>
+                        <span class="av-tag av-tag--soft"><?= esc(ucfirst($appointment['service_type'] ?? '')) ?></span>
+                    </header>
+
+                    <?php if (!empty($lab_services) || !empty($xray_services)): ?>
+                        <div class="av-services">
+
+                            <?php if (!empty($lab_services)): ?>
+                                <div class="av-service-group">
+                                    <h6 class="av-service-title av-service-title--lab">
+                                        <i class="bi bi-droplet-half" aria-hidden="true"></i>
+                                        Laboratory tests
+                                        <span class="av-service-count"><?= count($lab_services) ?></span>
+                                    </h6>
+                                    <ul class="av-service-list">
+                                        <?php foreach ($lab_services as $service): ?>
+                                            <li><?= esc($service) ?></li>
+                                        <?php endforeach; ?>
+                                    </ul>
+                                </div>
+                            <?php endif; ?>
+
+                            <?php if (!empty($xray_services)): ?>
+                                <div class="av-service-group">
+                                    <h6 class="av-service-title av-service-title--xray">
+                                        <i class="bi bi-radioactive" aria-hidden="true"></i>
+                                        X-Ray services
+                                        <span class="av-service-count"><?= count($xray_services) ?></span>
+                                    </h6>
+                                    <ul class="av-service-list">
+                                        <?php foreach ($xray_services as $service): ?>
+                                            <li><?= esc($service) ?></li>
+                                        <?php endforeach; ?>
+                                    </ul>
+                                </div>
+                            <?php endif; ?>
+
+                        </div>
+                    <?php else: ?>
+                        <div class="av-empty av-empty--inline">
+                            <div class="av-empty-icon"><i class="bi bi-inbox" aria-hidden="true"></i></div>
+                            <p>No services selected for this appointment.</p>
                         </div>
                     <?php endif; ?>
-                    
-                    <hr>
-                    
-                    <div class="mt-2">
-                        <h6 class="fw-bold"><i class="bi bi-clock-history me-1"></i> Timeline</h6>
-                        <ul class="timeline">
-                            <li>
-                                <span class="timeline-dot bg-teal"></span>
-                                <div>
-                                    <strong>Created</strong>
-                                    <span class="timeline-time"><?= date('M d, Y h:i A', strtotime($appointment['created_at'])) ?></span>
-                                </div>
-                            </li>
-                            <?php if ($appointment['status'] == 'approved' || $appointment['status'] == 'completed'): ?>
-                            <li>
-                                <span class="timeline-dot bg-success"></span>
-                                <div>
-                                    <strong>Approved</strong>
-                                    <span class="timeline-time"><?= $appointment['arrival_time'] ? date('M d, Y h:i A', strtotime($appointment['arrival_time'])) : 'N/A' ?></span>
-                                </div>
-                            </li>
-                            <?php endif; ?>
-                            <?php if ($appointment['status'] == 'completed'): ?>
-                            <li>
-                                <span class="timeline-dot bg-info"></span>
-                                <div>
-                                    <strong>Completed</strong>
-                                    <span class="timeline-time"><?= date('M d, Y h:i A', strtotime($appointment['updated_at'])) ?></span>
-                                </div>
-                            </li>
-                            <?php endif; ?>
-                            <?php if ($appointment['status'] == 'cancelled'): ?>
-                            <li>
-                                <span class="timeline-dot bg-danger"></span>
-                                <div>
-                                    <strong>Cancelled</strong>
-                                    <span class="timeline-time"><?= date('M d, Y h:i A', strtotime($appointment['updated_at'])) ?></span>
-                                </div>
-                            </li>
-                            <?php endif; ?>
-                            <?php if ($appointment['status'] == 'late'): ?>
-                            <li>
-                                <span class="timeline-dot bg-warning"></span>
-                                <div>
-                                    <strong>Marked as Late</strong>
-                                    <span class="timeline-time"><?= date('M d, Y h:i A', strtotime($appointment['updated_at'])) ?></span>
-                                </div>
-                            </li>
-                            <?php endif; ?>
-                        </ul>
+
+                    <?php if (!empty($appointment['other_requests'])): ?>
+                        <div class="av-note">
+                            <h6 class="av-note-title">
+                                <i class="bi bi-chat-quote" aria-hidden="true"></i>
+                                Other requests
+                            </h6>
+                            <p class="av-note-body"><?= esc($appointment['other_requests']) ?></p>
+                        </div>
+                    <?php endif; ?>
+                </section>
+
+            </div>
+
+            <!-- RIGHT COLUMN -->
+            <aside class="av-col-side">
+
+                <!-- ACTIONS -->
+                <section class="av-card">
+                    <header class="av-card-head">
+                        <h5 class="av-card-title">
+                            <i class="bi bi-gear" aria-hidden="true"></i>
+                            Actions
+                        </h5>
+                    </header>
+
+                    <div class="av-actions">
+
+                        <?php if ($statusKey === 'pending' || $statusKey === 'late'): ?>
+                            <a href="<?= base_url('receptionist/appointment/approve/' . ($appointment['id'] ?? 0)) ?>"
+                               class="av-action av-action--primary"
+                               onclick="return confirm('Approve this appointment?')">
+                                <i class="bi bi-check-circle" aria-hidden="true"></i>
+                                Approve appointment
+                            </a>
+                            <a href="<?= base_url('receptionist/appointment/cancel/' . ($appointment['id'] ?? 0)) ?>"
+                               class="av-action av-action--danger"
+                               onclick="return confirm('Cancel this appointment?')">
+                                <i class="bi bi-x-circle" aria-hidden="true"></i>
+                                Cancel appointment
+                            </a>
+
+                        <?php elseif ($statusKey === 'approved'): ?>
+                            <a href="<?= base_url('receptionist/appointment/complete/' . ($appointment['id'] ?? 0)) ?>"
+                               class="av-action av-action--primary"
+                               onclick="return confirm('Mark this appointment as completed?')">
+                                <i class="bi bi-check2-circle" aria-hidden="true"></i>
+                                Mark as completed
+                            </a>
+                            <a href="<?= base_url('receptionist/appointment/cancel/' . ($appointment['id'] ?? 0)) ?>"
+                               class="av-action av-action--danger"
+                               onclick="return confirm('Cancel this appointment?')">
+                                <i class="bi bi-x-circle" aria-hidden="true"></i>
+                                Cancel appointment
+                            </a>
+
+                        <?php elseif ($statusKey === 'completed'): ?>
+                            <div class="av-state av-state--success">
+                                <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+                                This appointment has been completed.
+                            </div>
+
+                        <?php elseif ($statusKey === 'cancelled'): ?>
+                            <div class="av-state av-state--danger">
+                                <i class="bi bi-x-circle-fill" aria-hidden="true"></i>
+                                This appointment has been cancelled.
+                            </div>
+                        <?php endif; ?>
+
                     </div>
-                </div>
-            </div>
+                </section>
+
+                <!-- TIMELINE -->
+                <section class="av-card">
+                    <header class="av-card-head">
+                        <h5 class="av-card-title">
+                            <i class="bi bi-clock-history" aria-hidden="true"></i>
+                            Timeline
+                        </h5>
+                    </header>
+
+                    <ul class="av-timeline">
+                        <li>
+                            <span class="av-timeline-dot av-timeline-dot--teal" aria-hidden="true"></span>
+                            <div class="av-timeline-body">
+                                <strong>Request created</strong>
+                                <span class="av-timeline-time">
+                                    <?= !empty($appointment['created_at']) ? esc(date('M d, Y h:i A', strtotime($appointment['created_at']))) : '—' ?>
+                                </span>
+                            </div>
+                        </li>
+
+                        <?php if ($statusKey === 'approved' || $statusKey === 'completed'): ?>
+                            <li>
+                                <span class="av-timeline-dot av-timeline-dot--success" aria-hidden="true"></span>
+                                <div class="av-timeline-body">
+                                    <strong>Approved</strong>
+                                    <span class="av-timeline-time">
+                                        <?= !empty($appointment['arrival_time']) ? esc(date('M d, Y h:i A', strtotime($appointment['arrival_time']))) : '—' ?>
+                                    </span>
+                                </div>
+                            </li>
+                        <?php endif; ?>
+
+                        <?php if ($statusKey === 'completed'): ?>
+                            <li>
+                                <span class="av-timeline-dot av-timeline-dot--info" aria-hidden="true"></span>
+                                <div class="av-timeline-body">
+                                    <strong>Completed</strong>
+                                    <span class="av-timeline-time">
+                                        <?= !empty($appointment['updated_at']) ? esc(date('M d, Y h:i A', strtotime($appointment['updated_at']))) : '—' ?>
+                                    </span>
+                                </div>
+                            </li>
+                        <?php endif; ?>
+
+                        <?php if ($statusKey === 'cancelled'): ?>
+                            <li>
+                                <span class="av-timeline-dot av-timeline-dot--danger" aria-hidden="true"></span>
+                                <div class="av-timeline-body">
+                                    <strong>Cancelled</strong>
+                                    <span class="av-timeline-time">
+                                        <?= !empty($appointment['updated_at']) ? esc(date('M d, Y h:i A', strtotime($appointment['updated_at']))) : '—' ?>
+                                    </span>
+                                </div>
+                            </li>
+                        <?php endif; ?>
+
+                        <?php if ($statusKey === 'late'): ?>
+                            <li>
+                                <span class="av-timeline-dot av-timeline-dot--warning" aria-hidden="true"></span>
+                                <div class="av-timeline-body">
+                                    <strong>Marked as late</strong>
+                                    <span class="av-timeline-time">
+                                        <?= !empty($appointment['updated_at']) ? esc(date('M d, Y h:i A', strtotime($appointment['updated_at']))) : '—' ?>
+                                    </span>
+                                </div>
+                            </li>
+                        <?php endif; ?>
+                    </ul>
+                </section>
+
+                <!-- QUICK ACTIONS -->
+                <section class="av-card">
+                    <header class="av-card-head">
+                        <h5 class="av-card-title">
+                            <i class="bi bi-lightning-charge" aria-hidden="true"></i>
+                            Quick actions
+                        </h5>
+                    </header>
+
+                    <div class="av-quick">
+                        <a href="mailto:<?= esc($appointment['email'] ?? '', 'attr') ?>" class="av-quick-item">
+                            <i class="bi bi-envelope" aria-hidden="true"></i>
+                            <span>Send email</span>
+                        </a>
+                        <a href="tel:<?= esc($appointment['phone'] ?? '', 'attr') ?>" class="av-quick-item">
+                            <i class="bi bi-telephone" aria-hidden="true"></i>
+                            <span>Call patient</span>
+                        </a>
+                        <button type="button" class="av-quick-item" onclick="window.print()">
+                            <i class="bi bi-printer" aria-hidden="true"></i>
+                            <span>Print details</span>
+                        </button>
+                    </div>
+                </section>
+
+            </aside>
         </div>
-        
-        <!-- Quick Actions -->
-        <div class="chart-card mt-3">
-            <div class="chart-header">
-                <h5><i class="bi bi-lightning-charge me-2"></i>Quick Actions</h5>
-            </div>
-            <div class="chart-body">
-                <div class="quick-actions">
-                    <a href="mailto:<?= esc($appointment['email']) ?>" class="action-btn">
-                        <i class="bi bi-envelope"></i>
-                        Send Email
-                    </a>
-                    <a href="tel:<?= esc($appointment['phone']) ?>" class="action-btn">
-                        <i class="bi bi-telephone"></i>
-                        Call Patient
-                    </a>
-                    <button onclick="window.print()" class="action-btn">
-                        <i class="bi bi-printer"></i>
-                        Print Details
-                    </button>
-                </div>
-            </div>
+
+    <?php else: ?>
+
+        <div class="av-empty">
+            <div class="av-empty-icon"><i class="bi bi-exclamation-circle" aria-hidden="true"></i></div>
+            <h3>Appointment not found</h3>
+            <p>The appointment you tried to open does not exist or has been removed.</p>
+            <a href="<?= base_url('receptionist/appointments') ?>" class="av-action av-action--primary">
+                <i class="bi bi-arrow-left" aria-hidden="true"></i>
+                Back to appointments
+            </a>
         </div>
-    </div>
+
+    <?php endif; ?>
+
 </div>
 
 <style>
-/* ===== PAGE HEADER ===== */
-.page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.5rem;
-    flex-wrap: wrap;
-    gap: 1rem;
+/* =========================================================
+   APPOINTMENT VIEW
+   Namespaced under .av so the layout's generic card and table
+   rules can't leak in. Visual tokens match the appointments
+   list and diagnostic requests pages.
+   ========================================================= */
+
+.av {
+    --av-ink:         #0f172a;
+    --av-text:        #334155;
+    --av-muted:       #64748b;
+    --av-faint:       #94a3b8;
+    --av-line:        #e2e8f0;
+    --av-line-soft:   #f1f5f9;
+    --av-surface:     #ffffff;
+    --av-subtle:      #f8fafc;
+    --av-accent:      #0d9488;
+    --av-accent-dark: #0f766e;
+    --av-accent-soft: #e6f7f7;
+    --av-danger:      #dc2626;
+    --av-danger-dark: #b91c1c;
+    --av-success:     #059669;
+    --av-amber:       #b45309;
+    --av-radius:      12px;
+    --av-radius-sm:   8px;
+    --av-ring:        0 0 0 3px rgba(13, 148, 136, 0.18);
+    --av-mono:        ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+    color: var(--av-text);
+    font-size: 0.875rem;
 }
 
-.header-actions {
+.av *:focus-visible { outline: 2px solid var(--av-accent); outline-offset: 2px; }
+
+.av-muted { color: var(--av-faint); }
+
+/* =========================================================
+   TOP BAR
+   ========================================================= */
+
+.av-topbar {
     display: flex;
-    gap: 0.75rem;
     align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
     flex-wrap: wrap;
 }
 
-/* ===== BACK BUTTON ===== */
-.btn-secondary {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    color: #0a2b4e;
-    padding: 0.5rem 1.2rem;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 0.85rem;
-    transition: all 0.3s ease;
+.av-back {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.45rem;
+    height: 34px;
+    padding: 0 0.85rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--av-text);
+    background: var(--av-surface);
+    border: 1px solid var(--av-line);
+    border-radius: var(--av-radius-sm);
     text-decoration: none;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.btn-secondary:hover {
-    background: #f8faff;
-    border-color: #0d9488;
-    color: #0d9488;
-    transform: translateX(-2px);
-    box-shadow: 0 4px 12px rgba(13, 148, 136, 0.1);
-    text-decoration: none;
+.av-back:hover {
+    background: var(--av-subtle);
+    border-color: #cbd5e1;
+    color: var(--av-ink);
 }
 
-.btn-secondary i {
-    transition: transform 0.3s ease;
-}
+.av-back--ghost { color: var(--av-muted); }
 
-.btn-secondary:hover i {
-    transform: translateX(-3px);
-}
+.av-back i { font-size: 0.9em; }
 
-/* ===== STATUS BANNER ===== */
-.status-banner {
+/* =========================================================
+   STATUS BANNER
+   ========================================================= */
+
+.av-banner {
     display: flex;
     align-items: center;
     gap: 1rem;
-    padding: 1rem 1.5rem;
-    border-radius: 12px;
-    margin-bottom: 1.5rem;
-    border-left: 4px solid;
-    background: #ffffff;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    padding: 1rem 1.15rem;
+    margin-bottom: 1.25rem;
+    background: var(--av-surface);
+    border: 1px solid var(--av-line);
+    border-left: 3px solid var(--av-tone, var(--av-line));
+    border-radius: var(--av-radius);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    flex-wrap: wrap;
 }
 
-.status-banner.status-pending {
-    border-left-color: #ffc107;
-    background: #fff8e1;
+.av-banner--pending   { --av-tone: #f59e0b; }
+.av-banner--approved  { --av-tone: #3b82f6; }
+.av-banner--completed { --av-tone: #10b981; }
+.av-banner--cancelled { --av-tone: #94a3b8; }
+.av-banner--late      { --av-tone: #ea580c; }
+
+.av-banner-icon {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    font-size: 1.1rem;
+    color: var(--av-tone, var(--av-muted));
+    background: color-mix(in srgb, var(--av-tone, var(--av-muted)) 12%, white);
+    border-radius: 10px;
+    flex-shrink: 0;
 }
 
-.status-banner.status-approved {
-    border-left-color: #0d9488;
-    background: #f0fdfa;
+.av-banner-copy { flex: 1 1 240px; min-width: 0; }
+
+.av-banner-title {
+    font-size: 0.95rem;
+    font-weight: 650;
+    color: var(--av-ink);
+    line-height: 1.25;
 }
 
-.status-banner.status-completed {
-    border-left-color: #28a745;
-    background: #e8f5e9;
+.av-banner-sub {
+    margin-top: 0.15rem;
+    font-size: 0.8rem;
+    color: var(--av-muted);
 }
 
-.status-banner.status-cancelled {
-    border-left-color: #dc3545;
-    background: #fce4ec;
+.av-banner-ref {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.15rem;
+    flex-shrink: 0;
 }
 
-.status-banner.status-late {
-    border-left-color: #ff6b00;
-    background: #fff3e0;
+.av-banner-ref-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--av-faint);
 }
 
-.status-banner-icon {
-    font-size: 1.8rem;
-    width: 48px;
-    height: 48px;
+.av-banner-ref-value {
+    font-family: var(--av-mono);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--av-ink);
+}
+
+/* =========================================================
+   GRID
+   ========================================================= */
+
+.av-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+    gap: 1.1rem;
+    align-items: start;
+}
+
+.av-col-main,
+.av-col-side {
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+    min-width: 0;
+}
+
+/* =========================================================
+   CARD
+   ========================================================= */
+
+.av-card {
+    background: var(--av-surface);
+    border: 1px solid var(--av-line);
+    border-radius: var(--av-radius);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    padding: 1.15rem 1.25rem 1.25rem;
+}
+
+.av-card-head {
     display: flex;
     align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.8);
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
 }
 
-.status-banner-title {
-    font-size: 1rem;
-    font-weight: 700;
-    color: #0a2b4e;
+.av-card-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 650;
+    color: var(--av-ink);
+    letter-spacing: -0.01em;
 }
 
-.status-banner-subtitle {
-    font-size: 0.85rem;
-    color: #64748b;
+.av-card-title i { color: var(--av-accent); font-size: 0.95rem; }
+
+.av-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    border-radius: 999px;
+    white-space: nowrap;
 }
 
-/* ===== PROFILE ROW ===== */
-.profile-row {
+.av-tag--soft {
+    color: var(--av-accent-dark);
+    background: var(--av-accent-soft);
+}
+
+/* =========================================================
+   PATIENT BLOCK
+   ========================================================= */
+
+.av-patient {
     display: flex;
     align-items: center;
     gap: 1rem;
     padding-bottom: 1rem;
-    border-bottom: 1px solid #f0f4ff;
     margin-bottom: 1rem;
-}
-
-.profile-avatar {
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #0d9488, #0f766e);
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.2rem;
-    font-weight: 700;
-    flex-shrink: 0;
-}
-
-.profile-info h3 {
-    margin: 0;
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: #0a2b4e;
-}
-
-.profile-meta {
-    display: flex;
-    gap: 1rem;
-    font-size: 0.8rem;
-    color: #64748b;
-    margin-top: 0.2rem;
+    border-bottom: 1px solid var(--av-line-soft);
     flex-wrap: wrap;
 }
 
-.profile-meta i {
-    color: #0d9488;
-}
-
-/* ===== INFO GRID ===== */
-.info-grid {
+.av-avatar {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.5rem;
+    place-items: center;
+    flex-shrink: 0;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    overflow: hidden;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--av-accent);
+    background: var(--av-accent-soft);
 }
 
-.info-item {
-    display: flex;
-    flex-direction: column;
-    padding: 0.5rem 0.75rem;
-    background: #f8faff;
-    border-radius: 8px;
-    border: 1px solid #f0f4ff;
+.av-avatar--male    { color: #1d4ed8; background: #eaf2fe; }
+.av-avatar--female  { color: #b32e50; background: #fce9ee; }
+.av-avatar--neutral { color: var(--av-accent); background: var(--av-accent-soft); }
+
+.av-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
 }
 
-.info-label {
-    font-size: 0.6rem;
-    text-transform: uppercase;
-    color: #94a3b8;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-}
+.av-avatar-initials { line-height: 1; }
 
-.info-label i {
-    margin-right: 0.3rem;
-}
+.av-patient-body { min-width: 0; flex: 1 1 200px; }
 
-.info-value {
-    font-size: 0.85rem;
-    font-weight: 500;
-    color: #0a2b4e;
-    margin-top: 0.1rem;
-}
-
-/* ===== CHART CARD ===== */
-.chart-card {
-    background: #ffffff;
-    border-radius: 14px;
-    padding: 1.25rem 1.5rem;
-    box-shadow: 0 2px 12px rgba(13, 148, 136, 0.06);
-    border: 1px solid rgba(13, 148, 136, 0.06);
-}
-
-.chart-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-}
-
-.chart-header h5 {
-    font-weight: 600;
-    color: #0a2b4e;
+.av-patient-name {
     margin: 0;
-    font-size: 0.95rem;
+    font-size: 1.1rem;
+    font-weight: 650;
+    color: var(--av-ink);
+    letter-spacing: -0.01em;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
 }
 
-.chart-header h5 i {
-    color: #0d9488;
+.av-patient-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 1rem;
+    margin-top: 0.35rem;
 }
 
-.badge-year {
-    background: #ccfbf1;
-    color: #0d9488;
-    font-size: 0.7rem;
+.av-meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.8rem;
+    color: var(--av-muted);
+}
+
+.av-meta-item i { color: var(--av-accent); font-size: 0.78rem; }
+
+/* =========================================================
+   FACTS
+   ========================================================= */
+
+.av-facts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem 1.25rem;
+    margin: 0;
+}
+
+.av-facts > div { min-width: 0; }
+
+.av-facts dt {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0 0 0.15rem;
+    font-size: 0.68rem;
     font-weight: 600;
-    padding: 0.25rem 0.75rem;
-    border-radius: 30px;
-    white-space: nowrap;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--av-faint);
 }
 
-/* ===== SERVICE LIST ===== */
-.text-teal {
-    color: #0d9488;
+.av-facts dt i { font-size: 0.75rem; color: var(--av-faint); }
+
+.av-facts dd {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--av-ink);
+    overflow-wrap: anywhere;
 }
 
-.service-list {
+.av-link {
+    color: var(--av-ink);
+    text-decoration: none;
+}
+
+.av-link:hover {
+    color: var(--av-accent-dark);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+/* =========================================================
+   SERVICES
+   ========================================================= */
+
+.av-services {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+}
+
+.av-service-group { min-width: 0; }
+
+.av-service-title {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0 0 0.5rem;
+    font-size: 0.78rem;
+    font-weight: 650;
+    color: var(--av-ink);
+}
+
+.av-service-title i { font-size: 0.8rem; }
+.av-service-title--lab i  { color: #0e7490; }
+.av-service-title--xray i { color: #4338ca; }
+
+.av-service-count {
+    margin-left: auto;
+    padding: 0.1rem 0.45rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--av-muted);
+    background: var(--av-line-soft);
+    border-radius: 999px;
+}
+
+.av-service-list {
     list-style: none;
     padding: 0;
     margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
 }
 
-.service-list li {
-    padding: 0.25rem 0;
-    font-size: 0.9rem;
-    color: #0a2b4e;
+.av-service-list li {
+    position: relative;
+    padding: 0.4rem 0.65rem 0.4rem 1.4rem;
+    font-size: 0.82rem;
+    color: var(--av-text);
+    background: var(--av-subtle);
+    border: 1px solid var(--av-line-soft);
+    border-radius: var(--av-radius-sm);
+    overflow-wrap: anywhere;
+}
+
+.av-service-list li::before {
+    content: "";
+    position: absolute;
+    left: 0.65rem;
+    top: 0.75em;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--av-accent);
+}
+
+/* =========================================================
+   NOTE
+   ========================================================= */
+
+.av-note {
+    margin-top: 1rem;
+    padding: 0.85rem 1rem;
+    background: var(--av-subtle);
+    border: 1px solid var(--av-line-soft);
+    border-radius: var(--av-radius-sm);
+}
+
+.av-note-title {
     display: flex;
     align-items: center;
     gap: 0.4rem;
+    margin: 0 0 0.35rem;
+    font-size: 0.8rem;
+    font-weight: 650;
+    color: var(--av-ink);
 }
 
-.service-list li i.text-teal {
-    color: #0d9488;
+.av-note-title i { color: var(--av-accent); font-size: 0.85rem; }
+
+.av-note-body {
+    margin: 0;
+    font-size: 0.84rem;
+    line-height: 1.6;
+    color: var(--av-text);
+    white-space: pre-wrap;
 }
 
-/* ===== ACTION BUTTONS ===== */
-.btn-action {
-    padding: 0.6rem 1rem;
-    font-size: 0.85rem;
-    border-radius: 8px;
-    font-weight: 600;
-    transition: all 0.3s ease;
+/* =========================================================
+   ACTIONS
+   ========================================================= */
+
+.av-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.av-action {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 0.5rem;
+    height: 38px;
+    padding: 0 1rem;
+    font-size: 0.84rem;
+    font-weight: 600;
+    text-decoration: none;
+    border: 1px solid var(--av-line);
+    border-radius: var(--av-radius-sm);
+    background: var(--av-surface);
+    color: var(--av-text);
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    width: 100%;
 }
 
-.btn-action:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+.av-action:hover {
+    background: var(--av-subtle);
+    border-color: #cbd5e1;
+    color: var(--av-ink);
 }
 
-.btn-success {
-    background: #0d9488;
-    border: none;
-    color: white;
-}
+.av-action i { font-size: 0.9em; }
 
-.btn-success:hover {
-    background: #0f766e;
-    color: white;
-}
+.av-action--primary,
+.av-action--primary:hover { color: #ffffff; }
+.av-action--primary { background: var(--av-accent); border-color: var(--av-accent); }
+.av-action--primary:hover { background: var(--av-accent-dark); border-color: var(--av-accent-dark); }
 
-.btn-danger {
-    background: #dc3545;
-    border: none;
-    color: white;
-}
+.av-action--danger,
+.av-action--danger:hover { color: #ffffff; }
+.av-action--danger { background: var(--av-danger); border-color: var(--av-danger); }
+.av-action--danger:hover { background: var(--av-danger-dark); border-color: var(--av-danger-dark); }
 
-.btn-danger:hover {
-    background: #c82333;
-    color: white;
-}
-
-.btn-info {
-    background: #0d9488;
-    border: none;
-    color: white;
-}
-
-.btn-info:hover {
-    background: #0f766e;
-    color: white;
-}
-
-/* ===== TIMELINE ===== */
-.timeline {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-
-.timeline li {
+.av-state {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.4rem 0;
-    border-bottom: 1px solid #f0f4ff;
+    gap: 0.55rem;
+    padding: 0.75rem 0.9rem;
+    font-size: 0.84rem;
+    border-radius: var(--av-radius-sm);
+    border: 1px solid transparent;
 }
 
-.timeline li:last-child {
-    border-bottom: none;
+.av-state--success {
+    color: #047857;
+    background: #ecfdf5;
+    border-color: #a7f3d0;
 }
 
-.timeline-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    border: 2px solid rgba(255,255,255,0.8);
+.av-state--danger {
+    color: #b91c1c;
+    background: #fef2f2;
+    border-color: #fecaca;
 }
 
-.timeline-dot.bg-teal { background: #0d9488; }
-.timeline-dot.bg-success { background: #28a745; }
-.timeline-dot.bg-info { background: #17a2b8; }
-.timeline-dot.bg-danger { background: #dc3545; }
-.timeline-dot.bg-warning { background: #ffc107; }
+.av-state i { font-size: 1rem; flex-shrink: 0; }
 
-.timeline li div {
+/* =========================================================
+   TIMELINE
+   ========================================================= */
+
+.av-timeline {
+    list-style: none;
+    margin: 0;
+    padding: 0;
     display: flex;
     flex-direction: column;
-    flex: 1;
 }
 
-.timeline li strong {
-    font-size: 0.85rem;
-    color: #0a2b4e;
+.av-timeline li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.7rem;
+    padding: 0 0 0.8rem 0;
+    position: relative;
 }
 
-.timeline-time {
-    font-size: 0.7rem;
-    color: #94a3b8;
+.av-timeline li:last-child { padding-bottom: 0; }
+
+.av-timeline li:not(:last-child)::before {
+    content: "";
+    position: absolute;
+    left: 4.5px;
+    top: 14px;
+    bottom: 0;
+    width: 2px;
+    background: var(--av-line);
 }
 
-/* ===== QUICK ACTIONS ===== */
-.quick-actions {
+.av-timeline-dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 3px;
+    background: var(--av-line);
+    box-shadow: 0 0 0 3px var(--av-surface);
+    position: relative;
+    z-index: 1;
+}
+
+.av-timeline-dot--teal    { background: var(--av-accent); }
+.av-timeline-dot--success { background: #10b981; }
+.av-timeline-dot--info    { background: #3b82f6; }
+.av-timeline-dot--danger  { background: #ef4444; }
+.av-timeline-dot--warning { background: #f59e0b; }
+
+.av-timeline-body { min-width: 0; }
+
+.av-timeline-body strong {
+    display: block;
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: var(--av-ink);
+    line-height: 1.3;
+}
+
+.av-timeline-time {
+    display: block;
+    margin-top: 0.1rem;
+    font-size: 0.74rem;
+    color: var(--av-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* =========================================================
+   QUICK ACTIONS
+   ========================================================= */
+
+.av-quick {
     display: flex;
     flex-direction: column;
     gap: 0.4rem;
 }
 
-.action-btn {
-    padding: 0.5rem 0.75rem;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    background: #fafcff;
-    color: #0a2b4e;
-    font-weight: 500;
-    font-size: 0.85rem;
+.av-quick-item {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    transition: all 0.3s ease;
+    gap: 0.55rem;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.84rem;
+    font-weight: 500;
+    color: var(--av-text);
+    background: var(--av-subtle);
+    border: 1px solid var(--av-line-soft);
+    border-radius: var(--av-radius-sm);
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
     width: 100%;
     text-align: left;
-    cursor: pointer;
+    font-family: inherit;
+}
+
+.av-quick-item:hover {
+    background: var(--av-surface);
+    border-color: var(--av-accent);
+    color: var(--av-ink);
     text-decoration: none;
 }
 
-.action-btn:hover {
-    background: #f0fdfa;
-    border-color: #0d9488;
-    transform: translateX(4px);
-    text-decoration: none;
-    color: #0a2b4e;
-}
-
-.action-btn i {
-    font-size: 1rem;
-    color: #0d9488;
+.av-quick-item i {
+    font-size: 0.95rem;
+    color: var(--av-accent);
     width: 20px;
+    text-align: center;
+    flex-shrink: 0;
 }
 
-/* ===== ALERT ===== */
-.alert {
+/* =========================================================
+   EMPTY STATE
+   ========================================================= */
+
+.av-empty {
+    padding: 3rem 1rem;
+    text-align: center;
+    background: var(--av-surface);
+    border: 1px solid var(--av-line);
+    border-radius: var(--av-radius);
+}
+
+.av-empty--inline {
+    padding: 1.5rem 1rem;
+    border: 1px dashed var(--av-line);
+    border-radius: var(--av-radius-sm);
+    background: var(--av-subtle);
+}
+
+.av-empty-icon {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    margin: 0 auto 0.85rem;
+    font-size: 1.2rem;
+    color: var(--av-faint);
+    background: var(--av-line-soft);
     border-radius: 10px;
-    padding: 0.75rem 1rem;
-    font-weight: 500;
 }
 
-.alert-success {
-    background: #e8f5e9;
-    color: #28a745;
-    border: 1px solid #c8e6c9;
+.av-empty h3 {
+    margin: 0 0 0.25rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--av-ink);
 }
 
-.alert-danger {
-    background: #fce4ec;
-    color: #dc3545;
-    border: 1px solid #f8d7da;
+.av-empty p {
+    max-width: 28rem;
+    margin: 0 auto 1rem;
+    font-size: 0.82rem;
+    color: var(--av-muted);
 }
 
-/* ===== RESPONSIVE ===== */
+.av-empty .av-action {
+    display: inline-flex;
+    width: auto;
+}
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 1100px) {
+    .av-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
 @media (max-width: 768px) {
-    .page-header {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 0.75rem;
-    }
-    
-    .header-actions {
-        flex-direction: column;
-    }
-    
-    .header-actions .btn {
-        width: 100%;
-        justify-content: center;
-    }
-    
-    .info-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    .status-banner {
-        flex-direction: column;
-        text-align: center;
-        padding: 1rem;
-    }
-    
-    .profile-row {
-        flex-direction: column;
-        text-align: center;
-    }
-    
-    .profile-meta {
-        justify-content: center;
-        flex-wrap: wrap;
-    }
+    .av-banner { padding: 0.9rem 1rem; }
+    .av-banner-ref { align-items: flex-start; width: 100%; }
+
+    .av-patient { align-items: flex-start; }
+
+    .av-facts { grid-template-columns: minmax(0, 1fr); }
+    .av-services { grid-template-columns: minmax(0, 1fr); }
+
+    .av-card { padding: 1rem; }
 }
 
 @media (max-width: 480px) {
-    .profile-avatar {
-        width: 44px;
-        height: 44px;
-        font-size: 1rem;
-    }
-    
-    .profile-info h3 {
-        font-size: 1rem;
-    }
-    
-    .page-title {
-        font-size: 1.1rem;
-    }
-    
-    .chart-card {
-        padding: 0.75rem 1rem;
-    }
+    .av-avatar { width: 48px; height: 48px; font-size: 0.95rem; }
+    .av-patient-name { font-size: 1rem; }
+    .av-topbar .av-back { flex: 1; justify-content: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .av *, .av *::before, .av *::after { transition: none !important; }
+}
+
+@media print {
+    .av-topbar,
+    .av-actions,
+    .av-quick { display: none !important; }
+
+    .av-card,
+    .av-banner,
+    .av-empty { box-shadow: none; break-inside: avoid; }
+
+    .av-grid { grid-template-columns: minmax(0, 1fr); }
 }
 </style>
-
-<?php endif; ?>
 
 <?= $this->endSection() ?>

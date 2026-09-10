@@ -38,9 +38,23 @@
             
             <nav class="sidebar-nav">
                 <ul>
+                    <!-- =========================================
+                         SIDEBAR COLLAPSE BUTTON (added, matches admin)
+                         ========================================= -->
+                    <li class="sidebar-toggle-item">
+                        <button type="button"
+                                class="sidebar-toggle-btn"
+                                id="sidebarCollapseBtn"
+                                onclick="toggleSidebarCollapse()"
+                                title="Collapse Sidebar">
+                            <i class="bi bi-layout-sidebar-inset"></i>
+                            <span>Collapse Sidebar</span>
+                        </button>
+                    </li>
+
                     <li class="nav-section">MAIN</li>
                     <li class="menu-item <?= current_url() == base_url('receptionist/dashboard') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/receptionist/dashboard" class="menu-btn">
+                        <a href="/polymedic/public/receptionist/dashboard" class="menu-btn" data-tooltip="Dashboard">
                             <i class="bi bi-grid-1x2-fill menu-icon"></i>
                             <span>Dashboard</span>
                             <?php if (current_url() == base_url('receptionist/dashboard')): ?>
@@ -49,7 +63,7 @@
                         </a>
                     </li>
                     <li class="menu-item <?= strpos(current_url(), 'receptionist/appointment') !== false ? 'active' : '' ?>">
-                        <a href="/polymedic/public/receptionist/appointments" class="menu-btn">
+                        <a href="/polymedic/public/receptionist/appointments" class="menu-btn" data-tooltip="Appointments">
                             <i class="bi bi-calendar-check menu-icon"></i>
                             <span>Appointments</span>
                             <?php if (strpos(current_url(), 'receptionist/appointment') !== false): ?>
@@ -58,7 +72,7 @@
                         </a>
                     </li>
                     <li class="menu-item <?= current_url() == base_url('receptionist/patients') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/receptionist/patients" class="menu-btn">
+                        <a href="/polymedic/public/receptionist/patients" class="menu-btn" data-tooltip="Patients">
                             <i class="bi bi-people-fill menu-icon"></i>
                             <span>Patients</span>
                             <?php if (current_url() == base_url('receptionist/patients')): ?>
@@ -67,7 +81,7 @@
                         </a>
                     </li>
                     <li class="menu-item <?= current_url() == base_url('receptionist/diagnostic-requests') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/receptionist/diagnostic-requests" class="menu-btn">
+                        <a href="/polymedic/public/receptionist/diagnostic-requests" class="menu-btn" data-tooltip="Diagnostic Requests">
                             <i class="bi bi-file-earmark-medical menu-icon"></i>
                             <span>Diagnostic Requests</span>
                             <?php 
@@ -87,7 +101,7 @@
                     
                     <li class="nav-section">FINANCIAL</li>
                     <li class="menu-item <?= current_url() == base_url('receptionist/billing') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/receptionist/billing" class="menu-btn">
+                        <a href="/polymedic/public/receptionist/billing" class="menu-btn" data-tooltip="Billing">
                             <i class="bi bi-receipt menu-icon"></i>
                             <span>Billing</span>
                             <?php if (current_url() == base_url('receptionist/billing')): ?>
@@ -96,7 +110,7 @@
                         </a>
                     </li>
                     <li class="menu-item <?= current_url() == base_url('receptionist/payments') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/receptionist/payments" class="menu-btn">
+                        <a href="/polymedic/public/receptionist/payments" class="menu-btn" data-tooltip="Payments">
                             <i class="bi bi-credit-card menu-icon"></i>
                             <span>Payments</span>
                             <?php if (current_url() == base_url('receptionist/payments')): ?>
@@ -105,7 +119,7 @@
                         </a>
                     </li>
                     <li class="menu-item <?= current_url() == base_url('receptionist/reports') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/receptionist/reports" class="menu-btn">
+                        <a href="/polymedic/public/receptionist/reports" class="menu-btn" data-tooltip="Reports">
                             <i class="bi bi-bar-chart-fill menu-icon"></i>
                             <span>Reports</span>
                             <?php if (current_url() == base_url('receptionist/reports')): ?>
@@ -115,7 +129,7 @@
                     </li>
 
                     <li class="menu-item <?= current_url() == base_url('receptionist/notifications') ? 'active' : '' ?>">
-                        <a href="<?= base_url('receptionist/notifications') ?>" class="menu-btn">
+                        <a href="<?= base_url('receptionist/notifications') ?>" class="menu-btn" data-tooltip="Notifications">
                             <i class="bi bi-bell-fill menu-icon"></i>
                             <span>Notifications</span>
                             <?php 
@@ -133,7 +147,7 @@
                     <li class="nav-divider"></li>
                     
                     <li class="menu-item logout-item">
-                        <a href="/polymedic/public/logout" class="menu-btn">
+                        <a href="/polymedic/public/logout" class="menu-btn" data-tooltip="Logout">
                             <i class="bi bi-box-arrow-right menu-icon"></i>
                             <span>Logout</span>
                         </a>
@@ -146,7 +160,7 @@
         <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
         
         <!-- Main Content -->
-        <main class="admin-main">
+        <main class="admin-main" id="adminMain">
             <!-- Top Navbar -->
             <header class="admin-header receptionist-header">
                 <div class="header-left">
@@ -237,6 +251,7 @@
        ============================================ */
     :root {
         --sidebar-width: 280px;
+        --sidebar-collapsed-width: 78px;
         --header-height: 64px;
         --active-blue: #1976d2;
         --active-blue-dark: #1565c0;
@@ -244,6 +259,8 @@
         --text-blue: #1e40af;
         --icon-gray: #9ca3af;
         --bg-light: #f8fafc;
+        --sidebar-ease: cubic-bezier(0.4, 0, 0.2, 1);
+        --sidebar-speed: 0.32s;
     }
 
     /* ===== SIDEBAR ===== */
@@ -257,7 +274,8 @@
         bottom: 0;
         z-index: 1000;
         overflow-y: auto;
-        transition: transform 0.3s ease;
+        overflow-x: hidden;
+        transition: width var(--sidebar-speed) var(--sidebar-ease), transform 0.3s ease;
         box-shadow: 2px 0 20px rgba(0,0,0,0.06);
         border-right: 1px solid #e5e7eb !important;
     }
@@ -278,18 +296,25 @@
         justify-content: space-between;
         padding: 1.5rem 1.5rem;
         border-bottom: 1px solid #f3f4f6 !important;
+        transition: padding var(--sidebar-speed) var(--sidebar-ease),
+                    justify-content var(--sidebar-speed) var(--sidebar-ease);
     }
 
     .sidebar-logo {
         display: flex;
         align-items: center;
         gap: 0.75rem;
+        min-width: 0;
+        transition: gap var(--sidebar-speed) var(--sidebar-ease);
     }
 
     .sidebar-logo img {
         height: 40px;
-        width: auto;
+        width: 40px;
         object-fit: contain;
+        flex-shrink: 0;
+        transition: width var(--sidebar-speed) var(--sidebar-ease),
+                    height var(--sidebar-speed) var(--sidebar-ease);
     }
 
     .sidebar-logo span {
@@ -298,6 +323,13 @@
         color: #111827 !important;
         letter-spacing: 0.5px;
         line-height: 1.2;
+        white-space: nowrap;
+        opacity: 1;
+        max-width: 200px;
+        overflow: hidden;
+        display: inline-block;
+        transition: opacity calc(var(--sidebar-speed) * 0.6) var(--sidebar-ease),
+                    max-width var(--sidebar-speed) var(--sidebar-ease);
     }
 
     .sidebar-logo span small {
@@ -343,6 +375,70 @@
         color: #9ca3af !important;
         padding: 1rem 0.75rem 0.25rem;
         font-weight: 700;
+        white-space: nowrap;
+        opacity: 1;
+        height: auto;
+        overflow: hidden;
+        transition: opacity calc(var(--sidebar-speed) * 0.6) var(--sidebar-ease),
+                    height var(--sidebar-speed) var(--sidebar-ease),
+                    padding var(--sidebar-speed) var(--sidebar-ease),
+                    margin var(--sidebar-speed) var(--sidebar-ease);
+    }
+
+    /* ===== COLLAPSE BUTTON (added, matches admin) ===== */
+    .sidebar-toggle-item {
+        margin-bottom: 0.35rem;
+    }
+
+    .sidebar-toggle-btn {
+        width: 100%;
+        min-height: 43px;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.65rem 0.95rem;
+        border: 1px solid #e5e7eb;
+        border-radius: 9px;
+        background: #f8fafc;
+        color: #64748b;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s ease,
+                    color 0.2s ease,
+                    border-color 0.2s ease,
+                    transform 0.2s ease,
+                    justify-content var(--sidebar-speed) var(--sidebar-ease),
+                    gap var(--sidebar-speed) var(--sidebar-ease),
+                    padding var(--sidebar-speed) var(--sidebar-ease);
+    }
+
+    .sidebar-toggle-btn i {
+        width: 24px;
+        min-width: 24px;
+        text-align: center;
+        font-size: 1.05rem;
+        transition: transform var(--sidebar-speed) var(--sidebar-ease);
+    }
+
+    .sidebar-toggle-btn span {
+        white-space: nowrap;
+        opacity: 1;
+        max-width: 200px;
+        overflow: hidden;
+        display: inline-block;
+        transition: opacity calc(var(--sidebar-speed) * 0.6) var(--sidebar-ease),
+                    max-width var(--sidebar-speed) var(--sidebar-ease);
+    }
+
+    .sidebar-toggle-btn:hover {
+        background: #e3f2fd;
+        border-color: #bfdbfe;
+        color: #1976d2;
+    }
+
+    .sidebar-toggle-btn:active {
+        transform: scale(0.98);
     }
 
     /* ===== NON-ACTIVE MENU ITEMS ===== */
@@ -381,12 +477,18 @@
         align-items: center;
         gap: 0.75rem;
         width: 100%;
+        min-height: 44px;
         padding: 0.75rem 1rem;
         border-radius: 8px !important;
         text-decoration: none;
         font-size: 0.875rem;
         font-weight: 600;
-        transition: all 0.2s ease;
+        transition: background 0.2s ease,
+                    color 0.2s ease,
+                    box-shadow 0.2s ease,
+                    gap var(--sidebar-speed) var(--sidebar-ease),
+                    padding var(--sidebar-speed) var(--sidebar-ease),
+                    justify-content var(--sidebar-speed) var(--sidebar-ease);
         background: transparent;
         cursor: pointer;
         position: relative;
@@ -400,6 +502,7 @@
 
     .menu-btn:hover .menu-icon {
         color: var(--active-blue) !important;
+        transform: scale(1.05);
     }
 
     .menu-item.active .menu-btn {
@@ -410,11 +513,25 @@
 
     /* Menu Icon */
     .menu-icon {
-        font-size: 1.1rem;
+        font-size: 1.08rem;
         flex-shrink: 0;
         width: 24px;
         text-align: center;
-        transition: color 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: color 0.2s ease, transform 0.2s ease;
+    }
+
+    /* Menu label — animates on width/opacity */
+    .menu-btn > span {
+        white-space: nowrap;
+        opacity: 1;
+        max-width: 200px;
+        overflow: hidden;
+        display: inline-block;
+        transition: opacity calc(var(--sidebar-speed) * 0.6) var(--sidebar-ease),
+                    max-width var(--sidebar-speed) var(--sidebar-ease);
     }
 
     /* Menu Arrow (Chevron) */
@@ -423,6 +540,8 @@
         color: #ffffff !important;
         margin-left: auto;
         flex-shrink: 0;
+        opacity: 1;
+        transition: opacity calc(var(--sidebar-speed) * 0.6) var(--sidebar-ease);
     }
 
     /* ===== REMOVE BADGE FROM ACTIVE ITEMS ===== */
@@ -448,6 +567,9 @@
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         flex-shrink: 0;
         line-height: 1;
+        opacity: 1;
+        transition: opacity calc(var(--sidebar-speed) * 0.6) var(--sidebar-ease),
+                    transform var(--sidebar-speed) var(--sidebar-ease);
     }
 
     /* Logout Item */
@@ -496,6 +618,13 @@
         background: var(--bg-light);
         width: calc(100% - var(--sidebar-width));
         max-width: 100%;
+        transition: margin-left var(--sidebar-speed) var(--sidebar-ease),
+                    width var(--sidebar-speed) var(--sidebar-ease);
+    }
+
+    .admin-main.sidebar-collapsed {
+        margin-left: var(--sidebar-collapsed-width);
+        width: calc(100% - var(--sidebar-collapsed-width));
     }
 
     /* ===== HEADER - FIXED FOR MOBILE ===== */
@@ -1011,6 +1140,183 @@
     }
 
     /* ============================================
+       COLLAPSED SIDEBAR (DESKTOP ONLY) — added, matches admin
+       ============================================ */
+
+    @media (min-width: 993px) {
+
+        .receptionist-sidebar.collapsed {
+            width: var(--sidebar-collapsed-width);
+        }
+
+        .receptionist-sidebar.collapsed .sidebar-header {
+            justify-content: center;
+            padding: 1rem 0.5rem;
+        }
+
+        .receptionist-sidebar.collapsed .sidebar-logo {
+            gap: 0;
+            justify-content: center;
+            width: 100%;
+        }
+
+        .receptionist-sidebar.collapsed .sidebar-logo img {
+            width: 40px;
+            height: 40px;
+        }
+
+        .receptionist-sidebar.collapsed .sidebar-logo span {
+            opacity: 0;
+            max-width: 0;
+        }
+
+        .receptionist-sidebar.collapsed .sidebar-nav {
+            padding: 0.9rem 0.6rem;
+        }
+
+        /* Toggle button - centered */
+        .receptionist-sidebar.collapsed .sidebar-toggle-btn {
+            justify-content: center;
+            padding: 0.65rem 0;
+            gap: 0;
+            background: #f1f5f9;
+            border-color: #e2e8f0;
+            display: flex;
+            align-items: center;
+        }
+
+        .receptionist-sidebar.collapsed .sidebar-toggle-btn span {
+            opacity: 0;
+            max-width: 0;
+            display: none;
+        }
+
+        .receptionist-sidebar.collapsed .sidebar-toggle-btn i {
+            margin: 0;
+            transform: rotate(180deg);
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+        }
+
+        .receptionist-sidebar.collapsed .nav-section {
+            font-size: 0.64rem;
+            height: 13px;
+            padding: 0;
+            margin: 0.55rem 0;
+            opacity: 0;
+        }
+
+        /* Menu buttons - centered icons */
+        .receptionist-sidebar.collapsed .menu-btn {
+            justify-content: center;
+            width: 100%;
+            min-height: 44px;
+            padding: 0.7rem 0;
+            gap: 0;
+            display: flex;
+            align-items: center;
+        }
+
+        .receptionist-sidebar.collapsed .menu-btn > span {
+            opacity: 0;
+            max-width: 0;
+            display: none;
+        }
+
+        /* Center the icon properly */
+        .receptionist-sidebar.collapsed .menu-icon {
+            width: 24px;
+            height: 24px;
+            margin: 0;
+            font-size: 1.15rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            text-align: center;
+            line-height: 1;
+        }
+
+        .receptionist-sidebar.collapsed .menu-arrow {
+            opacity: 0;
+            max-width: 0;
+            overflow: hidden;
+            display: none;
+        }
+
+        .receptionist-sidebar.collapsed .menu-item {
+            position: relative;
+        }
+
+        .receptionist-sidebar.collapsed .badge-notif {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            margin: 0;
+            min-width: 17px;
+            width: 17px;
+            height: 17px;
+            padding: 0;
+            font-size: 0.52rem;
+            z-index: 5;
+            opacity: 1;
+        }
+
+        /* Tooltips */
+        .receptionist-sidebar.collapsed .menu-btn:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            left: calc(100% + 12px);
+            top: 50%;
+            transform: translateY(-50%);
+            background: #111827;
+            color: #ffffff;
+            padding: 0.45rem 0.7rem;
+            border-radius: 6px;
+            font-size: 0.72rem;
+            font-weight: 500;
+            white-space: nowrap;
+            z-index: 3000;
+            pointer-events: none;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.18);
+            animation: tooltipFade 0.15s ease forwards;
+        }
+
+        .receptionist-sidebar.collapsed .sidebar-toggle-btn:hover::after {
+            content: attr(title);
+            position: absolute;
+            left: calc(100% + 12px);
+            top: 50%;
+            transform: translateY(-50%);
+            background: #111827;
+            color: #ffffff;
+            padding: 0.45rem 0.7rem;
+            border-radius: 6px;
+            font-size: 0.72rem;
+            font-weight: 500;
+            white-space: nowrap;
+            z-index: 3000;
+            pointer-events: none;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.18);
+            animation: tooltipFade 0.15s ease forwards;
+        }
+
+        @keyframes tooltipFade {
+            from {
+                opacity: 0;
+                transform: translateY(-50%) translateX(-5px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(-50%) translateX(0);
+            }
+        }
+    }
+
+    /* ============================================
        RESPONSIVE BREAKPOINTS
        ============================================ */
 
@@ -1061,6 +1367,56 @@
             box-shadow: 4px 0 30px rgba(0,0,0,0.1) !important;
         }
 
+        /* Force expanded state on mobile */
+        .receptionist-sidebar.collapsed {
+            width: var(--sidebar-width) !important;
+        }
+
+        .receptionist-sidebar.collapsed .sidebar-header {
+            justify-content: space-between !important;
+            padding: 1.5rem 1.5rem !important;
+        }
+
+        .receptionist-sidebar.collapsed .sidebar-logo {
+            gap: 0.75rem !important;
+            justify-content: flex-start !important;
+        }
+
+        .receptionist-sidebar.collapsed .sidebar-logo span {
+            opacity: 1 !important;
+            max-width: 200px !important;
+        }
+
+        .receptionist-sidebar.collapsed .nav-section {
+            font-size: 0.65rem !important;
+            height: auto !important;
+            padding: 1rem 0.75rem 0.25rem !important;
+            margin: 0 !important;
+            opacity: 1 !important;
+        }
+
+        .receptionist-sidebar.collapsed .menu-btn {
+            justify-content: flex-start !important;
+            padding: 0.75rem 1rem !important;
+            gap: 0.75rem !important;
+        }
+
+        .receptionist-sidebar.collapsed .menu-btn > span {
+            opacity: 1 !important;
+            max-width: 200px !important;
+        }
+
+        .receptionist-sidebar.collapsed .menu-arrow {
+            opacity: 1 !important;
+            max-width: 20px !important;
+            display: inline-block !important;
+        }
+
+        /* Hide collapse button on mobile */
+        .sidebar-toggle-item {
+            display: none !important;
+        }
+
         .sidebar-overlay {
             position: fixed;
             top: 0;
@@ -1083,6 +1439,11 @@
         .admin-main {
             margin-left: 0;
             width: 100%;
+        }
+
+        .admin-main.sidebar-collapsed {
+            margin-left: 0 !important;
+            width: 100% !important;
         }
 
         .hamburger-btn {
@@ -1135,7 +1496,7 @@
         }
 
         .header-datetime {
-            display: none; /* Hide datetime on mobile */
+            display: none;
         }
 
         .header-datetime span {
@@ -1332,7 +1693,7 @@
         }
 
         .header-user {
-            display: none; /* Hide user entirely on very small screens */
+            display: none;
         }
 
         .admin-content {
@@ -1493,12 +1854,24 @@
             height: 180px;
         }
     }
+
+    /* Disable transitions only during the initial state application
+       on page load, so restoring a saved collapsed/expanded state
+       never itself animates — only user clicks do. */
+    .receptionist-sidebar.no-transition,
+    .receptionist-sidebar.no-transition *,
+    .admin-main.no-transition {
+        transition: none !important;
+    }
     </style>
 
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js"></script>
     <script>
-        // Sidebar toggle
+        // ============================================================
+        // SIDEBAR TOGGLE (mobile hamburger)
+        // ============================================================
+
         function toggleSidebar() {
             const sidebar = document.getElementById('adminSidebar');
             const overlay = document.getElementById('sidebarOverlay');
@@ -1524,7 +1897,155 @@
         });
 
         // ============================================================
-        // NOTIFICATION FUNCTIONS - UPDATED FOR RECEPTIONIST
+        // SIDEBAR COLLAPSE / EXPAND (desktop) — added, matches admin
+        // ============================================================
+
+        (function() {
+            'use strict';
+
+            function getSidebarElements() {
+                var sidebar = document.getElementById('adminSidebar');
+                var adminMain = document.getElementById('adminMain');
+                var collapseBtn = document.getElementById('sidebarCollapseBtn');
+                return { sidebar: sidebar, adminMain: adminMain, collapseBtn: collapseBtn };
+            }
+
+            function applySidebarState(skipTransition) {
+                var elements = getSidebarElements();
+                var sidebar = elements.sidebar;
+                var adminMain = elements.adminMain;
+
+                if (!sidebar || !adminMain) {
+                    setTimeout(function() { applySidebarState(skipTransition); }, 50);
+                    return;
+                }
+
+                if (skipTransition) {
+                    sidebar.classList.add('no-transition');
+                    adminMain.classList.add('no-transition');
+                }
+
+                if (window.innerWidth <= 992) {
+                    sidebar.classList.remove('collapsed');
+                    adminMain.classList.remove('sidebar-collapsed');
+                    updateCollapseButton();
+                    if (skipTransition) requestAnimationFrame(removeNoTransition);
+                    return;
+                }
+
+                var savedState = localStorage.getItem('polymedicReceptionistSidebarCollapsed');
+
+                if (savedState === null) {
+                    localStorage.setItem('polymedicReceptionistSidebarCollapsed', '0');
+                    savedState = '0';
+                }
+
+                if (savedState === '1') {
+                    sidebar.classList.add('collapsed');
+                    adminMain.classList.add('sidebar-collapsed');
+                } else {
+                    sidebar.classList.remove('collapsed');
+                    adminMain.classList.remove('sidebar-collapsed');
+                }
+
+                updateCollapseButton();
+
+                if (skipTransition) requestAnimationFrame(removeNoTransition);
+            }
+
+            function removeNoTransition() {
+                var elements = getSidebarElements();
+                if (elements.sidebar) elements.sidebar.classList.remove('no-transition');
+                if (elements.adminMain) elements.adminMain.classList.remove('no-transition');
+            }
+
+            function updateCollapseButton() {
+                var elements = getSidebarElements();
+                var sidebar = elements.sidebar;
+                var collapseBtn = elements.collapseBtn;
+
+                if (!collapseBtn || !sidebar) return;
+
+                var icon = collapseBtn.querySelector('i');
+                var text = collapseBtn.querySelector('span');
+                var isCollapsed = sidebar.classList.contains('collapsed');
+
+                if (isCollapsed) {
+                    if (icon) icon.className = 'bi bi-layout-sidebar-inset-reverse';
+                    collapseBtn.title = 'Expand Sidebar';
+                    if (text) text.textContent = 'Expand Sidebar';
+                } else {
+                    if (icon) icon.className = 'bi bi-layout-sidebar-inset';
+                    collapseBtn.title = 'Collapse Sidebar';
+                    if (text) text.textContent = 'Collapse Sidebar';
+                }
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function() {
+                    applySidebarState(true);
+                });
+            } else {
+                applySidebarState(true);
+            }
+
+            window.addEventListener('load', function() {
+                applySidebarState(true);
+            });
+
+            window.addEventListener('pageshow', function(e) {
+                if (e.persisted) {
+                    setTimeout(function() { applySidebarState(true); }, 50);
+                }
+            });
+
+            window.toggleSidebarCollapse = function() {
+                var elements = getSidebarElements();
+                var sidebar = elements.sidebar;
+                var adminMain = elements.adminMain;
+
+                if (!sidebar || !adminMain) return;
+                if (window.innerWidth <= 992) return;
+
+                if (sidebar.classList.contains('collapsed')) {
+                    sidebar.classList.remove('collapsed');
+                    adminMain.classList.remove('sidebar-collapsed');
+                    localStorage.setItem('polymedicReceptionistSidebarCollapsed', '0');
+                } else {
+                    sidebar.classList.add('collapsed');
+                    adminMain.classList.add('sidebar-collapsed');
+                    localStorage.setItem('polymedicReceptionistSidebarCollapsed', '1');
+                }
+
+                updateCollapseButton();
+            };
+
+            window.addEventListener('resize', function() {
+                var elements = getSidebarElements();
+                var sidebar = elements.sidebar;
+                var adminMain = elements.adminMain;
+
+                if (!sidebar || !adminMain) return;
+
+                if (window.innerWidth > 992) {
+                    var savedState = localStorage.getItem('polymedicReceptionistSidebarCollapsed');
+                    if (savedState === '1') {
+                        sidebar.classList.add('collapsed');
+                        adminMain.classList.add('sidebar-collapsed');
+                    } else {
+                        sidebar.classList.remove('collapsed');
+                        adminMain.classList.remove('sidebar-collapsed');
+                    }
+                } else {
+                    sidebar.classList.remove('collapsed');
+                    adminMain.classList.remove('sidebar-collapsed');
+                }
+                updateCollapseButton();
+            });
+        })();
+
+        // ============================================================
+        // NOTIFICATION FUNCTIONS
         // ============================================================
 
         function fetchNotifications() {
@@ -1583,7 +2104,6 @@
                     colorClass = 'payment';
                 }
                 
-                // Use the actual link from the notification
                 const link = item.link || '#';
                 
                 html += `
@@ -1603,8 +2123,6 @@
         }
 
         function markNotificationRead(id, event) {
-            // Don't prevent default - let the link navigate
-            // Just mark as read in the background
             fetch('/polymedic/public/receptionist/notifications/mark-read/' + id, {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             })
@@ -1612,7 +2130,6 @@
             .then(data => {
                 if (data.status === 'success') {
                     updateNotificationBadge(data.unread_count);
-                    // Update the unread count in sidebar if needed
                     const sidebarBadge = document.querySelector('.sidebar-nav .badge-notif');
                     if (sidebarBadge) {
                         const newCount = data.unread_count;
@@ -1638,7 +2155,6 @@
                 if (data.status === 'success') {
                     updateNotificationBadge(0);
                     fetchNotifications();
-                    // Update sidebar badge
                     const sidebarBadge = document.querySelector('.sidebar-nav .badge-notif');
                     if (sidebarBadge) {
                         sidebarBadge.style.display = 'none';
@@ -1658,7 +2174,6 @@
                 .replace(/'/g, "&#039;");
         }
 
-        // Initialize and poll notifications every 15s
         document.addEventListener('DOMContentLoaded', function() {
             fetchNotifications();
             setInterval(fetchNotifications, 15000);

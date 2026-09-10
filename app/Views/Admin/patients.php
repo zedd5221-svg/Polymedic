@@ -12,13 +12,32 @@
             <h4 class="page-title">Patient Management</h4>
             <p class="page-subtitle">Manage all registered patients (<?= $total ?? 0 ?> total)</p>
         </div>
+        <div class="header-actions">
+            <button class="btn btn-export" onclick="exportPatients()">
+                <i class="bi bi-download"></i>
+                <span>Export</span>
+            </button>
+            <button class="btn btn-primary" onclick="window.location.href='<?= base_url('admin/patient/add') ?>'">
+                <i class="bi bi-person-plus"></i>
+                <span>Add Patient</span>
+            </button>
+        </div>
     </div>
 
     <!-- ===== TABLE TOOLBAR ===== -->
     <div class="table-toolbar">
         <div class="search-wrapper">
             <i class="bi bi-search"></i>
-            <input type="text" class="form-control" placeholder="Search patients..." id="searchPatients">
+            <input type="text" class="form-control" placeholder="Search by name, code, email, or phone..." id="searchPatients">
+        </div>
+        
+        <div class="select-wrapper filter-wrapper">
+            <select class="form-select filter-select" id="filterSource">
+                <option value="">All Sources</option>
+                <option value="online">Online</option>
+                <option value="walk-in">Walk-in</option>
+                <option value="referral">Referral</option>
+            </select>
         </div>
         
         <div class="select-wrapper filter-wrapper">
@@ -31,10 +50,10 @@
         
         <div class="select-wrapper sort-wrapper">
             <select class="form-select sort-select" id="sortBy">
-                <option value="last_visit">Sort by: Last Visit</option>
-                <option value="patient_name">Sort by: Patient Name</option>
+                <option value="created_at">Sort by: Newest</option>
+                <option value="full_name">Sort by: Patient Name</option>
                 <option value="age">Sort by: Age</option>
-                <option value="status">Sort by: Status</option>
+                <option value="created_at_oldest">Sort by: Oldest</option>
             </select>
         </div>
     </div>
@@ -42,14 +61,14 @@
     <!-- Success/Error Messages -->
     <?php if (session()->getFlashdata('success')): ?>
         <div class="alert alert-success alert-dismissible fade show" role="alert">
-            <?= session()->getFlashdata('success') ?>
+            <i class="bi bi-check-circle-fill me-2"></i><?= session()->getFlashdata('success') ?>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     <?php endif; ?>
 
     <?php if (session()->getFlashdata('error')): ?>
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <?= session()->getFlashdata('error') ?>
+            <i class="bi bi-exclamation-circle-fill me-2"></i><?= session()->getFlashdata('error') ?>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     <?php endif; ?>
@@ -60,45 +79,76 @@
             <table class="table patients-table" id="patientsTable">
                 <thead>
                     <tr>
-                        <th>Patient ID <i class="bi bi-arrow-down-up"></i></th>
+                        <th>Patient Code</th>
                         <th>Patient Name</th>
                         <th>Source</th>
                         <th>Gender</th>
                         <th>Age</th>
                         <th>Phone</th>
                         <th>Email</th>
-                        <th>Last Visit <i class="bi bi-arrow-down-up"></i></th>
+                        <th>Registered</th>
                         <th>Status</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody id="patientsTableBody">
                     <?php if (!empty($patients) && is_array($patients)): ?>
-                        <?php $counter = 1; ?>
                         <?php foreach ($patients as $patient): ?>
                             <?php 
-                            $lastVisit = $patient['last_visit'] ?? null;
+                            // Determine if patient is active (visited within last 30 days)
+                            $lastVisit = $patient['last_visit'] ?? $patient['created_at'] ?? null;
                             $isActive = $lastVisit && strtotime($lastVisit) > strtotime('-30 days');
+                            
+                            // Clean source display
+                            $source = $patient['source'] ?? 'walk-in';
+                            $sourceDisplay = ucfirst(strtolower($source));
+                            
+                            // Get patient code or fallback
+                            $patientCode = $patient['patient_code'] ?? 'N/A';
+                            
+                            // Check if patient is approved (has patient_code)
+                            $isApproved = $patientCode !== 'N/A' && !empty($patientCode);
+                            
+                            // Get patient ID
+                            $patientId = $patient['id'] ?? 0;
                             ?>
-                            <tr data-status="<?= $isActive ? 'active' : 'inactive' ?>" data-source="<?= esc($patient['source'] ?? '') ?>">
-                                <td><span class="patient-id">PM-<?= str_pad($counter, 4, '0', STR_PAD_LEFT) ?></span></td>
+                            <tr data-patient-row
+                                data-status="<?= $isActive ? 'active' : 'inactive' ?>"
+                                data-source="<?= esc(strtolower($source), 'attr') ?>"
+                                data-name="<?= esc(strtolower($patient['full_name'] ?? ''), 'attr') ?>"
+                                data-age="<?= esc((string) (int) ($patient['age'] ?? 0), 'attr') ?>"
+                                data-created="<?= isset($patient['created_at']) ? esc(date('Y-m-d H:i:s', strtotime($patient['created_at'])), 'attr') : '' ?>">
+                                <td>
+                                    <span class="patient-code <?= $isApproved ? 'approved' : 'pending' ?>">
+                                        <?= esc($patientCode) ?>
+                                        <?php if (!$isApproved): ?>
+                                            <span class="pending-badge">Pending</span>
+                                        <?php endif; ?>
+                                    </span>
+                                </td>
                                 <td>
                                     <div class="patient-cell">
                                         <span class="patient-avatar">
                                             <?php 
                                                 $nameParts = preg_split('/\s+/', trim($patient['full_name'] ?? 'Unknown'));
-                                                $initials = strtoupper(mb_substr($nameParts[0] ?? 'U', 0, 1) . mb_substr($nameParts[count($nameParts) - 1] ?? 'N', 0, 1));
+                                                $first = $nameParts[0] ?? 'U';
+                                                $last = $nameParts[count($nameParts) - 1] ?? 'N';
+                                                $initials = strtoupper(mb_substr($first, 0, 1) . mb_substr($last, 0, 1));
                                                 echo esc($initials);
                                             ?>
                                         </span>
                                         <div class="patient-meta">
                                             <span class="patient-name"><?= esc($patient['full_name'] ?? 'Unknown') ?></span>
+                                            <?php if ($isApproved): ?>
+                                                <small class="patient-code-small"><?= esc($patientCode) ?></small>
+                                            <?php endif; ?>
                                         </div>
                                     </div>
                                 </td>
                                 <td>
-                                    <span class="source-badge <?= strtolower($patient['source'] ?? 'walk-in') ?>">
-                                        <?= esc($patient['source'] ?? 'Walk-in') ?>
+                                    <span class="source-badge <?= strtolower($source) ?>">
+                                        <i class="bi <?= strtolower($source) === 'online' ? 'bi-globe' : (strtolower($source) === 'walk-in' ? 'bi-person-walking' : 'bi-person-arms-up') ?>"></i>
+                                        <?= $sourceDisplay ?>
                                     </span>
                                 </td>
                                 <td><?= esc($patient['gender'] ?? 'N/A') ?></td>
@@ -108,7 +158,7 @@
                                 <td>
                                     <div class="date-cell">
                                         <i class="bi bi-calendar3"></i>
-                                        <span><?= $lastVisit ? date('M d, Y', strtotime($lastVisit)) : '—' ?></span>
+                                        <span><?= isset($patient['created_at']) ? date('M d, Y', strtotime($patient['created_at'])) : '—' ?></span>
                                     </div>
                                 </td>
                                 <td>
@@ -118,21 +168,37 @@
                                     </span>
                                 </td>
                                 <td class="action-cell">
-                                    <a href="<?= base_url('admin/patient/view/' . ($patient['id'] ?? $counter)) ?>" class="action-icon-btn view" title="View">
+                                    <!-- Approve Button - Only show if not approved -->
+                                    <?php if (!$isApproved && $patientId > 0): ?>
+                                        <button class="action-icon-btn approve" onclick="approvePatient(<?= $patientId ?>)" title="Approve Patient">
+                                            <i class="bi bi-check-circle"></i>
+                                        </button>
+                                    <?php endif; ?>
+                                    
+                                    <button class="action-icon-btn view" onclick="viewPatient(<?= $patientId ?>)" title="View">
                                         <i class="bi bi-eye"></i>
-                                    </a>
-                                    <a href="<?= base_url('admin/patient/edit/' . ($patient['id'] ?? $counter)) ?>" class="action-icon-btn edit" title="Edit">
+                                    </button>
+                                    
+                                    <button class="action-icon-btn edit" onclick="editPatient(<?= $patientId ?>)" title="Edit">
                                         <i class="bi bi-pencil"></i>
-                                    </a>
-                                    <a href="mailto:<?= esc($patient['email'] ?? '') ?>" class="action-icon-btn email" title="Email">
-                                        <i class="bi bi-envelope"></i>
-                                    </a>
+                                    </button>
+                                    
+                                    <?php if (!empty($patient['email'])): ?>
+                                        <a href="mailto:<?= esc($patient['email']) ?>" class="action-icon-btn email" title="Email">
+                                            <i class="bi bi-envelope"></i>
+                                        </a>
+                                    <?php endif; ?>
+                                    
+                                    <?php if (!empty($patient['phone'])): ?>
+                                        <a href="tel:<?= esc($patient['phone']) ?>" class="action-icon-btn phone" title="Call">
+                                            <i class="bi bi-telephone"></i>
+                                        </a>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
-                            <?php $counter++; ?>
                         <?php endforeach; ?>
                     <?php else: ?>
-                        <tr>
+                        <tr data-empty-row>
                             <td colspan="10">
                                 <div class="empty-state">
                                     <i class="bi bi-people"></i>
@@ -142,18 +208,27 @@
                             </td>
                         </tr>
                     <?php endif; ?>
+
+                    <!-- Shown only when search/filters match nothing -->
+                    <tr data-noresults-row style="display: none;">
+                        <td colspan="10">
+                            <div class="empty-state">
+                                <i class="bi bi-search"></i>
+                                <p>No matching patients</p>
+                                <small>Try a different search term or clear the filters</small>
+                            </div>
+                        </td>
+                    </tr>
                 </tbody>
             </table>
         </div>
         
         <!-- ===== TABLE FOOTER / PAGINATION ===== -->
         <div class="table-footer">
-            <span id="showingText">Showing <?= min(count($patients ?? []), 5) ?> of <?= $total ?? count($patients ?? []) ?> patients</span>
+            <span id="showingText">Showing <?= count($patients ?? []) ?> of <?= $total ?? count($patients ?? []) ?> patients</span>
             <div class="pagination" id="paginationControls">
                 <button class="page-btn" id="prevBtn" disabled><i class="bi bi-chevron-left"></i></button>
                 <button class="page-btn active">1</button>
-                <button class="page-btn">2</button>
-                <button class="page-btn">3</button>
                 <button class="page-btn" id="nextBtn"><i class="bi bi-chevron-right"></i></button>
             </div>
         </div>
@@ -162,7 +237,7 @@
 
 <style>
 /* ============================================
-   PATIENTS - ENHANCED UI (Matching Lab Requests)
+   ADMIN PATIENTS - ENHANCED UI
    ============================================ */
 
 .patients-container {
@@ -178,6 +253,12 @@
     --green-soft: #E7F6EC;
     --red: #dc2626;
     --red-soft: #FEF2F2;
+    --orange: #C2410C;
+    --orange-soft: #FFF1E6;
+    --purple: #7c3aed;
+    --purple-soft: #ede9fe;
+    --gold: #f59e0b;
+    --gold-soft: #fef3c7;
     font-family: 'Inter', sans-serif;
 }
 
@@ -206,6 +287,33 @@
     font-weight: 400;
 }
 
+.header-actions {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.btn-export {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    color: var(--ink-soft);
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-export:hover {
+    background: var(--surface-alt);
+    border-color: var(--blue);
+    color: var(--blue);
+}
+
 .btn-primary {
     background: var(--blue);
     color: #ffffff;
@@ -218,12 +326,14 @@
     transition: all 0.2s ease;
     display: inline-flex;
     align-items: center;
+    gap: 0.5rem;
 }
 
 .btn-primary:hover {
     background: #1e40af;
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(29, 78, 216, 0.2);
+    color: #ffffff;
 }
 
 /* ===== TABLE TOOLBAR ===== */
@@ -274,14 +384,14 @@
     box-shadow: none;
 }
 
-/* ===== SELECT WRAPPER (With Icons Inside) ===== */
+/* ===== SELECT WRAPPER ===== */
 .select-wrapper {
     position: relative;
-    min-width: 180px;
+    min-width: 160px;
 }
 
 .select-wrapper.filter-wrapper::before {
-    content: '\F64E'; /* funnel icon */
+    content: '\F64E';
     font-family: "bootstrap-icons";
     position: absolute;
     left: 0.85rem;
@@ -294,7 +404,7 @@
 }
 
 .select-wrapper.sort-wrapper::before {
-    content: '\F174'; /* sort icon */
+    content: '\F174';
     font-family: "bootstrap-icons";
     position: absolute;
     left: 0.85rem;
@@ -310,7 +420,7 @@
     border: 1px solid var(--line);
     border-radius: 8px;
     font-size: 0.85rem;
-    padding: 0.45rem 2.5rem 0.45rem 2.3rem; /* Left padding for icon, right for dropdown arrow */
+    padding: 0.45rem 2.5rem 0.45rem 2.3rem;
     color: var(--ink);
     background-color: var(--surface);
     height: 42px;
@@ -358,13 +468,6 @@
     text-align: left;
 }
 
-.patients-table thead th i {
-    font-size: 0.65rem;
-    margin-left: 0.2rem;
-    color: var(--ink-faint);
-    opacity: 0.5;
-}
-
 .patients-table tbody tr {
     background: var(--surface);
     border-radius: 12px;
@@ -396,12 +499,42 @@
     border-radius: 0 12px 12px 0;
 }
 
-/* Patient ID */
-.patient-id {
+/* Patient Code */
+.patient-code {
     font-family: 'SFMono-Regular', Consolas, monospace;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     font-weight: 600;
-    color: var(--ink);
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.patient-code.approved {
+    color: var(--blue);
+    background: var(--blue-soft);
+}
+
+.patient-code.pending {
+    color: var(--gold);
+    background: var(--gold-soft);
+}
+
+.pending-badge {
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: var(--gold);
+    background: var(--gold-soft);
+    padding: 0.05rem 0.4rem;
+    border-radius: 12px;
+    text-transform: uppercase;
+}
+
+.patient-code-small {
+    font-size: 0.65rem;
+    color: var(--ink-faint);
+    font-family: 'SFMono-Regular', Consolas, monospace;
 }
 
 /* Patient Cell */
@@ -487,14 +620,23 @@
     white-space: nowrap;
 }
 
+.source-badge i {
+    font-size: 0.65rem;
+}
+
 .source-badge.online {
     background: var(--blue-soft);
     color: var(--blue);
 }
 
 .source-badge.walk-in {
-    background: var(--green-soft);
-    color: var(--green);
+    background: var(--orange-soft);
+    color: var(--orange);
+}
+
+.source-badge.referral {
+    background: var(--purple-soft);
+    color: var(--purple);
 }
 
 /* ===== ACTION BUTTONS ===== */
@@ -517,12 +659,64 @@
     border: 1px solid transparent;
     background: transparent;
     color: var(--ink-faint);
+    cursor: pointer;
 }
 
 .action-icon-btn:hover {
     background: var(--blue-soft);
     color: var(--blue);
     transform: translateY(-1px);
+}
+
+.action-icon-btn.approve {
+    color: var(--gold);
+    border-color: var(--gold-soft);
+}
+
+.action-icon-btn.approve:hover {
+    background: var(--gold-soft);
+    color: var(--gold);
+    border-color: var(--gold);
+}
+
+.action-icon-btn.view:hover {
+    background: var(--blue-soft);
+    color: var(--blue);
+}
+
+.action-icon-btn.edit:hover {
+    background: var(--orange-soft);
+    color: var(--orange);
+}
+
+.action-icon-btn.email:hover {
+    background: var(--green-soft);
+    color: var(--green);
+}
+
+.action-icon-btn.phone:hover {
+    background: var(--purple-soft);
+    color: var(--purple);
+}
+
+/* ===== ALERTS ===== */
+.alert {
+    border-radius: 12px;
+    padding: 0.75rem 1rem;
+    border: none;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+}
+
+.alert-success {
+    background: var(--green-soft);
+    color: var(--green);
+}
+
+.alert-danger {
+    background: var(--red-soft);
+    color: var(--red);
 }
 
 /* ===== EMPTY STATE ===== */
@@ -568,6 +762,8 @@
 .pagination {
     display: flex;
     gap: 0.25rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
 }
 
 .page-btn {
@@ -602,6 +798,15 @@
     cursor: not-allowed;
 }
 
+.page-btn.page-gap {
+    border-color: transparent;
+    background: transparent;
+    cursor: default;
+    opacity: 1;
+    color: var(--ink-faint);
+    width: 20px;
+}
+
 /* ============================================
    RESPONSIVE
    ============================================ */
@@ -622,6 +827,15 @@
     .page-header {
         flex-direction: column;
         align-items: stretch;
+    }
+    
+    .header-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .header-actions .btn {
+        justify-content: center;
     }
     
     .table-toolbar {
@@ -647,7 +861,7 @@
     
     .patients-table thead th,
     .patients-table tbody td {
-        padding: 0.7rem;
+        padding: 0.5rem;
         font-size: 0.72rem;
     }
     
@@ -662,137 +876,332 @@
         height: 28px;
         font-size: 0.75rem;
     }
+    
+    .action-icon-btn {
+        width: 28px;
+        height: 28px;
+        font-size: 0.8rem;
+    }
 }
 </style>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Search functionality
-    document.getElementById('searchPatients').addEventListener('keyup', function() {
-        const searchTerm = this.value.toLowerCase();
-        const rows = document.querySelectorAll('#patientsTable tbody tr');
-        
-        rows.forEach(row => {
-            const text = row.textContent.toLowerCase();
-            row.style.display = text.includes(searchTerm) ? '' : 'none';
-        });
-    });
+document.addEventListener('DOMContentLoaded', function () {
+    // ============================================
+    // TABLE STATE
+    // --------------------------------------------
+    // Single source of truth. `filteredRows` is derived from search +
+    // source + status together, and `render()` is the ONLY thing that
+    // touches row.style.display. Nothing ever reads display state back,
+    // which is what previously made hidden rows unrecoverable.
+    // ============================================
 
-    // Filter by status
-    document.getElementById('filterStatus').addEventListener('change', function() {
-        const status = this.value.toLowerCase();
-        const rows = document.querySelectorAll('#patientsTable tbody tr[data-status]');
-        
-        rows.forEach(row => {
-            if (!status) {
-                row.style.display = '';
+    var tbody              = document.getElementById('patientsTableBody');
+    var showingText        = document.getElementById('showingText');
+    var paginationControls = document.getElementById('paginationControls');
+    var searchInput        = document.getElementById('searchPatients');
+    var filterSource       = document.getElementById('filterSource');
+    var filterStatus       = document.getElementById('filterStatus');
+    var sortSelect         = document.getElementById('sortBy');
+
+    if (!tbody) { return; }
+
+    // Rows shown per page. Change this one value to adjust page size.
+    var PAGE_SIZE = 5;
+
+    var allRows      = Array.prototype.slice.call(tbody.querySelectorAll('tr[data-patient-row]'));
+    var emptyRow     = tbody.querySelector('tr[data-empty-row]');
+    var noResultsRow = tbody.querySelector('tr[data-noresults-row]');
+
+    var loadedTotal  = allRows.length;
+    var serverTotal  = <?= (int) ($total ?? 0) ?>;
+
+    var filteredRows = allRows.slice();
+    var currentPage  = 1;
+
+    function getTotalPages() {
+        return Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+    }
+
+    // ============================================
+    // FILTERING - search, source and status combined
+    // ============================================
+    function applyFilters(resetPage) {
+        var term   = searchInput  ? searchInput.value.toLowerCase().trim() : '';
+        var source = filterSource ? filterSource.value.toLowerCase() : '';
+        var status = filterStatus ? filterStatus.value.toLowerCase() : '';
+
+        filteredRows = allRows.filter(function (row) {
+            if (term && row.textContent.toLowerCase().indexOf(term) === -1) {
+                return false;
+            }
+            if (source && (row.dataset.source || '').toLowerCase() !== source) {
+                return false;
+            }
+            if (status && (row.dataset.status || '').toLowerCase() !== status) {
+                return false;
+            }
+            return true;
+        });
+
+        if (resetPage !== false) { currentPage = 1; }
+        render();
+    }
+
+    // ============================================
+    // SORTING - reorders the DOM and the row array
+    // together, then re-paginates from page 1
+    // ============================================
+    function applySort() {
+        var mode = sortSelect ? sortSelect.value : 'created_at';
+
+        var sorted = allRows.slice();
+        sorted.sort(function (a, b) {
+            switch (mode) {
+                case 'full_name':
+                    return (a.dataset.name || '').localeCompare(b.dataset.name || '');
+                case 'age':
+                    return (parseInt(a.dataset.age, 10) || 0) - (parseInt(b.dataset.age, 10) || 0);
+                case 'created_at_oldest':
+                    // ISO timestamps, so a plain string compare is chronological
+                    return (a.dataset.created || '').localeCompare(b.dataset.created || '');
+                default: // created_at (newest first)
+                    return (b.dataset.created || '').localeCompare(a.dataset.created || '');
+            }
+        });
+
+        sorted.forEach(function (row) { tbody.appendChild(row); });
+        if (emptyRow) { tbody.appendChild(emptyRow); }
+        if (noResultsRow) { tbody.appendChild(noResultsRow); }
+
+        allRows = sorted;
+        applyFilters(true);
+    }
+
+    // ============================================
+    // RENDER - hide every row, then reveal this page
+    // ============================================
+    function render() {
+        var pages = getTotalPages();
+        if (currentPage > pages) { currentPage = pages; }
+        if (currentPage < 1) { currentPage = 1; }
+
+        var start = (currentPage - 1) * PAGE_SIZE;
+
+        allRows.forEach(function (row) { row.style.display = 'none'; });
+
+        var pageRows = filteredRows.slice(start, start + PAGE_SIZE);
+        pageRows.forEach(function (row) { row.style.display = ''; });
+
+        if (emptyRow) {
+            emptyRow.style.display = (loadedTotal === 0) ? '' : 'none';
+        }
+        if (noResultsRow) {
+            noResultsRow.style.display = (loadedTotal > 0 && filteredRows.length === 0) ? '' : 'none';
+        }
+
+        updateShowingText(start, pageRows.length);
+        renderPagination(pages);
+    }
+
+    // ============================================
+    // FOOTER TEXT
+    // ============================================
+    function updateShowingText(start, shown) {
+        if (!showingText) { return; }
+
+        var count = filteredRows.length;
+
+        if (count === 0) {
+            showingText.textContent = (loadedTotal === 0)
+                ? 'No patients to show'
+                : 'No matching patients';
+            return;
+        }
+
+        var text = 'Showing ' + (start + 1) + ' to ' + (start + shown) +
+                   ' of ' + count + ' patient' + (count === 1 ? '' : 's');
+
+        if (count !== loadedTotal) {
+            text += ' (filtered from ' + loadedTotal + ')';
+        } else if (serverTotal > loadedTotal) {
+            text += ' (' + serverTotal + ' total registered)';
+        }
+
+        showingText.textContent = text;
+    }
+
+    // ============================================
+    // PAGINATION CONTROLS - rebuilt on every render
+    // ============================================
+    function buildPageList(pages, current) {
+        var list = [];
+        var i;
+
+        if (pages <= 7) {
+            for (i = 1; i <= pages; i++) { list.push(i); }
+            return list;
+        }
+
+        var first = 1;
+        var last  = pages;
+        var from  = Math.max(2, current - 1);
+        var to    = Math.min(pages - 1, current + 1);
+
+        if (current <= 3)         { from = 2;         to = 4; }
+        if (current >= pages - 2) { from = pages - 3; to = pages - 1; }
+
+        list.push(first);
+        if (from > 2) { list.push('gap'); }
+        for (i = from; i <= to; i++) { list.push(i); }
+        if (to < pages - 1) { list.push('gap'); }
+        list.push(last);
+
+        return list;
+    }
+
+    function renderPagination(pages) {
+        if (!paginationControls) { return; }
+
+        var html = '<button type="button" class="page-btn" id="prevBtn" aria-label="Previous page"' +
+                   (currentPage === 1 ? ' disabled' : '') +
+                   '><i class="bi bi-chevron-left"></i></button>';
+
+        buildPageList(pages, currentPage).forEach(function (item) {
+            if (item === 'gap') {
+                html += '<button type="button" class="page-btn page-gap" disabled aria-hidden="true">...</button>';
                 return;
             }
-            const rowStatus = row.dataset.status.toLowerCase();
-            row.style.display = rowStatus === status ? '' : 'none';
-        });
-    });
-
-    // Sort by
-    document.getElementById('sortBy').addEventListener('change', function() {
-        const sortBy = this.value;
-        const tbody = document.querySelector('#patientsTable tbody');
-        const rows = Array.from(tbody.querySelectorAll('tr'));
-
-        rows.sort((a, b) => {
-            let aVal, bVal;
-            switch(sortBy) {
-                case 'patient_name':
-                    aVal = a.querySelector('.patient-name')?.textContent.toLowerCase() || '';
-                    bVal = b.querySelector('.patient-name')?.textContent.toLowerCase() || '';
-                    break;
-                case 'age':
-                    aVal = parseInt(a.querySelector('td:nth-child(5)')?.textContent) || 0;
-                    bVal = parseInt(b.querySelector('td:nth-child(5)')?.textContent) || 0;
-                    break;
-                case 'status':
-                    aVal = a.querySelector('.status-badge')?.textContent.toLowerCase() || '';
-                    bVal = b.querySelector('.status-badge')?.textContent.toLowerCase() || '';
-                    break;
-                default: // last_visit
-                    aVal = a.querySelector('.date-cell span')?.textContent || '';
-                    bVal = b.querySelector('.date-cell span')?.textContent || '';
-            }
-            return aVal.localeCompare(bVal);
+            html += '<button type="button" class="page-btn' + (item === currentPage ? ' active' : '') +
+                    '" data-page="' + item + '" aria-label="Page ' + item + '"' +
+                    (item === currentPage ? ' aria-current="page"' : '') +
+                    '>' + item + '</button>';
         });
 
-        rows.forEach(row => tbody.appendChild(row));
-    });
+        html += '<button type="button" class="page-btn" id="nextBtn" aria-label="Next page"' +
+                (currentPage >= pages ? ' disabled' : '') +
+                '><i class="bi bi-chevron-right"></i></button>';
 
-    // Pagination logic (1-5 per page)
-    const rows = Array.from(document.querySelectorAll('#patientsTableBody tr'));
-    const showingText = document.getElementById('showingText');
-    const paginationControls = document.getElementById('paginationControls');
-    const pageSize = 5;
-    let currentPage = 1;
-    const totalEntries = <?= $total ?? count($patients ?? []) ?>;
+        paginationControls.innerHTML = html;
+    }
 
-    function renderTable() {
-        const start = (currentPage - 1) * pageSize;
-        const end = start + pageSize;
-        
-        rows.forEach((row, index) => {
-            row.style.display = (index >= start && index < end) ? '' : 'none';
+    // Delegated once on the container, so rebuilding the buttons
+    // above can never detach the click handlers.
+    if (paginationControls) {
+        paginationControls.addEventListener('click', function (event) {
+            var btn = event.target.closest('.page-btn');
+            if (!btn || btn.disabled || !paginationControls.contains(btn)) { return; }
+
+            if (btn.id === 'prevBtn') { window.changePage(-1); return; }
+            if (btn.id === 'nextBtn') { window.changePage(1);  return; }
+
+            var page = parseInt(btn.dataset.page, 10);
+            if (!isNaN(page)) { window.goToPage(page); }
         });
-
-        const showingCount = Math.min(end, totalEntries);
-        showingText.textContent = `Showing ${start + 1} to ${showingCount} of ${totalEntries} patients`;
     }
 
-    // Set up dynamic pagination
-    function setupPagination() {
-        const totalPages = Math.ceil(totalEntries / pageSize);
-        
-        // Clear existing buttons
-        paginationControls.innerHTML = `
-            <button class="page-btn" id="prevBtn" disabled><i class="bi bi-chevron-left"></i></button>
-            ${Array.from({length: totalPages}, (_, i) => `<button class="page-btn ${i === 0 ? 'active' : ''}" onclick="goToPage(${i + 1})">${i + 1}</button>`).join('')}
-            <button class="page-btn" id="nextBtn"><i class="bi bi-chevron-right"></i></button>
-        `;
-        
-        document.getElementById('prevBtn').addEventListener('click', () => changePage(-1));
-        document.getElementById('nextBtn').addEventListener('click', () => changePage(1));
-    }
+    window.changePage = function (direction) {
+        window.goToPage(currentPage + direction);
+    };
 
-    window.changePage = function(direction) {
-        const totalPages = Math.ceil(totalEntries / pageSize);
-        currentPage = Math.min(Math.max(1, currentPage + direction), totalPages);
-        renderTable();
-        updateActivePage();
-        updatePrevNextButtons();
-    }
-
-    window.goToPage = function(page) {
+    window.goToPage = function (page) {
+        var pages = getTotalPages();
+        page = parseInt(page, 10);
+        if (isNaN(page) || page < 1 || page > pages || page === currentPage) { return; }
         currentPage = page;
-        renderTable();
-        updateActivePage();
-        updatePrevNextButtons();
+        render();
+    };
+
+    // ============================================
+    // EVENT WIRING
+    // ============================================
+    if (searchInput) {
+        searchInput.addEventListener('input',  function () { applyFilters(true); });
+        searchInput.addEventListener('search', function () { applyFilters(true); });
+    }
+    if (filterSource) {
+        filterSource.addEventListener('change', function () { applyFilters(true); });
+    }
+    if (filterStatus) {
+        filterStatus.addEventListener('change', function () { applyFilters(true); });
+    }
+    if (sortSelect) {
+        sortSelect.addEventListener('change', applySort);
     }
 
-    function updateActivePage() {
-        const totalPages = Math.ceil(totalEntries / pageSize);
-        const buttons = document.querySelectorAll('.pagination .page-btn');
-        buttons.forEach((btn, i) => {
-            if (i > 0 && i <= totalPages) {
-                btn.classList.toggle('active', i === currentPage);
-            }
-        });
-    }
-
-    function updatePrevNextButtons() {
-        const totalPages = Math.ceil(totalEntries / pageSize);
-        document.getElementById('prevBtn').disabled = currentPage === 1;
-        document.getElementById('nextBtn').disabled = currentPage === totalPages;
-    }
-
-    setupPagination();
-    renderTable();
+    applyFilters(true);
 });
+
+// ===== APPROVE PATIENT =====
+function approvePatient(patientId) {
+    if (!patientId || patientId === 0) {
+        alert('Patient ID not available. Please sync patients first.');
+        return;
+    }
+    
+    if (!confirm('Are you sure you want to approve this patient? This will generate a patient code.')) {
+        return;
+    }
+    
+    // Show loading state
+    const btn = event?.target?.closest('.approve') || document.querySelector(`.approve[data-id="${patientId}"]`);
+    if (btn) {
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        btn.disabled = true;
+    }
+    
+    fetch(`/polymedic/public/admin/approve-patient/${patientId}`, {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Patient approved successfully! Patient Code: ' + data.patient_code);
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+            if (btn) {
+                btn.innerHTML = '<i class="bi bi-check-circle"></i>';
+                btn.disabled = false;
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error approving patient. Please try again.');
+        if (btn) {
+            btn.innerHTML = '<i class="bi bi-check-circle"></i>';
+            btn.disabled = false;
+        }
+    });
+}
+
+// ===== VIEW PATIENT =====
+function viewPatient(patientId) {
+    if (!patientId || patientId === 0) {
+        alert('Patient details not available.');
+        return;
+    }
+    window.location.href = `/polymedic/public/admin/patient/view/${patientId}`;
+}
+
+// ===== EDIT PATIENT =====
+function editPatient(patientId) {
+    if (!patientId || patientId === 0) {
+        alert('Patient cannot be edited.');
+        return;
+    }
+    window.location.href = `/polymedic/public/admin/patient/edit/${patientId}`;
+}
+
+// ===== EXPORT FUNCTION =====
+function exportPatients() {
+    alert('Export functionality coming soon!');
+}
 </script>
 
 <?= $this->endSection() ?>

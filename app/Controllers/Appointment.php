@@ -7,6 +7,7 @@ use App\Models\ServiceModel;
 use App\Models\LabRequestModel;
 use App\Models\XrayExaminationModel;
 use App\Models\NotificationModel;
+use App\Models\PatientModel;
 
 class Appointment extends BaseController
 {
@@ -48,8 +49,8 @@ class Appointment extends BaseController
             // Generate reference number
             $reference = 'APPT-' . date('Ymd') . '-' . strtoupper(substr(uniqid(), -6));
             
-            // Prepare data for database
-            $data = [
+            // Prepare data for appointment
+            $appointmentData = [
                 'reference_number' => $reference,
                 'appointment_date' => $this->request->getPost('appointment_date'),
                 'appointment_time' => $this->request->getPost('appointment_time'),
@@ -65,91 +66,54 @@ class Appointment extends BaseController
                 'status' => 'pending'
             ];
             
-            // Save to database
-            $model = new AppointmentModel();
-            $appointmentId = $model->insert($data);
+            // ===== SAVE APPOINTMENT =====
+            $appointmentModel = new AppointmentModel();
+            $appointmentId = $appointmentModel->insert($appointmentData);
             
-            // ===== OPTIONAL: AUTO-CREATE LAB REQUEST ON BOOKING =====
-            // This creates the lab request immediately when patient books
-            // If you want this, uncomment the code below:
-            /*
-            if (!empty($labServices)) {
-                $labRequestModel = new LabRequestModel();
-                
-                // Clean lab services
-                $cleanedServices = array_map(function($service) {
-                    $service = str_replace('\/', '/', $service);
-                    $service = str_replace('\\/', '/', $service);
-                    $service = stripslashes($service);
-                    return trim($service);
-                }, $labServices);
-                
-                $labData = [
-                    'appointment_id' => $appointmentId,
-                    'patient_name' => $this->request->getPost('full_name'),
-                    'age' => $this->request->getPost('age'),
-                    'gender' => $this->request->getPost('gender'),
-                    'lab_services' => implode(', ', $cleanedServices),
-                    'request_date' => $this->request->getPost('appointment_date'),
-                    'status' => 'pending'
-                ];
-                $labRequestModel->insert($labData);
-                
-                // Notify MedTech
-                NotificationModel::notify(
-                    'lab',
-                    'New Lab Request (Booking)',
-                    'New lab request for patient ' . $this->request->getPost('full_name'),
-                    $labRequestModel->getInsertID(),
-                    '/polymedic/public/medtech/request/view/' . $labRequestModel->getInsertID()
-                );
+            if (!$appointmentId) {
+                log_message('error', 'Failed to save appointment for: ' . $appointmentData['full_name']);
+                return redirect()->back()->with('error', 'Failed to save appointment. Please try again.')->withInput();
             }
             
-            if (!empty($xrayServices)) {
-                $xrayModel = new XrayExaminationModel();
-                
-                $cleanedServices = array_map(function($service) {
-                    $service = str_replace('\/', '/', $service);
-                    $service = str_replace('\\/', '/', $service);
-                    $service = stripslashes($service);
-                    return trim($service);
-                }, $xrayServices);
-                
-                $xrayData = [
-                    'appointment_id' => $appointmentId,
-                    'patient_name' => $this->request->getPost('full_name'),
-                    'age' => $this->request->getPost('age'),
-                    'gender' => $this->request->getPost('gender'),
-                    'exam_type' => implode(', ', $cleanedServices),
-                    'exam_date' => $this->request->getPost('appointment_date'),
-                    'status' => 'pending'
-                ];
-                $xrayModel->insert($xrayData);
-                
-                // Notify Radiologist
-                NotificationModel::notify(
-                    'xray',
-                    'New X-Ray Request (Booking)',
-                    'New X-Ray request for patient ' . $this->request->getPost('full_name'),
-                    $xrayModel->getInsertID(),
-                    '/polymedic/public/radiologist/examination/view/' . $xrayModel->getInsertID()
-                );
-            }
-            */
+            // ===== CREATE/UPDATE PATIENT RECORD =====
+            $patientModel = new PatientModel();
+            $patient = $patientModel->findOrCreateFromAppointment($appointmentData);
             
-            // Trigger Admin Notification
+            if ($patient) {
+                log_message('info', 'Patient created/found from online booking: ' . $appointmentData['full_name'] . ' (Code: ' . $patient['patient_code'] . ')');
+            } else {
+                log_message('error', 'Failed to create/find patient from online booking: ' . $appointmentData['full_name']);
+            }
+            
+            // ============================================================
+            // ❌ REMOVED: Auto-creation of lab requests on booking
+            // ❌ REMOVED: Auto-creation of x-ray requests on booking
+            // ✅ Diagnostic requests will now be created ONLY when the
+            //    receptionist approves the appointment in Receptionist::approveAppointment()
+            // ============================================================
+            
+            // ===== TRIGGER ADMIN NOTIFICATION =====
             NotificationModel::notify(
                 'appointment',
                 'New Appointment Request: ' . $reference,
-                'New appointment request from ' . $data['full_name'] . ' for ' . date('M d, Y', strtotime($data['appointment_date'])),
+                'New appointment request from ' . $appointmentData['full_name'] . ' for ' . date('M d, Y', strtotime($appointmentData['appointment_date'])),
                 $appointmentId,
-                '/polymedic/public/admin/appointment/view/' . $appointmentId
+                'admin/appointment/view/' . $appointmentId
+            );
+            
+            // ===== TRIGGER RECEPTIONIST NOTIFICATION =====
+            NotificationModel::notify(
+                'appointment',
+                'New Appointment: ' . $reference,
+                'New appointment request from ' . $appointmentData['full_name'] . ' for ' . date('M d, Y', strtotime($appointmentData['appointment_date'])),
+                $appointmentId,
+                'receptionist/appointment/view/' . $appointmentId
             );
             
             // Store in session for success page
-            session()->set('appointment_data', $data);
+            session()->set('appointment_data', $appointmentData);
             
-            return redirect()->to('http://localhost/polymedic/public/index.php/appointment/success/' . $reference)
+            return redirect()->to(base_url('appointment/success/' . $reference))
                             ->with('message', 'Appointment booked successfully!');
         } else {
             return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());

@@ -4,1212 +4,973 @@
 
 <?= $this->section('radiologistContent') ?>
 
-<div class="dashboard-container">
+<?php
+    // The controller passes flat variables to this view:
+    //   $pending, $processing, $completed, $released, $total
+    //   $recent_examinations, $pending_examinations
+    //   $weekly_data (from XrayExaminationModel::getWeeklyVolumeData())
+    //
+    // Anything else the previous version of this view referenced
+    // ($counts[...], $criticalFindings, $breakdownData, $weeklyLabels,
+    // $weeklyDatasets, $pendingExaminations) was never supplied. This
+    // version reads only what is actually provided.
 
-    <!-- ===== STATS ROW (6 cards, vertical layout) ===== -->
-    <div class="stats-row">
-        <div class="stat-card">
-            <div class="stat-icon purple">
-                <i class="bi bi-clock-history"></i>
+    $pending    = (int) ($pending ?? 0);
+    $processing = (int) ($processing ?? 0);
+    $completed  = (int) ($completed ?? 0);
+    $released   = (int) ($released ?? 0);
+    $total      = (int) ($total ?? 0);
+
+    $recentExaminations  = (isset($recent_examinations)  && is_array($recent_examinations))  ? $recent_examinations  : [];
+    $pendingExaminations = (isset($pending_examinations) && is_array($pending_examinations)) ? $pending_examinations : [];
+
+    // Weekly volume: the model returns ['labels' => [...], 'datasets' => [...]].
+    // If the controller hasn't been wired to pass it yet, the chart renders
+    // an empty placeholder rather than inventing numbers.
+    $weeklyData     = (isset($weekly_data) && is_array($weekly_data)) ? $weekly_data : [];
+    $weeklyLabels   = (isset($weeklyData['labels'])   && is_array($weeklyData['labels']))   ? $weeklyData['labels']   : [];
+    $weeklyDatasets = (isset($weeklyData['datasets']) && is_array($weeklyData['datasets'])) ? $weeklyData['datasets'] : [];
+
+    $hasWeeklyChart = !empty($weeklyLabels) && !empty($weeklyDatasets);
+
+    $statusMeta = [
+        'pending'     => ['label' => 'Pending',    'tone' => 'pending'],
+        'in_progress' => ['label' => 'In reading', 'tone' => 'progress'],
+        'processing'  => ['label' => 'In reading', 'tone' => 'progress'],
+        'completed'   => ['label' => 'Completed',  'tone' => 'completed'],
+        'released'    => ['label' => 'Released',   'tone' => 'released'],
+    ];
+
+    $initialsOf = static function ($name) {
+        $parts = preg_split('/\s+/', trim((string) $name));
+        $first = mb_substr($parts[0] ?? '', 0, 1);
+        $last  = count($parts) > 1 ? mb_substr(end($parts), 0, 1) : '';
+        return mb_strtoupper($first . $last);
+    };
+?>
+
+<div class="rd">
+    <!-- ===== STATS ===== -->
+    <div class="rd-stats">
+        <div class="rd-stat">
+            <div class="rd-stat-icon rd-stat-icon--amber">
+                <i class="bi bi-clock-history" aria-hidden="true"></i>
             </div>
-            <div class="stat-info">
-                <h3><?= $counts['pending'] ?? 0 ?></h3>
-                <p>Pending Read</p>
-                <small>Awaiting interpretation</small>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon blue">
-                <i class="bi bi-arrow-repeat"></i>
-            </div>
-            <div class="stat-info">
-                <h3><?= $counts['processing'] ?? 0 ?></h3>
-                <p>In Reading</p>
-                <small>Currently reading</small>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon green">
-                <i class="bi bi-check2-circle"></i>
-            </div>
-            <div class="stat-info">
-                <h3><?= $counts['completed'] ?? 0 ?></h3>
-                <p>Completed</p>
-                <small>Reports signed</small>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon teal">
-                <i class="bi bi-file-check"></i>
-            </div>
-            <div class="stat-info">
-                <h3><?= $counts['released'] ?? 0 ?></h3>
-                <p>Released</p>
-                <small>Sent to doctor</small>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon orange">
-                <i class="bi bi-exclamation-triangle"></i>
-            </div>
-            <div class="stat-info">
-                <h3><?= $counts['critical'] ?? 0 ?></h3>
-                <p>Critical Findings</p>
-                <small>Needs urgent call</small>
+            <div class="rd-stat-body">
+                <div class="rd-stat-value"><?= number_format($pending) ?></div>
+                <div class="rd-stat-label">Pending read</div>
+                <div class="rd-stat-sub">Awaiting interpretation</div>
             </div>
         </div>
-        <div class="stat-card">
-            <div class="stat-icon primary">
-                <i class="bi bi-x-ray"></i>
+
+        <div class="rd-stat">
+            <div class="rd-stat-icon rd-stat-icon--blue">
+                <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
             </div>
-            <div class="stat-info">
-                <h3><?= $counts['total'] ?? 0 ?></h3>
-                <p>Avg TAT</p>
-                <small>Target: 60 min</small>
+            <div class="rd-stat-body">
+                <div class="rd-stat-value"><?= number_format($processing) ?></div>
+                <div class="rd-stat-label">In reading</div>
+                <div class="rd-stat-sub">Currently open</div>
+            </div>
+        </div>
+
+        <div class="rd-stat">
+            <div class="rd-stat-icon rd-stat-icon--green">
+                <i class="bi bi-check2-circle" aria-hidden="true"></i>
+            </div>
+            <div class="rd-stat-body">
+                <div class="rd-stat-value"><?= number_format($completed) ?></div>
+                <div class="rd-stat-label">Completed</div>
+                <div class="rd-stat-sub">Report signed</div>
+            </div>
+        </div>
+
+        <div class="rd-stat">
+            <div class="rd-stat-icon rd-stat-icon--teal">
+                <i class="bi bi-send-check" aria-hidden="true"></i>
+            </div>
+            <div class="rd-stat-body">
+                <div class="rd-stat-value"><?= number_format($released) ?></div>
+                <div class="rd-stat-label">Released</div>
+                <div class="rd-stat-sub">Sent to reception</div>
+            </div>
+        </div>
+
+        <div class="rd-stat">
+            <div class="rd-stat-icon rd-stat-icon--violet">
+                <i class="bi bi-x-ray" aria-hidden="true"></i>
+            </div>
+            <div class="rd-stat-body">
+                <div class="rd-stat-value"><?= number_format($total) ?></div>
+                <div class="rd-stat-label">Total studies</div>
+                <div class="rd-stat-sub">All X-ray examinations</div>
             </div>
         </div>
     </div>
 
-    <!-- ===== CRITICAL FINDINGS ALERT ===== -->
-    <?php if (!empty($criticalFindings)): ?>
-    <div class="critical-alert">
-        <div class="critical-header">
-            <h5><i class="bi bi-exclamation-octagon"></i> Critical Findings — Immediate Action Required</h5>
-            <span class="critical-count"><?= count($criticalFindings) ?> active</span>
-        </div>
-        <div class="critical-list">
-            <?php foreach ($criticalFindings as $index => $finding): ?>
-                <div class="critical-item">
-                    <span class="modality-tag <?= strtolower($finding['modality']) ?>"><?= strtoupper($finding['modality']) ?></span>
-                    <div class="critical-content">
-                        <p class="patient-ref"><?= esc($finding['patient_name']) ?> · RAD-26-<?= str_pad($finding['id'], 4, '0', STR_PAD_LEFT) ?></p>
-                        <p class="finding-text"><?= esc($finding['finding']) ?></p>
-                    </div>
-                    <div class="critical-time">
-                        <span><?= date('h:i A', strtotime($finding['created_at'])) ?></span>
-                        <?php if ($index === 0): ?>
-                            <button class="btn-notify">Notify Now</button>
-                        <?php else: ?>
-                            <span class="btn-notified"><i class="bi bi-check-circle"></i> Notified</span>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            <?php endforeach; ?>
-        </div>
-    </div>
-    <?php endif; ?>
 
-    <!-- ===== CHARTS ROW ===== -->
-    <div class="charts-row">
-        <div class="chart-card">
-            <div class="chart-header">
-                <div>
-                    <h5>Weekly Study Volume by Modality</h5>
-                    <small>Stacked counts per day — week of <?= date('M d, Y') ?></small>
-                </div>
-                <div class="chart-legend-dots" id="weeklyLegend">
-                    <!-- Legend will be populated by JavaScript -->
-                </div>
+    <!-- ===== WEEKLY VOLUME ===== -->
+    <section class="rd-panel rd-panel--chart">
+        <header class="rd-panel-head">
+            <div>
+                <h5 class="rd-panel-title">
+                    <i class="bi bi-bar-chart" aria-hidden="true"></i>
+                    Weekly study volume
+                </h5>
+                <p class="rd-panel-sub">Stacked counts by modality</p>
             </div>
-            <div class="chart-body">
+            <div class="rd-legend" id="weeklyLegend" aria-hidden="true"></div>
+        </header>
+
+        <?php if ($hasWeeklyChart): ?>
+            <div class="rd-chart">
                 <canvas id="weeklyVolumeChart"></canvas>
             </div>
-        </div>
-
-        <div class="chart-card">
-            <div class="chart-header">
-                <div>
-                    <h5>Today's Breakdown</h5>
-                    <small>Studies by modality</small>
-                </div>
+        <?php else: ?>
+            <div class="rd-chart rd-chart--empty">
+                <i class="bi bi-bar-chart" aria-hidden="true"></i>
+                <p>No volume data for this week</p>
+                <small>Once examinations are scheduled, their counts appear here.</small>
             </div>
-            <div class="chart-body">
-                <canvas id="breakdownChart"></canvas>
-            </div>
-        </div>
-    </div>
+        <?php endif; ?>
+    </section>
 
-    <!-- ===== LOWER ROW (Reading Worklist + Equipment Status) ===== -->
-    <div class="lower-row">
-        <!-- Reading Worklist -->
-        <div class="queue-card">
-            <div class="queue-header">
-                <div class="queue-title">
-                    <h5>Reading Worklist</h5>
-                </div>
-                <div class="queue-filters">
-                    <button class="filter-btn active" data-filter="all">All</button>
-                    <button class="filter-btn" data-filter="stat">STAT</button>
-                    <button class="filter-btn" data-filter="pending">Pending</button>
-                    <button class="filter-btn" data-filter="reading">Reading</button>
-                    <button class="filter-btn" data-filter="completed">Completed</button>
-                    <button class="filter-btn" data-filter="released">Released</button>
-                </div>
-                <div class="queue-actions">
-                    <button class="refresh-btn" onclick="refreshTable()">
-                        <i class="bi bi-arrow-clockwise"></i> Refresh
-                    </button>
 
-                </div>
+    <!-- ===== WORKLIST ===== -->
+    <section class="rd-panel">
+        <header class="rd-panel-head">
+            <div>
+                <h5 class="rd-panel-title">
+                    <i class="bi bi-list-check" aria-hidden="true"></i>
+                    Reading worklist
+                </h5>
+                <p class="rd-panel-sub">Pending examinations, oldest first</p>
             </div>
-            <div class="table-responsive">
-                <table class="table queue-table" id="queueTable">
+
+            <div class="rd-panel-actions">
+                <div class="rd-tabs" role="group" aria-label="Filter worklist">
+                    <button type="button" class="rd-tab is-active" data-filter="all"     aria-pressed="true">All</button>
+                    <button type="button" class="rd-tab"          data-filter="stat"    aria-pressed="false">STAT</button>
+                    <button type="button" class="rd-tab"          data-filter="pending" aria-pressed="false">Pending</button>
+                    <button type="button" class="rd-tab"          data-filter="reading" aria-pressed="false">Reading</button>
+                </div>
+
+                <button type="button" class="rd-btn" onclick="refreshTable()">
+                    <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
+                    Refresh
+                </button>
+            </div>
+        </header>
+
+        <?php if (!empty($pendingExaminations)): ?>
+            <div class="rd-table-wrap">
+                <table class="rd-table" id="queueTable">
                     <thead>
                         <tr>
-                            <th>Accession</th>
-                            <th>Patient</th>
-                            <th>Modality</th>
-                            <th>Study</th>
-                            <th>Referring MD</th>
-                            <th>Priority</th>
-                            <th>Time</th>
-                            <th>Status</th>
-                            <th>Action</th>
+                            <th scope="col">Accession</th>
+                            <th scope="col">Patient</th>
+                            <th scope="col">Exam</th>
+                            <th scope="col">Referred by</th>
+                            <th scope="col">Priority</th>
+                            <th scope="col">Date</th>
+                            <th scope="col">Status</th>
+                            <th scope="col" class="rd-c-actions"><span class="visually-hidden">Action</span></th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if (!empty($pendingExaminations)): ?>
-                            <?php foreach ($pendingExaminations as $exam): ?>
-                                <?php 
-                                    $modality = 'X-Ray';
-                                    if (strpos(strtolower($exam['exam_type']), 'ct') !== false) $modality = 'CT';
-                                    elseif (strpos(strtolower($exam['exam_type']), 'mri') !== false) $modality = 'MRI';
-                                    elseif (strpos(strtolower($exam['exam_type']), 'us') !== false || strpos(strtolower($exam['exam_type']), 'ultra') !== false) $modality = 'US';
-                                    
-                                    $priority = $exam['priority'] ?? 'Routine';
-                                    $isStat = strtolower($priority) === 'stat';
-                                ?>
-                                <tr class="queue-row" data-status="<?= esc($exam['status']) ?>">
-                                    <td class="accession">RAD-26-<?= str_pad($exam['id'], 4, '0', STR_PAD_LEFT) ?></td>
-                                    <td>
-                                        <div class="patient-cell">
-                                            <span class="patient-name"><?= esc($exam['patient_name']) ?></span>
-                                            <small><?= esc($exam['age']) ?>y / <?= esc($exam['gender'][0] ?? 'F') ?></small>
+                        <?php foreach ($pendingExaminations as $exam):
+                            $examId    = (int) ($exam['id'] ?? 0);
+                            $statusKey = (string) ($exam['status'] ?? 'pending');
+                            $meta      = $statusMeta[$statusKey] ?? ['label' => ucfirst($statusKey), 'tone' => 'pending'];
+                            $name      = (string) ($exam['patient_name'] ?? 'Unknown');
+                            $examType  = (string) ($exam['exam_type'] ?? '');
+                            $doctor    = trim((string) ($exam['doctor_name'] ?? ''));
+                            $isStat    = strtolower((string) ($exam['priority'] ?? '')) === 'stat';
+                            $dateTs    = !empty($exam['exam_date']) ? strtotime($exam['exam_date']) : false;
+                        ?>
+                            <tr class="rd-row" data-status="<?= esc($statusKey, 'attr') ?>" data-stat="<?= $isStat ? '1' : '0' ?>">
+                                <td data-label="Accession" class="rd-c-accession">
+                                    <span class="rd-ref">XR-<?= esc(date('y')) ?>-<?= esc(str_pad((string) $examId, 4, '0', STR_PAD_LEFT)) ?></span>
+                                </td>
+
+                                <td data-label="Patient">
+                                    <div class="rd-patient">
+                                        <span class="rd-avatar" aria-hidden="true"><?= esc($initialsOf($name)) ?></span>
+                                        <div class="rd-patient-body">
+                                            <span class="rd-name"><?= esc($name) ?></span>
+                                            <span class="rd-sub">
+                                                <?= esc($exam['age'] ?? '—') ?> yrs
+                                                <span aria-hidden="true">·</span>
+                                                <?= esc($exam['gender'] ?? '—') ?>
+                                            </span>
                                         </div>
-                                    </td>
-                                    <td>
-                                        <span class="modality-tag <?= strtolower($modality) ?>"><?= $modality ?></span>
-                                    </td>
-                                    <td><?= esc($exam['exam_type']) ?></td>
-                                    <td><?= $exam['doctor_name'] ?? 'Dr. Ana Cruz' ?></td>
-                                    <td>
-                                        <?php if ($isStat): ?>
-                                            <span class="priority-badge stat"><i class="bi bi-circle-fill"></i> STAT</span>
-                                        <?php else: ?>
-                                            <span class="priority-badge routine"><i class="bi bi-circle-fill"></i> Routine</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td><?= date('h:i A', strtotime($exam['exam_date'])) ?></td>
-                                    <td>
-                                        <span class="status-badge <?= esc($exam['status']) ?>">
-                                            <i class="bi bi-circle-fill"></i>
-                                            <?= ucfirst($exam['status']) ?>
-                                        </span>
-                                    </td>
-                                    <td class="action-cell">
-                                        <!-- ALWAYS SHOW ICONS - EYE AND PENCIL -->
-                                        <a href="<?= base_url('radiologist/examination/view/' . $exam['id']) ?>" class="action-icons" title="View">
-                                            <i class="bi bi-eye"></i>
+                                    </div>
+                                </td>
+
+                                <td data-label="Exam"><?= esc($examType !== '' ? $examType : '—') ?></td>
+
+                                <td data-label="Referred by"><?= $doctor !== '' ? esc($doctor) : '<span class="rd-muted">—</span>' ?></td>
+
+                                <td data-label="Priority">
+                                    <?php if ($isStat): ?>
+                                        <span class="rd-tag rd-tag--stat">STAT</span>
+                                    <?php else: ?>
+                                        <span class="rd-muted">Routine</span>
+                                    <?php endif; ?>
+                                </td>
+
+                                <td data-label="Date" class="rd-c-date">
+                                    <?= $dateTs ? esc(date('M j, Y', $dateTs)) : '—' ?>
+                                </td>
+
+                                <td data-label="Status">
+                                    <span class="rd-status rd-status--<?= esc($meta['tone'], 'attr') ?>">
+                                        <?= esc($meta['label']) ?>
+                                    </span>
+                                </td>
+
+                                <td data-label="Action" class="rd-c-actions">
+                                    <div class="rd-actions">
+                                        <a href="<?= base_url('radiologist/examination/view/' . $examId) ?>"
+                                           class="rd-icon-btn"
+                                           title="Open study"
+                                           aria-label="Open <?= esc($name, 'attr') ?>">
+                                            <i class="bi bi-eye" aria-hidden="true"></i>
                                         </a>
-                                        <a href="<?= base_url('radiologist/examination/view/' . $exam['id']) ?>" class="action-icons" title="Edit/Interpret">
-                                            <i class="bi bi-pencil-square"></i>
+                                        <a href="<?= base_url('radiologist/examination/view/' . $examId) ?>"
+                                           class="rd-icon-btn rd-icon-btn--read"
+                                           title="Read / interpret"
+                                           aria-label="Read study for <?= esc($name, 'attr') ?>">
+                                            <i class="bi bi-pencil-square" aria-hidden="true"></i>
                                         </a>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <tr>
-                                <td colspan="9">
-                                    <div class="empty-state">
-                                        <i class="bi bi-inbox"></i>
-                                        <p>No examinations in worklist</p>
-                                        <small>All caught up!</small>
                                     </div>
                                 </td>
                             </tr>
-                        <?php endif; ?>
+                        <?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
-        </div>
+        <?php else: ?>
+            <div class="rd-empty">
+                <div class="rd-empty-icon"><i class="bi bi-inbox" aria-hidden="true"></i></div>
+                <h3>Nothing waiting</h3>
+                <p>Every pending study has been picked up. New requests will appear here as the receptionist creates them.</p>
+                <a href="<?= base_url('radiologist/examinations') ?>" class="rd-btn rd-btn--primary">
+                    <i class="bi bi-list-ul" aria-hidden="true"></i>
+                    Open examinations
+                </a>
+            </div>
+        <?php endif; ?>
 
-        <!-- Equipment Status -->
-        <div class="equipment-card">
-            <div class="equipment-header">
-                <h5>Equipment Status</h5>
-                <span class="online-badge"><i class="bi bi-circle-fill"></i> 5/6 Online</span>
-            </div>
-            <div class="equipment-list">
-                <div class="equipment-item">
-                    <div class="equip-info">
-                        <span class="equip-dot online"></span>
-                        <div>
-                            <p class="equip-name">X-Ray Room 1</p>
-                            <small>8 in queue · 99.2% uptime</small>
-                        </div>
-                    </div>
-                    <span class="equip-status online">Online</span>
-                </div>
-                <div class="equipment-item">
-                    <div class="equip-info">
-                        <span class="equip-dot online"></span>
-                        <div>
-                            <p class="equip-name">X-Ray Room 2</p>
-                            <small>5 in queue · 98.8% uptime</small>
-                        </div>
-                    </div>
-                    <span class="equip-status online">Online</span>
-                </div>
-                <div class="equipment-item">
-                    <div class="equip-info">
-                        <span class="equip-dot online"></span>
-                        <div>
-                            <p class="equip-name">CT Scanner</p>
-                            <small>4 in queue · 97.4% uptime</small>
-                        </div>
-                    </div>
-                    <span class="equip-status online">Online</span>
-                </div>
-                <div class="equipment-item">
-                    <div class="equip-info">
-                        <span class="equip-dot maintenance"></span>
-                        <div>
-                            <p class="equip-name">MRI 1.5T</p>
-                            <small>Scheduled maintenance</small>
-                        </div>
-                    </div>
-                    <span class="equip-status maintenance">Maintenance</span>
-                </div>
-                <div class="equipment-item">
-                    <div class="equip-info">
-                        <span class="equip-dot online"></span>
-                        <div>
-                            <p class="equip-name">US Room 1</p>
-                            <small>6 in queue · 99.9% uptime</small>
-                        </div>
-                    </div>
-                    <span class="equip-status online">Online</span>
-                </div>
-                <div class="equipment-item">
-                    <div class="equip-info">
-                        <span class="equip-dot online"></span>
-                        <div>
-                            <p class="equip-name">US Room 2</p>
-                            <small>3 in queue · 99.6% uptime</small>
-                        </div>
-                    </div>
-                    <span class="equip-status online">Online</span>
-                </div>
-            </div>
+        <!-- Shown when a filter matches nothing -->
+        <div class="rd-empty rd-empty--filter" id="rdNoMatch" hidden>
+            <div class="rd-empty-icon"><i class="bi bi-search" aria-hidden="true"></i></div>
+            <h3>No matching studies</h3>
+            <p>Try a different filter, or select All to see the full worklist.</p>
+            <button type="button" class="rd-btn" id="rdClearFilters">Show all</button>
         </div>
-    </div>
+    </section>
+
 </div>
 
 <style>
-/* ============================================
-   RADIOLOGIST DASHBOARD - MATCHING SCREENSHOT
-   ============================================ */
-.dashboard-container {
-    --ink: #101828;
-    --ink-soft: #64748B;
-    --ink-faint: #94A3B8;
-    --line: #E5E9ED;
-    --surface: #FFFFFF;
-    --surface-alt: #F8FAFB;
-    --blue: #1D4ED8;
-    --blue-soft: #E8EFFE;
-    --purple: #7c3aed;
-    --purple-soft: #ede9fe;
-    --green: #15803D;
-    --green-soft: #E7F6EC;
-    --cyan: #0E7490;
-    --cyan-soft: #E0F2F4;
-    --orange: #C2410C;
-    --orange-soft: #FFF1E6;
-    --red: #dc2626;
-    --red-soft: #FEF2F2;
-    font-family: 'Inter', sans-serif;
+/* =========================================================
+   RADIOLOGIST · DASHBOARD
+   Namespaced under .rd so the layout's generic card and table
+   rules can't leak in.
+   ========================================================= */
+
+.rd {
+    --rd-ink:         #0f172a;
+    --rd-text:        #334155;
+    --rd-muted:       #64748b;
+    --rd-faint:       #94a3b8;
+    --rd-line:        #e2e8f0;
+    --rd-line-soft:   #f1f5f9;
+    --rd-surface:     #ffffff;
+    --rd-subtle:      #f8fafc;
+    --rd-accent:      #1d4ed8;
+    --rd-accent-dark: #1e40af;
+    --rd-accent-soft: #eaf2fe;
+    --rd-green:       #047857;
+    --rd-green-soft:  #ecfdf5;
+    --rd-amber:       #b45309;
+    --rd-amber-soft:  #fff4e5;
+    --rd-teal:        #0f766e;
+    --rd-teal-soft:   #f0fdfa;
+    --rd-violet:      #6d28d9;
+    --rd-violet-soft: #f3e8ff;
+    --rd-danger:      #b91c1c;
+    --rd-danger-soft: #fef2f2;
+    --rd-radius:      12px;
+    --rd-radius-sm:   8px;
+    --rd-mono:        ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+    color: var(--rd-text);
+    font-size: 0.875rem;
 }
 
-/* ===== STATS ROW ===== */
-.stats-row {
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
+.rd *:focus-visible { outline: 2px solid var(--rd-accent); outline-offset: 2px; }
+
+.rd-muted { color: var(--rd-faint); }
+
+/* ---------- Header ---------- */
+
+.rd-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
     gap: 1rem;
-    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.25rem;
 }
 
-.stat-card {
-    background: var(--surface);
-    border-radius: 14px;
-    padding: 1.5rem 1.25rem;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.75rem;
-    box-shadow: 0 1px 3px rgba(16, 24, 40, 0.06);
-    border: 1px solid var(--line);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-    min-height: 160px;
+.rd-title {
+    margin: 0 0 0.2rem;
+    font-size: 1.25rem;
+    font-weight: 650;
+    letter-spacing: -0.015em;
+    color: var(--rd-ink);
 }
 
-.stat-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(16, 24, 40, 0.08);
+.rd-lede {
+    margin: 0;
+    font-size: 0.8125rem;
+    color: var(--rd-muted);
 }
 
-.stat-icon {
-    width: 42px;
-    height: 42px;
-    border-radius: 12px;
-    display: flex;
+.rd-lede strong { font-weight: 600; color: var(--rd-ink); }
+.rd-lede span { margin: 0 0.2rem; color: var(--rd-faint); }
+
+.rd-head-actions { display: flex; gap: 0.5rem; }
+
+/* ---------- Buttons ---------- */
+
+.rd-btn {
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.25rem;
-    flex-shrink: 0;
-    margin-bottom: 0.25rem;
+    gap: 0.4rem;
+    height: 36px;
+    padding: 0 0.9rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--rd-text);
+    background: var(--rd-surface);
+    border: 1px solid var(--rd-line);
+    border-radius: var(--rd-radius-sm);
+    box-shadow: 0 1px 1px rgba(15, 23, 42, 0.03);
+    white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.stat-icon.purple { background: var(--purple-soft); color: var(--purple); }
-.stat-icon.blue { background: var(--blue-soft); color: var(--blue); }
-.stat-icon.green { background: var(--green-soft); color: var(--green); }
-.stat-icon.teal { background: var(--cyan-soft); color: var(--cyan); }
-.stat-icon.orange { background: var(--orange-soft); color: var(--orange); }
-.stat-icon.primary { background: var(--blue-soft); color: var(--blue); }
+.rd-btn:hover { background: var(--rd-subtle); border-color: #cbd5e1; color: var(--rd-ink); }
+.rd-btn i { font-size: 0.9em; }
 
-.stat-info h3 {
-    font-size: 1.8rem;
-    font-weight: 800;
-    color: var(--ink);
-    margin: 0;
+.rd-btn--primary,
+.rd-btn--primary:hover { color: #ffffff; }
+.rd-btn--primary { background: var(--rd-accent); border-color: var(--rd-accent); }
+.rd-btn--primary:hover { background: var(--rd-accent-dark); border-color: var(--rd-accent-dark); }
+
+/* ---------- Stats ---------- */
+
+.rd-stats {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.9rem;
+    margin-bottom: 1.25rem;
+}
+
+.rd-stat {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    min-width: 0;
+    padding: 0.9rem 1rem;
+    background: var(--rd-surface);
+    border: 1px solid var(--rd-line);
+    border-radius: var(--rd-radius);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.rd-stat-icon {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    font-size: 1rem;
+    border-radius: var(--rd-radius-sm);
+}
+
+.rd-stat-icon--amber  { background: var(--rd-amber-soft); color: var(--rd-amber); }
+.rd-stat-icon--blue   { background: var(--rd-accent-soft); color: var(--rd-accent); }
+.rd-stat-icon--green  { background: var(--rd-green-soft); color: var(--rd-green); }
+.rd-stat-icon--teal   { background: var(--rd-teal-soft); color: var(--rd-teal); }
+.rd-stat-icon--violet { background: var(--rd-violet-soft); color: var(--rd-violet); }
+
+.rd-stat-body { min-width: 0; }
+
+.rd-stat-value {
+    font-size: 1.35rem;
+    font-weight: 700;
     line-height: 1.1;
     letter-spacing: -0.02em;
+    color: var(--rd-ink);
+    font-variant-numeric: tabular-nums;
 }
 
-.stat-info p {
-    font-size: 0.85rem;
+.rd-stat-label {
+    margin-top: 0.15rem;
+    font-size: 0.8125rem;
     font-weight: 600;
-    color: var(--ink);
-    margin: 0.15rem 0 0;
+    color: var(--rd-text);
 }
 
-.stat-info small {
-    font-size: 0.75rem;
-    color: var(--ink-soft);
-    font-weight: 400;
-    margin-top: 2px;
-    display: block;
+.rd-stat-sub {
+    font-size: 0.72rem;
+    color: var(--rd-muted);
 }
 
-/* ===== CRITICAL FINDINGS ===== */
-.critical-alert {
-    background: #fff5f5;
-    border: 1px solid #fecaca;
-    border-radius: 16px;
-    margin-bottom: 1.5rem;
+/* ---------- Panel ---------- */
+
+.rd-panel {
+    background: var(--rd-surface);
+    border: 1px solid var(--rd-line);
+    border-radius: var(--rd-radius);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
     overflow: hidden;
+    margin-bottom: 1rem;
 }
 
-.critical-header {
+.rd-panel--chart { margin-bottom: 1rem; }
+
+.rd-panel-head {
     display: flex;
+    align-items: flex-start;
     justify-content: space-between;
-    align-items: center;
-    padding: 1rem 1.5rem;
-    background: #fef2f2;
-    border-bottom: 1px solid #fecaca;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding: 0.9rem 1.1rem;
+    border-bottom: 1px solid var(--rd-line-soft);
 }
 
-.critical-header h5 {
-    font-weight: 700;
-    color: #991b1b;
-    margin: 0;
-    font-size: 0.95rem;
+.rd-panel-title {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-}
-
-.critical-count {
-    background: #dc2626;
-    color: #ffffff;
-    padding: 0.2rem 0.7rem;
-    border-radius: 30px;
-    font-size: 0.7rem;
-    font-weight: 700;
-}
-
-.critical-list {
-    padding: 0.5rem 1.5rem 1rem;
-}
-
-.critical-item {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 0.75rem 0;
-    border-bottom: 1px solid #fee2e2;
-}
-
-.critical-item:last-child {
-    border-bottom: none;
-}
-
-.modality-tag {
-    padding: 0.2rem 0.6rem;
-    border-radius: 6px;
-    font-size: 0.65rem;
-    font-weight: 700;
-    text-transform: uppercase;
-}
-
-.modality-tag.x-ray { background: var(--blue-soft); color: var(--blue); }
-.modality-tag.ct { background: var(--cyan-soft); color: var(--cyan); }
-.modality-tag.mri { background: var(--purple-soft); color: var(--purple); }
-.modality-tag.us { background: var(--green-soft); color: var(--green); }
-
-.critical-content {
-    flex: 1;
-}
-
-.patient-ref {
-    font-weight: 700;
-    color: var(--ink);
-    margin: 0 0 0.15rem;
-    font-size: 0.85rem;
-}
-
-.finding-text {
-    color: var(--ink-soft);
     margin: 0;
-    font-size: 0.8rem;
+    font-size: 0.9rem;
+    font-weight: 650;
+    color: var(--rd-ink);
 }
 
-.critical-time {
+.rd-panel-title i { color: var(--rd-accent); font-size: 0.9rem; }
+
+.rd-panel-sub {
+    margin: 0.15rem 0 0;
+    font-size: 0.78rem;
+    color: var(--rd-muted);
+}
+
+.rd-panel-actions {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    font-size: 0.75rem;
-    color: var(--ink-soft);
-}
-
-.btn-notify {
-    background: #dc2626;
-    color: #ffffff;
-    border: none;
-    padding: 0.35rem 0.85rem;
-    border-radius: 8px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    cursor: pointer;
-}
-
-.btn-notified {
-    color: var(--green);
-    font-weight: 600;
-}
-
-/* ===== CHARTS ROW ===== */
-.charts-row {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 1rem;
-    margin-bottom: 1rem;
-}
-
-.chart-card {
-    background: var(--surface);
-    border-radius: 16px;
-    padding: 1.5rem;
-    box-shadow: 0 1px 3px rgba(16, 24, 40, 0.06);
-    border: 1px solid var(--line);
-}
-
-.chart-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 1rem;
-}
-
-.chart-header h5 {
-    font-weight: 700;
-    color: var(--ink);
-    margin: 0 0 0.15rem;
-    font-size: 1rem;
-}
-
-.chart-header small {
-    color: var(--ink-soft);
-    font-size: 0.8rem;
-    font-weight: 400;
-}
-
-.chart-legend-dots {
-    display: flex;
-    gap: 0.75rem;
+    gap: 0.5rem;
     flex-wrap: wrap;
 }
 
-.chart-legend-dots span {
-    font-size: 0.75rem;
-    color: var(--ink-soft);
-    display: flex;
+/* ---------- Tabs ---------- */
+
+.rd-tabs {
+    display: inline-flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: 0.15rem;
+    padding: 3px;
+    background: var(--rd-line-soft);
+    border: 1px solid var(--rd-line);
+    border-radius: 9px;
 }
 
-.dot {
+.rd-tab {
+    padding: 0.3rem 0.7rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--rd-muted);
+    background: none;
+    border: 0;
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.rd-tab:hover { color: var(--rd-ink); }
+.rd-tab.is-active {
+    color: var(--rd-ink);
+    background: var(--rd-surface);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+/* ---------- Chart ---------- */
+
+.rd-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    align-items: center;
+    font-size: 0.75rem;
+    color: var(--rd-muted);
+}
+
+.rd-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.rd-legend-dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
     display: inline-block;
 }
 
-.dot.blue { background: var(--blue); }
-.dot.cyan { background: var(--cyan); }
-.dot.purple { background: var(--purple); }
-.dot.green { background: var(--green); }
-
-.chart-body {
+.rd-chart {
     position: relative;
-    height: 300px;
+    height: 280px;
+    padding: 1rem;
 }
 
-/* ===== LOWER ROW ===== */
-.lower-row {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 1rem;
-}
-
-/* ===== QUEUE CARD ===== */
-.queue-card {
-    background: var(--surface);
-    border-radius: 16px;
-    padding: 1.5rem;
-    box-shadow: 0 1px 3px rgba(16, 24, 40, 0.06);
-    border: 1px solid var(--line);
-}
-
-.queue-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-}
-
-.queue-title h5 {
-    font-weight: 700;
-    color: var(--ink);
-    margin: 0;
-    font-size: 1rem;
-}
-
-.queue-filters {
-    display: flex;
-    gap: 0.25rem;
-    flex-wrap: wrap;
-}
-
-.filter-btn {
-    background: transparent;
-    border: none;
-    padding: 0.3rem 0.75rem;
-    border-radius: 30px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--ink-soft);
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.filter-btn:hover {
-    background: var(--surface-alt);
-}
-
-.filter-btn.active {
-    background: var(--blue);
-    color: #ffffff;
-}
-
-.queue-actions {
-    display: flex;
-    gap: 0.5rem;
-}
-
-.refresh-btn {
-    background: var(--surface);
-    border: 1px solid var(--line);
-    padding: 0.4rem 0.85rem;
-    border-radius: 8px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--ink);
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    transition: all 0.2s ease;
-}
-
-.refresh-btn:hover {
-    background: var(--surface-alt);
-}
-
-.new-study-btn {
-    background: var(--blue);
-    color: #ffffff;
-    border: none;
-    padding: 0.4rem 0.85rem;
-    border-radius: 8px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    transition: all 0.2s ease;
-}
-
-.new-study-btn:hover {
-    background: #1e40af;
-}
-
-/* ===== TABLE ===== */
-.queue-table {
-    margin: 0;
-}
-
-.queue-table thead th {
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--ink-faint);
-    font-weight: 600;
-    border-bottom: 1px solid var(--line);
-    padding: 0.75rem;
-    background: var(--surface-alt);
-    white-space: nowrap;
-}
-
-.queue-table thead th:first-child {
-    border-radius: 8px 0 0 0;
-}
-
-.queue-table thead th:last-child {
-    border-radius: 0 8px 0 0;
-}
-
-.queue-table tbody td {
-    padding: 0.75rem;
-    vertical-align: middle;
-    font-size: 0.8rem;
-    color: var(--ink);
-    border-bottom: 1px solid var(--line);
-    white-space: nowrap;
-}
-
-.queue-table tbody tr:last-child td {
-    border-bottom: none;
-}
-
-.queue-table tbody tr:hover {
-    background: var(--surface-alt);
-}
-
-.accession {
-    font-family: 'SFMono-Regular', Consolas, monospace;
-    font-size: 0.7rem;
-    font-weight: 600;
-    color: var(--blue);
-}
-
-.patient-cell {
+.rd-chart--empty {
     display: flex;
     flex-direction: column;
-}
-
-.patient-name {
-    font-weight: 600;
-    color: var(--ink);
-}
-
-.patient-cell small {
-    font-size: 0.65rem;
-    color: var(--ink-soft);
-}
-
-.modality-tag {
-    padding: 0.2rem 0.6rem;
-    border-radius: 6px;
-    font-size: 0.65rem;
-    font-weight: 700;
-}
-
-.modality-tag.x-ray { background: var(--blue-soft); color: var(--blue); }
-.modality-tag.ct { background: var(--cyan-soft); color: var(--cyan); }
-.modality-tag.mri { background: var(--purple-soft); color: var(--purple); }
-.modality-tag.us { background: var(--green-soft); color: var(--green); }
-
-.priority-badge {
-    padding: 0.2rem 0.6rem;
-    border-radius: 6px;
-    font-size: 0.65rem;
-    font-weight: 700;
-}
-
-.priority-badge.stat {
-    background: var(--red-soft);
-    color: var(--red);
-}
-
-.priority-badge.routine {
-    background: var(--surface-alt);
-    color: var(--ink-soft);
-}
-
-.status-badge {
-    padding: 0.3rem 0.8rem;
-    border-radius: 30px;
-    font-size: 0.7rem;
-    font-weight: 600;
-    display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 0.35rem;
+    text-align: center;
+    color: var(--rd-muted);
+}
+
+.rd-chart--empty i { font-size: 1.6rem; color: var(--rd-faint); }
+.rd-chart--empty p { margin: 0; font-weight: 600; color: var(--rd-ink); font-size: 0.9rem; }
+.rd-chart--empty small { font-size: 0.78rem; color: var(--rd-faint); }
+
+/* ---------- Table ---------- */
+
+.rd-table-wrap { overflow-x: auto; }
+
+.rd-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+    color: var(--rd-text);
+}
+
+.rd-table th {
+    padding: 0.65rem 1rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    text-align: left;
+    white-space: nowrap;
+    color: var(--rd-muted);
+    background: var(--rd-subtle);
+    border-bottom: 1px solid var(--rd-line);
+}
+
+.rd-table td {
+    padding: 0.85rem 1rem;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--rd-line-soft);
+}
+
+.rd-table tbody tr:last-child td { border-bottom: 0; }
+
+.rd-row { transition: background-color 0.12s ease; }
+.rd-row:hover { background: #fafbfd; }
+
+.rd-row td:first-child { position: relative; }
+
+.rd-row td:first-child::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--rail, transparent);
+}
+
+.rd-row[data-status="pending"]     { --rail: #f59e0b; }
+.rd-row[data-status="in_progress"] { --rail: #3b82f6; }
+.rd-row[data-status="processing"]  { --rail: #3b82f6; }
+.rd-row[data-status="completed"]   { --rail: #10b981; }
+.rd-row[data-status="released"]    { --rail: #14b8a6; }
+
+.rd-c-accession { white-space: nowrap; }
+
+.rd-ref {
+    padding: 0.15rem 0.5rem;
+    font-family: var(--rd-mono);
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: var(--rd-ink);
+    background: var(--rd-line-soft);
+    border-radius: 5px;
+}
+
+.rd-patient { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
+
+.rd-avatar {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--rd-accent);
+    background: var(--rd-accent-soft);
+    border-radius: 50%;
+}
+
+.rd-patient-body { min-width: 0; }
+
+.rd-name {
+    display: block;
+    font-weight: 600;
+    color: var(--rd-ink);
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.status-badge .bi-circle-fill {
-    font-size: 0.4rem;
-}
+.rd-sub { display: block; font-size: 0.72rem; color: var(--rd-muted); }
+.rd-sub span { margin: 0 0.15rem; color: var(--rd-faint); }
 
-.status-badge.pending {
-    background: var(--orange-soft);
-    color: var(--orange);
-}
+.rd-c-date { white-space: nowrap; font-variant-numeric: tabular-nums; }
 
-.status-badge.processing {
-    background: var(--blue-soft);
-    color: var(--blue);
-}
-
-.status-badge.completed {
-    background: var(--green-soft);
-    color: var(--green);
-}
-
-.status-badge.released {
-    background: var(--cyan-soft);
-    color: var(--cyan);
-}
-
-/* ===== ACTION CELL - ALWAYS SHOW ICONS ===== */
-.action-cell {
-    display: flex;
-    gap: 0.5rem;
+.rd-tag {
+    display: inline-flex;
     align-items: center;
-    justify-content: flex-start;
+    padding: 0.15rem 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    border-radius: 4px;
 }
 
-/* Light blue/gray icon style - matching screenshot */
-.action-icons {
-    color: #93c5fd; /* LIGHT BLUE */
-    font-size: 1.1rem;
-    text-decoration: none;
+.rd-tag--stat { color: var(--rd-danger); background: var(--rd-danger-soft); }
+
+.rd-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--rd-tone-fg);
+    background: var(--rd-tone-bg);
+    border-radius: 999px;
+}
+
+.rd-status::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--rd-tone-dot);
+}
+
+.rd-status--pending   { --rd-tone-bg: var(--rd-amber-soft); --rd-tone-fg: var(--rd-amber); --rd-tone-dot: #f59e0b; }
+.rd-status--progress  { --rd-tone-bg: var(--rd-accent-soft); --rd-tone-fg: var(--rd-accent); --rd-tone-dot: #3b82f6; }
+.rd-status--completed { --rd-tone-bg: var(--rd-green-soft); --rd-tone-fg: var(--rd-green); --rd-tone-dot: #10b981; }
+.rd-status--released  { --rd-tone-bg: var(--rd-teal-soft); --rd-tone-fg: var(--rd-teal); --rd-tone-dot: #14b8a6; }
+
+.rd-c-actions { width: 1%; text-align: right; white-space: nowrap; }
+
+.rd-actions { display: inline-flex; align-items: center; gap: 0.25rem; }
+
+.rd-icon-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     width: 32px;
     height: 32px;
-    border-radius: 8px;
-    transition: all 0.2s ease;
+    font-size: 0.85rem;
+    color: var(--rd-muted);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--rd-radius-sm);
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
-.action-icons:hover {
-    color: var(--blue);
-    background: var(--blue-soft);
+.rd-icon-btn:hover { background: var(--rd-accent-soft); color: var(--rd-accent); border-color: #dbe6fb; }
+.rd-icon-btn--read:hover { background: var(--rd-green-soft); color: var(--rd-green); border-color: #a7f3d0; }
+
+/* ---------- Empty states ---------- */
+
+.rd-empty { padding: 3.5rem 1rem; text-align: center; }
+.rd-empty--filter { border-top: 1px solid var(--rd-line); }
+
+.rd-empty-icon {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    margin: 0 auto 0.85rem;
+    font-size: 1.2rem;
+    color: var(--rd-faint);
+    background: var(--rd-line-soft);
+    border-radius: 10px;
 }
 
-.empty-state {
-    text-align: center;
-    padding: 2rem;
-}
+.rd-empty h3 { margin: 0 0 0.25rem; font-size: 0.95rem; font-weight: 600; color: var(--rd-ink); }
+.rd-empty p { max-width: 26rem; margin: 0 auto 1rem; font-size: 0.8125rem; color: var(--rd-muted); }
 
-.empty-state i {
-    font-size: 2rem;
-    color: var(--ink-faint);
-    margin-bottom: 0.5rem;
-    display: block;
-}
-
-.empty-state p {
-    color: var(--ink-soft);
-    font-weight: 500;
-}
-
-/* ===== EQUIPMENT STATUS ===== */
-.equipment-card {
-    background: var(--surface);
-    border-radius: 16px;
-    padding: 1.5rem;
-    box-shadow: 0 1px 3px rgba(16, 24, 40, 0.06);
-    border: 1px solid var(--line);
-}
-
-.equipment-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-}
-
-.equipment-header h5 {
-    font-weight: 700;
-    color: var(--ink);
-    margin: 0;
-    font-size: 1rem;
-}
-
-.online-badge {
-    background: var(--green-soft);
-    color: var(--green);
-    padding: 0.2rem 0.7rem;
-    border-radius: 30px;
-    font-size: 0.7rem;
-    font-weight: 600;
-}
-
-.equipment-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-}
-
-.equipment-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid var(--line);
-}
-
-.equipment-item:last-child {
-    border-bottom: none;
-}
-
-.equip-info {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-}
-
-.equip-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-
-.equip-dot.online {
-    background: var(--green);
-}
-
-.equip-dot.maintenance {
-    background: var(--orange);
-}
-
-.equip-name {
-    font-weight: 600;
-    color: var(--ink);
-    margin: 0;
-    font-size: 0.8rem;
-}
-
-.equip-info small {
-    color: var(--ink-soft);
-    font-size: 0.7rem;
-}
-
-.equip-status {
-    font-size: 0.7rem;
-    font-weight: 600;
-}
-
-.equip-status.online {
-    color: var(--green);
-}
-
-.equip-status.maintenance {
-    color: var(--orange);
-}
-
-/* ============================================
-   RESPONSIVE
-   ============================================ */
-
-@media (max-width: 1400px) {
-    .stats-row {
-        grid-template-columns: repeat(3, 1fr);
-    }
-}
+/* ---------- Responsive ---------- */
 
 @media (max-width: 1200px) {
-    .charts-row,
-    .lower-row {
-        grid-template-columns: 1fr;
-    }
+    .rd-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
-@media (max-width: 992px) {
-    .stats-row {
-        grid-template-columns: repeat(2, 1fr);
-    }
+@media (max-width: 900px) {
+    .rd-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 768px) {
-    .queue-header {
-        flex-direction: column;
-        align-items: flex-start;
+    .rd-panel-head { flex-direction: column; align-items: stretch; }
+    .rd-panel-actions { width: 100%; justify-content: space-between; }
+    .rd-chart { height: 240px; }
+
+    .rd-table thead { display: none; }
+
+    .rd-table,
+    .rd-table tbody,
+    .rd-table tr,
+    .rd-table td { display: block; width: 100%; }
+
+    .rd-table tr.rd-row {
+        padding: 0.9rem 1rem;
+        border-bottom: 1px solid var(--rd-line);
     }
-    
-    .queue-filters {
-        flex-wrap: wrap;
-    }
-    
-    .queue-actions {
-        width: 100%;
+
+    .rd-row td:first-child::before { top: 0; bottom: 0; }
+
+    .rd-table td {
+        display: flex;
+        align-items: center;
         justify-content: space-between;
+        gap: 1rem;
+        padding: 0.25rem 0;
+        text-align: right;
+        border: 0;
     }
-    
-    .stats-row {
-        grid-template-columns: 1fr 1fr;
-        gap: 0.75rem;
+
+    .rd-table td[data-label]::before {
+        content: attr(data-label);
+        flex-shrink: 0;
+        font-size: 0.75rem;
+        font-weight: 400;
+        color: var(--rd-muted);
+        text-align: left;
     }
-    
-    .stat-card {
-        padding: 1rem;
-    }
-    
-    .stat-icon {
-        width: 36px;
-        height: 36px;
-        font-size: 1rem;
-    }
-    
-    .stat-info h3 {
-        font-size: 1.4rem;
-    }
-    
-    .critical-item {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.5rem;
-    }
-    
-    .critical-time {
-        width: 100%;
-        justify-content: space-between;
-    }
+
+    .rd-table td.rd-c-accession,
+    .rd-table td:nth-child(2) { display: block; text-align: left; }
+    .rd-table td.rd-c-accession::before,
+    .rd-table td:nth-child(2)::before { content: none; }
+    .rd-table td:nth-child(2) { margin: 0.35rem 0 0.5rem; }
+
+    .rd-table td.rd-c-actions { justify-content: flex-end; margin-top: 0.5rem; }
 }
 
 @media (max-width: 576px) {
-    .stats-row {
-        grid-template-columns: 1fr;
-    }
-    
-    .chart-body {
-        height: 250px;
-    }
-    
-    .queue-table {
-        font-size: 0.75rem;
-    }
-    
-    .queue-table thead th,
-    .queue-table tbody td {
-        padding: 0.5rem;
-    }
+    .rd-stats { grid-template-columns: minmax(0, 1fr); gap: 0.6rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .rd *, .rd *::before, .rd *::after { transition: none !important; }
 }
 </style>
 
-<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // ===== WEEKLY STUDY VOLUME (Stacked Bar Chart) =====
-    const weeklyCtx = document.getElementById('weeklyVolumeChart').getContext('2d');
-    
-    // Get data from PHP
-    const weeklyLabels = <?= $weeklyLabels ?? '["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]' ?>;
-    const weeklyDatasets = <?= $weeklyDatasets ?? '[]' ?>;
-    
-    // If no datasets or all zeros, show empty state data
-    let datasets = weeklyDatasets;
-    if (!datasets || datasets.length === 0) {
-        datasets = [{
-            label: 'No Data',
-            data: [0, 0, 0, 0, 0, 0, 0],
-            backgroundColor: '#94A3B8',
-            borderRadius: 4,
-            barPercentage: 0.6
-        }];
-    }
-    
-    // Chart.js color palette for modalities
-    const colorPalette = {
-        'X-Ray': '#1D4ED8',
-        'CT': '#0E7490',
-        'MRI': '#7c3aed',
-        'Ultrasound': '#16a34a',
-        'Mammography': '#f59e0b',
-        'Other': '#94A3B8'
-    };
-    
-    // Apply colors to datasets if not already set
-    datasets = datasets.map(ds => {
-        if (!ds.backgroundColor || ds.backgroundColor === '#94A3B8') {
-            ds.backgroundColor = colorPalette[ds.label] || '#94A3B8';
+(function () {
+    'use strict';
+
+    /* =====================================================
+       WEEKLY VOLUME CHART
+       Data comes from XrayExaminationModel::getWeeklyVolumeData()
+       via the controller. If nothing was passed, the chart canvas
+       is not rendered at all (the PHP template shows a placeholder
+       instead), so this block just checks and exits.
+       ===================================================== */
+
+    var weeklyCanvas = document.getElementById('weeklyVolumeChart');
+
+    if (weeklyCanvas && typeof Chart !== 'undefined') {
+
+        var weeklyLabels   = <?= json_encode($weeklyLabels,   JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+        var weeklyDatasets = <?= json_encode($weeklyDatasets, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+
+        // Legend: one dot per dataset, so the reader sees which colour
+        // belongs to which modality without relying on Chart.js's own
+        // legend (kept off so the header layout stays tight).
+        var legend = document.getElementById('weeklyLegend');
+
+        if (legend && Array.isArray(weeklyDatasets)) {
+            legend.innerHTML = weeklyDatasets.map(function (ds) {
+                var color = ds.backgroundColor || '#94a3b8';
+                return '<span><i class="rd-legend-dot" style="background:' + color + '"></i>' +
+                       String(ds.label || '') + '</span>';
+            }).join('');
         }
-        return ds;
-    });
-    
-    // ===== UPDATE LEGEND =====
-    const legendContainer = document.getElementById('weeklyLegend');
-    if (legendContainer) {
-        let legendHtml = '';
-        datasets.forEach(ds => {
-            const color = ds.backgroundColor || '#94A3B8';
-            legendHtml += `<span><i class="dot" style="background:${color};"></i> ${ds.label}</span>`;
+
+        new Chart(weeklyCanvas.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: weeklyLabels,
+                datasets: weeklyDatasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#ffffff',
+                        titleColor: '#0f172a',
+                        bodyColor: '#334155',
+                        borderColor: '#e2e8f0',
+                        borderWidth: 1,
+                        padding: 10,
+                        cornerRadius: 6
+                    }
+                },
+                scales: {
+                    x: {
+                        stacked: true,
+                        grid: { display: false },
+                        border: { display: false },
+                        ticks: { color: '#94a3b8', font: { size: 11 } }
+                    },
+                    y: {
+                        stacked: true,
+                        beginAtZero: true,
+                        grid: { color: '#f1f5f9', drawBorder: false, drawTicks: false },
+                        border: { display: false },
+                        ticks: { color: '#94a3b8', font: { size: 11 }, stepSize: 1, precision: 0 }
+                    }
+                }
+            }
         });
-        legendContainer.innerHTML = legendHtml;
     }
-    
-    new Chart(weeklyCtx, {
-        type: 'bar',
-        data: {
-            labels: weeklyLabels,
-            datasets: datasets
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false }
-            },
-            scales: {
-                x: {
-                    stacked: true,
-                    grid: { display: false },
-                    ticks: { color: '#94A3B8' }
-                },
-                y: {
-                    stacked: true,
-                    beginAtZero: true,
-                    grid: { color: '#F0F2F5' },
-                    ticks: { color: '#94A3B8', stepSize: 1 }
-                }
-            }
-        }
-    });
 
-    // ===== TODAY'S BREAKDOWN (Horizontal Bar Chart) =====
-    const breakdownCtx = document.getElementById('breakdownChart').getContext('2d');
-    
-    // Get breakdown data from PHP
-    const breakdownData = <?= json_encode($breakdownData ?? ['labels' => ['No Data'], 'data' => [0]]) ?>;
-    
-    // Colors for breakdown chart
-    const breakdownColors = {
-        'X-Ray': '#1D4ED8',
-        'CT': '#0E7490',
-        'MRI': '#7c3aed',
-        'Ultrasound': '#16a34a',
-        'Mammography': '#f59e0b',
-        'Other': '#94A3B8',
-        'No Data': '#94A3B8'
-    };
-    
-    const bgColors = breakdownData.labels.map(label => breakdownColors[label] || '#94A3B8');
-    
-    new Chart(breakdownCtx, {
-        type: 'bar',
-        data: {
-            labels: breakdownData.labels,
-            datasets: [{
-                label: 'Studies',
-                data: breakdownData.data,
-                backgroundColor: bgColors,
-                borderRadius: 4,
-                barThickness: 16
-            }]
-        },
-        options: {
-            indexAxis: 'y',
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false }
-            },
-            scales: {
-                x: {
-                    beginAtZero: true,
-                    grid: { color: '#F0F2F5' },
-                    ticks: { color: '#94A3B8', stepSize: 1 }
-                },
-                y: {
-                    grid: { display: false },
-                    ticks: { color: '#374151', font: { size: 12, weight: '600' } }
-                }
-            }
-        }
-    });
-});
 
-// ===== QUEUE FILTER =====
-document.querySelectorAll('.filter-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-        this.classList.add('active');
-        
-        const filter = this.dataset.filter;
-        const rows = document.querySelectorAll('#queueTable .queue-row');
-        
-        rows.forEach(row => {
-            const status = row.dataset.status ? row.dataset.status.toLowerCase() : '';
-            const text = row.textContent.toLowerCase();
-            
-            if (filter === 'all' || status === filter || text.includes(filter)) {
-                row.style.display = '';
+    /* =====================================================
+       WORKLIST FILTER
+       Tabs filter the table rows by status, with a special case
+       for the STAT tab which reads the data-stat attribute.
+       ===================================================== */
+
+    var tabs = Array.prototype.slice.call(document.querySelectorAll('.rd-tab'));
+    var table = document.getElementById('queueTable');
+    var noMatch = document.getElementById('rdNoMatch');
+    var clearBtn = document.getElementById('rdClearFilters');
+
+    function rows() {
+        return table ? Array.prototype.slice.call(table.querySelectorAll('tbody tr.rd-row')) : [];
+    }
+
+    function applyFilter(filter) {
+        var visible = 0;
+
+        rows().forEach(function (row) {
+            var status = (row.dataset.status || '').toLowerCase();
+            var isStat = row.dataset.stat === '1';
+
+            var show = false;
+            if (filter === 'all') {
+                show = true;
+            } else if (filter === 'stat') {
+                show = isStat;
+            } else if (filter === 'reading') {
+                // The DB and the codebase use both words for this state.
+                show = status === 'in_progress' || status === 'processing';
             } else {
-                row.style.display = 'none';
+                show = status === filter;
             }
+
+            row.style.display = show ? '' : 'none';
+            if (show) { visible++; }
+        });
+
+        if (noMatch) {
+            noMatch.hidden = !(rows().length > 0 && visible === 0);
+        }
+    }
+
+    tabs.forEach(function (tab) {
+        tab.addEventListener('click', function () {
+            tabs.forEach(function (t) {
+                var on = t === tab;
+                t.classList.toggle('is-active', on);
+                t.setAttribute('aria-pressed', on ? 'true' : 'false');
+            });
+            applyFilter(tab.dataset.filter || 'all');
         });
     });
-});
 
-// ===== REFRESH =====
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function () {
+            tabs.forEach(function (t) {
+                var on = t.dataset.filter === 'all';
+                t.classList.toggle('is-active', on);
+                t.setAttribute('aria-pressed', on ? 'true' : 'false');
+            });
+            applyFilter('all');
+        });
+    }
+
+    applyFilter('all');
+})();
+
+
+/* =====================================================
+   REFRESH
+   Reloads the page so the counts and worklist re-read from
+   the database. A spinner shows on the button while it fires.
+   ===================================================== */
+
 function refreshTable() {
-    const btn = document.querySelector('.refresh-btn');
-    const icon = btn.querySelector('i');
-    icon.style.animation = 'spin 0.8s linear infinite';
-    
-    setTimeout(() => {
-        icon.style.animation = 'none';
+    var btn = event && event.currentTarget ? event.currentTarget : document.querySelector('.rd-btn[onclick*="refreshTable"]');
+    var icon = btn ? btn.querySelector('i') : null;
+
+    if (icon) {
+        icon.style.animation = 'rd-spin 0.8s linear infinite';
+    }
+
+    setTimeout(function () {
+        if (icon) { icon.style.animation = 'none'; }
         location.reload();
-    }, 800);
+    }, 600);
 }
 
-// ===== Add spin animation =====
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes spin {
-        to { transform: rotate(360deg); }
-    }
-`;
-document.head.appendChild(style);
+(function () {
+    var style = document.createElement('style');
+    style.textContent = '@keyframes rd-spin { to { transform: rotate(360deg); } }';
+    document.head.appendChild(style);
+})();
 </script>
 
 <?= $this->endSection() ?>

@@ -2,155 +2,190 @@
 
 <?= $this->section('AppointmentContent') ?>
 
+<?php
+    // Optional flags the controller can set. When absent, this view
+    // simply does not make the claim.
+    $emailSent = !empty($emailSent ?? false);
+?>
+
 <style>
-/* ===== MEDICAL THEME STYLES ===== */
+/* =========================================================
+   APPOINTMENT CONFIRMATION
+   Calm, printable, single-purpose. No confetti, no emoji.
+   ========================================================= */
+
 :root {
-    --primary-blue: #0a2b4e;
-    --primary-light: #1a4a7a;
-    --accent-teal: #04ccab;
-    --accent-blue: #0148ca;
-    --bg-light: #f0f7ff;
-    --card-shadow: 0 10px 40px rgba(10, 43, 78, 0.08);
-    --radius-lg: 24px;
-    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --ac-blue:      #0a2b4e;
+    --ac-blue-soft: #eef4ff;
+    --ac-teal:      #0f766e;
+    --ac-teal-soft: #ecfdf5;
+    --ac-line:      #e2e8f0;
+    --ac-line-soft: #f1f5f9;
+    --ac-text:      #334155;
+    --ac-muted:     #64748b;
+    --ac-ink:       #0f172a;
+    --ac-surface:   #ffffff;
+    --ac-canvas:    #f6f8fc;
+    --ac-mono:      ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 }
 
 .success-page {
-    background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 50%, #f5faff 100%);
+    background: var(--ac-canvas);
     min-height: 100vh;
     padding: 3rem 0 4rem;
+    color: var(--ac-text);
+    font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-/* ===== CONFETTI ANIMATION ===== */
-.confetti-container {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 9999;
-    overflow: hidden;
-}
+/* ---------- Card ---------- */
 
-.confetti {
-    position: absolute;
-    width: 10px;
-    height: 10px;
-    opacity: 0;
-    animation: confettiFall 3s ease-in forwards;
-}
-
-@keyframes confettiFall {
-    0% {
-        opacity: 1;
-        transform: translateY(-20px) rotate(0deg);
-    }
-    100% {
-        opacity: 0;
-        transform: translateY(100vh) rotate(720deg);
-    }
-}
-
-/* ===== SUCCESS CARD ===== */
 .success-card {
-    background: #ffffff;
-    border-radius: var(--radius-lg);
-    box-shadow: var(--card-shadow);
-    border: 1px solid rgba(1, 72, 202, 0.06);
+    background: var(--ac-surface);
+    border: 1px solid var(--ac-line);
+    border-radius: 14px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
     overflow: hidden;
-    max-width: 700px;
+    max-width: 720px;
     margin: 0 auto;
-    transition: var(--transition);
-}
-
-.success-card:hover {
-    box-shadow: 0 20px 60px rgba(10, 43, 78, 0.12);
 }
 
 .card-header-success {
-    background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-light) 100%);
-    padding: 2rem 2.5rem;
-    border-bottom: none;
+    background: var(--ac-blue);
+    padding: 2rem 2.25rem 1.75rem;
     text-align: center;
+    color: #ffffff;
 }
 
-.card-header-success .success-icon-wrapper {
-    width: 80px;
-    height: 80px;
-    background: linear-gradient(135deg, var(--accent-teal), #03b898);
+.success-icon-wrapper {
+    width: 56px;
+    height: 56px;
+    background: var(--ac-teal);
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: -4rem auto 1rem;
-    box-shadow: 0 8px 30px rgba(4, 204, 171, 0.35);
+    margin: 0 auto 1rem;
 }
 
-.card-header-success .success-icon-wrapper i {
-    font-size: 2.5rem;
-    color: white;
+.success-icon-wrapper i {
+    font-size: 1.75rem;
+    color: #ffffff;
 }
 
 .card-header-success h2 {
-    color: white;
-    font-weight: 700;
-    font-size: 1.8rem;
-    margin: 0.5rem 0 0.25rem;
+    color: #ffffff;
+    font-weight: 650;
+    font-size: 1.5rem;
+    letter-spacing: -0.015em;
+    margin: 0 0 0.35rem;
 }
 
 .card-header-success p {
-    color: rgba(255,255,255,0.8);
+    color: rgba(255, 255, 255, 0.78);
     margin: 0;
-    font-size: 1rem;
+    font-size: 0.9rem;
 }
 
 .card-body-success {
-    padding: 2.5rem;
+    padding: 1.75rem 2.25rem 2rem;
 }
 
-/* ===== REFERENCE NUMBER ===== */
+/* ---------- Reference number ---------- */
+
 .ref-number {
-    background: linear-gradient(135deg, #f0f7ff, #fafcff);
-    border-radius: 16px;
-    padding: 1.25rem;
+    background: var(--ac-blue-soft);
+    border: 1px dashed #c7d8f4;
+    border-radius: 12px;
+    padding: 1.1rem;
     text-align: center;
-    border: 2px dashed #dbeafe;
     margin-bottom: 1.5rem;
 }
 
 .ref-number .label {
-    color: #64748b;
-    font-size: 0.8rem;
+    display: block;
+    color: var(--ac-muted);
+    font-size: 0.72rem;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.35rem;
 }
 
 .ref-number .number {
-    font-size: 1.8rem;
-    font-weight: 800;
-    color: var(--accent-blue);
-    letter-spacing: 1px;
-    font-family: 'Courier New', monospace;
+    display: inline-block;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--ac-blue);
+    letter-spacing: 0.04em;
+    font-family: var(--ac-mono);
+    overflow-wrap: anywhere;
 }
 
-.ref-number .copy-btn {
-    background: transparent;
-    border: none;
-    color: var(--accent-blue);
+.copy-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-left: 0.5rem;
+    padding: 0.35rem 0.7rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--ac-blue);
+    background: var(--ac-surface);
+    border: 1px solid #c7d8f4;
+    border-radius: 7px;
     cursor: pointer;
-    font-size: 0.9rem;
-    padding: 0.25rem 0.75rem;
-    border-radius: 8px;
-    transition: var(--transition);
+    vertical-align: middle;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
-.ref-number .copy-btn:hover {
-    background: #dbeafe;
+.copy-btn:hover { background: #ffffff; border-color: var(--ac-blue); }
+
+/* ---------- Screenshot reminder ---------- */
+
+.screenshot-reminder {
+    display: flex;
+    gap: 0.85rem;
+    padding: 1rem 1.1rem;
+    margin-bottom: 1.5rem;
+    background: #fff8e6;
+    border: 1px solid #fde68a;
+    border-radius: 12px;
+    color: #78350f;
 }
 
-/* ===== DETAILS GRID ===== */
+.screenshot-reminder i {
+    font-size: 1.15rem;
+    color: #b45309;
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+}
+
+.screenshot-reminder strong {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #78350f;
+    margin-bottom: 0.2rem;
+}
+
+.screenshot-reminder p {
+    margin: 0;
+    font-size: 0.83rem;
+    line-height: 1.55;
+    color: #92400e;
+}
+
+.screenshot-reminder .ref-inline {
+    font-family: var(--ac-mono);
+    font-weight: 700;
+    color: #78350f;
+    background: #fef3c7;
+    border-radius: 4px;
+    padding: 0.05rem 0.35rem;
+}
+
+/* ---------- Details grid ---------- */
+
 .details-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -159,354 +194,386 @@
 }
 
 .detail-item {
-    background: #f8faff;
-    border-radius: 12px;
+    background: var(--ac-line-soft);
+    border: 1px solid var(--ac-line);
+    border-radius: 10px;
     padding: 0.75rem 1rem;
-    border: 1px solid #eef2f7;
+    min-width: 0;
 }
 
 .detail-item .label {
-    font-size: 0.7rem;
-    color: #64748b;
+    display: block;
+    font-size: 0.68rem;
+    color: var(--ac-muted);
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    display: block;
+    letter-spacing: 0.06em;
+    margin-bottom: 0.2rem;
 }
+
+.detail-item .label i { color: var(--ac-blue); }
 
 .detail-item .value {
-    font-weight: 700;
-    color: var(--primary-blue);
-    font-size: 0.95rem;
-    margin-top: 0.15rem;
+    font-weight: 600;
+    color: var(--ac-ink);
+    font-size: 0.9rem;
+    overflow-wrap: anywhere;
 }
 
-/* ===== PAYMENT STATUS BADGE ===== */
+/* ---------- Payment badge ---------- */
+
 .payment-badge {
-    display: inline-block;
-    background: linear-gradient(135deg, var(--accent-teal), #03b898);
-    color: white;
-    padding: 0.3rem 1.2rem;
-    border-radius: 30px;
-    font-size: 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.28rem 0.85rem;
+    font-size: 0.78rem;
     font-weight: 700;
-    letter-spacing: 0.5px;
+    color: var(--ac-teal);
+    background: var(--ac-teal-soft);
+    border: 1px solid #a7f3d0;
+    border-radius: 999px;
 }
 
-/* ===== SERVICES LIST ===== */
+.payment-badge i { font-size: 0.8em; }
+
+/* ---------- Services ---------- */
+
 .services-list {
-    background: #f8faff;
-    border-radius: 12px;
-    padding: 1rem 1.25rem;
-    border: 1px solid #eef2f7;
+    background: var(--ac-line-soft);
+    border: 1px solid var(--ac-line);
+    border-radius: 10px;
+    padding: 1rem 1.15rem;
     margin-bottom: 1.5rem;
 }
 
 .services-list .label {
-    font-size: 0.7rem;
-    color: #64748b;
+    display: block;
+    font-size: 0.68rem;
+    color: var(--ac-muted);
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    display: block;
-    margin-bottom: 0.5rem;
+    letter-spacing: 0.06em;
+    margin-bottom: 0.55rem;
 }
+
+.services-list .label i { color: var(--ac-blue); }
 
 .services-list .tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: 0.4rem;
 }
 
 .services-list .tag {
-    background: #ffffff;
-    border: 1px solid #dbeafe;
-    padding: 0.25rem 0.75rem;
-    border-radius: 30px;
-    font-size: 0.8rem;
-    color: var(--primary-blue);
+    background: var(--ac-surface);
+    border: 1px solid #d8e2f2;
+    padding: 0.2rem 0.65rem;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    color: var(--ac-blue);
     font-weight: 500;
 }
 
-/* ===== BUTTONS ===== */
-.btn-primary-custom {
-    background: linear-gradient(135deg, var(--accent-blue), #0037a0);
-    border: none;
-    color: white;
-    padding: 0.75rem 2rem;
-    border-radius: 12px;
-    font-weight: 600;
-    font-size: 1rem;
-    transition: var(--transition);
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.btn-primary-custom:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(1, 72, 202, 0.3);
-    color: white;
-}
-
-.btn-outline-custom {
-    background: transparent;
-    border: 2px solid #e2e8f0;
-    color: #64748b;
-    padding: 0.75rem 2rem;
-    border-radius: 12px;
-    font-weight: 600;
-    font-size: 1rem;
-    transition: var(--transition);
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.btn-outline-custom:hover {
-    border-color: var(--primary-blue);
-    color: var(--primary-blue);
-    background: #f8faff;
-}
+/* ---------- Buttons ---------- */
 
 .btn-group-success {
     display: flex;
-    gap: 1rem;
+    gap: 0.6rem;
     justify-content: center;
     flex-wrap: wrap;
     margin-top: 1.5rem;
 }
 
-/* ===== PRINT STYLES ===== */
+.btn-primary-custom,
+.btn-outline-custom {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    padding: 0.7rem 1.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    border-radius: 9px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.btn-primary-custom {
+    background: var(--ac-blue);
+    color: #ffffff;
+    border: 1px solid var(--ac-blue);
+}
+
+.btn-primary-custom:hover {
+    background: #08223d;
+    border-color: #08223d;
+    color: #ffffff;
+    text-decoration: none;
+}
+
+.btn-outline-custom {
+    background: var(--ac-surface);
+    color: var(--ac-text);
+    border: 1px solid var(--ac-line);
+}
+
+.btn-outline-custom:hover {
+    background: var(--ac-line-soft);
+    border-color: #cbd5e1;
+    color: var(--ac-ink);
+    text-decoration: none;
+}
+
+/* ---------- Footer note ---------- */
+
+.help-note {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--ac-line-soft);
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--ac-muted);
+    line-height: 1.6;
+}
+
+.help-note strong { color: var(--ac-ink); }
+
+/* ---------- Print ---------- */
+
 @media print {
-    .navbar,
+    .success-page { background: #ffffff; padding: 0; }
+
     .btn-group-success,
-    .footer {
-        display: none !important;
-    }
+    .copy-btn,
+    .footer { display: none !important; }
+
     .success-card {
-        box-shadow: none !important;
-        border: 1px solid #ddd !important;
+        box-shadow: none;
+        border: 1px solid #cbd5e1;
+        border-radius: 0;
+        max-width: 100%;
+    }
+
+    .screenshot-reminder {
+        background: #ffffff;
+        border-style: solid;
     }
 }
 
-/* ===== RESPONSIVE ===== */
+/* ---------- Responsive ---------- */
+
 @media (max-width: 768px) {
-    .card-header-success {
-        padding: 1.5rem;
-    }
-    
-    .card-body-success {
-        padding: 1.5rem;
-    }
-    
-    .details-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    .ref-number .number {
-        font-size: 1.3rem;
-    }
-    
-    .btn-group-success {
-        flex-direction: column;
-        align-items: center;
-    }
-    
-    .btn-group-success .btn {
-        width: 100%;
-        justify-content: center;
-    }
+    .success-page { padding: 1.5rem 0 2.5rem; }
+
+    .card-header-success { padding: 1.5rem 1.25rem 1.25rem; }
+
+    .card-body-success { padding: 1.25rem 1.25rem 1.5rem; }
+
+    .details-grid { grid-template-columns: 1fr; }
+
+    .ref-number .number { font-size: 1.2rem; }
+
+    .copy-btn { margin-left: 0; margin-top: 0.5rem; display: block; width: fit-content; }
+
+    .btn-group-success { flex-direction: column; align-items: stretch; }
+
+    .btn-group-success .btn-primary-custom,
+    .btn-group-success .btn-outline-custom { width: 100%; }
 }
 
-@media (max-width: 480px) {
-    .card-header-success .success-icon-wrapper {
-        width: 60px;
-        height: 60px;
-    }
-    
-    .card-header-success .success-icon-wrapper i {
-        font-size: 1.8rem;
-    }
-    
-    .card-header-success h2 {
-        font-size: 1.3rem;
-    }
+@media (prefers-reduced-motion: reduce) {
+    .success-page * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
 </style>
-
-<!-- ===== CONFETTI ANIMATION ===== -->
-<div class="confetti-container" id="confettiContainer"></div>
 
 <!-- ===== SUCCESS PAGE ===== -->
 <section class="success-page">
     <div class="container">
-        
-        <!-- ===== SUCCESS CARD ===== -->
+
         <div class="success-card">
+
             <div class="card-header-success">
-                <div class="success-icon-wrapper">
+                <div class="success-icon-wrapper" aria-hidden="true">
                     <i class="bi bi-check-lg"></i>
                 </div>
-                <h2>Appointment Confirmed!</h2>
-                <p>Your appointment has been successfully booked</p>
+                <h2>Appointment confirmed</h2>
+                <p>Your appointment has been successfully booked.</p>
             </div>
-            
+
             <div class="card-body-success">
-                
-                <!-- Reference Number -->
+
+                <!-- Reference number -->
                 <div class="ref-number">
-                    <span class="label">Reference Number</span>
-                    <div>
-                        <span class="number" id="refNumber"><?= $reference ?? 'CP-2026-000-000' ?></span>
-                        <button class="copy-btn" onclick="copyReference()" title="Copy Reference Number">
-                            <i class="bi bi-copy"></i> Copy
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- Appointment Details -->
-                <?php if (isset($appointment)): ?>
-                <div class="details-grid">
-                    <div class="detail-item">
-                        <span class="label"><i class="bi bi-calendar3 me-1"></i> Date</span>
-                        <span class="value"><?= $appointment['appointment_date'] ?? 'N/A' ?></span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="label"><i class="bi bi-clock me-1"></i> Time</span>
-                        <span class="value"><?= $appointment['appointment_time'] ?? 'N/A' ?></span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="label"><i class="bi bi-person me-1"></i> Patient</span>
-                        <span class="value"><?= $appointment['full_name'] ?? 'N/A' ?></span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="label"><i class="bi bi-gender-ambiguous me-1"></i> Age / Gender</span>
-                        <span class="value"><?= ($appointment['age'] ?? 'N/A') . ' yrs, ' . ($appointment['gender'] ?? 'N/A') ?></span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="label"><i class="bi bi-envelope me-1"></i> Email</span>
-                        <span class="value" style="font-size: 0.85rem;"><?= $appointment['email'] ?? 'N/A' ?></span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="label"><i class="bi bi-phone me-1"></i> Phone</span>
-                        <span class="value"><?= $appointment['phone'] ?? 'N/A' ?></span>
-                    </div>
-                    <div class="detail-item" style="grid-column: 1 / -1; text-align: center; background: linear-gradient(135deg, #f0fdf4, #f0f7ff);">
-                        <span class="label"><i class="bi bi-credit-card me-1"></i> Payment Status</span>
-                        <span class="value">
-                            <span class="payment-badge">✅ Booking Confirmed</span>
-                        </span>
-                    </div>
-                </div>
-                
-                <!-- Services -->
-                <?php 
-                $services = [];
-                if (isset($appointment['lab_services']) && is_array($appointment['lab_services'])) {
-                    $services = array_merge($services, $appointment['lab_services']);
-                }
-                if (isset($appointment['xray_services']) && is_array($appointment['xray_services'])) {
-                    $services = array_merge($services, $appointment['xray_services']);
-                }
-                ?>
-                
-                <?php if (!empty($services)): ?>
-                <div class="services-list">
-                    <span class="label"><i class="bi bi-clipboard2-pulse me-1"></i> Selected Services</span>
-                    <div class="tags">
-                        <?php foreach ($services as $service): ?>
-                            <span class="tag"><?= esc($service) ?></span>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-                <?php endif; ?>
-                
-                <!-- Other Requests -->
-                <?php if (isset($appointment['other_requests']) && !empty($appointment['other_requests'])): ?>
-                <div class="services-list" style="background: #fff8f0; border-color: #fde8d0;">
-                    <span class="label"><i class="bi bi-clipboard me-1"></i> Other Requests</span>
-                    <p class="mb-0 text-muted" style="font-size: 0.95rem;"><?= esc($appointment['other_requests']) ?></p>
-                </div>
-                <?php endif; ?>
-                
-                <?php else: ?>
-                <div class="alert alert-warning rounded-3">
-                    <i class="bi bi-exclamation-triangle me-2"></i>
-                    No appointment data found. Please contact us for assistance.
-                </div>
-                <?php endif; ?>
-                
-                <!-- Action Buttons -->
-                <div class="btn-group-success">
-                    <a href="/polymedic/public/" class="btn btn-outline-custom btn-lg px-4">
-                        <i class="bi bi-house me-2"></i>Back Home
-                    </a>
-                    <a href="/polymedic/public/index.php/appointment/book" class="btn btn-primary-custom btn-lg px-5">
-                        <i class="bi bi-plus-circle me-2"></i>New Appointment
-                    </a>
-                    <button onclick="window.print()" class="btn btn-outline-secondary btn-lg px-4" style="border-color: #dbeafe; color: var(--primary-blue);">
-                        <i class="bi bi-printer me-2"></i>Print
+                    <span class="label">Reference number</span>
+                    <span class="number" id="refNumber"><?= esc($reference ?? '—') ?></span>
+                    <button type="button" class="copy-btn" onclick="copyReference()" title="Copy reference number">
+                        <i class="bi bi-clipboard" aria-hidden="true"></i>
+                        <span id="copyBtnLabel">Copy</span>
                     </button>
                 </div>
-                
-                <!-- Help Text -->
-                <div class="text-center mt-4">
-                    <p class="text-muted small">
-                        <i class="bi bi-envelope me-1"></i> A confirmation email has been sent to your email address.
-                        <br>
-                        For urgent concerns, please call <strong>(064) 123-4567</strong>
+
+                <!-- Screenshot reminder -->
+                <div class="screenshot-reminder" role="note">
+                    <i class="bi bi-camera" aria-hidden="true"></i>
+                    <div>
+                        <strong>Save this page for your reference.</strong>
+                        <p>
+                            Take a screenshot of this page, or write down the reference number
+                            <span class="ref-inline"><?= esc($reference ?? '—') ?></span>.
+                            You will need it when you arrive at the clinic and if you contact us about this booking.
+                        </p>
+                    </div>
+                </div>
+
+                <?php if (isset($appointment) && is_array($appointment)): ?>
+
+                    <div class="details-grid">
+                        <div class="detail-item">
+                            <span class="label"><i class="bi bi-calendar3" aria-hidden="true"></i> Date</span>
+                            <span class="value"><?= esc($appointment['appointment_date'] ?? 'N/A') ?></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="label"><i class="bi bi-clock" aria-hidden="true"></i> Time</span>
+                            <span class="value"><?= esc($appointment['appointment_time'] ?? 'N/A') ?></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="label"><i class="bi bi-person" aria-hidden="true"></i> Patient</span>
+                            <span class="value"><?= esc($appointment['full_name'] ?? 'N/A') ?></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="label"><i class="bi bi-gender-ambiguous" aria-hidden="true"></i> Age / sex</span>
+                            <span class="value"><?= esc(($appointment['age'] ?? 'N/A') . ' yrs, ' . ($appointment['gender'] ?? 'N/A')) ?></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="label"><i class="bi bi-envelope" aria-hidden="true"></i> Email</span>
+                            <span class="value" style="font-size: 0.85rem;"><?= esc($appointment['email'] ?? 'N/A') ?></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="label"><i class="bi bi-telephone" aria-hidden="true"></i> Phone</span>
+                            <span class="value"><?= esc($appointment['phone'] ?? 'N/A') ?></span>
+                        </div>
+                        <div class="detail-item" style="grid-column: 1 / -1; text-align: center;">
+                            <span class="label"><i class="bi bi-credit-card" aria-hidden="true"></i> Payment status</span>
+                            <span class="value">
+                                <span class="payment-badge">
+                                    <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+                                    Booking confirmed
+                                </span>
+                            </span>
+                        </div>
+                    </div>
+
+                    <?php
+                    $services = [];
+
+                    if (!empty($appointment['lab_services']) && is_array($appointment['lab_services'])) {
+                        $services = array_merge($services, $appointment['lab_services']);
+                    }
+                    if (!empty($appointment['xray_services']) && is_array($appointment['xray_services'])) {
+                        $services = array_merge($services, $appointment['xray_services']);
+                    }
+                    ?>
+
+                    <?php if (!empty($services)): ?>
+                        <div class="services-list">
+                            <span class="label"><i class="bi bi-clipboard2-pulse" aria-hidden="true"></i> Selected services</span>
+                            <div class="tags">
+                                <?php foreach ($services as $service): ?>
+                                    <span class="tag"><?= esc($service) ?></span>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+
+                    <?php if (!empty($appointment['other_requests'])): ?>
+                        <div class="services-list" style="background: #fff8f0; border-color: #fde8d0;">
+                            <span class="label"><i class="bi bi-clipboard" aria-hidden="true"></i> Other requests</span>
+                            <p class="mb-0" style="font-size: 0.9rem; color: #92400e; margin: 0;">
+                                <?= esc($appointment['other_requests']) ?>
+                            </p>
+                        </div>
+                    <?php endif; ?>
+
+                <?php else: ?>
+                    <div class="alert alert-warning rounded-3">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        No appointment data found. Please contact us for assistance.
+                    </div>
+                <?php endif; ?>
+
+                <div class="btn-group-success">
+                    <a href="<?= base_url('/') ?>" class="btn-outline-custom">
+                        <i class="bi bi-house" aria-hidden="true"></i>
+                        Back home
+                    </a>
+                    <a href="<?= base_url('appointment/book') ?>" class="btn-primary-custom">
+                        <i class="bi bi-plus-circle" aria-hidden="true"></i>
+                        New appointment
+                    </a>
+                    <button type="button" onclick="window.print()" class="btn-outline-custom">
+                        <i class="bi bi-printer" aria-hidden="true"></i>
+                        Print
+                    </button>
+                </div>
+
+                <div class="help-note">
+                    <?php if ($emailSent): ?>
+                        <p style="margin: 0 0 0.35rem;">
+                            <i class="bi bi-envelope" aria-hidden="true"></i>
+                            A confirmation email has been sent to your email address.
+                        </p>
+                    <?php endif; ?>
+                    <p style="margin: 0;">
+                        For urgent concerns, please contact the clinic using the number listed on our website.
                     </p>
                 </div>
+
             </div>
         </div>
-        
+
     </div>
 </section>
 
 <footer class="py-2 bg-dark text-white footer">
     <div class="container px-5">
-        <p class="text-center mb-0">&copy; 2026 PolyMedic. All rights reserved.</p>
+        <p class="text-center mb-0">&copy; <?= date('Y') ?> PolyMedic. All rights reserved.</p>
     </div>
 </footer>
 
 <script>
-// ===== CONFETTI ANIMATION =====
-document.addEventListener('DOMContentLoaded', function() {
-    const colors = ['#04ccab', '#0148ca', '#ff6b6b', '#ffd93d', '#6c5ce7', '#00b894', '#fdcb6e', '#e17055'];
-    const container = document.getElementById('confettiContainer');
-    
-    for (let i = 0; i < 50; i++) {
-        const confetti = document.createElement('div');
-        confetti.className = 'confetti';
-        confetti.style.left = Math.random() * 100 + '%';
-        confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
-        confetti.style.width = (Math.random() * 8 + 4) + 'px';
-        confetti.style.height = (Math.random() * 8 + 4) + 'px';
-        confetti.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
-        confetti.style.animationDuration = (Math.random() * 2 + 2) + 's';
-        confetti.style.animationDelay = (Math.random() * 2) + 's';
-        container.appendChild(confetti);
-    }
-    
-    // Remove confetti after animation
-    setTimeout(function() {
-        container.style.display = 'none';
-    }, 5000);
-});
+(function () {
+    'use strict';
 
-// ===== COPY REFERENCE NUMBER =====
-function copyReference() {
-    const refNumber = document.getElementById('refNumber').textContent;
-    navigator.clipboard.writeText(refNumber).then(function() {
-        const btn = document.querySelector('.copy-btn');
-        const originalText = btn.innerHTML;
-        btn.innerHTML = '<i class="bi bi-check"></i> Copied!';
-        setTimeout(function() {
-            btn.innerHTML = originalText;
-        }, 2000);
-    });
-}
+    /* Copy the reference number. Falls back to a manual-selection
+       dialog on browsers where the Clipboard API is unavailable
+       (older Safari, or when the page is served over plain HTTP). */
+    window.copyReference = function () {
+        var el = document.getElementById('refNumber');
+        var label = document.getElementById('copyBtnLabel');
+
+        if (!el) { return; }
+
+        var text = el.textContent.trim();
+
+        function showCopied() {
+            if (!label) { return; }
+            var original = label.textContent;
+            label.textContent = 'Copied';
+            window.setTimeout(function () { label.textContent = original; }, 2000);
+        }
+
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text).then(showCopied).catch(function () {
+                window.prompt('Copy the reference number below.', text);
+            });
+            return;
+        }
+
+        window.prompt('Copy the reference number below.', text);
+    };
+})();
 </script>
 
 <?= $this->endSection() ?>

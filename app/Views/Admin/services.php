@@ -5,125 +5,151 @@
 <?= $this->section('adminContent') ?>
 
 <div class="services-container">
-    <!-- Header -->
-    <div class="page-header">
-        <div>
-            <h4 class="page-title">Service Management</h4>
-            <p class="page-subtitle">Manage laboratory and X-Ray services</p>
+    <!-- ===== STATS CARDS ROW ===== -->
+    <div class="stats-cards-row">
+        
+        <!-- Laboratory -->
+        <div class="stat-card-simple">
+            <div class="stat-card-top">
+                <span class="stat-card-icon lab-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 3h6"></path>
+                        <path d="M10 3v6.5L4.5 18a2 2 0 0 0 1.8 3h11.4a2 2 0 0 0 1.8-3L14 9.5V3"></path>
+                    </svg>
+                </span>
+                <span class="stat-card-badge"><?= $lab_count ?? 0 ?></span>
+            </div>
+            <div class="stat-card-number"><?= $lab_count ?? 0 ?></div>
+            <div class="stat-card-title">Laboratory</div>
+            <div class="stat-card-sub">Active services</div>
         </div>
-        <button class="btn btn-primary-custom" data-bs-toggle="modal" data-bs-target="#addServiceModal">
-            <i class="bi bi-plus-circle me-2"></i>Add New Service
+
+        <!-- X-Ray -->
+        <div class="stat-card-simple">
+            <div class="stat-card-top">
+                <span class="stat-card-icon xray-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M12 6v6l4 2"></path>
+                    </svg>
+                </span>
+                <span class="stat-card-badge"><?= $xray_count ?? 0 ?></span>
+            </div>
+            <div class="stat-card-number"><?= $xray_count ?? 0 ?></div>
+            <div class="stat-card-title">X-Ray</div>
+            <div class="stat-card-sub">Active services</div>
+        </div>
+
+        <!-- Other -->
+        <div class="stat-card-simple">
+            <div class="stat-card-top">
+                <span class="stat-card-icon other-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="1"></circle>
+                        <circle cx="12" cy="5" r="1"></circle>
+                        <circle cx="12" cy="19" r="1"></circle>
+                    </svg>
+                </span>
+                <span class="stat-card-badge"><?= $other_count ?? 0 ?></span>
+            </div>
+            <div class="stat-card-number"><?= $other_count ?? 0 ?></div>
+            <div class="stat-card-title">Other</div>
+            <div class="stat-card-sub">Active services</div>
+        </div>
+
+        <!-- Total Services -->
+        <div class="stat-card-simple">
+            <div class="stat-card-top">
+                <span class="stat-card-icon total-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 11l3 3L22 4"></path>
+                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                    </svg>
+                </span>
+                <span class="stat-card-badge"><?= $total ?? 0 ?></span>
+            </div>
+            <div class="stat-card-number"><?= $total ?? 0 ?></div>
+            <div class="stat-card-title">Total Services</div>
+            <div class="stat-card-sub">All categories</div>
+        </div>
+    </div>
+
+    <!-- ===== FILTER TABS ===== -->
+    <div class="filter-tabs-row">
+        <button class="filter-tab active" data-filter="all">
+            All <span class="tab-count"><?= $total ?? 0 ?></span>
+        </button>
+        <button class="filter-tab" data-filter="laboratory">
+            Laboratory <span class="tab-count"><?= $lab_count ?? 0 ?></span>
+        </button>
+        <button class="filter-tab" data-filter="xray">
+            X-Ray <span class="tab-count"><?= $xray_count ?? 0 ?></span>
+        </button>
+        <button class="filter-tab" data-filter="other">
+            Other <span class="tab-count"><?= $other_count ?? 0 ?></span>
         </button>
     </div>
 
-    <!-- Stats -->
-    <div class="stats-row">
-        <div class="stat-mini">
-            <span class="stat-mini-icon lab"><i class="bi bi-droplet"></i></span>
-            <div>
-                <span class="stat-mini-number"><?= $lab_count ?? 0 ?></span>
-                <span class="stat-mini-label">Laboratory</span>
-            </div>
-        </div>
-        <div class="stat-mini">
-            <span class="stat-mini-icon xray"><i class="bi bi-x-ray"></i></span>
-            <div>
-                <span class="stat-mini-number"><?= $xray_count ?? 0 ?></span>
-                <span class="stat-mini-label">X-Ray</span>
-            </div>
-        </div>
-        <div class="stat-mini">
-            <span class="stat-mini-icon other"><i class="bi bi-file-medical"></i></span>
-            <div>
-                <span class="stat-mini-number"><?= $other_count ?? 0 ?></span>
-                <span class="stat-mini-label">Other</span>
-            </div>
-        </div>
-        <div class="stat-mini">
-            <span class="stat-mini-icon total"><i class="bi bi-grid-3x3-gap-fill"></i></span>
-            <div>
-                <span class="stat-mini-number"><?= $total ?? 0 ?></span>
-                <span class="stat-mini-label">Total Services</span>
-            </div>
+    <!-- ===== SEARCH BAR ===== -->
+    <div class="search-container">
+        <div class="search-box">
+            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" class="search-input" placeholder="Search services by name or code..." id="searchServices">
         </div>
     </div>
 
-    <!-- Success/Error Messages -->
-    <?php if (session()->getFlashdata('success')): ?>
-        <div class="alert alert-success alert-dismissible fade show">
-            <i class="bi bi-check-circle me-2"></i><?= session()->getFlashdata('success') ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    <?php endif; ?>
-
-    <?php if (session()->getFlashdata('error')): ?>
-        <div class="alert alert-danger alert-dismissible fade show">
-            <i class="bi bi-exclamation-circle me-2"></i><?= session()->getFlashdata('error') ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    <?php endif; ?>
-
-    <?php if (session()->getFlashdata('errors')): ?>
-        <div class="alert alert-danger alert-dismissible fade show">
-            <ul class="mb-0">
-                <?php foreach (session()->getFlashdata('errors') as $error): ?>
-                    <li><?= $error ?></li>
-                <?php endforeach; ?>
-            </ul>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    <?php endif; ?>
-
-    <!-- Filter Tabs -->
-    <div class="filter-tabs">
-        <button class="filter-tab active" data-filter="all">All (<?= $total ?? 0 ?>)</button>
-        <button class="filter-tab" data-filter="laboratory">Laboratory (<?= $lab_count ?? 0 ?>)</button>
-        <button class="filter-tab" data-filter="xray">X-Ray (<?= $xray_count ?? 0 ?>)</button>
-        <button class="filter-tab" data-filter="other">Other (<?= $other_count ?? 0 ?>)</button>
-    </div>
-
-    <!-- Services Table -->
-    <div class="table-card">
-        <div class="table-toolbar">
-            <div class="search-wrapper">
-                <i class="bi bi-search"></i>
-                <input type="text" class="form-control" placeholder="Search services..." id="searchServices">
-            </div>
-        </div>
-        
-        <div class="table-responsive">
-            <table class="table service-table" id="servicesTable">
-                <thead>
-                    <tr>
-                        <th>Code</th>
-                        <th>Service Name</th>
-                        <th>Category</th>
-                        <th>Price (₱)</th>
-                        <th>Status</th>
-                        <th>Created</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (!empty($services)): ?>
-                        <?php foreach ($services as $service): ?>
-                            <tr data-category="<?= $service['category'] ?>">
-                                <td><code><?= esc($service['service_code']) ?></code></td>
-                                <td><?= esc($service['service_name']) ?></td>
-                                <td>
-                                    <span class="category-badge <?= $service['category'] ?>">
-                                        <?= ucfirst($service['category']) ?>
+    <!-- ===== TABLE ===== -->
+    <div class="table-container">
+        <table class="service-table" id="servicesTable">
+            <thead>
+                <tr>
+                    <th>CODE</th>
+                    <th>SERVICE NAME</th>
+                    <th>CATEGORY</th>
+                    <th>PRICE (₱)</th>
+                    <th>STATUS</th>
+                    <th>CREATED</th>
+                    <th>ACTIONS</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (!empty($services)): ?>
+                    <?php foreach ($services as $service): ?>
+                        <tr data-category="<?= $service['category'] ?>">
+                            <td>
+                                <span class="code-badge"><?= esc($service['service_code']) ?></span>
+                            </td>
+                            <td>
+                                <div class="service-name-cell">
+                                    <span class="service-name-icon">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0D9488" stroke-width="2">
+                                            <path d="M9 3h6"></path>
+                                            <path d="M10 3v6.5L4.5 18a2 2 0 0 0 1.8 3h11.4a2 2 0 0 0 1.8-3L14 9.5V3"></path>
+                                        </svg>
                                     </span>
-                                </td>
-                                <td><strong>₱<?= number_format($service['charge'] ?? 0, 2) ?></strong></td>
-                                <td>
-                                    <span class="status-badge <?= $service['is_active'] ? 'active' : 'inactive' ?>">
-                                        <?= $service['is_active'] ? 'Active' : 'Inactive' ?>
-                                    </span>
-                                </td>
-                                <td><?= date('M d, Y', strtotime($service['created_at'])) ?></td>
-                                <td>
-                                    <button class="action-icon edit-service" 
+                                    <?= esc($service['service_name']) ?>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="category-badge <?= $service['category'] ?>">
+                                    <?= ucfirst($service['category']) ?>
+                                </span>
+                            </td>
+                            <td class="price-cell">
+                                <strong>₱<?= number_format($service['charge'] ?? 0, 2) ?></strong>
+                            </td>
+                            <td>
+                                <span class="status-badge <?= $service['is_active'] ? 'active' : 'inactive' ?>">
+                                    <?= $service['is_active'] ? 'Active' : 'Inactive' ?>
+                                </span>
+                            </td>
+                            <td class="date-cell"><?= date('M d, Y', strtotime($service['created_at'])) ?></td>
+                            <td>
+                                <div class="action-buttons">
+                                    <button class="action-btn edit-service" 
                                             data-id="<?= $service['id'] ?>"
                                             data-code="<?= esc($service['service_code']) ?>"
                                             data-name="<?= esc($service['service_name']) ?>"
@@ -132,32 +158,69 @@
                                             data-charge="<?= $service['charge'] ?? 0 ?>"
                                             data-active="<?= $service['is_active'] ?>"
                                             data-bs-toggle="modal" 
-                                            data-bs-target="#editServiceModal">
-                                        <i class="bi bi-pencil"></i>
+                                            data-bs-target="#editServiceModal" title="Edit">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+                                        </svg>
                                     </button>
                                     <a href="<?= base_url('admin/services/toggle/' . $service['id']) ?>" 
-                                       class="action-icon" 
+                                       class="action-btn" 
                                        title="<?= $service['is_active'] ? 'Deactivate' : 'Activate' ?>">
-                                        <i class="bi bi-<?= $service['is_active'] ? 'lock' : 'unlock' ?>"></i>
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                        </svg>
                                     </a>
-                                    <a href="<?= base_url('admin/services/delete/' . $service['id']) ?>" 
-                                       class="action-icon text-danger" 
-                                       onclick="return confirm('Delete this service?')">
-                                        <i class="bi bi-trash3"></i>
-                                    </a>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <tr>
-                            <td colspan="7" class="text-center py-4 text-muted">
-                                <i class="bi bi-inbox fs-2 d-block mb-2"></i>
-                                No services found
+                                    <button class="action-btn" title="More">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <circle cx="12" cy="12" r="1"></circle>
+                                            <circle cx="19" cy="12" r="1"></circle>
+                                            <circle cx="5" cy="12" r="1"></circle>
+                                        </svg>
+                                    </button>
+                                </div>
                             </td>
                         </tr>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-muted">
+                            <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+                            No services found
+                        </td>
+                    </tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+        
+        <!-- ===== PAGINATION ===== -->
+        <div class="pagination-row">
+            <span class="showing-text">Showing <?= $startRow ?? 1 ?> to <?= $endRow ?? 0 ?> of <?= $total ?? 0 ?> services</span>
+            <div class="pagination-controls">
+                <?php if ($currentPage > 1): ?>
+                    <a href="<?= base_url('admin/services?page=' . ($currentPage - 1)) ?>" class="page-btn"><i class="bi bi-chevron-left"></i></a>
+                <?php else: ?>
+                    <span class="page-btn disabled"><i class="bi bi-chevron-left"></i></span>
+                <?php endif; ?>
+                
+                <?php for ($i = 1; $i <= $totalPages; $i++): ?>
+                    <?php if ($i == $currentPage): ?>
+                        <span class="page-btn active"><?= $i ?></span>
+                    <?php elseif ($i <= 3 || $i > $totalPages - 3 || abs($i - $currentPage) <= 1): ?>
+                        <a href="<?= base_url('admin/services?page=' . $i) ?>" class="page-btn"><?= $i ?></a>
+                    <?php elseif ($i == 4 && $currentPage > 5): ?>
+                        <span class="page-btn dots">...</span>
+                    <?php elseif ($i == $totalPages - 3 && $currentPage < $totalPages - 4): ?>
+                        <span class="page-btn dots">...</span>
                     <?php endif; ?>
-                </tbody>
-            </table>
+                <?php endfor; ?>
+                
+                <?php if ($currentPage < $totalPages): ?>
+                    <a href="<?= base_url('admin/services?page=' . ($currentPage + 1)) ?>" class="page-btn"><i class="bi bi-chevron-right"></i></a>
+                <?php else: ?>
+                    <span class="page-btn disabled"><i class="bi bi-chevron-right"></i></span>
+                <?php endif; ?>
+            </div>
         </div>
     </div>
 </div>
@@ -175,7 +238,6 @@
                     <div class="mb-3">
                         <label class="form-label">Service Code *</label>
                         <input type="text" class="form-control" name="service_code" placeholder="e.g., LAB-CBC" required>
-                        <small class="text-muted">Unique identifier for the service</small>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Service Name *</label>
@@ -192,7 +254,7 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Description</label>
-                        <textarea class="form-control" name="description" rows="2" placeholder="Brief description of the service"></textarea>
+                        <textarea class="form-control" name="description" rows="2"></textarea>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Price (₱)</label>
@@ -268,292 +330,492 @@
 </div>
 
 <style>
-/* ===== PAGE HEADER ===== */
+/* ============================================
+   SERVICE MANAGEMENT - EXACT MATCH DESIGN
+   ============================================ */
+
+.services-container {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #F8FAFC;
+    padding: 24px;
+    min-height: 100vh;
+}
+
+/* ===== HEADER ===== */
 .page-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1.5rem;
+    margin-bottom: 24px;
+}
+
+.header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
 
 .page-title {
+    font-size: 1.5rem;
     font-weight: 700;
-    color: #0a2b4e;
+    color: #0D9488;
     margin: 0;
-    font-size: 1.3rem;
+    letter-spacing: -0.02em;
 }
 
-.page-subtitle {
-    color: #64748b;
+.header-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     font-size: 0.85rem;
-    margin: 0;
+    color: #64748B;
 }
 
-.btn-primary-custom {
-    background: linear-gradient(135deg, #0148ca, #0037a0);
+.header-meta i {
+    margin-right: 4px;
+    color: #94A3B8;
+}
+
+.meta-separator {
+    color: #CBD5E1;
+}
+
+.btn-add-service {
+    background: #0D9488;
     border: none;
     color: white;
-    padding: 0.6rem 1.5rem;
+    padding: 10px 20px;
     border-radius: 10px;
     font-weight: 600;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-add-service:hover {
+    background: #0F766E;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(13, 148, 136, 0.3);
+}
+
+/* ===== STATS CARDS ROW ===== */
+.stats-cards-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.stat-card-simple {
+    background: #FFFFFF;
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    border: 1px solid #F1F5F9;
     transition: all 0.3s ease;
 }
 
-.btn-primary-custom:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(1, 72, 202, 0.3);
-    color: white;
+.stat-card-simple:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
 }
 
-/* ===== STATS ROW ===== */
-.stats-row {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-}
-
-.stat-mini {
-    background: #ffffff;
-    border-radius: 12px;
-    padding: 1rem 1.25rem;
+.stat-card-top {
     display: flex;
+    justify-content: space-between;
     align-items: center;
-    gap: 1rem;
-    box-shadow: 0 2px 12px rgba(10, 43, 78, 0.06);
-    border: 1px solid rgba(1, 72, 202, 0.04);
+    margin-bottom: 16px;
 }
 
-.stat-mini-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
+.stat-card-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.1rem;
-    flex-shrink: 0;
 }
 
-.stat-mini-icon.lab { background: #e8f5e9; color: #28a745; }
-.stat-mini-icon.xray { background: #f3e5f5; color: #7b1fa2; }
-.stat-mini-icon.other { background: #fff3e0; color: #e65100; }
-.stat-mini-icon.total { background: #e3f2fd; color: #0148ca; }
+.lab-icon { background: #E6F7F7; color: #0D9488; }
+.xray-icon { background: #FFF4E5; color: #F59E0B; }
+.other-icon { background: #F0EBFE; color: #8B5CF6; }
+.total-icon { background: #E6F7F7; color: #0D9488; }
 
-.stat-mini-number {
-    font-size: 1.2rem;
-    font-weight: 700;
-    color: #0a2b4e;
-    display: block;
+.stat-card-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: #E6F7F7;
+    color: #0D9488;
+}
+
+.stat-card-simple:nth-child(2) .stat-card-badge { background: #FFF4E5; color: #F59E0B; }
+.stat-card-simple:nth-child(3) .stat-card-badge { background: #F0EBFE; color: #8B5CF6; }
+.stat-card-simple:nth-child(4) .stat-card-badge { background: #E6F7F7; color: #0D9488; }
+
+.stat-card-number {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #1E293B;
     line-height: 1;
+    margin-bottom: 8px;
+    letter-spacing: -0.02em;
 }
 
-.stat-mini-label {
-    font-size: 0.7rem;
-    color: #64748b;
+.stat-card-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #1E293B;
+    margin-bottom: 2px;
+}
+
+.stat-card-sub {
+    font-size: 0.75rem;
+    color: #94A3B8;
 }
 
 /* ===== FILTER TABS ===== */
-.filter-tabs {
+.filter-tabs-row {
     display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1.25rem;
-    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
 }
 
 .filter-tab {
-    padding: 0.3rem 1rem;
+    padding: 8px 16px;
     border-radius: 30px;
-    font-size: 0.78rem;
+    font-size: 0.85rem;
     font-weight: 500;
-    color: #64748b;
-    background: #f0f4ff;
-    border: none;
+    color: #64748B;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
     cursor: pointer;
     transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .filter-tab:hover {
-    background: #e6f0fa;
-    color: #0148ca;
+    border-color: #0D9488;
+    color: #0D9488;
 }
 
 .filter-tab.active {
-    background: #0148ca;
-    color: #fff;
+    background: #0D9488;
+    color: white;
+    border-color: #0D9488;
 }
 
-/* ===== TABLE ===== */
-.table-card {
-    background: #ffffff;
-    border-radius: 14px;
-    padding: 1.5rem;
-    box-shadow: 0 2px 12px rgba(10, 43, 78, 0.06);
-    border: 1px solid rgba(1, 72, 202, 0.04);
+.tab-count {
+    background: rgba(0,0,0,0.05);
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
 }
 
-.table-toolbar {
-    margin-bottom: 1.25rem;
+.filter-tab.active .tab-count {
+    background: rgba(255,255,255,0.2);
 }
 
-.search-wrapper {
+/* ===== SEARCH BAR ===== */
+.search-container {
+    margin-bottom: 20px;
+}
+
+.search-box {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    border: 2px solid #e2e8f0;
-    border-radius: 10px;
-    padding: 0.25rem 0.75rem;
-    max-width: 300px;
+    gap: 10px;
+    background: #FFFFFF;
+    border-radius: 12px;
+    padding: 12px 16px;
+    border: 1px solid #E2E8F0;
     transition: all 0.3s ease;
 }
 
-.search-wrapper:focus-within {
-    border-color: #0148ca;
-    box-shadow: 0 0 0 4px rgba(1, 72, 202, 0.08);
+.search-box:focus-within {
+    border-color: #0D9488;
+    box-shadow: 0 0 0 4px rgba(13, 148, 136, 0.08);
 }
 
-.search-wrapper i {
-    color: #94a3b8;
+.search-icon {
+    color: #94A3B8;
 }
 
-.search-wrapper .form-control {
+.search-input {
+    flex: 1;
     border: none;
-    padding: 0.5rem 0;
+    outline: none;
     font-size: 0.9rem;
+    color: #1E293B;
     background: transparent;
 }
 
-.search-wrapper .form-control:focus {
-    box-shadow: none;
+.search-input::placeholder {
+    color: #94A3B8;
+}
+
+/* ===== TABLE ===== */
+.table-container {
+    background: #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    border: 1px solid #F1F5F9;
+    overflow: hidden;
 }
 
 .service-table {
-    margin: 0;
+    width: 100%;
+    border-collapse: collapse;
 }
 
 .service-table thead th {
     font-size: 0.7rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: #64748b;
+    color: #94A3B8;
     font-weight: 600;
-    border-bottom: 2px solid #f0f4ff;
-    padding: 0.75rem 0.5rem;
+    padding: 16px 20px;
+    border-bottom: 1px solid #F1F5F9;
+    text-align: left;
 }
 
 .service-table tbody td {
-    padding: 0.75rem 0.5rem;
+    padding: 16px 20px;
     vertical-align: middle;
     font-size: 0.85rem;
-    color: #0a2b4e;
-    border-bottom: 1px solid #f0f4ff;
+    color: #1E293B;
+    border-bottom: 1px solid #F1F5F9;
 }
 
 .service-table tbody tr:hover {
-    background: #f8faff;
+    background: #F8FAFC;
+}
+
+.service-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.code-badge {
+    background: #E6F7F7;
+    color: #0D9488;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    font-family: monospace;
+}
+
+.service-name-cell {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 500;
+}
+
+.service-name-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background: #F8FAFC;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
 }
 
 .category-badge {
-    padding: 0.2rem 0.6rem;
-    border-radius: 30px;
-    font-size: 0.65rem;
-    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 500;
 }
 
 .category-badge.laboratory {
-    background: #e8f5e9;
-    color: #28a745;
+    background: #E6F7F7;
+    color: #0D9488;
 }
 
 .category-badge.xray {
-    background: #f3e5f5;
-    color: #7b1fa2;
+    background: #FFF4E5;
+    color: #F59E0B;
 }
 
 .category-badge.other {
-    background: #fff3e0;
-    color: #e65100;
+    background: #F0EBFE;
+    color: #8B5CF6;
+}
+
+.price-cell {
+    font-weight: 600;
+    color: #1E293B;
 }
 
 .status-badge {
-    padding: 0.2rem 0.6rem;
-    border-radius: 30px;
-    font-size: 0.65rem;
-    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 500;
 }
 
 .status-badge.active {
-    background: #e8f5e9;
-    color: #28a745;
+    background: #E6F7F7;
+    color: #0D9488;
 }
 
 .status-badge.inactive {
-    background: #fce4ec;
-    color: #dc3545;
+    background: #FCE7F3;
+    color: #EC4899;
 }
 
-.action-icon {
+.date-cell {
+    color: #64748B;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.action-btn {
     background: transparent;
     border: none;
-    color: #94a3b8;
-    padding: 0.2rem 0.4rem;
+    color: #94A3B8;
+    padding: 6px;
+    border-radius: 6px;
     cursor: pointer;
     transition: all 0.2s ease;
-    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.action-btn:hover {
+    color: #0D9488;
+    background: #E6F7F7;
+}
+
+/* ===== PAGINATION ===== */
+.pagination-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-top: 1px solid #F1F5F9;
+}
+
+.showing-text {
+    font-size: 0.8rem;
+    color: #64748B;
+}
+
+.pagination-controls {
+    display: flex;
+    gap: 4px;
+}
+
+.page-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: #64748B;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     text-decoration: none;
 }
 
-.action-icon:hover {
-    color: #0148ca;
+.page-btn:hover {
+    background: #F1F5F9;
+    color: #1E293B;
 }
 
-.action-icon.text-danger:hover {
-    color: #dc3545;
+.page-btn.active {
+    background: #0D9488;
+    color: white;
+    font-weight: 600;
 }
 
-code {
-    background: #f0f4ff;
-    padding: 0.15rem 0.4rem;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    color: #0148ca;
+.page-btn.disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
 }
 
-/* ===== RESPONSIVE ===== */
-@media (max-width: 768px) {
-    .page-header {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 0.75rem;
-    }
-    
-    .stats-row {
+.page-btn.dots {
+    cursor: default;
+    background: transparent;
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+
+@media (max-width: 1200px) {
+    .stats-cards-row {
         grid-template-columns: repeat(2, 1fr);
     }
+}
+
+@media (max-width: 992px) {
+    .services-container {
+        padding: 16px;
+    }
     
-    .search-wrapper {
-        max-width: 100%;
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+}
+
+@media (max-width: 768px) {
+    .stats-cards-row {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+    
+    .filter-tabs-row {
+        flex-wrap: wrap;
+    }
+    
+    .service-table {
+        min-width: 800px;
+    }
+    
+    .table-container {
+        overflow-x: auto;
     }
 }
 
 @media (max-width: 480px) {
-    .stats-row {
-        grid-template-columns: 1fr 1fr;
-        gap: 0.5rem;
+    .stats-cards-row {
+        grid-template-columns: 1fr;
     }
     
-    .stat-mini {
-        padding: 0.75rem;
+    .page-header {
+        gap: 8px;
     }
     
-    .stat-mini-number {
-        font-size: 1rem;
+    .btn-add-service {
+        width: 100%;
+        justify-content: center;
     }
     
-    .stat-mini-icon {
-        width: 32px;
-        height: 32px;
-        font-size: 0.9rem;
+    .pagination-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
     }
 }
 </style>

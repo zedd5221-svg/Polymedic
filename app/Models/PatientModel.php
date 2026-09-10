@@ -34,30 +34,27 @@ class PatientModel extends Model
     public function generatePatientCode()
     {
         $year = date('y');
+        $prefix = 'PAT-' . $year . '-';
         $maxAttempts = 50;
         $attempt = 0;
         
-        // Get the highest number for this year using a more reliable query
-        $builder = $this->db->table($this->table);
-        $builder->select('patient_code');
-        $builder->like('patient_code', 'PAT-' . $year . '-', 'after');
-        $builder->orderBy('id', 'DESC');
-        $builder->limit(1);
-        $result = $builder->get()->getRowArray();
+        // Get the highest number for this year using MAX on numeric suffix
+        $db = \Config\Database::connect();
+        $query = $db->query("
+            SELECT MAX(CAST(SUBSTRING(patient_code, 8) AS UNSIGNED)) as max_num
+            FROM patients
+            WHERE patient_code LIKE '{$prefix}%'
+        ");
+        $row = $query->getRow();
+        $maxNum = $row->max_num ?? 0;
         
-        $nextNumber = 1;
-        if ($result && isset($result['patient_code'])) {
-            $lastCode = $result['patient_code'];
-            if (preg_match('/PAT-' . $year . '-(\d{4})/', $lastCode, $matches)) {
-                $nextNumber = intval($matches[1]) + 1;
-            }
-        }
+        $nextNumber = $maxNum + 1;
         
         // Generate a unique code with attempts
         $code = '';
         do {
             $numberStr = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
-            $code = 'PAT-' . $year . '-' . $numberStr;
+            $code = $prefix . $numberStr;
             $nextNumber++;
             $attempt++;
             
@@ -66,14 +63,13 @@ class PatientModel extends Model
             
             if ($attempt > $maxAttempts) {
                 // Fallback: use timestamp + random
-                $code = 'PAT-' . $year . '-' . date('Hi') . rand(10, 99);
-                // Check one more time
+                $code = $prefix . date('Hi') . rand(10, 99);
                 $exists = $this->where('patient_code', $code)->first();
                 if (!$exists) {
                     break;
                 }
                 // Ultimate fallback: microtime
-                $code = 'PAT-' . $year . '-' . substr(microtime(true) * 10000, -4);
+                $code = $prefix . substr(microtime(true) * 10000, -4);
                 break;
             }
         } while ($exists);
@@ -82,189 +78,216 @@ class PatientModel extends Model
     }
     
     /**
-     * Find existing patient or create from appointment data
+     * Find existing patient or create from appointment data (Online Booking)
+     * FIXED: Properly creates patient records from online appointments
      */
     public function findOrCreateFromAppointment($appointment)
     {
-        // Try to find by email first
-        if (!empty($appointment['email'])) {
-            $existing = $this->where('email', $appointment['email'])->first();
-            if ($existing) {
-                return $this->updatePatientSource($existing);
-            }
-        }
+        $fullName = trim($appointment['full_name'] ?? '');
+        $age = $appointment['age'] ?? null;
+        $gender = $appointment['gender'] ?? '';
+        $email = trim($appointment['email'] ?? '');
+        $phone = trim($appointment['phone'] ?? '');
         
-        // Try by phone
-        if (!empty($appointment['phone'])) {
-            $existing = $this->where('phone', $appointment['phone'])->first();
-            if ($existing) {
-                return $this->updatePatientSource($existing);
-            }
-        }
-        
-        // Try by name + age + gender
-        $existing = $this->where('full_name', $appointment['full_name'])
-                         ->where('age', $appointment['age'])
-                         ->where('gender', $appointment['gender'])
-                         ->first();
-        if ($existing) {
-            return $this->updatePatientSource($existing);
-        }
-        
-        // Create new patient
-        return $this->createFromAppointment($appointment);
-    }
-    
-    /**
-     * Update patient source to include walk-in if they came in person
-     */
-    private function updatePatientSource($patient)
-    {
-        if (($patient['source'] ?? '') !== 'walk-in') {
-            $this->update($patient['id'], ['source' => 'walk-in']);
-            $patient['source'] = 'walk-in';
-        }
-        return $patient;
-    }
-    
-    /**
-     * Create patient from appointment data
-     */
-    public function createFromAppointment($appointment)
-    {
-        $patientCode = $this->generatePatientCode();
-        
-        $data = [
-            'patient_code' => $patientCode,
-            'full_name' => $appointment['full_name'],
-            'email' => $appointment['email'] ?? null,
-            'phone' => $appointment['phone'] ?? null,
-            'age' => $appointment['age'],
-            'gender' => $appointment['gender'],
-            'source' => 'online'
-        ];
-        
-        try {
-            $this->insert($data);
-            return $this->find($this->getInsertID());
-        } catch (\Exception $e) {
-            log_message('error', 'Create from appointment error: ' . $e->getMessage());
-            // Try to find existing patient with same name/age/gender
-            $existing = $this->where('full_name', $appointment['full_name'])
-                             ->where('age', $appointment['age'])
-                             ->where('gender', $appointment['gender'])
-                             ->first();
-            if ($existing) {
-                return $this->updatePatientSource($existing);
-            }
+        if (empty($fullName)) {
+            log_message('error', 'findOrCreateFromAppointment: Empty name');
             return null;
         }
-    }
-    
-    /**
-     * Find existing patient or create from request data
-     */
-    public function findOrCreateFromRequest($data)
-    {
-        // Try by email
-        if (!empty($data['email'])) {
-            $existing = $this->where('email', $data['email'])->first();
-            if ($existing) {
-                return $this->updatePatientSource($existing);
-            }
+        
+        // ---- STEP 1: Try to find existing by email ----
+        $patient = null;
+        if (!empty($email)) {
+            $patient = $this->where('email', $email)->first();
         }
         
-        // Try by phone
-        if (!empty($data['phone'])) {
-            $existing = $this->where('phone', $data['phone'])->first();
-            if ($existing) {
-                return $this->updatePatientSource($existing);
-            }
+        // ---- STEP 2: Try by phone ----
+        if (!$patient && !empty($phone)) {
+            $patient = $this->where('phone', $phone)->first();
         }
         
-        // Try by name + age + gender
-        $existing = $this->where('full_name', $data['patient_name'])
-                         ->where('age', $data['age'])
-                         ->where('gender', $data['gender'])
-                         ->first();
-        if ($existing) {
-            return $this->updatePatientSource($existing);
+        // ---- STEP 3: Try by name + age + gender ----
+        if (!$patient) {
+            $patient = $this->where('full_name', $fullName)
+                           ->where('age', $age)
+                           ->where('gender', $gender)
+                           ->first();
         }
         
-        // Create new patient
-        return $this->createFromRequestData($data);
-    }
-    
-    /**
-     * Create patient from diagnostic request data
-     */
-    public function createFromRequestData($data)
-    {
-        $patientCode = $this->generatePatientCode();
+        // ---- STEP 4: Try by name + age only (fallback) ----
+        if (!$patient) {
+            $patient = $this->where('full_name', $fullName)
+                           ->where('age', $age)
+                           ->first();
+        }
         
-        $patientData = [
-            'patient_code' => $patientCode,
-            'full_name' => $data['patient_name'],
-            'email' => $data['email'] ?? null,
-            'phone' => $data['phone'] ?? null,
-            'age' => $data['age'],
-            'gender' => $data['gender'],
-            'source' => 'walk-in'
-        ];
+        // ---- STEP 5: If patient exists, update and return ----
+        if ($patient) {
+            $update = [];
+            if (empty($patient['email']) && !empty($email)) {
+                $update['email'] = $email;
+            }
+            if (empty($patient['phone']) && !empty($phone)) {
+                $update['phone'] = $phone;
+            }
+            if (empty($patient['gender']) && !empty($gender)) {
+                $update['gender'] = $gender;
+            }
+            if (($patient['source'] ?? '') !== 'online') {
+                $update['source'] = 'online';
+            }
+            if (!empty($update)) {
+                $this->update($patient['id'], $update);
+                log_message('info', 'Updated existing patient from appointment: ' . $patient['id']);
+            }
+            return $patient;
+        }
         
-        try {
-            $this->insert($patientData);
-            $id = $this->getInsertID();
-            if ($id) {
-                return $this->find($id);
-            }
-        } catch (\Exception $e) {
-            log_message('error', 'Create from request error: ' . $e->getMessage());
-            // Try to find existing patient with same name/age/gender
-            $existing = $this->where('full_name', $data['patient_name'])
-                             ->where('age', $data['age'])
-                             ->where('gender', $data['gender'])
-                             ->first();
-            if ($existing) {
-                return $this->updatePatientSource($existing);
-            }
+        // ---- STEP 6: Create new patient (Online source) ----
+        $maxAttempts = 5;
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            $newCode = $this->generatePatientCode();
+            $insertData = [
+                'patient_code' => $newCode,
+                'full_name'    => $fullName,
+                'email'        => !empty($email) ? $email : null,
+                'phone'        => !empty($phone) ? $phone : null,
+                'age'          => $age,
+                'gender'       => $gender,
+                'source'       => 'online',
+                'address'      => null,
+                'created_at'   => date('Y-m-d H:i:s'),
+                'updated_at'   => date('Y-m-d H:i:s')
+            ];
             
-            // Ultimate fallback: try with a different code
-            $fallbackCode = 'PAT-' . date('y') . '-' . date('Hi') . rand(10, 99);
-            $patientData['patient_code'] = $fallbackCode;
             try {
-                $this->insert($patientData);
+                $this->insert($insertData);
                 $id = $this->getInsertID();
                 if ($id) {
-                    return $this->find($id);
+                    $patient = $this->find($id);
+                    log_message('info', "Patient created from appointment: $fullName (Code: $newCode, ID: $id)");
+                    return $patient;
                 }
-            } catch (\Exception $e2) {
-                log_message('error', 'Fallback patient creation error: ' . $e2->getMessage());
+            } catch (\Exception $e) {
+                if (strpos($e->getMessage(), 'Duplicate entry') !== false) {
+                    log_message('warning', "Duplicate code $newCode, retry $attempt/$maxAttempts");
+                    continue;
+                }
+                log_message('error', 'Insert exception in findOrCreateFromAppointment: ' . $e->getMessage());
+                break;
             }
         }
         
+        log_message('error', "Failed to create patient from appointment after $maxAttempts attempts");
         return null;
     }
     
     /**
-     * Get patient by patient code
+     * Find existing patient or create from walk-in request data
+     * This is used by diagnostic_requests (Receptionist)
      */
-    public function getByPatientCode($patientCode)
+    public function findOrCreateFromWalkin($data)
     {
-        return $this->where('patient_code', $patientCode)->first();
-    }
-    
-    /**
-     * Get patients by source
-     */
-    public function getBySource($source)
-    {
-        return $this->where('source', $source)->findAll();
+        $fullName = trim($data['full_name'] ?? '');
+        $age = $data['age'] ?? null;
+        $gender = $data['gender'] ?? '';
+        $email = trim($data['email'] ?? '');
+        $phone = trim($data['phone'] ?? '');
+        
+        if (empty($fullName)) {
+            log_message('error', 'findOrCreateFromWalkin: Empty name');
+            return null;
+        }
+        
+        // ---- STEP 1: Try to find existing by email ----
+        $patient = null;
+        if (!empty($email)) {
+            $patient = $this->where('email', $email)->first();
+        }
+        
+        // ---- STEP 2: Try by phone ----
+        if (!$patient && !empty($phone)) {
+            $patient = $this->where('phone', $phone)->first();
+        }
+        
+        // ---- STEP 3: Try by name + age + gender ----
+        if (!$patient) {
+            $patient = $this->where('full_name', $fullName)
+                           ->where('age', $age)
+                           ->where('gender', $gender)
+                           ->first();
+        }
+        
+        // ---- STEP 4: Try by name + age only (fallback) ----
+        if (!$patient) {
+            $patient = $this->where('full_name', $fullName)
+                           ->where('age', $age)
+                           ->first();
+        }
+        
+        // ---- STEP 5: If patient exists, update source to walk-in ----
+        if ($patient) {
+            $update = [];
+            if (empty($patient['email']) && !empty($email)) {
+                $update['email'] = $email;
+            }
+            if (empty($patient['phone']) && !empty($phone)) {
+                $update['phone'] = $phone;
+            }
+            if (empty($patient['gender']) && !empty($gender)) {
+                $update['gender'] = $gender;
+            }
+            if (($patient['source'] ?? '') !== 'walk-in') {
+                $update['source'] = 'walk-in';
+            }
+            if (!empty($update)) {
+                $this->update($patient['id'], $update);
+                log_message('info', 'Updated existing patient from walk-in: ' . $patient['id']);
+            }
+            return $patient;
+        }
+        
+        // ---- STEP 6: Create new walk-in patient ----
+        $maxAttempts = 5;
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            $newCode = $this->generatePatientCode();
+            $insertData = [
+                'patient_code' => $newCode,
+                'full_name'    => $fullName,
+                'email'        => !empty($email) ? $email : null,
+                'phone'        => !empty($phone) ? $phone : null,
+                'age'          => $age,
+                'gender'       => $gender,
+                'source'       => 'walk-in',
+                'address'      => null,
+                'created_at'   => date('Y-m-d H:i:s'),
+                'updated_at'   => date('Y-m-d H:i:s')
+            ];
+            
+            try {
+                $this->insert($insertData);
+                $id = $this->getInsertID();
+                if ($id) {
+                    $patient = $this->find($id);
+                    log_message('info', "Patient created from walk-in: $fullName (Code: $newCode, ID: $id)");
+                    return $patient;
+                }
+            } catch (\Exception $e) {
+                if (strpos($e->getMessage(), 'Duplicate entry') !== false) {
+                    log_message('warning', "Duplicate code $newCode, retry $attempt/$maxAttempts");
+                    continue;
+                }
+                log_message('error', 'Insert exception in findOrCreateFromWalkin: ' . $e->getMessage());
+                break;
+            }
+        }
+        
+        log_message('error', "Failed to create walk-in patient after $maxAttempts attempts");
+        return null;
     }
     
     /**
      * Sync walk-in patients from lab_requests and xray_examinations
-     * This prevents duplicate patients
+     * This prevents duplicate patients when syncing
      */
     public function syncWalkInPatients()
     {
@@ -287,20 +310,15 @@ class PatientModel extends Model
                                      ->first();
                     
                     if (!$existing) {
-                        $patientCode = $this->generatePatientCode();
-                        try {
-                            $this->insert([
-                                'patient_code' => $patientCode,
-                                'full_name' => $request['patient_name'],
-                                'email' => $request['email'] ?? null,
-                                'phone' => $request['phone'] ?? null,
-                                'age' => $request['age'],
-                                'gender' => $request['gender'],
-                                'source' => 'walk-in'
-                            ]);
+                        $patient = $this->findOrCreateFromWalkin([
+                            'full_name' => $request['patient_name'],
+                            'age' => $request['age'],
+                            'gender' => $request['gender'],
+                            'email' => $request['email'] ?? '',
+                            'phone' => $request['phone'] ?? ''
+                        ]);
+                        if ($patient) {
                             $count++;
-                        } catch (\Exception $e) {
-                            $errors[] = 'Lab sync error: ' . $e->getMessage();
                         }
                     }
                 }
@@ -324,20 +342,15 @@ class PatientModel extends Model
                                      ->first();
                     
                     if (!$existing) {
-                        $patientCode = $this->generatePatientCode();
-                        try {
-                            $this->insert([
-                                'patient_code' => $patientCode,
-                                'full_name' => $request['patient_name'],
-                                'email' => $request['email'] ?? null,
-                                'phone' => $request['phone'] ?? null,
-                                'age' => $request['age'],
-                                'gender' => $request['gender'],
-                                'source' => 'walk-in'
-                            ]);
+                        $patient = $this->findOrCreateFromWalkin([
+                            'full_name' => $request['patient_name'],
+                            'age' => $request['age'],
+                            'gender' => $request['gender'],
+                            'email' => $request['email'] ?? '',
+                            'phone' => $request['phone'] ?? ''
+                        ]);
+                        if ($patient) {
                             $count++;
-                        } catch (\Exception $e) {
-                            $errors[] = 'X-Ray sync error: ' . $e->getMessage();
                         }
                     }
                 }
@@ -351,5 +364,138 @@ class PatientModel extends Model
         }
         
         return $count;
+    }
+    
+    /**
+     * Get patient by patient code
+     */
+    public function getByPatientCode($patientCode)
+    {
+        return $this->where('patient_code', $patientCode)->first();
+    }
+    
+    /**
+     * Get patients by source (online, walk-in, referral)
+     */
+    public function getBySource($source)
+    {
+        return $this->where('source', $source)->findAll();
+    }
+    
+    /**
+     * Get patient by email
+     */
+    public function getByEmail($email)
+    {
+        return $this->where('email', $email)->first();
+    }
+    
+    /**
+     * Get patient by phone
+     */
+    public function getByPhone($phone)
+    {
+        return $this->where('phone', $phone)->first();
+    }
+    
+    /**
+     * Search patients by keyword
+     */
+    public function search($keyword)
+    {
+        return $this->like('full_name', $keyword)
+                    ->orLike('patient_code', $keyword)
+                    ->orLike('email', $keyword)
+                    ->orLike('phone', $keyword)
+                    ->findAll();
+    }
+    
+    /**
+     * Get all patients with pagination
+     */
+    public function getPatients($limit = null, $offset = 0, $source = null)
+    {
+        if ($source) {
+            $this->where('source', $source);
+        }
+        if ($limit) {
+            $this->limit($limit, $offset);
+        }
+        return $this->orderBy('created_at', 'DESC')->findAll();
+    }
+    
+    /**
+     * Get patients by gender
+     */
+    public function getByGender($gender)
+    {
+        return $this->where('gender', $gender)->findAll();
+    }
+    
+    /**
+     * Get patients by age range
+     */
+    public function getByAgeRange($minAge, $maxAge)
+    {
+        return $this->where('age >=', $minAge)
+                    ->where('age <=', $maxAge)
+                    ->findAll();
+    }
+    
+    /**
+     * Count total patients
+     */
+    public function countPatients($source = null)
+    {
+        if ($source) {
+            return $this->where('source', $source)->countAllResults();
+        }
+        return $this->countAll();
+    }
+    
+    /**
+     * Get recent patients
+     */
+    public function getRecentPatients($limit = 10, $source = null)
+    {
+        if ($source) {
+            $this->where('source', $source);
+        }
+        return $this->orderBy('created_at', 'DESC')
+                    ->limit($limit)
+                    ->findAll();
+    }
+    
+    /**
+     * Update patient information
+     */
+    public function updatePatient($id, $data)
+    {
+        return $this->update($id, $data);
+    }
+    
+    /**
+     * Delete patient (hard delete)
+     */
+    public function deletePatient($id)
+    {
+        return $this->delete($id);
+    }
+    
+    /**
+     * Get patients with their appointment count
+     */
+    public function getPatientsWithAppointmentCount()
+    {
+        $db = \Config\Database::connect();
+        
+        $query = $db->table('patients p')
+                    ->select('p.*, COUNT(a.id) as appointment_count')
+                    ->join('appointments a', 'a.full_name = p.full_name AND a.age = p.age', 'left')
+                    ->groupBy('p.id')
+                    ->orderBy('p.created_at', 'DESC')
+                    ->get();
+        
+        return $query->getResultArray();
     }
 }

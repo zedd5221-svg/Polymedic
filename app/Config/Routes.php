@@ -81,6 +81,7 @@ $routes->group('radiologist', ['filter' => 'auth:radiologist'], function($routes
     $routes->get('examination/release/(:num)', 'Radiologist::releaseResult/$1');
     $routes->get('examination/print/(:num)', 'Radiologist::printResult/$1');
     $routes->get('notifications', 'Radiologist::notifications');
+    $routes->post('examination/save-draft/(:num)', 'Radiologist::saveDraft/$1'); 
     $routes->get('notifications/fetch', 'NotificationController::radiologistFetch');
     $routes->get('notifications/mark-read/(:num)', 'NotificationController::radiologistMarkRead/$1');
     $routes->get('notifications/mark-all-read', 'NotificationController::radiologistMarkAllRead');

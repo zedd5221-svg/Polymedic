@@ -29,7 +29,8 @@
         .login-wrapper {
             width: 100%;
             max-width: 1120px;
-            animation: fadeUp 0.6s ease;
+            position: relative;
+            z-index: 1;
         }
 
         @keyframes fadeUp {
@@ -46,6 +47,7 @@
             overflow: hidden;
             border: none;
             min-height: 600px;
+            position: relative;
         }
 
         /* ===== LEFT PANEL (brand / feature) - BLUE BACKGROUND ===== */
@@ -498,6 +500,165 @@
             letter-spacing: 0.2px;
         }
 
+        /* ===== SPLIT ANIMATION ===== */
+
+        /* Entrance: the two halves slide in and meet in the middle */
+        .left-panel  { animation: joinLeft 0.8s cubic-bezier(.22, 1, .36, 1) both; }
+        .right-panel { animation: joinRight 0.8s cubic-bezier(.22, 1, .36, 1) both; }
+
+        @keyframes joinLeft {
+            from { transform: translateX(-48px); opacity: 0; }
+            to   { transform: none; opacity: 1; }
+        }
+        @keyframes joinRight {
+            from { transform: translateX(48px); opacity: 0; }
+            to   { transform: none; opacity: 1; }
+        }
+
+        /* Seam of light that appears right before the split */
+        .login-card::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            width: 2px;
+            margin-left: -1px;
+            background: linear-gradient(to bottom, transparent, #ffffff 20%, #90caf9 50%, #ffffff 80%, transparent);
+            box-shadow: 0 0 18px 4px rgba(144, 202, 249, 0.8);
+            opacity: 0;
+            transform: scaleY(0);
+            pointer-events: none;
+            z-index: 3;
+        }
+
+        /* Exit on login: the card splits open */
+        body.is-splitting {
+            overflow: hidden;
+        }
+
+        body.is-splitting .login-card {
+            background: transparent;
+            box-shadow: none;
+            overflow: visible;
+        }
+
+        body.is-splitting .login-card::after {
+            animation: seam 0.55s ease-out forwards;
+        }
+
+        body.is-splitting .left-panel {
+            border-radius: 24px 0 0 24px;
+            box-shadow: 0 40px 80px rgba(0, 20, 50, 0.12);
+            animation: splitLeft 0.9s cubic-bezier(.77, 0, .18, 1) 0.2s forwards;
+        }
+
+        body.is-splitting .right-panel {
+            border-radius: 0 24px 24px 0;
+            box-shadow: 0 40px 80px rgba(0, 20, 50, 0.12);
+            animation: splitRight 0.9s cubic-bezier(.77, 0, .18, 1) 0.2s forwards;
+        }
+
+        @keyframes seam {
+            0%   { opacity: 0; transform: scaleY(0); }
+            40%  { opacity: 1; transform: scaleY(1); }
+            100% { opacity: 0; transform: scaleY(1); }
+        }
+        @keyframes splitLeft {
+            0%   { transform: none; opacity: 1; }
+            100% { transform: translateX(-65vw); opacity: 0; }
+        }
+        @keyframes splitRight {
+            0%   { transform: none; opacity: 1; }
+            100% { transform: translateX(65vw); opacity: 0; }
+        }
+
+        /* What's revealed behind the panels */
+        .split-reveal {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.35rem;
+            text-align: center;
+            padding: 1.5rem;
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity 0.5s ease 0.45s, visibility 0s linear 0.45s;
+        }
+
+        body.is-splitting .split-reveal {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .split-reveal .reveal-mark {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: #1976d2;
+            color: #ffffff;
+            font-size: 1.9rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 0.9rem;
+            box-shadow: 0 0 0 10px rgba(25, 118, 210, 0.1);
+            transform: scale(0.4);
+        }
+
+        body.is-splitting .reveal-mark {
+            animation: markPop 0.5s cubic-bezier(.34, 1.56, .64, 1) 0.6s forwards;
+        }
+
+        @keyframes markPop {
+            to { transform: scale(1); }
+        }
+
+        .split-reveal .reveal-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #0a2b4e;
+            margin: 0;
+        }
+
+        .split-reveal .reveal-sub {
+            font-size: 0.85rem;
+            color: #64748b;
+            margin: 0;
+        }
+
+        .split-reveal .reveal-bar {
+            width: 140px;
+            height: 3px;
+            border-radius: 3px;
+            background: #dbe7f6;
+            margin-top: 1rem;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .split-reveal .reveal-bar::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 40%;
+            border-radius: 3px;
+            background: #1976d2;
+            animation: barSlide 1.1s ease-in-out infinite;
+        }
+
+        @keyframes barSlide {
+            from { transform: translateX(-100%); }
+            to   { transform: translateX(250%); }
+        }
+
         /* ===== responsive ===== */
         @media (max-width: 820px) {
             .login-card {
@@ -516,6 +677,51 @@
             }
             .left-panel .big-tagline {
                 font-size: 1.5rem;
+            }
+
+            /* stacked layout: join and split vertically */
+            .left-panel  { animation-name: joinTop; }
+            .right-panel { animation-name: joinBottom; }
+            .login-card::after { display: none; }
+
+            body.is-splitting .left-panel {
+                border-radius: 16px 16px 0 0;
+                animation-name: splitUp;
+            }
+            body.is-splitting .right-panel {
+                border-radius: 0 0 16px 16px;
+                animation-name: splitDown;
+            }
+
+            @keyframes joinTop {
+                from { transform: translateY(-40px); opacity: 0; }
+                to   { transform: none; opacity: 1; }
+            }
+            @keyframes joinBottom {
+                from { transform: translateY(40px); opacity: 0; }
+                to   { transform: none; opacity: 1; }
+            }
+            @keyframes splitUp {
+                0%   { transform: none; opacity: 1; }
+                100% { transform: translateY(-110vh); opacity: 0; }
+            }
+            @keyframes splitDown {
+                0%   { transform: none; opacity: 1; }
+                100% { transform: translateY(110vh); opacity: 0; }
+            }
+        }
+
+        /* Respect reduced-motion preferences */
+        @media (prefers-reduced-motion: reduce) {
+            .left-panel,
+            .right-panel,
+            .login-card::after,
+            .reveal-mark,
+            .reveal-bar::after {
+                animation: none !important;
+            }
+            .split-reveal .reveal-mark {
+                transform: none;
             }
         }
 
@@ -552,6 +758,14 @@
     </style>
 </head>
 <body>
+
+<!-- Revealed behind the card when it splits open -->
+<div class="split-reveal" role="status" aria-live="polite">
+    <div class="reveal-mark"><i class="bi bi-check-lg"></i></div>
+    <p class="reveal-title">Signing you in</p>
+    <p class="reveal-sub">Opening the <span id="revealRole">Administrator</span> workspace</p>
+    <div class="reveal-bar"></div>
+</div>
 
 <div class="login-wrapper">
     <div class="login-card">
@@ -719,10 +933,44 @@
             return;
         }
 
+        // Valid input: hold the submit until the split animation plays
+        e.preventDefault();
+        const form = this;
+
         loginBtn.classList.add('loading');
         loginBtn.disabled = true;
         alertDiv.className = 'alert-custom';
         alertDiv.style.display = 'none';
+
+        // Show the chosen role on the reveal screen
+        const roleSelect = document.getElementById('selectedRole');
+        document.getElementById('revealRole').textContent =
+            roleSelect.options[roleSelect.selectedIndex].text;
+
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduceMotion) {
+            document.body.classList.add('is-splitting');
+            HTMLFormElement.prototype.submit.call(form);
+            return;
+        }
+
+        // Brief spinner, then split open, then submit to the server
+        setTimeout(function() {
+            document.body.classList.add('is-splitting');
+            setTimeout(function() {
+                HTMLFormElement.prototype.submit.call(form);
+            }, 1000);
+        }, 350);
+    });
+
+    // If the user comes back with the browser Back button, close the card again
+    window.addEventListener('pageshow', function(event) {
+        if (event.persisted) {
+            document.body.classList.remove('is-splitting');
+            const loginBtn = document.getElementById('loginBtn');
+            loginBtn.classList.remove('loading');
+            loginBtn.disabled = false;
+        }
     });
 
     // Auto-hide flash messages after 5s

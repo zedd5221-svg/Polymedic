@@ -12,7 +12,7 @@ class XrayExaminationModel extends Model
     protected $allowedFields = [
         'appointment_id', 'patient_name', 'patient_id', 'age', 'gender',
         'email', 'phone', 'exam_type', 'exam_date', 'doctor_name', 
-        'radiologist_name', 'priority', 'status', 'image_path', 
+        'radiologist_name', 'priority', 'status', 'image_path', 'image_paths',
         'findings', 'interpretation', 'released_at'
     ];
     

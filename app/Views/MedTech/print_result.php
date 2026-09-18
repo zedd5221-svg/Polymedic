@@ -1,359 +1,678 @@
-<?= $this->extend('layouts/MedTechLayout') ?>
-
-<?= $this->section('pageTitle') ?>Reports<?= $this->endSection() ?>
-
-<?= $this->section('medtechContent') ?>
-
-<div class="reports-container">
-    <!-- Page Header -->
-    <div class="page-header">
-        <div>
-            <h4 class="page-title">Laboratory Reports</h4>
-            <p class="page-subtitle">View laboratory statistics and reports</p>
-        </div>
-    </div>
-
-    <!-- Stats Grid -->
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-icon orange">
-                <i class="bi bi-clock-history"></i>
-            </div>
-            <div class="stat-info">
-                <h3><?= $counts['pending'] ?? 0 ?></h3>
-                <p>Pending</p>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon blue">
-                <i class="bi bi-arrow-repeat"></i>
-            </div>
-            <div class="stat-info">
-                <h3><?= $counts['in_progress'] ?? 0 ?></h3>
-                <p>In Progress</p>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon green">
-                <i class="bi bi-check2-circle"></i>
-            </div>
-            <div class="stat-info">
-                <h3><?= $counts['completed'] ?? 0 ?></h3>
-                <p>Completed</p>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon teal">
-                <i class="bi bi-file-check"></i>
-            </div>
-            <div class="stat-info">
-                <h3><?= $counts['released'] ?? 0 ?></h3>
-                <p>Released</p>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon purple">
-                <i class="bi bi-flask"></i>
-            </div>
-            <div class="stat-info">
-                <h3><?= $totalLabAppointments ?? 0 ?></h3>
-                <p>Total Lab Patients</p>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon primary">
-                <i class="bi bi-grid-3x3-gap-fill"></i>
-            </div>
-            <div class="stat-info">
-                <h3><?= $counts['total'] ?? 0 ?></h3>
-                <p>Total Requests</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Monthly Statistics -->
-    <div class="reports-card mt-4">
-        <div class="card-header-custom">
-            <h5><i class="bi bi-calendar3"></i> Monthly Statistics</h5>
-        </div>
-        <div class="table-responsive">
-            <table class="table reports-table">
-                <thead>
-                    <tr>
-                        <th>Month</th>
-                        <th>Pending</th>
-                        <th>In Progress</th>
-                        <th>Draft</th>
-                        <th>Completed</th>
-                        <th>Released</th>
-                        <th>Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (!empty($monthlyStats)): ?>
-                        <?php foreach ($monthlyStats as $month => $stats): ?>
-                            <tr>
-                                <td><strong><?= date('F Y', strtotime($month . '-01')) ?></strong></td>
-                                <td><span class="badge-status pending"><?= $stats['pending'] ?? 0 ?></span></td>
-                                <td><span class="badge-status in_progress"><?= $stats['in_progress'] ?? 0 ?></span></td>
-                                <td><span class="badge-status draft"><?= $stats['draft'] ?? 0 ?></span></td>
-                                <td><span class="badge-status completed"><?= $stats['completed'] ?? 0 ?></span></td>
-                                <td><span class="badge-status released"><?= $stats['released'] ?? 0 ?></span></td>
-                                <td><strong><?= $stats['total'] ?? 0 ?></strong></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <tr>
-                            <td colspan="7" class="text-center py-3 text-muted">No data available</td>
-                        </tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Laboratory Result · <?= esc($request['patient_name']) ?></title>
 <style>
-/* ===== PAGE HEADER ===== */
-.page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.5rem;
+@page {
+    size: A4 portrait;
+    margin: 12mm 12mm 16mm;
 }
 
-.page-title {
-    font-weight: 700;
-    color: #0a2b4e;
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
     margin: 0;
-    font-size: 1.3rem;
-}
-
-.page-subtitle {
-    color: #64748b;
-    font-size: 0.85rem;
-    margin: 0;
-}
-
-/* ===== STATS GRID ===== */
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-}
-
-.stat-card {
+    padding: 0;
     background: #ffffff;
-    border-radius: 14px;
-    padding: 1.25rem 1.5rem;
+    color: #000;
+    font-family: "Times New Roman", Times, Georgia, serif;
+    font-size: 10pt;
+    line-height: 1.3;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+.sheet {
+    position: relative;
+    width: 100%;
+    max-width: 186mm;
+    margin: 0 auto;
+}
+
+/* ================= Screen-only controls ================= */
+
+.controls {
+    position: fixed;
+    top: 12px;
+    right: 12px;
     display: flex;
+    gap: 8px;
+    z-index: 20;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.controls button,
+.controls a {
+    display: inline-flex;
     align-items: center;
-    gap: 1rem;
-    box-shadow: 0 2px 12px rgba(10, 43, 78, 0.06);
-    border: 1px solid rgba(1, 72, 202, 0.04);
-    transition: all 0.3s ease;
-}
-
-.stat-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 25px rgba(10, 43, 78, 0.1);
-}
-
-.stat-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.2rem;
-    flex-shrink: 0;
-}
-
-.stat-icon.orange { background: #fff3e0; color: #ff6b00; }
-.stat-icon.blue { background: #e3f2fd; color: #0148ca; }
-.stat-icon.green { background: #e8f5e9; color: #28a745; }
-.stat-icon.teal { background: #ccfbf1; color: #0d9488; }
-.stat-icon.purple { background: #f3e5f5; color: #800080; }
-.stat-icon.primary { background: #e3f2fd; color: #0148ca; }
-
-.stat-info h3 {
-    font-size: 1.4rem;
-    font-weight: 700;
-    color: #0a2b4e;
-    margin: 0;
-    line-height: 1.2;
-}
-
-.stat-info p {
-    color: #64748b;
-    font-size: 0.8rem;
-    margin: 0;
-    font-weight: 500;
-}
-
-/* ===== REPORTS CARD ===== */
-.reports-card {
-    background: #ffffff;
-    border-radius: 14px;
-    padding: 1.25rem 1.5rem;
-    box-shadow: 0 2px 12px rgba(10, 43, 78, 0.06);
-    border: 1px solid rgba(1, 72, 202, 0.04);
-}
-
-.card-header-custom {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-}
-
-.card-header-custom h5 {
+    gap: 6px;
+    padding: 8px 14px;
+    font-size: 13px;
     font-weight: 600;
-    color: #0a2b4e;
+    color: #fff;
+    background: #0d9488;
+    border: 0;
+    border-radius: 6px;
+    text-decoration: none;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.controls a.secondary {
+    background: #fff;
+    color: #0f172a;
+    border: 1px solid #cbd5e1;
+}
+
+/* ================= Letterhead ================= */
+
+.letterhead {
+    display: flex;
+    align-items: center;
+    gap: 6mm;
+    padding-bottom: 3mm;
+    border-bottom: 2pt solid #000;
+}
+
+.letterhead-logo {
+    flex: 0 0 auto;
+    width: 20mm;
+    height: 20mm;
+    object-fit: contain;
+}
+
+.letterhead-text { flex: 1 1 auto; min-width: 0; }
+
+.clinic-name {
     margin: 0;
-    font-size: 0.95rem;
-}
-
-.card-header-custom h5 i {
-    color: #16a34a;
-    margin-right: 0.5rem;
-}
-
-/* ===== TABLE ===== */
-.reports-table {
-    margin: 0;
-}
-
-.reports-table thead th {
-    font-size: 0.7rem;
+    font-size: 16pt;
+    font-weight: 700;
+    letter-spacing: 0.6pt;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: #64748b;
-    font-weight: 600;
-    border-bottom: 2px solid #f0f4ff;
-    padding: 0.75rem 0.5rem;
+    line-height: 1.1;
 }
 
-.reports-table tbody td {
-    padding: 0.75rem 0.5rem;
-    vertical-align: middle;
-    font-size: 0.85rem;
-    color: #0a2b4e;
-    border-bottom: 1px solid #f0f4ff;
+.clinic-sub {
+    margin: 0.6mm 0 0;
+    font-size: 8.5pt;
+    line-height: 1.35;
 }
 
-.reports-table tbody tr:hover {
-    background: #f8faff;
+.clinic-accred {
+    margin: 0.8mm 0 0;
+    font-size: 7.5pt;
+    font-style: italic;
+    color: #333;
 }
 
-.badge-status {
-    padding: 0.2rem 0.6rem;
-    border-radius: 30px;
-    font-size: 0.7rem;
-    font-weight: 600;
+/* ================= Document title ================= */
+
+.doc-title {
+    margin: 0;
+    padding: 2.4mm 0 2mm;
+    font-size: 12pt;
+    font-weight: 700;
+    letter-spacing: 2pt;
+    text-transform: uppercase;
+    text-align: center;
+    border-bottom: 0.8pt solid #000;
 }
 
-.badge-status.pending {
-    background: #fff3e0;
-    color: #ff6b00;
+/* ================= Patient block ================= */
+
+.patient-box {
+    margin-top: 3.5mm;
+    border: 0.8pt solid #000;
 }
 
-.badge-status.in_progress {
-    background: #e3f2fd;
-    color: #0148ca;
+.patient-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
 }
 
-.badge-status.draft {
-    background: #f5f5f5;
-    color: #6c757d;
+.patient-cell {
+    display: flex;
+    align-items: baseline;
+    gap: 2mm;
+    padding: 1.5mm 3mm;
+    font-size: 9.5pt;
+    border-bottom: 0.4pt solid #b0b0b0;
 }
 
-.badge-status.completed {
-    background: #e8f5e9;
-    color: #28a745;
+.patient-cell:nth-child(odd) { border-right: 0.4pt solid #b0b0b0; }
+.patient-grid .patient-cell:nth-last-child(-n+2) { border-bottom: 0; }
+
+.p-label {
+    flex: 0 0 30mm;
+    font-weight: 700;
+    font-size: 8.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.2pt;
 }
 
-.badge-status.released {
-    background: #ccfbf1;
-    color: #0d9488;
+.p-value {
+    flex: 1 1 auto;
+    word-break: break-word;
 }
 
-/* ============================================
-   RESPONSIVE
-   ============================================ */
+.p-value.strong { font-weight: 700; }
 
-@media (max-width: 1200px) {
-    .stats-grid {
-        grid-template-columns: repeat(3, 1fr);
+/* ================= Results table ================= */
+
+table.result {
+    width: 100%;
+    margin-top: 4mm;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+table.result thead th {
+    padding: 1.8mm 2mm;
+    font-size: 8.5pt;
+    font-weight: 700;
+    text-align: left;
+    text-transform: uppercase;
+    letter-spacing: 0.3pt;
+    vertical-align: bottom;
+    border-top: 1pt solid #000;
+    border-bottom: 1pt solid #000;
+}
+
+table.result thead th.c-test   { width: 36%; }
+table.result thead th.c-result { width: 16%; text-align: right; }
+table.result thead th.c-unit   { width: 14%; }
+table.result thead th.c-range  { width: 34%; text-align: right; }
+
+table.result tbody td {
+    padding: 1.3mm 2mm;
+    font-size: 9.5pt;
+    vertical-align: top;
+    border-bottom: 0.4pt solid #d5d5d5;
+}
+
+.c-test   { text-align: left; word-break: break-word; }
+.c-result { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.c-unit   { text-align: left; white-space: nowrap; }
+.c-range  { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+table.result tr.group-head td {
+    padding: 2mm 2mm 1mm;
+    font-size: 8.5pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4pt;
+    background: #ececec;
+    border-top: 0.6pt solid #000;
+    border-bottom: 0.6pt solid #000;
+}
+
+.flag {
+    display: inline-block;
+    min-width: 4mm;
+    margin-right: 1mm;
+    font-weight: 700;
+    text-align: left;
+}
+
+.value-abnormal { font-weight: 700; }
+
+.table-close { border-top: 1pt solid #000; }
+
+/* ================= Legend + interpretation ================= */
+
+.legend {
+    margin-top: 2mm;
+    font-size: 8pt;
+    color: #333;
+}
+
+.legend strong { font-weight: 700; }
+
+.narrative {
+    margin-top: 5mm;
+    page-break-inside: avoid;
+}
+
+.narrative-block { margin-bottom: 3.5mm; }
+
+.narrative-key {
+    margin: 0 0 1mm;
+    font-size: 8.5pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4pt;
+    border-bottom: 0.4pt solid #000;
+    padding-bottom: 0.6mm;
+}
+
+.narrative-body {
+    margin: 0;
+    font-size: 9.5pt;
+    line-height: 1.45;
+    text-align: justify;
+    word-break: break-word;
+}
+
+/* ================= Critical notice ================= */
+
+.critical-notice {
+    margin-top: 4mm;
+    padding: 2mm 3mm;
+    font-size: 8.5pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3pt;
+    border: 1pt solid #000;
+    page-break-inside: avoid;
+}
+
+/* ================= Signatures ================= */
+
+.sig-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6mm;
+    margin-top: 16mm;
+    page-break-inside: avoid;
+}
+
+.sig-col {
+    text-align: center;
+    font-size: 9pt;
+}
+
+.sig-name {
+    font-weight: 700;
+    font-size: 9pt;
+    text-transform: uppercase;
+    line-height: 1.25;
+    min-height: 4.2mm;
+    word-break: break-word;
+}
+
+.sig-lic {
+    margin-top: 0.6mm;
+    font-size: 8pt;
+    letter-spacing: 0.1pt;
+}
+
+.sig-line {
+    width: 100%;
+    max-width: 54mm;
+    margin: 1.4mm auto 1.2mm;
+    border-top: 0.75pt solid #000;
+}
+
+.sig-sub {
+    font-size: 8pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4pt;
+}
+
+.sig-footnote {
+    margin-top: 4mm;
+    text-align: center;
+    font-size: 8pt;
+    font-style: italic;
+}
+
+.end-mark {
+    margin-top: 6mm;
+    font-size: 9pt;
+    font-weight: 700;
+    letter-spacing: 1pt;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+.doc-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 4mm;
+    margin-top: 4mm;
+    padding-top: 1.5mm;
+    font-size: 7.5pt;
+    color: #333;
+    border-top: 0.4pt solid #999;
+}
+
+/* ================= Draft watermark ================= */
+
+.watermark {
+    position: fixed;
+    top: 45%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-30deg);
+    font-size: 54pt;
+    font-weight: 700;
+    letter-spacing: 6pt;
+    color: rgba(0, 0, 0, 0.10);
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.draft-banner {
+    margin-bottom: 3mm;
+    padding: 2mm 3mm;
+    font-size: 9pt;
+    font-weight: 700;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.5pt;
+    border: 1.2pt solid #000;
+}
+
+/* ================= Screen preview ================= */
+
+@media screen {
+    body { background: #eef1f4; padding: 24px 16px 40px; }
+    .sheet {
+        background: #fff;
+        padding: 12mm;
+        box-shadow: 0 4px 24px rgba(15, 23, 42, 0.14);
+        max-width: 210mm;
     }
 }
 
-@media (max-width: 768px) {
-    .stats-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 0.75rem;
-    }
-    
-    .stat-card {
-        padding: 1rem;
-    }
-    
-    .stat-icon {
-        width: 40px;
-        height: 40px;
-        font-size: 1rem;
-    }
-    
-    .stat-info h3 {
-        font-size: 1.1rem;
-    }
-    
-    .page-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.75rem;
-    }
-    
-    .reports-table {
-        font-size: 0.75rem;
-    }
+@media print {
+    .controls { display: none !important; }
+    .sheet { padding: 0; box-shadow: none; max-width: none; }
+
+    thead { display: table-header-group; }
+    tfoot { display: table-footer-group; }
+
+    table.result tbody tr { page-break-inside: avoid; }
+    table.result tr.group-head { page-break-after: avoid; }
+
+    .sig-row, .narrative, .critical-notice { page-break-inside: avoid; }
 }
 
-@media (max-width: 576px) {
-    .stats-grid {
-        grid-template-columns: 1fr 1fr;
-        gap: 0.5rem;
-    }
-    
-    .stat-card {
-        padding: 0.75rem;
-        flex-direction: column;
-        text-align: center;
-        gap: 0.5rem;
-    }
-    
-    .stat-icon {
-        width: 36px;
-        height: 36px;
-        font-size: 0.9rem;
-    }
-    
-    .stat-info h3 {
-        font-size: 1rem;
-    }
-    
-    .stat-info p {
-        font-size: 0.7rem;
-    }
-    
-    .reports-table thead th,
-    .reports-table tbody td {
-        padding: 0.4rem 0.25rem;
-        font-size: 0.65rem;
-    }
+@media screen and (max-width: 720px) {
+    .sheet { padding: 8mm 6mm; }
+    .letterhead { flex-direction: column; text-align: center; gap: 3mm; }
+    .patient-grid { grid-template-columns: 1fr; }
+    .patient-cell:nth-child(odd) { border-right: 0; }
+    .sig-row { grid-template-columns: 1fr; gap: 12mm; }
 }
 </style>
+</head>
+<body>
 
-<?= $this->endSection() ?>
+<div class="controls">
+    <a class="secondary" href="<?= base_url('medtech/request/view/' . (int) $request['id']) ?>">
+        Back to report
+    </a>
+    <button type="button" onclick="window.print()">Print</button>
+</div>
+
+<?php
+/* -------- Derived values -------- */
+$refNo = 'LAB-' . date('Y', strtotime($request['request_date'])) . '-'
+       . str_pad((string) $request['id'], 4, '0', STR_PAD_LEFT);
+
+$sexDisplay = strtoupper(trim((string) ($request['gender'] ?? '')));
+if ($sexDisplay === '' || $sexDisplay === 'N/A') { $sexDisplay = '—'; }
+
+$doctorDisplay = trim((string) ($request['doctor_name'] ?? ''));
+$doctorDisplay = $doctorDisplay !== '' ? strtoupper($doctorDisplay) : '—';
+
+$patientDisplay = strtoupper(trim((string) $request['patient_name']));
+
+$isReleased = (($request['status'] ?? '') === 'released');
+
+/*
+ * Group rows by their service name. Rows arriving without a
+ * service_name are collected under a final "Additional Tests"
+ * heading, which matches the on-screen grouping.
+ */
+$grouped = [];
+foreach ($results as $row) {
+    $svc = trim((string) ($row['service_name'] ?? ''));
+    if ($svc === '') { $svc = 'Additional Tests'; }
+    if (!isset($grouped[$svc])) { $grouped[$svc] = []; }
+    $grouped[$svc][] = $row;
+}
+
+/* Abnormal / critical tallies drive the legend and the notice. */
+$hasAbnormal = false;
+$criticalTests = [];
+foreach ($results as $row) {
+    $f = (string) ($row['flag'] ?? 'normal');
+    if (in_array($f, ['high', 'low', 'critical'], true)) { $hasAbnormal = true; }
+    if ($f === 'critical') { $criticalTests[] = (string) $row['test_name']; }
+}
+
+/* The section title is the first service name in uppercase. If there
+   are several, it falls back to a generic heading. */
+$firstService = $grouped ? array_key_first($grouped) : '';
+$sectionTitle = count($grouped) === 1
+    ? strtoupper($firstService) . ' RESULT'
+    : 'LABORATORY REPORT';
+
+/*
+ * Signature row data.
+ *
+ * $technologistUser is passed by MedTech::printResult() and carries
+ * the currently logged-in user's record, including prc_license.
+ * $pathologistUser is null for now because there is no pathologist
+ * role in the users table. The third column falls back to the
+ * requesting doctor's name and leaves the PRC line blank.
+ */
+$techName = trim((string) ($technologistUser['full_name'] ?? session()->get('full_name') ?? ''));
+$techPrc  = trim((string) ($technologistUser['prc_license'] ?? ''));
+
+$pathName = trim((string) ($pathologistUser['full_name'] ?? $doctorDisplay));
+$pathPrc  = trim((string) ($pathologistUser['prc_license'] ?? ''));
+?>
+
+<?php if (!$isReleased): ?>
+    <div class="watermark" aria-hidden="true">NOT VALIDATED</div>
+<?php endif; ?>
+
+<div class="sheet">
+
+    <!-- ================= LETTERHEAD ================= -->
+    <div class="letterhead">
+        <img class="letterhead-logo"
+             src="<?= base_url('assets/images/logo4.png') ?>"
+             alt=""
+             onerror="this.style.display='none'">
+        <div class="letterhead-text">
+            <h1 class="clinic-name">PolyMedic Diagnostic Center</h1>
+            <p class="clinic-sub">
+                Davao City, Davao del Sur, Philippines<br>
+                Tel. (082) 000-0000 &nbsp;·&nbsp; polymedic@example.com
+            </p>
+            <p class="clinic-accred">Clinical Laboratory &nbsp;·&nbsp; DOH License No. 0000-00-0000</p>
+        </div>
+    </div>
+
+    <h2 class="doc-title"><?= esc($sectionTitle) ?></h2>
+
+    <?php if (!$isReleased): ?>
+        <div class="draft-banner">
+            Preliminary copy — not yet validated or released. Not for clinical use.
+        </div>
+    <?php endif; ?>
+
+    <!-- ================= PATIENT / SPECIMEN ================= -->
+    <div class="patient-box">
+        <div class="patient-grid">
+            <div class="patient-cell">
+                <span class="p-label">Patient Name</span>
+                <span class="p-value strong"><?= esc($patientDisplay) ?></span>
+            </div>
+            <div class="patient-cell">
+                <span class="p-label">Lab No.</span>
+                <span class="p-value strong"><?= esc($refNo) ?></span>
+            </div>
+
+            <div class="patient-cell">
+                <span class="p-label">Age / Sex</span>
+                <span class="p-value"><?= esc($request['age']) ?> / <?= esc($sexDisplay) ?></span>
+            </div>
+            <div class="patient-cell">
+                <span class="p-label">Date Received</span>
+                <span class="p-value"><?= date('M j, Y', strtotime($request['request_date'])) ?></span>
+            </div>
+
+            <div class="patient-cell">
+                <span class="p-label">Requesting MD</span>
+                <span class="p-value"><?= esc($doctorDisplay) ?></span>
+            </div>
+            <div class="patient-cell">
+                <span class="p-label">Date Released</span>
+                <span class="p-value">
+                    <?= !empty($request['released_at'])
+                        ? date('M j, Y', strtotime($request['released_at']))
+                        : '—' ?>
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= RESULTS TABLE ================= -->
+    <table class="result">
+        <thead>
+            <tr>
+                <th class="c-test">Test Name</th>
+                <th class="c-result">Result</th>
+                <th class="c-unit">Unit</th>
+                <th class="c-range">Reference Range</th>
+            </tr>
+        </thead>
+        <tbody>
+        <?php if (empty($grouped)): ?>
+            <tr>
+                <td colspan="4" style="text-align:center; padding:10mm 0;">
+                    No tests recorded for this report.
+                </td>
+            </tr>
+        <?php else: ?>
+            <?php foreach ($grouped as $svcName => $rows): ?>
+                <?php if (count($grouped) > 1): ?>
+                    <tr class="group-head">
+                        <td colspan="4"><?= esc(strtoupper($svcName)) ?></td>
+                    </tr>
+                <?php endif; ?>
+
+                <?php foreach ($rows as $row):
+                    $flag   = (string) ($row['flag'] ?? 'normal');
+                    $result = trim((string) ($row['result'] ?? ''));
+                    $unit   = trim((string) ($row['unit'] ?? ''));
+                    $range  = trim((string) ($row['reference_range'] ?? ''));
+
+                    $isHigh     = $flag === 'high';
+                    $isLow      = $flag === 'low';
+                    $isCritical = $flag === 'critical';
+                    $isAbnormal = $isHigh || $isLow || $isCritical;
+
+                    $letter = $isCritical ? '**' : ($isHigh ? 'H' : ($isLow ? 'L' : ''));
+                ?>
+                    <tr>
+                        <td class="c-test"><?= esc($row['test_name']) ?></td>
+                        <td class="c-result<?= $isAbnormal ? ' value-abnormal' : '' ?>">
+                            <?php if ($isAbnormal): ?><span class="flag"><?= esc($letter) ?></span><?php endif; ?><?= esc($result !== '' ? $result : '—') ?>
+                        </td>
+                        <td class="c-unit"><?= esc($unit !== '' ? $unit : '—') ?></td>
+                        <td class="c-range"><?= esc($range !== '' ? $range : '—') ?></td>
+                    </tr>
+                <?php endforeach; ?>
+            <?php endforeach; ?>
+        <?php endif; ?>
+        </tbody>
+        <tfoot>
+            <tr><td colspan="4" class="table-close" style="padding:0; height:0;"></td></tr>
+        </tfoot>
+    </table>
+
+    <?php if ($hasAbnormal): ?>
+        <p class="legend">
+            <strong>Legend:</strong>
+            H = above reference range &nbsp;·&nbsp;
+            L = below reference range &nbsp;·&nbsp;
+            ** = critical value
+        </p>
+    <?php endif; ?>
+
+    <?php if (!empty($criticalTests)): ?>
+        <div class="critical-notice">
+            Critical value(s) reported:
+            <?= esc(implode(', ', $criticalTests)) ?>.
+            Attending physician to be notified immediately.
+        </div>
+    <?php endif; ?>
+
+    <!-- ================= INTERPRETATION ================= -->
+    <?php if (!empty($request['findings']) || !empty($request['remarks'])): ?>
+        <div class="narrative">
+            <?php if (!empty($request['findings'])): ?>
+                <div class="narrative-block">
+                    <p class="narrative-key">Findings / Interpretation</p>
+                    <p class="narrative-body"><?= nl2br(esc($request['findings'])) ?></p>
+                </div>
+            <?php endif; ?>
+            <?php if (!empty($request['remarks'])): ?>
+                <div class="narrative-block">
+                    <p class="narrative-key">Remarks</p>
+                    <p class="narrative-body"><?= nl2br(esc($request['remarks'])) ?></p>
+                </div>
+            <?php endif; ?>
+        </div>
+    <?php endif; ?>
+
+    <!-- ================= SIGNATURES ================= -->
+    <div class="sig-row">
+        <div class="sig-col">
+            <div class="sig-name">
+                <?= esc(strtoupper($techName !== '' ? $techName : 'Medical Technologist')) ?>
+            </div>
+            <div class="sig-lic">
+                PRC LIC # <?= esc($techPrc !== '' ? $techPrc : '____________') ?>
+            </div>
+            <div class="sig-line"></div>
+            <div class="sig-sub">Medical Technologist</div>
+        </div>
+
+        <div class="sig-col">
+            <div class="sig-name">&nbsp;</div>
+            <div class="sig-lic">PRC LIC # ____________</div>
+            <div class="sig-line"></div>
+            <div class="sig-sub">Medical Technologist</div>
+        </div>
+
+        <div class="sig-col">
+            <div class="sig-name">
+                <?= esc(strtoupper($pathName !== '' ? $pathName : 'Pathologist')) ?>
+            </div>
+            <div class="sig-lic">
+                PRC LIC # <?= esc($pathPrc !== '' ? $pathPrc : '____________') ?>
+            </div>
+            <div class="sig-line"></div>
+            <div class="sig-sub">Pathologist</div>
+        </div>
+    </div>
+
+    <p class="sig-footnote">
+        <?= $isReleased ? '*** Results Electronically Signed ***' : '' ?>
+    </p>
+
+    <p class="end-mark">
+        <?= $isReleased
+            ? '*** End of Report — Electronically Signed ***'
+            : '*** Preliminary — Not Validated ***' ?>
+    </p>
+
+    <div class="doc-footer">
+        <span><?= esc($refNo) ?> &nbsp;·&nbsp; <?= esc($patientDisplay) ?></span>
+        <span>Printed <?= date('M j, Y g:i A') ?> &nbsp;·&nbsp; MS-PAT-LB-F-08 Rev.2</span>
+    </div>
+
+</div>
+
+</body>
+</html>

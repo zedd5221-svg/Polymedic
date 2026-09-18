@@ -171,4 +171,56 @@ class PaymentModel extends Model
             'failed' => $this->where('payment_status', self::STATUS_FAILED)->countAllResults()
         ];
     }
+
+    /**
+     * ============================================================
+     * RADIOLOGY REVENUE
+     * ============================================================
+     * Sums payments recorded against x-ray requests. Only rows
+     * whose payment_status is 'paid' are counted, so cancelled,
+     * pending, refunded, and failed payments never inflate the
+     * figure.
+     *
+     * The `request_type` column already partitions payments by
+     * department ('lab' or 'xray'), so no join is needed.
+     *
+     * @param  string $from  Inclusive lower bound, 'YYYY-MM-DD'
+     * @param  string $to    Inclusive upper bound, 'YYYY-MM-DD'
+     * @return float
+     */
+    public function getXrayRevenueBetween(string $from, string $to): float
+    {
+        $row = $this->selectSum('total_amount', 'revenue')
+                    ->where('request_type', 'xray')
+                    ->where('payment_status', self::STATUS_PAID)
+                    ->where('payment_date >=', $from . ' 00:00:00')
+                    ->where('payment_date <=', $to   . ' 23:59:59')
+                    ->first();
+
+        return (float) ($row['revenue'] ?? 0);
+    }
+
+    /**
+     * Today's x-ray revenue.
+     */
+    public function getXrayRevenueToday(): float
+    {
+        $today = date('Y-m-d');
+        return $this->getXrayRevenueBetween($today, $today);
+    }
+
+    /**
+     * Month-to-date x-ray revenue.
+     *
+     * The upper bound is today, not the last calendar day, so a
+     * post-dated payment cannot appear as revenue before it was
+     * actually collected.
+     */
+    public function getXrayRevenueThisMonth(): float
+    {
+        return $this->getXrayRevenueBetween(
+            date('Y-m-01'),
+            date('Y-m-d')
+        );
+    }
 }

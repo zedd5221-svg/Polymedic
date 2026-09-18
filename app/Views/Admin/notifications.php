@@ -4,336 +4,313 @@
 
 <?= $this->section('adminContent') ?>
 
-<div class="notifications-wrapper">
-    <!-- Header Stats Card -->
-    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-        <div>
-            <h4 class="fw-bold text-dark mb-1">Notification Center</h4>
-            <p class="text-muted small mb-0">Manage system notifications and appointment alerts</p>
+<?php
+$notifBase = $notif_base ?? 'admin/notifications';
+
+/*
+ * Avatar PNGs live at:
+ *   public/assets/images/man-avatar.png
+ *   public/assets/images/woman-avatar.png
+ */
+$maleAvatar   = 'man-avatar.png';
+$femaleAvatar = 'woman-avatar.png';
+
+$initialsOf = static function ($name) {
+    $parts = preg_split('/\s+/', trim((string) $name));
+    $first = mb_substr($parts[0] ?? '', 0, 1);
+    $last  = count($parts) > 1 ? mb_substr(end($parts), 0, 1) : '';
+    $out   = mb_strtoupper($first . $last);
+    return $out !== '' ? $out : '?';
+};
+
+$patientNameFrom = static function ($title) {
+    $name = preg_replace(
+        '/^(Pending Appointment|New Appointment Request|New Appointment|Appointment|New Lab Request|New X-Ray Request|X-Ray Examination|Laboratory Request):\s*/i',
+        '',
+        (string) $title
+    );
+    return trim($name);
+};
+
+$bucketOf = static function ($ts) {
+    if (!$ts) return 'Earlier';
+    if ($ts >= strtotime('today'))     return 'Today';
+    if ($ts >= strtotime('yesterday')) return 'Yesterday';
+    if ($ts >= strtotime('-7 days'))   return 'Earlier this week';
+    if ($ts >= strtotime('-30 days'))  return 'Earlier this month';
+    return 'Older';
+};
+
+$relativeTime = static function ($ts) {
+    if (!$ts) return '';
+    $diff = time() - $ts;
+    if ($diff < 60)     return 'Just now';
+    if ($diff < 3600)   { $n = (int) floor($diff / 60);    return $n . ($n === 1 ? ' min ago'  : ' mins ago'); }
+    if ($diff < 86400)  { $n = (int) floor($diff / 3600);  return $n . ($n === 1 ? ' hour ago' : ' hours ago'); }
+    if ($diff < 604800) { $n = (int) floor($diff / 86400); return $n . ($n === 1 ? ' day ago'  : ' days ago'); }
+    return date('M j', $ts);
+};
+
+$typeLabels = [
+    'appointment' => 'Appointments',
+    'xray'        => 'X-Ray',
+    'lab'         => 'Laboratory',
+    'billing'     => 'Billing',
+    'payment'     => 'Payments',
+    'system'      => 'System',
+];
+
+$typeCounts = [];
+foreach (($notifications ?? []) as $n) {
+    $t = (string) ($n['type'] ?? 'system');
+    $typeCounts[$t] = ($typeCounts[$t] ?? 0) + 1;
+}
+arsort($typeCounts);
+?>
+
+<div class="nc">
+
+    <header class="nc-head">
+        <div class="nc-head-text">
+            <h2 class="nc-title">Notifications</h2>
+            <p class="nc-lede">
+                <?php if ($unread_count > 0): ?>
+                    <strong><?= (int) $unread_count ?></strong>
+                    unread notification<?= $unread_count === 1 ? '' : 's' ?>.
+                <?php else: ?>
+                    You're all caught up.
+                <?php endif; ?>
+            </p>
         </div>
-        <div class="d-flex gap-2">
-            <a href="<?= base_url('admin/notifications/mark-all-read') ?>" class="btn btn-outline-primary btn-sm d-flex align-items-center gap-2">
-                <i class="bi bi-check2-all"></i> Mark All as Read
-            </a>
-        </div>
-    </div>
+
+        <?php if ($unread_count > 0): ?>
+            <div class="nc-head-actions">
+                <a href="<?= base_url($notifBase . '/mark-all-read') ?>" class="nc-btn">
+                    <i class="bi bi-check2-all" aria-hidden="true"></i>
+                    <span>Mark all as read</span>
+                </a>
+            </div>
+        <?php endif; ?>
+    </header>
 
     <?php if (session()->getFlashdata('success')): ?>
-        <div class="alert alert-success alert-dismissible fade show mb-4">
-            <i class="bi bi-check-circle me-2"></i><?= session()->getFlashdata('success') ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <div class="nc-alert nc-alert--success alert alert-dismissible fade show" role="status">
+            <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+            <span><?= esc(session()->getFlashdata('success')) ?></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss"></button>
         </div>
     <?php endif; ?>
 
     <?php if (session()->getFlashdata('error')): ?>
-        <div class="alert alert-danger alert-dismissible fade show mb-4">
-            <i class="bi bi-exclamation-circle me-2"></i><?= session()->getFlashdata('error') ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <div class="nc-alert nc-alert--error alert alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i>
+            <span><?= esc(session()->getFlashdata('error')) ?></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss"></button>
         </div>
     <?php endif; ?>
 
-    <!-- Filter Pills -->
-    <div class="filter-bar mb-4">
-        <div class="filter-pills d-flex gap-2 flex-wrap">
-            <button class="filter-pill active" data-filter="all">All (<?= $total_count ?>)</button>
-            <button class="filter-pill" data-filter="unread">Unread (<?= $unread_count ?>)</button>
-            <button class="filter-pill" data-filter="read">Read (<?= $total_count - $unread_count ?>)</button>
-        </div>
-    </div>
+    <section class="nc-panel" aria-label="Notifications">
 
-    <!-- Notification List Card -->
-    <div class="table-card">
-        <?php if (!empty($notifications)): ?>
-            <div class="notification-list">
-                <?php foreach ($notifications as $notif): ?>
-                    <div class="notif-card <?= $notif['is_read'] == 0 ? 'unread' : 'read' ?>" data-read-status="<?= $notif['is_read'] == 0 ? 'unread' : 'read' ?>">
-                        <div class="notif-card-icon <?= $notif['type'] ?>">
-                            <i class="bi <?= $notif['type'] == 'appointment' ? 'bi-calendar-check' : 'bi-bell-fill' ?>"></i>
-                        </div>
-                        <div class="notif-card-content">
-                            <div class="d-flex justify-content-between align-items-start mb-1">
-                                <h6 class="notif-card-title mb-0"><?= esc($notif['title']) ?></h6>
-                                <span class="notif-card-time"><i class="bi bi-clock me-1"></i><?= date('M d, Y · h:i A', strtotime($notif['created_at'])) ?></span>
-                            </div>
-                            <p class="notif-card-desc mb-2"><?= esc($notif['message']) ?></p>
-                            <div class="notif-card-actions d-flex align-items-center gap-3">
-                                <?php if ($notif['link']): ?>
-                                    <a href="<?= base_url('admin/notifications/mark-read/' . $notif['id']) ?>" class="btn btn-sm btn-primary-light">
-                                        <i class="bi bi-arrow-right-circle me-1"></i> View Details
-                                    </a>
-                                <?php endif; ?>
-                                <?php if ($notif['is_read'] == 0): ?>
-                                    <a href="<?= base_url('admin/notifications/mark-read/' . $notif['id']) ?>" class="text-secondary small text-decoration-none">
-                                        <i class="bi bi-check-lg me-1"></i> Mark Read
-                                    </a>
-                                <?php endif; ?>
-                                <a href="<?= base_url('admin/notifications/delete/' . $notif['id']) ?>" class="text-danger small text-decoration-none ms-auto" onclick="return confirm('Delete this notification?')">
-                                    <i class="bi bi-trash me-1"></i> Delete
-                                </a>
-                            </div>
-                        </div>
-                    </div>
+        <div class="nc-toolbar">
+            <div class="nc-tabs" role="tablist" aria-label="Filter by read status">
+                <button type="button" class="nc-tab is-active" data-filter="all" aria-pressed="true">
+                    <span>All</span>
+                    <span class="nc-tab-count" data-count-for="all"><?= (int) $total_count ?></span>
+                </button>
+                <button type="button" class="nc-tab" data-filter="unread" aria-pressed="false">
+                    <span>Unread</span>
+                    <span class="nc-tab-count" data-count-for="unread"><?= (int) $unread_count ?></span>
+                </button>
+                <button type="button" class="nc-tab" data-filter="read" aria-pressed="false">
+                    <span>Read</span>
+                    <span class="nc-tab-count" data-count-for="read"><?= (int) ($total_count - $unread_count) ?></span>
+                </button>
+            </div>
+
+            <?php if (!empty($notifications)): ?>
+                <div class="nc-search">
+                    <i class="bi bi-search" aria-hidden="true"></i>
+                    <input type="search"
+                           id="ncSearch"
+                           class="nc-search-input"
+                           placeholder="Search name or message"
+                           autocomplete="off"
+                           aria-label="Search notifications">
+                    <button type="button" class="nc-search-clear" id="ncSearchClear" hidden aria-label="Clear search">
+                        <i class="bi bi-x-lg" aria-hidden="true"></i>
+                    </button>
+                </div>
+            <?php endif; ?>
+        </div>
+
+        <?php if (count($typeCounts) > 1): ?>
+            <div class="nc-chips" role="group" aria-label="Filter by type">
+                <button type="button" class="nc-chip is-active" data-type="all" aria-pressed="true">
+                    All types
+                </button>
+                <?php foreach ($typeCounts as $t => $count): ?>
+                    <button type="button" class="nc-chip" data-type="<?= esc($t, 'attr') ?>" aria-pressed="false">
+                        <span class="nc-chip-dot nc-chip-dot--<?= esc($t, 'attr') ?>" aria-hidden="true"></span>
+                        <?= esc($typeLabels[$t] ?? ucfirst($t)) ?>
+                        <span class="nc-chip-count"><?= (int) $count ?></span>
+                    </button>
                 <?php endforeach; ?>
             </div>
-        <?php else: ?>
-            <div class="text-center py-5">
-                <i class="bi bi-bell-slash text-muted" style="font-size: 3rem;"></i>
-                <h5 class="mt-3 text-secondary">No Notifications Found</h5>
-                <p class="text-muted small">New system alerts and appointment requests will appear here.</p>
-            </div>
         <?php endif; ?>
-    </div>
+
+        <?php if (!empty($notifications)): ?>
+
+            <div class="nc-list" id="ncList">
+                <?php
+                $currentBucket = null;
+                $cardIndex     = 0;
+
+                foreach ($notifications as $notif):
+                    $isUnread = ((int) ($notif['is_read'] ?? 0)) === 0;
+                    $type     = (string) ($notif['type'] ?? 'system');
+
+                    $createdTs = !empty($notif['created_at'])
+                        ? strtotime($notif['created_at'])
+                        : false;
+
+                    $bucket = $bucketOf($createdTs);
+
+                    if ($bucket !== $currentBucket):
+                        if ($currentBucket !== null): ?>
+                            </div>
+                        </section>
+                        <?php endif;
+                        $currentBucket = $bucket;
+                        ?>
+                        <section class="nc-group" data-group="<?= esc($bucket, 'attr') ?>">
+                            <h3 class="nc-group-head"><span><?= esc($bucket) ?></span></h3>
+                            <div class="nc-group-body">
+                    <?php endif;
+
+                    $gender = strtolower((string) ($notif['reference_gender'] ?? ''));
+                    if (!in_array($gender, ['male', 'female'], true)) {
+                        $gender = null;
+                    }
+
+                    $icon  = (string) ($notif['icon'] ?? 'bi-bell-fill');
+                    $color = (string) ($notif['color'] ?? $type);
+
+                    $displayTitle  = (string) ($notif['title'] ?? '');
+                    $message       = (string) ($notif['message'] ?? '');
+                    $nameForAvatar = $patientNameFrom($displayTitle);
+
+                    $showAvatar = ($gender !== null && $type === 'appointment');
+
+                    $haystack = mb_strtolower($displayTitle . ' ' . $message);
+
+                    $cardIndex++;
+                ?>
+                    <article class="nc-card<?= $isUnread ? ' is-unread' : '' ?><?= $showAvatar ? ' is-patient' : '' ?>"
+                             data-read-status="<?= $isUnread ? 'unread' : 'read' ?>"
+                             data-type="<?= esc($type, 'attr') ?>"
+                             data-search="<?= esc($haystack, 'attr') ?>"
+                             style="--nc-i: <?= (int) min($cardIndex, 12) ?>">
+
+                        <div class="nc-lead">
+                            <?php if ($showAvatar): ?>
+                                <span class="nc-avatar nc-avatar--<?= esc($gender, 'attr') ?>">
+                                    <img src="<?= esc(base_url('assets/images/' . ($gender === 'female' ? $femaleAvatar : $maleAvatar)), 'attr') ?>"
+                                         alt=""
+                                         class="nc-avatar-img"
+                                         loading="lazy"
+                                         decoding="async">
+                                </span>
+                            <?php elseif ($type === 'appointment'): ?>
+                                <span class="nc-avatar nc-avatar--initials" aria-hidden="true">
+                                    <?= esc($initialsOf($nameForAvatar)) ?>
+                                </span>
+                            <?php else: ?>
+                                <span class="nc-tile nc-tile--<?= esc($color, 'attr') ?>" aria-hidden="true">
+                                    <i class="bi <?= esc($icon) ?>"></i>
+                                </span>
+                            <?php endif; ?>
+                        </div>
+
+                        <div class="nc-body">
+
+                            <header class="nc-body-head">
+                                <h4 class="nc-card-title"><?= esc($displayTitle) ?></h4>
+
+                                <?php if ($createdTs): ?>
+                                    <time class="nc-time"
+                                          datetime="<?= esc(date('c', $createdTs), 'attr') ?>"
+                                          title="<?= esc(date('M j, Y · g:i A', $createdTs), 'attr') ?>">
+                                        <?= esc($relativeTime($createdTs)) ?>
+                                    </time>
+                                <?php endif; ?>
+                            </header>
+
+                            <p class="nc-card-message"><?= esc($message) ?></p>
+
+                            <footer class="nc-body-foot">
+                                <?php if (!empty($notif['can_open'])): ?>
+                                    <a href="<?= base_url($notifBase . '/mark-read/' . $notif['id']) ?>"
+                                       class="nc-btn nc-btn--sm">
+                                        <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                                        <span>View details</span>
+                                    </a>
+                                <?php else: ?>
+                                    <span class="nc-locked">
+                                        <i class="bi bi-eye-slash" aria-hidden="true"></i>
+                                        <span>Notification only</span>
+                                    </span>
+                                <?php endif; ?>
+
+                                <?php if ($isUnread): ?>
+                                    <a href="<?= base_url($notifBase . '/mark-read/' . $notif['id']) ?>"
+                                       class="nc-link">
+                                        <i class="bi bi-check2" aria-hidden="true"></i>
+                                        <span>Mark read</span>
+                                    </a>
+                                <?php endif; ?>
+
+                                <a href="<?= base_url($notifBase . '/delete/' . $notif['id']) ?>"
+                                   class="nc-link nc-link--danger"
+                                   onclick="return confirm('Delete this notification?')">
+                                    <i class="bi bi-trash3" aria-hidden="true"></i>
+                                    <span>Delete</span>
+                                </a>
+                            </footer>
+
+                        </div>
+                    </article>
+                <?php endforeach; ?>
+
+                <?php if ($currentBucket !== null): ?>
+                            </div>
+                        </section>
+                <?php endif; ?>
+            </div>
+
+            <div class="nc-empty" id="ncEmpty" hidden>
+                <div class="nc-empty-icon"><i class="bi bi-funnel" aria-hidden="true"></i></div>
+                <h3>Nothing matches that filter</h3>
+                <p>Try a different filter, or clear the search to see everything.</p>
+                <button type="button" class="nc-btn" id="ncClearFilter">
+                    <span>Reset filters</span>
+                </button>
+            </div>
+
+        <?php else: ?>
+
+            <div class="nc-empty">
+                <div class="nc-empty-icon"><i class="bi bi-bell-slash" aria-hidden="true"></i></div>
+                <h3>No notifications yet</h3>
+                <p>New alerts and appointment requests will show up here.</p>
+            </div>
+
+        <?php endif; ?>
+
+    </section>
+
 </div>
 
-<style>
-/* ===== ADMIN THEME COLORS ===== */
-:root {
-    --admin-primary: #0148ca;
-    --admin-primary-light: #e0edff;
-    --admin-primary-bg: #f0f7ff;
-}
-
-.table-card {
-    background: #ffffff;
-    border-radius: 14px;
-    padding: 1.5rem;
-    box-shadow: 0 2px 12px rgba(1, 72, 202, 0.06);
-    border: 1px solid rgba(1, 72, 202, 0.06);
-}
-
-/* ===== FILTER PILLS ===== */
-.filter-pill {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    padding: 0.4rem 1rem;
-    border-radius: 30px;
-    font-size: 0.82rem;
-    color: #64748b;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.filter-pill.active {
-    background: #0148ca;
-    color: white;
-    border-color: #0148ca;
-}
-
-.filter-pill:hover:not(.active) {
-    background: #f0f7ff;
-    border-color: #0148ca;
-    color: #0148ca;
-}
-
-/* ===== NOTIFICATION LIST ===== */
-.notification-list {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.notif-card {
-    display: flex;
-    gap: 1rem;
-    padding: 1.2rem;
-    border-radius: 12px;
-    border: 1px solid #eef2f7;
-    background: #ffffff;
-    transition: all 0.2s ease;
-}
-
-.notif-card.unread {
-    background: #f8fafc;
-    border-left: 4px solid #0148ca;
-}
-
-.notif-card.read {
-    opacity: 0.85;
-}
-
-.notif-card:hover {
-    box-shadow: 0 4px 12px rgba(1, 72, 202, 0.08);
-}
-
-/* ===== NOTIFICATION ICON ===== */
-.notif-card-icon {
-    width: 42px;
-    height: 42px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.2rem;
-    flex-shrink: 0;
-}
-
-.notif-card-icon.appointment {
-    background: #e0edff;
-    color: #0148ca;
-}
-
-.notif-card-icon.system {
-    background: #fef3c7;
-    color: #d97706;
-}
-
-/* ===== NOTIFICATION CONTENT ===== */
-.notif-card-content {
-    flex: 1;
-    min-width: 0;
-}
-
-.notif-card-title {
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: #0f172a;
-}
-
-.notif-card-time {
-    font-size: 0.75rem;
-    color: #94a3b8;
-    white-space: nowrap;
-}
-
-.notif-card-desc {
-    font-size: 0.85rem;
-    color: #475569;
-}
-
-/* ===== BUTTONS ===== */
-.btn-outline-primary {
-    background: transparent;
-    border: 1px solid #0148ca;
-    color: #0148ca;
-    font-weight: 600;
-    transition: all 0.3s ease;
-}
-
-.btn-outline-primary:hover {
-    background: #0148ca;
-    color: white;
-}
-
-.btn-primary-light {
-    background: #e0edff;
-    color: #0148ca;
-    font-weight: 600;
-    border: none;
-    font-size: 0.78rem;
-    padding: 0.35rem 0.85rem;
-    border-radius: 6px;
-    transition: all 0.3s ease;
-}
-
-.btn-primary-light:hover {
-    background: #0148ca;
-    color: white;
-}
-
-/* ===== RESPONSIVE ===== */
-@media (max-width: 768px) {
-    .d-flex.justify-content-between {
-        flex-direction: column;
-        align-items: stretch !important;
-        gap: 0.75rem;
-    }
-    
-    .d-flex.justify-content-between .d-flex.gap-2 {
-        justify-content: stretch;
-    }
-    
-    .d-flex.justify-content-between .d-flex.gap-2 a {
-        flex: 1;
-        text-align: center;
-    }
-    
-    .notif-card {
-        flex-direction: column;
-        align-items: flex-start;
-        padding: 1rem;
-    }
-    
-    .notif-card-icon {
-        width: 36px;
-        height: 36px;
-        font-size: 1rem;
-    }
-    
-    .notif-card-title {
-        font-size: 0.85rem;
-    }
-    
-    .notif-card-time {
-        font-size: 0.65rem;
-        white-space: normal;
-    }
-    
-    .notif-card-desc {
-        font-size: 0.8rem;
-    }
-    
-    .notif-card-actions {
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        width: 100%;
-    }
-    
-    .notif-card-actions .ms-auto {
-        margin-left: 0 !important;
-    }
-    
-    .notif-card-actions a {
-        font-size: 0.7rem !important;
-        padding: 0.25rem 0.6rem !important;
-    }
-    
-    .filter-pills {
-        gap: 0.5rem;
-    }
-    
-    .filter-pill {
-        font-size: 0.7rem;
-        padding: 0.25rem 0.6rem;
-    }
-}
-
-@media (max-width: 480px) {
-    .table-card {
-        padding: 0.75rem;
-    }
-    
-    .notif-card {
-        padding: 0.75rem;
-    }
-    
-    .notif-card-content .d-flex {
-        flex-direction: column;
-        align-items: flex-start !important;
-        gap: 0.25rem;
-    }
-}
-</style>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Filter functionality
-    document.querySelectorAll('.filter-pill').forEach(pill => {
-        pill.addEventListener('click', function() {
-            document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
-            this.classList.add('active');
-            const filter = this.dataset.filter;
-
-            document.querySelectorAll('.notif-card').forEach(card => {
-                if (filter === 'all' || card.dataset.readStatus === filter) {
-                    card.style.display = 'flex';
-                } else {
-                    card.style.display = 'none';
-                }
-            });
-        });
-    });
-});
-</script>
+<?= $this->include('partials/notificationStyles') ?>
+<?= $this->include('partials/notificationScript') ?>
 
 <?= $this->endSection() ?>

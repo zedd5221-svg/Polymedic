@@ -30,6 +30,38 @@
 
     $reportComplete = trim($findings) !== '' && trim($interpretation) !== '';
 
+    /*
+     * Collect every image path for this study.
+     *
+     * Preference order:
+     *   1. image_paths (JSON array, new format, up to 5)
+     *   2. image_path  (legacy single-column)
+     *
+     * Duplicates are removed so a study saved under both columns
+     * does not show the same image twice.
+     */
+    $imagePaths = [];
+
+    if (!empty($examination['image_paths'])) {
+        $decoded = json_decode($examination['image_paths'], true);
+        if (is_array($decoded)) {
+            foreach ($decoded as $p) {
+                if (is_string($p) && trim($p) !== '') {
+                    $imagePaths[] = $p;
+                }
+            }
+        }
+    }
+
+    if (empty($imagePaths) && !empty($examination['image_path'])) {
+        $imagePaths[] = $examination['image_path'];
+    }
+
+    $imagePaths = array_values(array_unique($imagePaths));
+    $imageCount = count($imagePaths);
+    $maxImages  = 5;
+    $slotsLeft  = max(0, $maxImages - $imageCount);
+
     $initialsOf = static function ($name) {
         $parts = preg_split('/\s+/', trim((string) $name));
         $first = mb_substr($parts[0] ?? '', 0, 1);
@@ -85,47 +117,132 @@
             <section class="xv-card xv-card--viewer">
                 <header class="xv-card-head">
                     <h5 class="xv-card-title">
-                        <i class="bi bi-image" aria-hidden="true"></i>
-                        Radiology image
+                        <i class="bi bi-images" aria-hidden="true"></i>
+                        Radiology images
+                        <?php if ($imageCount > 0): ?>
+                            <span class="xv-count"><?= $imageCount ?> of <?= $maxImages ?></span>
+                        <?php endif; ?>
                     </h5>
 
                     <?php if ($isEditable): ?>
-                        <form action="<?= base_url('radiologist/examination/upload/' . (int) $examination['id']) ?>"
-                              method="POST"
-                              enctype="multipart/form-data"
-                              class="xv-upload">
-                            <?= csrf_field() ?>
-                            <input type="file"
-                                   name="xray_image"
-                                   id="xrayUpload"
-                                   accept="image/*"
-                                   required
-                                   hidden>
-                            <button type="button" class="xv-btn xv-btn--sm" onclick="document.getElementById('xrayUpload').click()">
-                                <i class="bi bi-upload" aria-hidden="true"></i>
-                                <span id="uploadBtnLabel">Choose image</span>
-                            </button>
-                            <button type="submit" class="xv-btn xv-btn--sm xv-btn--primary" id="uploadSubmit" hidden>
-                                <i class="bi bi-check2" aria-hidden="true"></i>
-                                Upload
-                            </button>
-                        </form>
+                        <?php if ($slotsLeft > 0): ?>
+                            <form action="<?= base_url('radiologist/examination/upload/' . (int) $examination['id']) ?>"
+                                  method="POST"
+                                  enctype="multipart/form-data"
+                                  class="xv-upload">
+                                <?= csrf_field() ?>
+                                <input type="file"
+                                       name="xray_images[]"
+                                       id="xrayUpload"
+                                       accept="image/jpeg,image/png,image/gif,image/webp"
+                                       multiple
+                                       hidden>
+                                <button type="button" class="xv-btn xv-btn--sm" onclick="document.getElementById('xrayUpload').click()">
+                                    <i class="bi bi-upload" aria-hidden="true"></i>
+                                    <span id="uploadBtnLabel">
+                                        <?= $imageCount > 0 ? 'Add images' : 'Choose images' ?>
+                                    </span>
+                                </button>
+                                <button type="submit" class="xv-btn xv-btn--sm xv-btn--primary" id="uploadSubmit" hidden>
+                                    <i class="bi bi-check2" aria-hidden="true"></i>
+                                    Upload
+                                </button>
+                            </form>
+                        <?php else: ?>
+                            <span class="xv-cap-note">
+                                Maximum of <?= $maxImages ?> images reached.
+                            </span>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </header>
 
-                <div class="xv-viewer">
-                    <?php if (!empty($examination['image_path'])): ?>
-                        <img src="<?= base_url($examination['image_path']) ?>"
-                             alt="Radiology image for <?= esc($examination['patient_name'] ?? '', 'attr') ?>"
-                             class="xv-image">
-                    <?php else: ?>
-                        <div class="xv-viewer-empty">
-                            <i class="bi bi-image" aria-hidden="true"></i>
-                            <p>No image uploaded yet</p>
-                            <small>Upload a JPEG or PNG to begin the read.</small>
+                <?php if ($imageCount > 0): ?>
+
+                    <div class="xv-viewer"
+                         id="xvViewer"
+                         data-count="<?= $imageCount ?>">
+
+                        <?php foreach ($imagePaths as $i => $path): ?>
+                            <img src="<?= base_url($path) ?>"
+                                 alt="Radiology image <?= (int) ($i + 1) ?> for <?= esc($examination['patient_name'] ?? '', 'attr') ?>"
+                                 class="xv-image<?= $i === 0 ? ' is-active' : '' ?>"
+                                 data-index="<?= $i ?>"
+                                 <?= $i === 0 ? '' : 'hidden' ?>>
+                        <?php endforeach; ?>
+
+                        <?php if ($imageCount > 1): ?>
+                            <button type="button"
+                                    class="xv-nav xv-nav--prev"
+                                    id="xvPrev"
+                                    aria-label="Previous image">
+                                <i class="bi bi-chevron-left" aria-hidden="true"></i>
+                            </button>
+                            <button type="button"
+                                    class="xv-nav xv-nav--next"
+                                    id="xvNext"
+                                    aria-label="Next image">
+                                <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                            </button>
+                            <span class="xv-counter" id="xvCounter">1 / <?= $imageCount ?></span>
+                        <?php endif; ?>
+                    </div>
+
+                    <?php if ($imageCount > 1): ?>
+                        <div class="xv-thumbs" role="tablist" aria-label="Image thumbnails">
+                            <?php foreach ($imagePaths as $i => $path): ?>
+                                <?php if ($isEditable): ?>
+                                    <form action="<?= base_url('radiologist/examination/remove-image/' . (int) $examination['id']) ?>"
+                                          method="POST"
+                                          class="xv-thumb-form"
+                                          onsubmit="return confirm('Remove this image? This cannot be undone.');">
+                                        <?= csrf_field() ?>
+                                        <input type="hidden" name="image_path" value="<?= esc($path, 'attr') ?>">
+                                        <button type="button"
+                                                class="xv-thumb<?= $i === 0 ? ' is-active' : '' ?>"
+                                                data-index="<?= $i ?>"
+                                                role="tab"
+                                                aria-selected="<?= $i === 0 ? 'true' : 'false' ?>"
+                                                aria-label="Show image <?= (int) ($i + 1) ?>">
+                                            <img src="<?= base_url($path) ?>"
+                                                 alt=""
+                                                 loading="lazy"
+                                                 decoding="async">
+                                        </button>
+                                        <button type="submit"
+                                                class="xv-thumb-remove"
+                                                title="Remove this image"
+                                                aria-label="Remove image <?= (int) ($i + 1) ?>">
+                                            <i class="bi bi-x" aria-hidden="true"></i>
+                                        </button>
+                                    </form>
+                                <?php else: ?>
+                                    <button type="button"
+                                            class="xv-thumb<?= $i === 0 ? ' is-active' : '' ?>"
+                                            data-index="<?= $i ?>"
+                                            role="tab"
+                                            aria-selected="<?= $i === 0 ? 'true' : 'false' ?>"
+                                            aria-label="Show image <?= (int) ($i + 1) ?>">
+                                        <img src="<?= base_url($path) ?>"
+                                             alt=""
+                                             loading="lazy"
+                                             decoding="async">
+                                    </button>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
                         </div>
                     <?php endif; ?>
-                </div>
+
+                <?php else: ?>
+
+                    <div class="xv-viewer">
+                        <div class="xv-viewer-empty">
+                            <i class="bi bi-image" aria-hidden="true"></i>
+                            <p>No images uploaded yet</p>
+                            <small>Upload up to <?= $maxImages ?> JPEG, PNG, GIF, or WEBP files to begin the read.</small>
+                        </div>
+                    </div>
+
+                <?php endif; ?>
             </section>
 
             <!-- RIGHT: PATIENT -->
@@ -213,7 +330,6 @@
 
             <?php if ($isReleased): ?>
 
-                <!-- Read-only report -->
                 <div class="xv-report">
                     <div class="xv-report-section">
                         <h6 class="xv-report-label">Findings</h6>
@@ -236,13 +352,6 @@
 
             <?php else: ?>
 
-                <!-- Editable report.
-                     Save draft posts to saveDraft/{id}: saves whatever is
-                     there and keeps the status at in_progress.
-                     Save report posts to save/{id}: refuses unless both
-                     fields have content, then sets status to completed.
-                     Release is a separate link that only fires when the
-                     report is already complete. -->
                 <form action="<?= base_url('radiologist/examination/save/' . (int) $examination['id']) ?>"
                       method="POST"
                       id="xvReportForm"
@@ -290,8 +399,6 @@
                         </div>
 
                         <div class="xv-report-buttons">
-                            <!-- Save draft: always enabled. Saves what is
-                                 there and keeps status at in_progress. -->
                             <button type="submit"
                                     class="xv-btn"
                                     formaction="<?= base_url('radiologist/examination/save-draft/' . (int) $examination['id']) ?>">
@@ -299,10 +406,6 @@
                                 Save draft
                             </button>
 
-                            <!-- Save report / Complete: only fires when
-                                 both fields have content. Server also
-                                 validates so a crafted POST cannot
-                                 bypass the rule. -->
                             <button type="submit"
                                     class="xv-btn xv-btn--primary"
                                     id="xvCompleteBtn"
@@ -335,7 +438,7 @@
 /* =========================================================
    RADIOLOGIST · VIEW EXAMINATION
    Namespaced under .xv. Visual tokens match the receptionist
-   pages so this doesn't look like a different product.
+   pages so this does not look like a different product.
    ========================================================= */
 
 .xv {
@@ -516,6 +619,21 @@
 
 .xv-card-title i { color: var(--xv-accent); font-size: 0.9rem; }
 
+.xv-count {
+    margin-left: 0.35rem;
+    padding: 0.15rem 0.45rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--xv-muted);
+    background: var(--xv-line-soft);
+    border-radius: 999px;
+}
+
+.xv-cap-note {
+    font-size: 0.75rem;
+    color: var(--xv-muted);
+}
+
 /* ---------- grid ---------- */
 
 .xv-grid {
@@ -535,11 +653,13 @@
 }
 
 .xv-viewer {
+    position: relative;
     display: grid;
     place-items: center;
     min-height: 380px;
     padding: 1rem;
     background: #0f172a;
+    overflow: hidden;
 }
 
 .xv-image {
@@ -548,6 +668,108 @@
     display: block;
     border-radius: 6px;
 }
+
+.xv-image[hidden] { display: none; }
+
+.xv-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    color: #e2e8f0;
+    background: rgba(15, 23, 42, 0.55);
+    border: 1px solid rgba(226, 232, 240, 0.15);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.xv-nav:hover {
+    background: rgba(15, 23, 42, 0.85);
+    border-color: rgba(226, 232, 240, 0.3);
+}
+
+.xv-nav--prev { left: 0.75rem; }
+.xv-nav--next { right: 0.75rem; }
+
+.xv-counter {
+    position: absolute;
+    bottom: 0.75rem;
+    right: 0.75rem;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #e2e8f0;
+    background: rgba(15, 23, 42, 0.65);
+    border-radius: 999px;
+    font-variant-numeric: tabular-nums;
+}
+
+.xv-thumbs {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.1rem;
+    overflow-x: auto;
+    background: var(--xv-subtle);
+    border-top: 1px solid var(--xv-line-soft);
+}
+
+.xv-thumb-form {
+    position: relative;
+    display: inline-flex;
+    margin: 0;
+}
+
+.xv-thumb {
+    width: 64px;
+    height: 64px;
+    padding: 0;
+    overflow: hidden;
+    background: #ffffff;
+    border: 2px solid var(--xv-line);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.xv-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.xv-thumb:hover { border-color: #cbd5e1; }
+
+.xv-thumb.is-active {
+    border-color: var(--xv-accent);
+    box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.18);
+}
+
+.xv-thumb-remove {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 20px;
+    height: 20px;
+    display: grid;
+    place-items: center;
+    color: #ffffff;
+    background: var(--xv-danger);
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 0.7rem;
+    line-height: 1;
+    padding: 0;
+    transition: background-color 0.15s ease;
+}
+
+.xv-thumb-remove:hover { background: #7f1d1d; }
 
 .xv-viewer-empty {
     display: flex;
@@ -716,7 +938,6 @@
     box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.12);
 }
 
-/* A field that failed the completeness check while completing. */
 .xv-textarea.is-missing {
     border-color: var(--xv-danger);
     box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.12);
@@ -790,6 +1011,12 @@
 @media (max-width: 640px) {
     .xv-viewer { min-height: 240px; }
 
+    .xv-nav { width: 30px; height: 30px; }
+    .xv-nav--prev { left: 0.5rem; }
+    .xv-nav--next { right: 0.5rem; }
+
+    .xv-thumb { width: 52px; height: 52px; }
+
     .xv-report-foot { flex-direction: column; align-items: stretch; }
     .xv-report-buttons { width: 100%; }
     .xv-report-buttons .xv-btn { flex: 1; justify-content: center; }
@@ -805,7 +1032,8 @@
     'use strict';
 
     /* =====================================================
-       Upload button: show a confirm button once a file is chosen.
+       Upload button: reveal the confirm button once files are
+       selected, and summarise how many were chosen.
        ===================================================== */
 
     var fileInput = document.getElementById('xrayUpload');
@@ -814,28 +1042,87 @@
 
     if (fileInput && uploadSubmit) {
         fileInput.addEventListener('change', function () {
-            if (this.files && this.files.length > 0) {
+            var n = this.files ? this.files.length : 0;
+
+            if (n > 0) {
                 uploadSubmit.hidden = false;
                 if (uploadLabel) {
-                    uploadLabel.textContent = this.files[0].name;
+                    uploadLabel.textContent = n === 1
+                        ? this.files[0].name
+                        : n + ' files selected';
                 }
             } else {
                 uploadSubmit.hidden = true;
                 if (uploadLabel) {
-                    uploadLabel.textContent = 'Choose image';
+                    uploadLabel.textContent = 'Choose images';
                 }
             }
         });
     }
 
     /* =====================================================
-       Completeness gate.
+       Image viewer.
+       Thumbnails switch the main image; prev/next step
+       through the set; a counter shows the current position.
+       Nothing is fetched — every image is already in the DOM.
+       ===================================================== */
+
+    var viewer = document.getElementById('xvViewer');
+    var images = viewer ? Array.prototype.slice.call(viewer.querySelectorAll('.xv-image')) : [];
+    var thumbs = Array.prototype.slice.call(document.querySelectorAll('.xv-thumb'));
+    var counter = document.getElementById('xvCounter');
+    var prevBtn = document.getElementById('xvPrev');
+    var nextBtn = document.getElementById('xvNext');
+
+    if (images.length > 1) {
+        var current = 0;
+
+        var show = function (index) {
+            if (index < 0) { index = images.length - 1; }
+            if (index >= images.length) { index = 0; }
+            current = index;
+
+            images.forEach(function (img, i) {
+                var active = i === current;
+                img.hidden = !active;
+                img.classList.toggle('is-active', active);
+            });
+
+            thumbs.forEach(function (btn, i) {
+                var active = i === current;
+                btn.classList.toggle('is-active', active);
+                btn.setAttribute('aria-selected', active ? 'true' : 'false');
+            });
+
+            if (counter) {
+                counter.textContent = (current + 1) + ' / ' + images.length;
+            }
+        };
+
+        thumbs.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var idx = parseInt(this.dataset.index, 10);
+                if (!isNaN(idx)) { show(idx); }
+            });
+        });
+
+        if (prevBtn) { prevBtn.addEventListener('click', function () { show(current - 1); }); }
+        if (nextBtn) { nextBtn.addEventListener('click', function () { show(current + 1); }); }
+
+        document.addEventListener('keydown', function (e) {
+            if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+                return;
+            }
+            if (e.key === 'ArrowLeft')  { show(current - 1); }
+            if (e.key === 'ArrowRight') { show(current + 1); }
+        });
+    }
+
+    /* =====================================================
+       Completeness gate for the report.
        Save report (and its release step) are only allowed when
-       both Findings and Impression have content. The button
-       disables itself the moment either field goes empty, so the
-       radiologist cannot accidentally complete a half-written
-       report. The server checks the same thing again, so a
-       crafted POST cannot skip this rule.
+       both Findings and Impression have content. The server
+       checks the same rule again.
        ===================================================== */
 
     var findingsEl = document.getElementById('findingsInput');
@@ -861,8 +1148,6 @@
 
         completeBtn.disabled = !okBoth;
 
-        // Mark each field separately so the radiologist sees exactly
-        // which one is missing, not just that something is.
         findingsEl.classList.toggle('is-missing', !okFindings);
         impressionEl.classList.toggle('is-missing', !okImpression);
 

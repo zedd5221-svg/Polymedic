@@ -5,364 +5,351 @@
 <?= $this->section('radiologistContent') ?>
 
 <?php
-    $examinations = (isset($examinations) && is_array($examinations)) ? $examinations : [];
-    $counts       = is_array($counts ?? null) ? $counts : [];
+/* ------------------------------------------------------------------
+   View-local helpers only. No controller or query logic is changed.
+   ------------------------------------------------------------------ */
+$examinations = (isset($examinations) && is_array($examinations)) ? $examinations : [];
+$counts       = is_array($counts ?? null) ? $counts : [];
 
-    // PNG avatar filenames inside public/assets/images/.
-    // Change these two strings if your files are named differently.
-    $maleAvatar   = 'man-avatar.png';
-    $femaleAvatar = 'woman-avatar.png';
+// PNG avatar filenames inside public/assets/images/.
+$maleAvatar   = 'man-avatar.png';
+$femaleAvatar = 'woman-avatar.png';
 
-    $statusTabs = [
-        'all'         => ['label' => 'All',         'count' => (int) ($counts['total']      ?? count($examinations))],
-        'pending'     => ['label' => 'Pending',     'count' => (int) ($counts['pending']    ?? 0)],
-        'in_progress' => ['label' => 'In reading',  'count' => (int) ($counts['processing'] ?? 0)],
-        'completed'   => ['label' => 'Completed',   'count' => (int) ($counts['completed']  ?? 0)],
-        'released'    => ['label' => 'Released',    'count' => (int) ($counts['released']   ?? 0)],
-    ];
+$statusMeta = [
+    'pending'     => ['label' => 'Pending',    'tone' => 'pending'],
+    'in_progress' => ['label' => 'In reading', 'tone' => 'progress'],
+    'processing'  => ['label' => 'In reading', 'tone' => 'progress'],
+    'completed'   => ['label' => 'Completed',  'tone' => 'completed'],
+    'released'    => ['label' => 'Released',   'tone' => 'released'],
+];
 
-    $statusMeta = [
-        'pending'     => ['label' => 'Pending',    'tone' => 'pending'],
-        'in_progress' => ['label' => 'In reading', 'tone' => 'progress'],
-        'processing'  => ['label' => 'In reading', 'tone' => 'progress'],
-        'completed'   => ['label' => 'Completed',  'tone' => 'completed'],
-        'released'    => ['label' => 'Released',   'tone' => 'released'],
-    ];
+$filterTabs = [
+    'all'         => ['label' => 'All',         'count' => (int) ($counts['total']      ?? count($examinations))],
+    'pending'     => ['label' => 'Pending',     'count' => (int) ($counts['pending']    ?? 0)],
+    'in_progress' => ['label' => 'In reading',  'count' => (int) ($counts['processing'] ?? 0)],
+    'completed'   => ['label' => 'Completed',   'count' => (int) ($counts['completed']  ?? 0)],
+    'released'    => ['label' => 'Released',    'count' => (int) ($counts['released']   ?? 0)],
+];
 
-    $initialsOf = static function ($name) {
-        $parts = preg_split('/\s+/', trim((string) $name));
-        $first = mb_substr($parts[0] ?? '', 0, 1);
-        $last  = count($parts) > 1 ? mb_substr(end($parts), 0, 1) : '';
-        return mb_strtoupper($first . $last);
-    };
+$initialsOf = static function ($name) {
+    $parts = preg_split('/\s+/', trim((string) $name));
+    $first = mb_substr($parts[0] ?? '', 0, 1);
+    $last  = count($parts) > 1 ? mb_substr(end($parts), 0, 1) : '';
+    return mb_strtoupper($first . $last);
+};
 
-    $shorten = static function ($text, $max = 46) {
-        $text = trim((string) $text);
-        if ($text === '') { return ''; }
-        if (mb_strlen($text) <= $max) { return $text; }
-        return mb_substr($text, 0, $max - 1) . '…';
-    };
+$shorten = static function ($text, $max = 46) {
+    $text = trim((string) $text);
+    if ($text === '') { return ''; }
+    if (mb_strlen($text) <= $max) { return $text; }
+    return mb_substr($text, 0, $max - 1) . '…';
+};
 ?>
 
-<div class="ex">
-    <!-- STATS -->
-    <div class="ex-stats">
-        <div class="ex-stat">
-            <div class="ex-stat-icon ex-stat-icon--blue">
-                <i class="bi bi-clipboard2-pulse" aria-hidden="true"></i>
-            </div>
-            <div class="ex-stat-body">
-                <div class="ex-stat-value"><?= number_format($counts['total'] ?? 0) ?></div>
-                <div class="ex-stat-label">Total studies</div>
-                <div class="ex-stat-sub">All X-Ray examinations</div>
-            </div>
+<div class="dx">
+
+    <!-- PAGE HEADER -->
+    <header class="dx-head">
+        <div>
+            <h2 class="dx-title">X-Ray examinations</h2>
         </div>
 
-        <div class="ex-stat">
-            <div class="ex-stat-icon ex-stat-icon--amber">
-                <i class="bi bi-clock-history" aria-hidden="true"></i>
-            </div>
-            <div class="ex-stat-body">
-                <div class="ex-stat-value"><?= number_format($counts['pending'] ?? 0) ?></div>
-                <div class="ex-stat-label">Pending</div>
-                <div class="ex-stat-sub">Awaiting read</div>
-            </div>
+        <div class="dx-head-actions">
+            <button type="button" class="dx-btn" onclick="window.location.reload()">
+                <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
+                Refresh
+            </button>
         </div>
-
-        <div class="ex-stat">
-            <div class="ex-stat-icon ex-stat-icon--blue">
-                <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
-            </div>
-            <div class="ex-stat-body">
-                <div class="ex-stat-value"><?= number_format($counts['processing'] ?? 0) ?></div>
-                <div class="ex-stat-label">In reading</div>
-                <div class="ex-stat-sub">Currently open</div>
-            </div>
-        </div>
-
-        <div class="ex-stat">
-            <div class="ex-stat-icon ex-stat-icon--green">
-                <i class="bi bi-check2-circle" aria-hidden="true"></i>
-            </div>
-            <div class="ex-stat-body">
-                <div class="ex-stat-value"><?= number_format($counts['completed'] ?? 0) ?></div>
-                <div class="ex-stat-label">Completed</div>
-                <div class="ex-stat-sub">Report signed</div>
-            </div>
-        </div>
-
-        <div class="ex-stat">
-            <div class="ex-stat-icon ex-stat-icon--teal">
-                <i class="bi bi-send-check" aria-hidden="true"></i>
-            </div>
-            <div class="ex-stat-body">
-                <div class="ex-stat-value"><?= number_format($counts['released'] ?? 0) ?></div>
-                <div class="ex-stat-label">Released</div>
-                <div class="ex-stat-sub">Sent to reception</div>
-            </div>
-        </div>
-    </div>
+    </header>
 
 
-    <!-- PANEL -->
-    <section class="ex-panel" aria-label="X-Ray examinations">
+    <!-- WORKLIST -->
+    <section class="dx-panel" aria-label="X-Ray examinations">
 
-        <div class="ex-tabs" role="group" aria-label="Filter by status">
-            <?php foreach ($statusTabs as $key => $tab): ?>
+        <div class="dx-tabs" role="group" aria-label="Filter by status">
+            <?php foreach ($filterTabs as $key => $tab): ?>
                 <button type="button"
-                        class="ex-tab<?= $key === 'all' ? ' is-active' : '' ?>"
+                        class="dx-tab<?= $key === 'all' ? ' is-active' : '' ?>"
                         data-status="<?= esc($key, 'attr') ?>"
                         aria-pressed="<?= $key === 'all' ? 'true' : 'false' ?>">
                     <?= esc($tab['label']) ?>
-                    <span class="ex-tab-count"><?= (int) $tab['count'] ?></span>
+                    <span class="dx-tab-count"><?= (int) $tab['count'] ?></span>
                 </button>
             <?php endforeach; ?>
         </div>
 
-        <div class="ex-filters">
-            <div class="ex-search">
+        <div class="dx-filters">
+            <div class="dx-search">
                 <i class="bi bi-search" aria-hidden="true"></i>
                 <label class="visually-hidden" for="searchExams">Search examinations</label>
-                <input type="text"
-                       class="ex-input"
+                <input type="search"
+                       class="dx-input"
                        id="searchExams"
                        placeholder="Search patient, accession, exam or physician"
                        autocomplete="off">
-                <kbd class="ex-kbd" aria-hidden="true">/</kbd>
+                <kbd class="dx-kbd" aria-hidden="true">/</kbd>
             </div>
         </div>
 
-        <div class="ex-grid-wrap">
-            <div class="ex-cards" id="examinationsTable">
-                <?php if (count($examinations) > 0): ?>
-                    <?php foreach ($examinations as $exam):
-                        $examId    = (int) ($exam['id'] ?? 0);
-                        $statusKey = (string) ($exam['status'] ?? 'pending');
-                        $meta      = $statusMeta[$statusKey] ?? ['label' => ucfirst($statusKey), 'tone' => 'pending'];
-                        $name      = (string) ($exam['patient_name'] ?? 'Unknown');
-                        $examType  = trim((string) ($exam['exam_type'] ?? ''));
-                        $doctor    = trim((string) ($exam['doctor_name'] ?? ''));
-                        $radiologist = trim((string) ($exam['radiologist_name'] ?? ''));
-                        $isStat    = strtolower((string) ($exam['priority'] ?? '')) === 'stat';
-                        $dateTs    = !empty($exam['exam_date']) ? strtotime($exam['exam_date']) : false;
-                        $createdTs = !empty($exam['created_at']) ? strtotime($exam['created_at']) : false;
+        <div class="dx-grid-wrap" id="dxTableWrap"<?= empty($examinations) ? ' hidden' : '' ?>>
+            <div class="dx-cards" id="dxRows">
+                <?php foreach ($examinations as $exam):
 
-                        $hasImage  = !empty($exam['image_path']);
-                        $hasDraft  = trim((string) ($exam['findings'] ?? '')) !== ''
-                                  || trim((string) ($exam['interpretation'] ?? '')) !== '';
+                    $examId      = (int) ($exam['id'] ?? 0);
+                    $statusKey   = (string) ($exam['status'] ?? 'pending');
+                    $meta        = $statusMeta[$statusKey] ?? ['label' => ucfirst($statusKey), 'tone' => 'pending'];
+                    $reference   = 'XR-' . date('y') . '-' . str_pad((string) $examId, 4, '0', STR_PAD_LEFT);
+                    $name        = (string) ($exam['patient_name'] ?? 'Unknown');
+                    $examType    = trim((string) ($exam['exam_type'] ?? ''));
+                    $doctor      = trim((string) ($exam['doctor_name'] ?? ''));
+                    $radiologist = trim((string) ($exam['radiologist_name'] ?? ''));
+                    $isStat      = strtolower((string) ($exam['priority'] ?? '')) === 'stat';
+                    $dateTs      = !empty($exam['exam_date']) ? strtotime($exam['exam_date']) : false;
+                    $createdTs   = !empty($exam['created_at']) ? strtotime($exam['created_at']) : false;
 
-                        // Avatar kind: male, female, or neutral fallback to initials
-                        $genderRaw  = strtolower(trim((string) ($exam['gender'] ?? '')));
-                        $isMale     = $genderRaw === 'male'   || $genderRaw === 'm';
-                        $isFemale   = $genderRaw === 'female' || $genderRaw === 'f';
-                        $avatarKind = $isMale ? 'male' : ($isFemale ? 'female' : 'neutral');
+                    $hasImage = !empty($exam['image_path']);
+                    $hasDraft = trim((string) ($exam['findings'] ?? '')) !== ''
+                             || trim((string) ($exam['interpretation'] ?? '')) !== '';
 
-                        $modality = 'xray';
-                        if (stripos($examType, 'ct') !== false)      { $modality = 'ct'; }
-                        elseif (stripos($examType, 'mri') !== false) { $modality = 'mri'; }
-                        elseif (stripos($examType, 'ultra') !== false
-                             || stripos($examType, ' us') !== false) { $modality = 'us'; }
+                    $genderRaw  = strtolower(trim((string) ($exam['gender'] ?? '')));
+                    $isMale     = $genderRaw === 'male'   || $genderRaw === 'm';
+                    $isFemale   = $genderRaw === 'female' || $genderRaw === 'f';
+                    $avatarKind = $isMale ? 'male' : ($isFemale ? 'female' : 'neutral');
 
-                        $searchIndex = strtolower(implode(' ', [
-                            $name, $examType, $doctor, $radiologist,
-                            'xr-' . date('y') . '-' . str_pad((string) $examId, 4, '0', STR_PAD_LEFT),
-                        ]));
-                    ?>
-                        <article class="ex-card ex-card--<?= esc($statusKey, 'attr') ?><?= $isStat ? ' is-stat' : '' ?>"
-                                 data-status="<?= esc($statusKey, 'attr') ?>"
-                                 data-search="<?= esc($searchIndex, 'attr') ?>">
+                    $modality = 'xray';
+                    if (stripos($examType, 'ct') !== false)      { $modality = 'ct'; }
+                    elseif (stripos($examType, 'mri') !== false) { $modality = 'mri'; }
+                    elseif (stripos($examType, 'ultra') !== false
+                         || stripos($examType, ' us') !== false) { $modality = 'us'; }
 
-                            <header class="ex-card-head">
-                                <span class="ex-ref">XR-<?= esc(date('y')) ?>-<?= esc(str_pad((string) $examId, 4, '0', STR_PAD_LEFT)) ?></span>
+                    $kindLabel = $modality === 'xray' ? 'X-Ray'
+                              : ($modality === 'ct' ? 'CT Scan'
+                              : ($modality === 'mri' ? 'MRI' : 'Ultrasound'));
 
-                                <div class="ex-card-flags">
-                                    <?php if ($isStat): ?>
-                                        <span class="ex-tag ex-tag--stat" title="Urgent">STAT</span>
-                                    <?php endif; ?>
-                                    <span class="ex-status ex-status--<?= esc($meta['tone'], 'attr') ?>">
-                                        <?= esc($meta['label']) ?>
-                                    </span>
-                                </div>
-                            </header>
+                    $ageText = '';
+                    if (!empty($exam['age']) && is_numeric($exam['age'])) {
+                        $ageText = ((int) $exam['age']) . ' y';
+                    }
 
-                            <div class="ex-card-patient">
-                                <span class="ex-avatar ex-avatar--<?= esc($avatarKind, 'attr') ?>" aria-hidden="true">
-                                    <?php if ($isMale): ?>
-                                        <img src="<?= esc(base_url('assets/images/' . $maleAvatar), 'attr') ?>"
-                                             alt=""
-                                             class="ex-avatar-img"
-                                             loading="lazy"
-                                             decoding="async">
-                                    <?php elseif ($isFemale): ?>
-                                        <img src="<?= esc(base_url('assets/images/' . $femaleAvatar), 'attr') ?>"
-                                             alt=""
-                                             class="ex-avatar-img"
-                                             loading="lazy"
-                                             decoding="async">
+                    $sexText = '';
+                    if (!empty($exam['gender']) && strtoupper(trim((string) $exam['gender'])) !== 'N/A') {
+                        $sexText = ucfirst(strtolower(trim((string) $exam['gender'])));
+                    }
+
+                    $demo = implode(' · ', array_filter([$ageText, $sexText]));
+
+                    $searchIndex = strtolower(implode(' ', [
+                        $name, $examType, $doctor, $radiologist, $reference,
+                    ]));
+                ?>
+                    <article class="dx-card dx-card--<?= esc($statusKey, 'attr') ?><?= $isStat ? ' is-stat' : '' ?>"
+                             data-status="<?= esc($statusKey, 'attr') ?>"
+                             data-search="<?= esc($searchIndex, 'attr') ?>">
+
+                        <header class="dx-card-head">
+                            <span class="dx-ref"><?= esc($reference) ?></span>
+
+                            <div class="dx-card-flags">
+                                <?php if ($isStat): ?>
+                                    <span class="dx-tag-stat" title="Urgent">STAT</span>
+                                <?php endif; ?>
+                                <span class="dx-status dx-status--<?= esc($meta['tone'], 'attr') ?>">
+                                    <?= esc($meta['label']) ?>
+                                </span>
+                            </div>
+                        </header>
+
+                        <div class="dx-card-patient">
+                            <span class="dx-avatar dx-avatar--<?= esc($avatarKind, 'attr') ?>" aria-hidden="true">
+                                <?php if ($isMale): ?>
+                                    <img src="<?= esc(base_url('assets/images/' . $maleAvatar), 'attr') ?>"
+                                         alt=""
+                                         class="dx-avatar-img"
+                                         loading="lazy"
+                                         decoding="async">
+                                <?php elseif ($isFemale): ?>
+                                    <img src="<?= esc(base_url('assets/images/' . $femaleAvatar), 'attr') ?>"
+                                         alt=""
+                                         class="dx-avatar-img"
+                                         loading="lazy"
+                                         decoding="async">
+                                <?php else: ?>
+                                    <?= esc($initialsOf($name)) ?>
+                                <?php endif; ?>
+                            </span>
+
+                            <div class="dx-card-patient-body">
+                                <h3 class="dx-card-name"><?= esc($name) ?></h3>
+                                <p class="dx-card-demo">
+                                    <?php if ($demo !== ''): ?>
+                                        <?= esc($demo) ?>
                                     <?php else: ?>
-                                        <?= esc($initialsOf($name)) ?>
+                                        <span class="dx-muted">No age or sex on file</span>
                                     <?php endif; ?>
-                                </span>
-                                <div class="ex-card-patient-body">
-                                    <h3 class="ex-name"><?= esc($name) ?></h3>
-                                    <p class="ex-sub">
-                                        <?= esc($exam['age'] ?? '—') ?> yrs
-                                        <span aria-hidden="true">·</span>
-                                        <?= esc($exam['gender'] ?? '—') ?>
-                                    </p>
-                                </div>
+                                </p>
                             </div>
+                        </div>
 
-                            <div class="ex-card-exam">
-                                <span class="ex-mod ex-mod--<?= esc($modality, 'attr') ?>">
-                                    <?= esc(strtoupper($modality === 'xray' ? 'XR' : $modality)) ?>
-                                </span>
-                                <span class="ex-exam-name" title="<?= esc($examType, 'attr') ?>">
-                                    <?= esc($shorten($examType !== '' ? $examType : '—')) ?>
-                                </span>
-                            </div>
+                        <div class="dx-card-tags">
+                            <span class="dx-kind dx-kind--xray">
+                                <i class="bi bi-radioactive" aria-hidden="true"></i>
+                                <?= esc($kindLabel) ?>
+                            </span>
+                        </div>
 
-                            <dl class="ex-card-meta">
-                                <div>
-                                    <dt>Requested</dt>
-                                    <dd>
-                                        <?php if ($createdTs): ?>
+                        <div class="dx-card-services">
+                            <span class="dx-chip" title="<?= esc($examType, 'attr') ?>">
+                                <?= esc($shorten($examType !== '' ? $examType : '—')) ?>
+                            </span>
+                        </div>
+
+                        <dl class="dx-card-meta">
+                            <div>
+                                <dt>Requested</dt>
+                                <dd>
+                                    <?php if ($createdTs): ?>
+                                        <time datetime="<?= esc(date('c', $createdTs), 'attr') ?>">
                                             <?= esc(date('M j, Y', $createdTs)) ?>
                                             <span aria-hidden="true">·</span>
                                             <?= esc(date('g:i A', $createdTs)) ?>
-                                        <?php elseif ($dateTs): ?>
+                                        </time>
+                                    <?php elseif ($dateTs): ?>
+                                        <time datetime="<?= esc(date('c', $dateTs), 'attr') ?>">
                                             <?= esc(date('M j, Y', $dateTs)) ?>
-                                        <?php else: ?>
-                                            &mdash;
-                                        <?php endif; ?>
-                                    </dd>
-                                </div>
-                                <div>
-                                    <dt>Referred by</dt>
-                                    <dd><?= $doctor !== '' ? esc($doctor) : '<span class="ex-muted">&mdash;</span>' ?></dd>
-                                </div>
-                                <div>
-                                    <dt>Radiologist</dt>
-                                    <dd><?= $radiologist !== '' ? esc($radiologist) : '<span class="ex-muted">&mdash;</span>' ?></dd>
-                                </div>
-                            </dl>
-
-                            <?php if ($hasImage || $hasDraft): ?>
-                                <div class="ex-card-chips">
-                                    <?php if ($hasImage): ?>
-                                        <span class="ex-chip ex-chip--image">
-                                            <i class="bi bi-image" aria-hidden="true"></i>
-                                            Image attached
-                                        </span>
+                                        </time>
+                                    <?php else: ?>
+                                        &mdash;
                                     <?php endif; ?>
-                                    <?php if ($hasDraft && $statusKey !== 'released'): ?>
-                                        <span class="ex-chip ex-chip--draft">
-                                            <i class="bi bi-pencil" aria-hidden="true"></i>
-                                            Draft saved
-                                        </span>
-                                    <?php endif; ?>
-                                </div>
-                            <?php endif; ?>
+                                </dd>
+                            </div>
+                            <div>
+                                <dt>Referred by</dt>
+                                <dd><?= $doctor !== '' ? esc($doctor) : '<span class="dx-muted">&mdash;</span>' ?></dd>
+                            </div>
+                            <div>
+                                <dt>Radiologist</dt>
+                                <dd><?= $radiologist !== '' ? esc($radiologist) : '<span class="dx-muted">&mdash;</span>' ?></dd>
+                            </div>
+                        </dl>
 
-                            <footer class="ex-card-foot">
-                                <a href="<?= base_url('radiologist/examination/view/' . $examId) ?>"
-                                   class="ex-btn ex-btn--primary ex-btn--sm">
-                                    <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i>
-                                    Open study
-                                </a>
+                        <?php if ($hasImage || $hasDraft): ?>
+                            <div class="dx-card-chips">
+                                <?php if ($hasImage): ?>
+                                    <span class="dx-chip dx-chip--image">
+                                        <i class="bi bi-image" aria-hidden="true"></i>
+                                        Image attached
+                                    </span>
+                                <?php endif; ?>
+                                <?php if ($hasDraft && $statusKey !== 'released'): ?>
+                                    <span class="dx-chip dx-chip--draft">
+                                        <i class="bi bi-pencil" aria-hidden="true"></i>
+                                        Draft saved
+                                    </span>
+                                <?php endif; ?>
+                            </div>
+                        <?php endif; ?>
 
-                                <div class="dropdown ex-card-menu">
-                                    <button type="button" class="ex-icon-btn"
-                                            data-bs-toggle="dropdown"
-                                            data-bs-popper-config='{"strategy":"fixed"}'
-                                            aria-expanded="false"
-                                            aria-label="More actions for XR-<?= esc(str_pad((string) $examId, 4, '0', STR_PAD_LEFT), 'attr') ?>">
-                                        <i class="bi bi-three-dots" aria-hidden="true"></i>
-                                    </button>
-                                    <ul class="dropdown-menu dropdown-menu-end ex-menu">
+                        <footer class="dx-card-foot">
+                            <a href="<?= base_url('radiologist/examination/view/' . $examId) ?>"
+                               class="dx-btn dx-btn--sm dx-btn--primary">
+                                <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i>
+                                Open study
+                            </a>
+
+                            <div class="dropdown dx-card-menu">
+                                <button type="button" class="dx-icon-btn"
+                                        data-bs-toggle="dropdown"
+                                        data-bs-popper-config='{"strategy":"fixed"}'
+                                        aria-expanded="false"
+                                        aria-label="More actions for <?= esc($reference, 'attr') ?>">
+                                    <i class="bi bi-three-dots" aria-hidden="true"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end dx-menu">
+                                    <li>
+                                        <a class="dropdown-item" href="<?= base_url('radiologist/examination/view/' . $examId) ?>">
+                                            <i class="bi bi-pencil-square" aria-hidden="true"></i> Read / interpret
+                                        </a>
+                                    </li>
+                                    <?php if ($statusKey === 'released'): ?>
+                                        <li><hr class="dropdown-divider"></li>
                                         <li>
-                                            <a class="dropdown-item" href="<?= base_url('radiologist/examination/view/' . $examId) ?>">
-                                                <i class="bi bi-pencil-square" aria-hidden="true"></i> Read / interpret
+                                            <a class="dropdown-item" href="<?= base_url('radiologist/examination/print/' . $examId) ?>" target="_blank">
+                                                <i class="bi bi-printer" aria-hidden="true"></i> Print result
                                             </a>
                                         </li>
-                                        <?php if ($statusKey === 'released'): ?>
-                                            <li><hr class="dropdown-divider"></li>
-                                            <li>
-                                                <a class="dropdown-item" href="<?= base_url('radiologist/examination/print/' . $examId) ?>" target="_blank">
-                                                    <i class="bi bi-printer" aria-hidden="true"></i> Print result
-                                                </a>
-                                            </li>
-                                        <?php endif; ?>
-                                    </ul>
-                                </div>
-                            </footer>
-                        </article>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <div class="ex-empty">
-                        <div class="ex-empty-icon"><i class="bi bi-x-ray" aria-hidden="true"></i></div>
-                        <h3>No examinations yet</h3>
-                        <p>X-Ray requests created by the receptionist will appear in this list.</p>
-                    </div>
-                <?php endif; ?>
+                                    <?php endif; ?>
+                                </ul>
+                            </div>
+                        </footer>
+                    </article>
+                <?php endforeach; ?>
             </div>
         </div>
 
-        <!-- Shown only when a filter or search matches nothing -->
-        <div class="ex-empty ex-empty--filter" id="exNoMatch" hidden>
-            <div class="ex-empty-icon"><i class="bi bi-search" aria-hidden="true"></i></div>
-            <h3>No matching examinations</h3>
-            <p>Try a different search term, or select All to clear the filter.</p>
-            <button type="button" class="ex-btn" id="exClearFilters">Clear filters</button>
+        <!-- No examinations at all -->
+        <div class="dx-empty" id="dxEmpty"<?= empty($examinations) ? '' : ' hidden' ?>>
+            <div class="dx-empty-icon"><i class="bi bi-x-ray" aria-hidden="true"></i></div>
+            <h3>No examinations yet</h3>
+            <p>X-Ray requests created by the receptionist will appear in this list.</p>
         </div>
+
+        <!-- Filters match nothing -->
+        <div class="dx-empty" id="dxNoMatch" hidden>
+            <div class="dx-empty-icon"><i class="bi bi-search" aria-hidden="true"></i></div>
+            <h3>No matching examinations</h3>
+            <p>Try a different search term or clear the filters.</p>
+            <button type="button" class="dx-btn" id="dxClearFilters">Clear filters</button>
+        </div>
+
+        <footer class="dx-foot" id="dxFoot"<?= empty($examinations) ? ' hidden' : '' ?>>
+            <span id="dxRange" aria-live="polite"></span>
+            <nav class="dx-pager" id="dxPager" aria-label="Pagination"></nav>
+        </footer>
 
     </section>
 
 </div>
 
+
 <style>
 /* =========================================================
    RADIOLOGIST · EXAMINATIONS
-   Card grid matching the receptionist's diagnostic-requests
-   page. Namespaced under .ex.
+   Card grid matching the receptionist's diagnostic requests
+   page. Namespaced under .dx.
    ========================================================= */
 
-.ex {
-    --ex-ink:         #0f172a;
-    --ex-text:        #334155;
-    --ex-muted:       #64748b;
-    --ex-faint:       #94a3b8;
-    --ex-line:        #e2e8f0;
-    --ex-line-soft:   #f1f5f9;
-    --ex-surface:     #ffffff;
-    --ex-subtle:      #f8fafc;
-    --ex-accent:      #1d4ed8;
-    --ex-accent-dark: #1e40af;
-    --ex-accent-soft: #eaf2fe;
-    --ex-green:       #047857;
-    --ex-green-soft:  #ecfdf5;
-    --ex-amber:       #b45309;
-    --ex-amber-soft:  #fff4e5;
-    --ex-teal:        #0f766e;
-    --ex-teal-soft:   #f0fdfa;
-    --ex-danger:      #b91c1c;
-    --ex-danger-soft: #fef2f2;
-    --ex-radius:      10px;
-    --ex-radius-sm:   7px;
-    --ex-ring:        0 0 0 3px rgba(29, 78, 216, 0.18);
-    --ex-mono:        ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+.dx {
+    --dx-ink:         #0f172a;
+    --dx-text:        #334155;
+    --dx-muted:       #64748b;
+    --dx-faint:       #94a3b8;
+    --dx-line:        #e2e8f0;
+    --dx-line-soft:   #f1f5f9;
+    --dx-surface:     #ffffff;
+    --dx-subtle:      #f8fafc;
+    --dx-accent:      #1d4ed8;
+    --dx-accent-dark: #1e40af;
+    --dx-accent-soft: #eaf2fe;
+    --dx-danger:      #dc2626;
+    --dx-danger-dark: #b91c1c;
+    --dx-radius:      10px;
+    --dx-radius-sm:   7px;
+    --dx-ring:        0 0 0 3px rgba(29, 78, 216, 0.18);
+    --dx-mono:        ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 
-    color: var(--ex-text);
-    font-size: 0.875rem;
+    color: var(--dx-text);
 }
 
-.ex *:focus-visible { outline: 2px solid var(--ex-accent); outline-offset: 2px; }
+.dx *:focus-visible {
+    outline: 2px solid var(--dx-accent);
+    outline-offset: 2px;
+}
 
-.ex-muted { color: var(--ex-faint); }
+.dx-muted { color: var(--dx-faint); }
 
 /* ---------- Page header ---------- */
 
-.ex-head {
+.dx-head {
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
@@ -371,106 +358,151 @@
     margin-bottom: 1.25rem;
 }
 
-.ex-title {
+.dx-title {
     margin: 0 0 0.2rem;
     font-size: 1.25rem;
     font-weight: 650;
     letter-spacing: -0.015em;
-    color: var(--ex-ink);
+    color: var(--dx-ink);
 }
 
-.ex-lede {
+.dx-lede {
     margin: 0;
     font-size: 0.8125rem;
-    color: var(--ex-muted);
+    color: var(--dx-muted);
 }
 
-.ex-lede strong { font-weight: 600; color: var(--ex-ink); }
-.ex-lede span { margin: 0 0.2rem; color: var(--ex-faint); }
+.dx-lede strong { font-weight: 600; color: var(--dx-ink); }
+.dx-lede span { margin: 0 0.25rem; color: var(--dx-faint); }
 
-/* ---------- Stats ---------- */
+.dx-head-actions { display: flex; gap: 0.5rem; }
 
-.ex-stats {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 0.9rem;
-    margin-bottom: 1.25rem;
-}
+/* ---------- Buttons ---------- */
 
-.ex-stat {
-    display: flex;
+.dx-btn {
+    display: inline-flex;
     align-items: center;
-    gap: 0.85rem;
-    min-width: 0;
-    padding: 0.9rem 1rem;
-    background: var(--ex-surface);
-    border: 1px solid var(--ex-line);
-    border-radius: var(--ex-radius);
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-}
-
-.ex-stat-icon {
-    display: grid;
-    place-items: center;
-    flex-shrink: 0;
-    width: 36px;
+    justify-content: center;
+    gap: 0.4rem;
     height: 36px;
-    font-size: 1rem;
-    border-radius: var(--ex-radius-sm);
-}
-
-.ex-stat-icon--blue  { background: var(--ex-accent-soft); color: var(--ex-accent); }
-.ex-stat-icon--amber { background: var(--ex-amber-soft); color: var(--ex-amber); }
-.ex-stat-icon--green { background: var(--ex-green-soft); color: var(--ex-green); }
-.ex-stat-icon--teal  { background: var(--ex-teal-soft); color: var(--ex-teal); }
-
-.ex-stat-body { min-width: 0; }
-
-.ex-stat-value {
-    font-size: 1.35rem;
-    font-weight: 700;
-    line-height: 1.1;
-    letter-spacing: -0.02em;
-    color: var(--ex-ink);
-    font-variant-numeric: tabular-nums;
-}
-
-.ex-stat-label {
-    margin-top: 0.15rem;
+    padding: 0 0.9rem;
     font-size: 0.8125rem;
     font-weight: 600;
-    color: var(--ex-text);
+    line-height: 1;
+    color: var(--dx-text);
+    background: var(--dx-surface);
+    border: 1px solid var(--dx-line);
+    border-radius: var(--dx-radius-sm);
+    box-shadow: 0 1px 1px rgba(15, 23, 42, 0.03);
+    white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.ex-stat-sub {
-    font-size: 0.72rem;
-    color: var(--ex-muted);
+.dx-btn:hover { background: var(--dx-subtle); border-color: #cbd5e1; color: var(--dx-ink); }
+.dx-btn i { font-size: 0.9em; }
+
+.dx-btn--primary,
+.dx-btn--primary:hover { color: #ffffff; }
+.dx-btn--primary { background: var(--dx-accent); border-color: var(--dx-accent); }
+.dx-btn--primary:hover { background: var(--dx-accent-dark); border-color: var(--dx-accent-dark); }
+
+.dx-btn--sm { height: 32px; padding: 0 0.75rem; font-size: 0.78rem; flex: 1; min-width: 0; }
+
+.dx-icon-btn {
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    color: var(--dx-muted);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--dx-radius-sm);
+    cursor: pointer;
 }
 
-/* ---------- Panel ---------- */
+.dx-icon-btn:hover,
+.dx-icon-btn[aria-expanded="true"] { background: var(--dx-line-soft); color: var(--dx-ink); }
 
-.ex-panel {
-    background: var(--ex-surface);
-    border: 1px solid var(--ex-line);
+/* ---------- Inputs ---------- */
+
+.dx-input {
+    width: 100%;
+    height: 36px;
+    padding: 0 0.75rem;
+    font-size: 0.8125rem;
+    color: var(--dx-ink);
+    background-color: var(--dx-surface);
+    border: 1px solid var(--dx-line);
+    border-radius: var(--dx-radius-sm);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.dx-input::placeholder { color: var(--dx-faint); }
+
+.dx-input:focus {
+    outline: none;
+    border-color: var(--dx-accent);
+    box-shadow: var(--dx-ring);
+}
+
+.dx-search { position: relative; flex: 1 1 280px; max-width: 380px; }
+.dx-search > i {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.8rem;
+    color: var(--dx-faint);
+    pointer-events: none;
+}
+
+.dx-search .dx-input { padding-left: 2.1rem; }
+
+.dx-kbd {
+    position: absolute;
+    right: 0.6rem;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 0.05rem 0.35rem;
+    font-family: var(--dx-mono);
+    font-size: 0.7rem;
+    line-height: 1.3;
+    color: var(--dx-muted);
+    background: var(--dx-subtle);
+    border: 1px solid var(--dx-line);
+    border-radius: 4px;
+    pointer-events: none;
+}
+
+.dx-search .dx-input:focus ~ .dx-kbd,
+.dx-search .dx-input:not(:placeholder-shown) ~ .dx-kbd { display: none; }
+
+/* ---------- Worklist panel ---------- */
+
+.dx-panel {
+    background: var(--dx-surface);
+    border: 1px solid var(--dx-line);
     border-radius: 12px;
     box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
     overflow: hidden;
 }
 
-/* ---------- Tabs ---------- */
-
-.ex-tabs {
+.dx-tabs {
     display: flex;
     gap: 0.25rem;
     padding: 0 0.75rem;
-    border-bottom: 1px solid var(--ex-line);
+    border-bottom: 1px solid var(--dx-line);
     overflow-x: auto;
     scrollbar-width: none;
 }
 
-.ex-tabs::-webkit-scrollbar { display: none; }
+.dx-tabs::-webkit-scrollbar { display: none; }
 
-.ex-tab {
+.dx-tab {
     position: relative;
     display: inline-flex;
     align-items: center;
@@ -478,7 +510,7 @@
     padding: 0.85rem 0.6rem;
     font-size: 0.8125rem;
     font-weight: 600;
-    color: var(--ex-muted);
+    color: var(--dx-muted);
     background: none;
     border: 0;
     white-space: nowrap;
@@ -486,7 +518,7 @@
     transition: color 0.15s ease;
 }
 
-.ex-tab::after {
+.dx-tab::after {
     content: "";
     position: absolute;
     left: 0.4rem;
@@ -497,27 +529,25 @@
     background: transparent;
 }
 
-.ex-tab:hover { color: var(--ex-ink); }
-.ex-tab.is-active { color: var(--ex-ink); }
-.ex-tab.is-active::after { background: var(--ex-accent); }
+.dx-tab:hover { color: var(--dx-ink); }
+.dx-tab.is-active { color: var(--dx-ink); }
+.dx-tab.is-active::after { background: var(--dx-accent); }
 
-.ex-tab-count {
+.dx-tab-count {
     min-width: 1.4rem;
     padding: 0.05rem 0.4rem;
     font-size: 0.7rem;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
     text-align: center;
-    color: var(--ex-muted);
-    background: var(--ex-line-soft);
+    color: var(--dx-muted);
+    background: var(--dx-line-soft);
     border-radius: 999px;
 }
 
-.ex-tab.is-active .ex-tab-count { color: var(--ex-accent); background: var(--ex-accent-soft); }
+.dx-tab.is-active .dx-tab-count { color: var(--dx-accent); background: var(--dx-accent-soft); }
 
-/* ---------- Filters ---------- */
-
-.ex-filters {
+.dx-filters {
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -525,102 +555,47 @@
     padding: 0.75rem 1rem;
 }
 
-.ex-search { position: relative; flex: 1 1 280px; max-width: 420px; }
+/* ---------- Card grid ---------- */
 
-.ex-search > i {
-    position: absolute;
-    left: 0.75rem;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 0.8rem;
-    color: var(--ex-faint);
-    pointer-events: none;
+.dx-grid-wrap {
+    border-top: 1px solid var(--dx-line);
+    background: #f8fafc;
 }
 
-.ex-input {
-    width: 100%;
-    height: 36px;
-    padding: 0 0.75rem 0 2.1rem;
-    font-size: 0.8125rem;
-    color: var(--ex-ink);
-    background-color: var(--ex-surface);
-    border: 1px solid var(--ex-line);
-    border-radius: var(--ex-radius-sm);
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.ex-input::placeholder { color: var(--ex-faint); }
-
-.ex-input:focus {
-    outline: none;
-    border-color: var(--ex-accent);
-    box-shadow: var(--ex-ring);
-}
-
-.ex-kbd {
-    position: absolute;
-    right: 0.6rem;
-    top: 50%;
-    transform: translateY(-50%);
-    padding: 0.05rem 0.35rem;
-    font-family: var(--ex-mono);
-    font-size: 0.7rem;
-    line-height: 1.3;
-    color: var(--ex-muted);
-    background: var(--ex-subtle);
-    border: 1px solid var(--ex-line);
-    border-radius: 4px;
-    pointer-events: none;
-}
-
-.ex-search .ex-input:focus ~ .ex-kbd,
-.ex-search .ex-input:not(:placeholder-shown) ~ .ex-kbd { display: none; }
-
-/* ---------- Grid ---------- */
-
-.ex-grid-wrap { border-top: 1px solid var(--ex-line); }
-
-.ex-cards {
+.dx-cards {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1rem;
-    padding: 1rem;
+    gap: 1.1rem;
+    padding: 1.15rem;
 }
 
-/* ---------- Card ---------- */
-
-.ex-card {
+.dx-card {
     position: relative;
     display: flex;
     flex-direction: column;
     min-width: 0;
     padding: 1rem 1.05rem 1rem;
-    background: var(--ex-surface);
-    border: 1px solid var(--ex-line);
-    border-left: 3px solid var(--ex-line);
-    border-radius: var(--ex-radius);
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    background: var(--dx-surface);
+    border: 1px solid #d4dbe5;
+    border-radius: var(--dx-radius);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 
-.ex-card:hover {
-    border-color: #cbd5e1;
-    border-left-color: #cbd5e1;
-    box-shadow: 0 6px 18px -10px rgba(15, 23, 42, 0.22);
+.dx-card:hover {
+    border-color: #b6c2d2;
+    box-shadow: 0 8px 20px -8px rgba(15, 23, 42, 0.25), 0 2px 4px rgba(15, 23, 42, 0.06);
 }
 
-.ex-card--pending     { border-left-color: #f59e0b; }
-.ex-card--in_progress { border-left-color: #3b82f6; }
-.ex-card--processing  { border-left-color: #3b82f6; }
-.ex-card--completed   { border-left-color: #10b981; }
-.ex-card--released    { border-left-color: #14b8a6; }
-
-.ex-card.is-stat {
-    background-image: linear-gradient(180deg, rgba(254, 242, 242, 0.6), transparent 45%);
+.dx-card.is-stat {
+    background-image: linear-gradient(180deg, rgba(254, 242, 242, 0.55), transparent 45%);
 }
 
-.ex-card.is-hidden { display: none; }
+.dx-card.is-hidden { display: none; }
 
-.ex-card-head {
+/* ---- header ---- */
+
+.dx-card-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -628,51 +603,44 @@
     margin-bottom: 0.6rem;
 }
 
-.ex-ref {
-    padding: 0.15rem 0.5rem;
-    font-family: var(--ex-mono);
+.dx-ref {
+    font-family: var(--dx-mono);
     font-size: 0.76rem;
     font-weight: 600;
-    color: var(--ex-ink);
-    background: var(--ex-line-soft);
-    border-radius: 5px;
+    letter-spacing: 0.01em;
+    color: var(--dx-ink);
     white-space: nowrap;
 }
 
-.ex-card-flags {
+.dx-card-flags {
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
     flex-shrink: 0;
 }
 
-.ex-tag {
-    display: inline-flex;
-    align-items: center;
+.dx-tag-stat {
     padding: 0 0.35rem;
     font-size: 0.62rem;
     font-weight: 700;
     letter-spacing: 0.06em;
     line-height: 1.6;
+    color: var(--dx-danger-dark);
+    background: #fef2f2;
+    border: 1px solid #fecaca;
     border-radius: 4px;
 }
 
-.ex-tag--stat {
-    color: var(--ex-danger);
-    background: var(--ex-danger-soft);
-    border: 1px solid #fecaca;
-}
+/* ---- patient block with avatar ---- */
 
-/* Patient block */
-
-.ex-card-patient {
+.dx-card-patient {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
-    margin-bottom: 0.55rem;
+    gap: 0.65rem;
+    margin-bottom: 0.7rem;
 }
 
-.ex-avatar {
+.dx-avatar {
     display: grid;
     place-items: center;
     flex-shrink: 0;
@@ -680,98 +648,116 @@
     height: 36px;
     font-size: 0.72rem;
     font-weight: 700;
-    color: var(--ex-accent);
-    background: var(--ex-accent-soft);
+    color: var(--dx-accent);
+    background: var(--dx-accent-soft);
     border-radius: 50%;
     overflow: hidden;
 }
 
-/* Male / female / neutral tints. The PNG fills the circle; the tint
-   shows through transparent PNG edges as a subtle backdrop. */
-.ex-avatar--male    { color: #1d4ed8; background: #eaf2fe; }
-.ex-avatar--female  { color: #b32e50; background: #fce9ee; }
-.ex-avatar--neutral { color: var(--ex-accent); background: var(--ex-accent-soft); }
+.dx-avatar--male    { color: #1d4ed8; background: #eaf2fe; }
+.dx-avatar--female  { color: #b32e50; background: #fce9ee; }
+.dx-avatar--neutral { color: var(--dx-accent); background: var(--dx-accent-soft); }
 
-.ex-avatar-img {
+.dx-avatar-img {
     width: 100%;
     height: 100%;
     object-fit: cover;
     display: block;
 }
 
-.ex-card-patient-body { min-width: 0; }
+.dx-card-patient-body { min-width: 0; }
 
-.ex-name {
+.dx-card-name {
     margin: 0;
     font-size: 0.95rem;
     font-weight: 650;
     letter-spacing: -0.01em;
     line-height: 1.3;
-    color: var(--ex-ink);
+    color: var(--dx-ink);
     overflow-wrap: anywhere;
 }
 
-.ex-sub {
+.dx-card-demo {
     margin: 0.1rem 0 0;
     font-size: 0.76rem;
-    color: var(--ex-muted);
+    color: var(--dx-muted);
 }
 
-.ex-sub span { margin: 0 0.15rem; color: var(--ex-faint); }
+/* ---- kind + source chips ---- */
 
-/* Exam block */
-
-.ex-card-exam {
+.dx-card-tags {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.85rem;
-    min-width: 0;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.7rem;
 }
 
-.ex-mod {
+.dx-kind {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    min-width: 30px;
-    padding: 0.15rem 0.45rem;
-    font-size: 0.66rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
+    gap: 0.3rem;
+    padding: 0.15rem 0.5rem;
+    font-size: 0.72rem;
+    font-weight: 600;
     border-radius: 5px;
-    color: #4338ca;
-    background: #eef2ff;
-    border: 1px solid #e0e7ff;
+    border: 1px solid transparent;
+    white-space: nowrap;
 }
 
-.ex-mod--ct  { color: var(--ex-teal);  background: var(--ex-teal-soft);  border-color: #99f6e4; }
-.ex-mod--mri { color: #6d28d9;         background: #f3e8ff;               border-color: #e9d5ff; }
-.ex-mod--us  { color: var(--ex-green); background: var(--ex-green-soft); border-color: #a7f3d0; }
+.dx-kind--xray { color: #4338ca; background: #eef2ff; border-color: #e0e7ff; }
 
-.ex-exam-name {
-    min-width: 0;
+.dx-kind i { font-size: 0.72em; }
+
+/* ---- services ---- */
+
+.dx-card-services {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin-bottom: 0.85rem;
+    min-height: 1.55rem;
+}
+
+.dx-chip {
+    padding: 0.15rem 0.5rem;
+    font-size: 0.72rem;
+    color: var(--dx-text);
+    background: var(--dx-surface);
+    border: 1px solid var(--dx-line);
+    border-radius: 5px;
+    white-space: nowrap;
+    max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 0.8125rem;
-    color: var(--ex-text);
 }
 
-/* Meta */
+.dx-card-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin-bottom: 0.85rem;
+}
 
-.ex-card-meta {
+.dx-chip--image { color: #0e7490; background: #ecfeff; border-color: #cffafe; }
+.dx-chip--draft { color: #b45309; background: #fff4e5; border-color: #fde68a; }
+
+.dx-chip i { font-size: 0.72em; }
+
+/* ---- meta ---- */
+
+.dx-card-meta {
     display: grid;
     grid-template-columns: 1fr;
     gap: 0.4rem;
     margin: 0 0 0.85rem;
     padding: 0.7rem 0;
-    border-top: 1px solid var(--ex-line-soft);
-    border-bottom: 1px solid var(--ex-line-soft);
+    border-top: 1px solid var(--dx-line-soft);
+    border-bottom: 1px solid var(--dx-line-soft);
     font-size: 0.78rem;
 }
 
-.ex-card-meta > div {
+.dx-card-meta > div {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
@@ -779,53 +765,39 @@
     min-width: 0;
 }
 
-.ex-card-meta dt {
+.dx-card-meta dt {
     flex-shrink: 0;
-    color: var(--ex-muted);
+    color: var(--dx-muted);
     font-weight: 500;
 }
 
-.ex-card-meta dd {
+.dx-card-meta dd {
     margin: 0;
     text-align: right;
-    color: var(--ex-ink);
+    color: var(--dx-ink);
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-/* Chips */
+.dx-card-meta time { font-variant-numeric: tabular-nums; }
+.dx-card-meta time > span { color: var(--dx-faint); margin: 0 0.1rem; }
 
-.ex-card-chips {
+/* ---- footer ---- */
+
+.dx-card-foot {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.3rem;
-    margin-bottom: 0.85rem;
-}
-
-.ex-chip {
-    display: inline-flex;
     align-items: center;
-    gap: 0.3rem;
-    padding: 0.15rem 0.5rem;
-    font-size: 0.72rem;
-    font-weight: 500;
-    color: var(--ex-text);
-    background: var(--ex-surface);
-    border: 1px solid var(--ex-line);
-    border-radius: 5px;
-    white-space: nowrap;
+    gap: 0.4rem;
+    margin-top: auto;
 }
 
-.ex-chip i { font-size: 0.72em; }
+.dx-card-menu { flex-shrink: 0; }
 
-.ex-chip--image { color: #0e7490; background: #ecfeff; border-color: #cffafe; }
-.ex-chip--draft { color: var(--ex-amber); background: var(--ex-amber-soft); border-color: #fde68a; }
+/* ---- status pill ---- */
 
-/* Status pill */
-
-.ex-status {
+.dx-status {
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
@@ -833,182 +805,164 @@
     font-size: 0.72rem;
     font-weight: 600;
     white-space: nowrap;
-    color: var(--ex-tone-fg);
-    background: var(--ex-tone-bg);
+    color: var(--tone-fg);
+    background: var(--tone-bg);
     border-radius: 999px;
 }
 
-.ex-status::before {
+.dx-status::before {
     content: "";
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: var(--ex-tone-dot);
+    background: var(--tone-dot);
 }
 
-.ex-status--pending   { --ex-tone-bg: var(--ex-amber-soft);  --ex-tone-fg: var(--ex-amber);  --ex-tone-dot: #f59e0b; }
-.ex-status--progress  { --ex-tone-bg: var(--ex-accent-soft); --ex-tone-fg: var(--ex-accent); --ex-tone-dot: #3b82f6; }
-.ex-status--completed { --ex-tone-bg: var(--ex-green-soft);  --ex-tone-fg: var(--ex-green);  --ex-tone-dot: #10b981; }
-.ex-status--released  { --ex-tone-bg: var(--ex-teal-soft);   --ex-tone-fg: var(--ex-teal);   --ex-tone-dot: #14b8a6; }
+.dx-status--pending   { --tone-bg: #fffbeb; --tone-fg: #b45309; --tone-dot: #f59e0b; }
+.dx-status--progress  { --tone-bg: #eff6ff; --tone-fg: #1d4ed8; --tone-dot: #3b82f6; }
+.dx-status--completed { --tone-bg: #ecfdf5; --tone-fg: #047857; --tone-dot: #10b981; }
+.dx-status--released  { --tone-bg: #f0fdfa; --tone-fg: #0f766e; --tone-dot: #14b8a6; }
+.dx-status--cancelled { --tone-bg: #f1f5f9; --tone-fg: #64748b; --tone-dot: #94a3b8; }
 
-/* Footer */
+/* ---- row menu ---- */
 
-.ex-card-foot {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    margin-top: auto;
-}
-
-.ex-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.4rem;
-    height: 36px;
-    padding: 0 0.9rem;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    line-height: 1;
-    color: var(--ex-text);
-    background: var(--ex-surface);
-    border: 1px solid var(--ex-line);
-    border-radius: var(--ex-radius-sm);
-    text-decoration: none;
-    white-space: nowrap;
-    cursor: pointer;
-    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-}
-
-.ex-btn:hover { background: var(--ex-subtle); border-color: #cbd5e1; color: var(--ex-ink); }
-.ex-btn i { font-size: 0.9em; }
-
-.ex-btn--sm { height: 32px; padding: 0 0.75rem; font-size: 0.78rem; flex: 1; min-width: 0; }
-
-.ex-btn--primary,
-.ex-btn--primary:hover { color: #ffffff; }
-.ex-btn--primary { background: var(--ex-accent); border-color: var(--ex-accent); }
-.ex-btn--primary:hover { background: var(--ex-accent-dark); border-color: var(--ex-accent-dark); }
-
-.ex-card-menu { flex-shrink: 0; }
-
-.ex-icon-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    font-size: 0.85rem;
-    color: var(--ex-muted);
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: var(--ex-radius-sm);
-    cursor: pointer;
-    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-}
-
-.ex-icon-btn:hover,
-.ex-icon-btn[aria-expanded="true"] { background: var(--ex-line-soft); color: var(--ex-ink); border-color: var(--ex-line); }
-
-.ex-menu {
+.dx-menu {
     min-width: 11rem;
     padding: 0.3rem;
     font-size: 0.8125rem;
-    border: 1px solid var(--ex-line);
+    border: 1px solid var(--dx-line);
     border-radius: 9px;
     box-shadow: 0 12px 28px -8px rgba(15, 23, 42, 0.2);
 }
 
-.ex-menu .dropdown-item {
+.dx-menu .dropdown-item {
     display: flex;
     align-items: center;
     gap: 0.55rem;
     padding: 0.45rem 0.6rem;
-    color: var(--ex-text);
+    color: var(--dx-text);
     border-radius: 6px;
 }
 
-.ex-menu .dropdown-item i { font-size: 0.85rem; color: var(--ex-faint); }
-.ex-menu .dropdown-item:hover,
-.ex-menu .dropdown-item:focus { background: var(--ex-line-soft); color: var(--ex-ink); }
-.ex-menu .dropdown-divider { margin: 0.3rem 0; border-color: var(--ex-line-soft); }
+.dx-menu .dropdown-item i { font-size: 0.85rem; color: var(--dx-faint); }
+.dx-menu .dropdown-item:hover,
+.dx-menu .dropdown-item:focus { background: var(--dx-line-soft); color: var(--dx-ink); }
+.dx-menu .dropdown-divider { margin: 0.3rem 0; border-color: var(--dx-line-soft); }
 
-/* ---------- Empty states ---------- */
+/* ---------- Empty states and footer ---------- */
 
-.ex-empty {
-    grid-column: 1 / -1;
-    padding: 3.5rem 1rem;
-    text-align: center;
-}
-.ex-empty--filter { border-top: 1px solid var(--ex-line); }
+.dx-empty { padding: 3.5rem 1rem; text-align: center; border-top: 1px solid var(--dx-line); }
 
-.ex-empty-icon {
+.dx-empty-icon {
     display: grid;
     place-items: center;
     width: 44px;
     height: 44px;
     margin: 0 auto 0.85rem;
     font-size: 1.2rem;
-    color: var(--ex-faint);
-    background: var(--ex-line-soft);
+    color: var(--dx-faint);
+    background: var(--dx-line-soft);
     border-radius: 10px;
 }
 
-.ex-empty h3 { margin: 0 0 0.25rem; font-size: 0.95rem; font-weight: 600; color: var(--ex-ink); }
-.ex-empty p { max-width: 26rem; margin: 0 auto 1rem; font-size: 0.8125rem; color: var(--ex-muted); }
+.dx-empty h3 { margin: 0 0 0.25rem; font-size: 0.95rem; font-weight: 600; color: var(--dx-ink); }
+.dx-empty p { max-width: 26rem; margin: 0 auto 1rem; font-size: 0.8125rem; color: var(--dx-muted); }
+
+.dx-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding: 0.7rem 1rem;
+    font-size: 0.78rem;
+    color: var(--dx-muted);
+    border-top: 1px solid var(--dx-line);
+}
+
+.dx-foot strong { font-weight: 600; color: var(--dx-ink); font-variant-numeric: tabular-nums; }
+
+.dx-pager { display: flex; align-items: center; gap: 0.25rem; }
+
+.dx-page {
+    min-width: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.45rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--dx-text);
+    background: var(--dx-surface);
+    border: 1px solid var(--dx-line);
+    border-radius: var(--dx-radius-sm);
+    cursor: pointer;
+}
+
+.dx-page:hover:not(:disabled) { background: var(--dx-subtle); border-color: #cbd5e1; }
+.dx-page:disabled { opacity: 0.45; cursor: not-allowed; }
+.dx-page[aria-current="page"] { color: var(--dx-accent); background: var(--dx-accent-soft); border-color: #bcd6f3; }
+.dx-page-gap { min-width: 20px; text-align: center; color: var(--dx-faint); }
 
 /* ---------- Responsive ---------- */
 
 @media (max-width: 1200px) {
-    .ex-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .ex-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-
-@media (max-width: 900px) {
-    .ex-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .dx-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 768px) {
-    .ex-filters .ex-search { flex-basis: 100%; max-width: none; }
-    .ex-kbd { display: none; }
+    .dx-head { flex-direction: column; align-items: stretch; }
+    .dx-head-actions .dx-btn { flex: 1; }
 
-    .ex-cards { grid-template-columns: minmax(0, 1fr); padding: 0.75rem; }
+    .dx-filters .dx-search { flex-basis: 100%; max-width: none; }
+    .dx-kbd { display: none; }
 
-    .ex-card-meta > div { align-items: flex-start; flex-direction: column; gap: 0.1rem; }
-    .ex-card-meta dd { text-align: left; white-space: normal; }
-}
+    .dx-cards { grid-template-columns: minmax(0, 1fr); padding: 0.75rem; }
 
-@media (max-width: 576px) {
-    .ex-stats { grid-template-columns: minmax(0, 1fr); gap: 0.6rem; }
+    .dx-card-meta > div { align-items: flex-start; flex-direction: column; gap: 0.1rem; }
+    .dx-card-meta dd { text-align: left; white-space: normal; }
+
+    .dx-foot { justify-content: center; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .ex *, .ex *::before, .ex *::after { transition: none !important; }
+    .dx * { transition: none !important; }
 }
 </style>
+
 
 <script>
 (function () {
     'use strict';
 
     var search   = document.getElementById('searchExams');
-    var grid     = document.getElementById('examinationsTable');
-    var noMatch  = document.getElementById('exNoMatch');
-    var clearBtn = document.getElementById('exClearFilters');
-    var tabs     = Array.prototype.slice.call(document.querySelectorAll('.ex-tab'));
+    var grid     = document.getElementById('dxRows');
+    var noMatch  = document.getElementById('dxNoMatch');
+    var clearBtn = document.getElementById('dxClearFilters');
+    var tabs     = Array.prototype.slice.call(document.querySelectorAll('.dx-tab'));
 
     var activeStatus = 'all';
 
-    function cards() {
-        return grid ? Array.prototype.slice.call(grid.querySelectorAll('.ex-card')) : [];
-    }
+    var cards = grid ? Array.prototype.slice.call(grid.querySelectorAll('.dx-card')) : [];
+    var matches = cards.slice();
+    var PER_PAGE = 9;
+    var page = 1;
 
-    function applyFilters() {
+    var pager      = document.getElementById('dxPager');
+    var rangeLabel = document.getElementById('dxRange');
+    var foot       = document.getElementById('dxFoot');
+    var wrap       = document.getElementById('dxTableWrap');
+    var emptyBox   = document.getElementById('dxEmpty');
+
+    function byId(id) { return document.getElementById(id); }
+
+    function applyFilters(keepPage) {
         var term = search ? search.value.toLowerCase().trim() : '';
-        var visible = 0;
 
-        cards().forEach(function (card) {
-            var text = card.dataset.search || card.textContent.toLowerCase();
+        matches = cards.filter(function (card) {
+            var text   = card.dataset.search || card.textContent.toLowerCase();
             var status = (card.dataset.status || '').toLowerCase();
 
             var matchesSearch = term === '' || text.indexOf(term) !== -1;
@@ -1019,19 +973,96 @@
                 (activeStatus === 'in_progress' && status === 'processing') ||
                 (activeStatus === 'processing'   && status === 'in_progress');
 
-            var show = matchesSearch && matchesStatus;
-            card.classList.toggle('is-hidden', !show);
-            if (show) { visible++; }
+            return matchesSearch && matchesStatus;
         });
 
-        if (noMatch) {
-            noMatch.hidden = !(cards().length > 0 && visible === 0);
+        if (!keepPage) { page = 1; }
+        render();
+    }
+
+    function render() {
+        var pages = Math.max(1, Math.ceil(matches.length / PER_PAGE));
+        page = Math.min(Math.max(1, page), pages);
+
+        var start = (page - 1) * PER_PAGE;
+        var end   = Math.min(start + PER_PAGE, matches.length);
+
+        cards.forEach(function (card) { card.classList.add('is-hidden'); });
+        matches.slice(start, end).forEach(function (card) { card.classList.remove('is-hidden'); });
+
+        var none = cards.length === 0;
+
+        if (emptyBox) { emptyBox.hidden = !none; }
+        if (noMatch)  { noMatch.hidden  = none || matches.length > 0; }
+        if (wrap)     { wrap.hidden     = none || matches.length === 0; }
+        if (foot)     { foot.hidden     = none || matches.length === 0; }
+
+        if (rangeLabel) {
+            rangeLabel.innerHTML = matches.length
+                ? 'Showing <strong>' + (start + 1) + '–' + end + '</strong> of <strong>' + matches.length + '</strong>'
+                : '';
         }
+
+        renderPager(pages);
+    }
+
+    function renderPager(pages) {
+        if (!pager) { return; }
+
+        if (pages <= 1) { pager.innerHTML = ''; return; }
+
+        var list = [];
+        var i;
+
+        if (pages <= 7) {
+            for (i = 1; i <= pages; i++) { list.push(i); }
+        } else {
+            var from = Math.max(2, page - 1);
+            var to   = Math.min(pages - 1, page + 1);
+            if (page <= 3)         { from = 2; to = 4; }
+            if (page >= pages - 2) { from = pages - 3; to = pages - 1; }
+
+            list.push(1);
+            if (from > 2) { list.push('gap'); }
+            for (i = from; i <= to; i++) { list.push(i); }
+            if (to < pages - 1) { list.push('gap'); }
+            list.push(pages);
+        }
+
+        var html = '<button type="button" class="dx-page" data-page="' + (page - 1) + '"' +
+                   (page === 1 ? ' disabled' : '') + ' aria-label="Previous page">' +
+                   '<i class="bi bi-chevron-left" aria-hidden="true"></i></button>';
+
+        list.forEach(function (item) {
+            if (item === 'gap') {
+                html += '<span class="dx-page-gap" aria-hidden="true">…</span>';
+                return;
+            }
+            html += '<button type="button" class="dx-page" data-page="' + item + '"' +
+                    (item === page ? ' aria-current="page"' : '') +
+                    ' aria-label="Page ' + item + '">' + item + '</button>';
+        });
+
+        html += '<button type="button" class="dx-page" data-page="' + (page + 1) + '"' +
+                (page === pages ? ' disabled' : '') + ' aria-label="Next page">' +
+                '<i class="bi bi-chevron-right" aria-hidden="true"></i></button>';
+
+        pager.innerHTML = html;
+    }
+
+    if (pager) {
+        pager.addEventListener('click', function (e) {
+            var btn = e.target.closest('.dx-page');
+            if (!btn || btn.disabled) { return; }
+            page = parseInt(btn.dataset.page, 10) || 1;
+            render();
+            if (wrap) { wrap.scrollIntoView({ block: 'nearest' }); }
+        });
     }
 
     if (search) {
-        search.addEventListener('input', applyFilters);
-        search.addEventListener('search', applyFilters);
+        search.addEventListener('input', function () { applyFilters(); });
+        search.addEventListener('search', function () { applyFilters(); });
     }
 
     document.addEventListener('keydown', function (e) {

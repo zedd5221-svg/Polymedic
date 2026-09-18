@@ -50,11 +50,20 @@ $statusMeta = [
     'cancelled'   => ['label' => 'Cancelled',   'tone' => 'cancelled'],
 ];
 
-// The one action a receptionist is most likely to take next
+/*
+ * The receptionist's own actions. The job ends once the patient is
+ * sent to the laboratory or x-ray. Completing and releasing results
+ * belongs to the MedTech or Radiologist, so those steps are
+ * deliberately not offered here.
+ *
+ *   pending      -> Start    (send patient to lab/x-ray)
+ *   in_progress  -> (none)   (patient is with the diagnostic staff)
+ *   completed    -> (none)   (result ready, awaiting release by staff)
+ *   released     -> Print    (hand the printed result to the patient)
+ *   cancelled    -> Restore  (undo a mistaken cancellation)
+ */
 $nextStep = [
-    'pending'     => ['to' => 'in_progress', 'label' => 'Start'],
-    'in_progress' => ['to' => 'completed',   'label' => 'Complete'],
-    'completed'   => ['to' => 'released',    'label' => 'Release'],
+    'pending' => ['to' => 'in_progress', 'label' => 'Start'],
 ];
 
 $requests = is_array($requests ?? null) ? $requests : [];
@@ -71,8 +80,6 @@ $validationErrors = session()->getFlashdata('validation_errors');
 $exportRows       = [];
 
 // PNG avatar filenames inside public/assets/images/.
-// Same two files used on the appointments, patients, and
-// radiologist examinations pages, so one set is enough.
 $maleAvatar   = 'man-avatar.png';
 $femaleAvatar = 'woman-avatar.png';
 
@@ -341,11 +348,11 @@ $filterTabs = [
                         </dl>
 
                         <footer class="dx-card-foot">
-                            <?php if (isset($nextStep[$status])): ?>
+                            <?php if ($status === 'pending'): ?>
                                 <button type="button" class="dx-btn dx-btn--sm dx-btn--primary"
                                         data-action="status"
-                                        data-status="<?= esc($nextStep[$status]['to'], 'attr') ?>">
-                                    <?= esc($nextStep[$status]['label']) ?>
+                                        data-status="in_progress">
+                                    Start
                                 </button>
                             <?php elseif ($status === 'released'): ?>
                                 <a class="dx-btn dx-btn--sm"
@@ -359,6 +366,16 @@ $filterTabs = [
                                         data-status="pending">
                                     Restore
                                 </button>
+                            <?php elseif ($status === 'in_progress'): ?>
+                                <span class="dx-waiting dx-waiting--sm">
+                                    <i class="bi bi-hourglass-split" aria-hidden="true"></i>
+                                    With lab / x-ray
+                                </span>
+                            <?php elseif ($status === 'completed'): ?>
+                                <span class="dx-waiting dx-waiting--sm">
+                                    <i class="bi bi-hourglass-split" aria-hidden="true"></i>
+                                    Awaiting release
+                                </span>
                             <?php endif; ?>
 
                             <div class="dropdown dx-card-menu">
@@ -837,6 +854,33 @@ $filterTabs = [
 .dx-icon-btn:hover,
 .dx-icon-btn[aria-expanded="true"] { background: var(--dx-line-soft); color: var(--dx-ink); }
 
+/* Quiet "waiting on another department" indicator.
+   Used instead of a disabled button so the receptionist reads it
+   as a status, not as something they might be able to click. */
+.dx-waiting {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    height: 32px;
+    padding: 0 0.75rem;
+    font-size: 0.78rem;
+    font-weight: 500;
+    font-style: italic;
+    color: var(--dx-muted);
+    background: var(--dx-subtle);
+    border: 1px solid var(--dx-line);
+    border-radius: var(--dx-radius-sm);
+    white-space: nowrap;
+}
+
+.dx-waiting i { font-style: normal; }
+
+.dx-waiting--sm {
+    height: 30px;
+    padding: 0 0.65rem;
+    font-size: 0.75rem;
+}
+
 .dx-textbtn {
     padding: 0.25rem 0.45rem;
     font-size: 0.78rem;
@@ -995,13 +1039,16 @@ $filterTabs = [
 
 /* ---------- Card grid ---------- */
 
-.dx-grid-wrap { border-top: 1px solid var(--dx-line); }
+.dx-grid-wrap {
+    border-top: 1px solid var(--dx-line);
+    background: #f8fafc;
+}
 
 .dx-cards {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1rem;
-    padding: 1rem;
+    gap: 1.1rem;
+    padding: 1.15rem;
 }
 
 .dx-card {
@@ -1011,32 +1058,25 @@ $filterTabs = [
     min-width: 0;
     padding: 1rem 1.05rem 1rem;
     background: var(--dx-surface);
-    border: 1px solid var(--dx-line);
-    border-left: 3px solid var(--dx-line);
+    border: 1px solid #d4dbe5;
     border-radius: var(--dx-radius);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
     cursor: pointer;
     transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 
 .dx-card:hover {
-    border-color: #cbd5e1;
-    border-left-color: #cbd5e1;
-    box-shadow: 0 6px 18px -10px rgba(15, 23, 42, 0.22);
+    border-color: #b6c2d2;
+    box-shadow: 0 8px 20px -8px rgba(15, 23, 42, 0.25), 0 2px 4px rgba(15, 23, 42, 0.06);
 }
 
 .dx-card:focus-within {
     border-color: var(--dx-accent);
-    border-left-color: var(--dx-accent);
+    box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.15);
 }
 
-.dx-card--pending     { border-left-color: #f59e0b; }
-.dx-card--in_progress { border-left-color: #3b82f6; }
-.dx-card--completed   { border-left-color: #10b981; }
-.dx-card--released    { border-left-color: #14b8a6; }
-.dx-card--cancelled   { border-left-color: #94a3b8; }
-
 .dx-card.is-stat {
-    background-image: linear-gradient(180deg, rgba(254, 242, 242, 0.6), transparent 45%);
+    background-image: linear-gradient(180deg, rgba(254, 242, 242, 0.55), transparent 45%);
 }
 
 .dx-card.is-hidden { display: none; }
@@ -1108,8 +1148,6 @@ $filterTabs = [
     overflow: hidden;
 }
 
-/* Male / female / neutral tints. The PNG fills the circle; the
-   tint shows through transparent PNG edges as a subtle backdrop. */
 .dx-avatar--male    { color: #1d4ed8; background: #eaf2fe; }
 .dx-avatar--female  { color: #b32e50; background: #fce9ee; }
 .dx-avatar--neutral { color: var(--dx-accent); background: var(--dx-accent-soft); }
@@ -1815,14 +1853,31 @@ $filterTabs = [
         cancelled:   { label: 'Cancelled',   tone: 'cancelled' }
     };
 
-    var NEXT = { pending: 'in_progress', in_progress: 'completed', completed: 'released' };
+    var NEXT = { pending: 'in_progress' };
 
+    /*
+     * Only the transitions the receptionist is allowed to make.
+     * Completing and releasing are clinical actions owned by the
+     * MedTech or Radiologist. If a stale page or a manual call ever
+     * asks for those, STEPS[to] is undefined and askStatus() bails.
+     */
     var STEPS = {
-        in_progress: { title: 'Start processing?',     verb: 'Start processing', done: 'Processing started' },
-        completed:   { title: 'Mark as completed?',    verb: 'Mark completed',   done: 'Marked as completed' },
-        released:    { title: 'Release results?',      verb: 'Release results',  done: 'Results released' },
-        cancelled:   { title: 'Cancel this request?',  verb: 'Cancel request',   done: 'Request cancelled', danger: true },
-        pending:     { title: 'Restore this request?', verb: 'Restore',          done: 'Request restored to pending' }
+        in_progress: {
+            title: 'Send to laboratory or x-ray?',
+            verb:  'Send patient',
+            done:  'Patient sent to the diagnostic department'
+        },
+        cancelled: {
+            title: 'Cancel this request?',
+            verb:  'Cancel request',
+            done:  'Request cancelled',
+            danger: true
+        },
+        pending: {
+            title: 'Restore this request?',
+            verb:  'Restore',
+            done:  'Request restored to pending'
+        }
     };
 
     var PESO = String.fromCharCode(0x20B1);
@@ -2018,30 +2073,16 @@ $filterTabs = [
 
     function refreshCounts() {
         var counts = { all: cards.length };
-        var pending = 0;
-        var stat = 0;
 
         cards.forEach(function (card) {
             var s = card.dataset.status;
             counts[s] = (counts[s] || 0) + 1;
-            if (s === 'pending') {
-                pending++;
-                if (card.querySelector('.dx-tag-stat')) { stat++; }
-            }
         });
 
         document.querySelectorAll('.dx-tab').forEach(function (tab) {
             var badge = tab.querySelector('.dx-tab-count');
             if (badge) { badge.textContent = counts[tab.dataset.status] || 0; }
         });
-
-        var lede = byId('dxLede');
-        if (lede) {
-            lede.innerHTML = pending
-                ? '<strong>' + pending + '</strong> awaiting processing' +
-                  (stat ? ', including <strong class="dx-lede-stat">' + stat + ' STAT</strong>' : '') + '.'
-                : 'No requests are waiting to be processed.';
-        }
     }
 
     document.querySelectorAll('.dx-tab').forEach(function (tab) {
@@ -2180,17 +2221,19 @@ $filterTabs = [
 
     function askStatus(ctx, to) {
         var step = STEPS[to];
+
+        /* Refuse anything the receptionist is not allowed to do,
+           even if a stale page still has the button. */
         if (!step) { return; }
 
-        var who = '<strong>' + esc(ctx.patient) + '</strong> (' + esc(ctx.reference) + ')';
-        var dept = ctx.type === 'xray' ? 'radiology' : 'the laboratory';
+        var who  = '<strong>' + esc(ctx.patient) + '</strong> (' + esc(ctx.reference) + ')';
+        var dept = ctx.type === 'xray' ? 'the X-ray department' : 'the laboratory';
 
         var body = {
-            in_progress: 'Start processing ' + who + '? This records a cash payment of <strong>' +
+            in_progress: 'Send ' + who + ' to ' + dept + '? This records the cash payment of <strong>' +
                          (ctx.amount ? esc(money(ctx.amount)) : 'the amount due') +
-                         '</strong> and sends the request to ' + dept + '.',
-            completed:   'Mark ' + who + ' as completed? The result will be ready to release.',
-            released:    'Release the results for ' + who + '? They can then be printed for the patient.',
+                         '</strong> and moves the request into the diagnostic queue. ' +
+                         'You will be able to print the result once it has been released.',
             cancelled:   'Cancel ' + who + '? You can restore it to pending later.',
             pending:     'Restore ' + who + ' to pending?'
         }[to];
@@ -2394,19 +2437,33 @@ $filterTabs = [
         var actions = byId('viewRequestActions');
         actions.dataset.status = status;
 
+        /*
+         * The receptionist can only:
+         *   - Print, once the staff has released the result.
+         *   - Restore, if the request was cancelled.
+         *   - Start, if it is still pending.
+         * Everything else shows a waiting indicator so the receptionist
+         * knows the patient is with another department.
+         */
         var buttons = '';
+
         if (status === 'released') {
-            buttons += '<a class="dx-btn" href="' +
+            buttons += '<a class="dx-btn dx-btn--primary" href="' +
                        esc(PRINT_BASE + '/' + encodeURIComponent(ctx.id) + '/' + encodeURIComponent(ctx.type)) +
                        '"><i class="bi bi-printer" aria-hidden="true"></i> Print result</a>';
-        }
-        if (status === 'cancelled') {
+        } else if (status === 'cancelled') {
             buttons += '<button type="button" class="dx-btn" data-action="status" data-status="pending">Restore</button>';
+        } else if (status === 'pending') {
+            buttons += '<button type="button" class="dx-btn dx-btn--primary" data-action="status" data-status="in_progress">' +
+                       '<i class="bi bi-send" aria-hidden="true"></i> Send to lab / x-ray</button>';
+        } else {
+            buttons += '<span class="dx-waiting"><i class="bi bi-hourglass-split" aria-hidden="true"></i> ' +
+                       (status === 'in_progress'
+                           ? 'With the diagnostic staff'
+                           : 'Awaiting release by staff') +
+                       '</span>';
         }
-        if (NEXT[status]) {
-            buttons += '<button type="button" class="dx-btn dx-btn--primary" data-action="status" data-status="' +
-                       NEXT[status] + '">' + esc(STEPS[NEXT[status]].verb) + '</button>';
-        }
+
         actions.innerHTML = buttons;
     }
 

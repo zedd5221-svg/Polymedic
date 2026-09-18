@@ -4,1041 +4,1695 @@
 
 <?= $this->section('medtechContent') ?>
 
-<div class="view-request-container">
+<?php
+$isReleased = ($request['status'] === 'released');
+$status     = (string) $request['status'];
 
-    <!-- Success/Error Messages -->
+$statusLabel = [
+    'pending'     => 'Pending',
+    'in_progress' => 'In progress',
+    'draft'       => 'Draft',
+    'completed'   => 'Completed',
+    'released'    => 'Released',
+][$status] ?? ucfirst($status);
+
+$statusTone = [
+    'pending'     => 'amber',
+    'in_progress' => 'blue',
+    'draft'       => 'slate',
+    'completed'   => 'green',
+    'released'    => 'teal',
+][$status] ?? 'slate';
+
+$refNo = 'LAB-' . date('Y') . '-' . str_pad((string) $request['id'], 4, '0', STR_PAD_LEFT);
+
+/*
+ * Group the merged result rows back under the service they came from.
+ */
+$grouped = [];
+foreach ($results as $row) {
+    $svc = trim((string) ($row['service_name'] ?? ''));
+    if ($svc === '') {
+        $svc = 'Additional tests';
+    }
+    if (!isset($grouped[$svc])) {
+        $grouped[$svc] = [];
+    }
+    $grouped[$svc][] = $row;
+}
+
+/* Completion, so the header can show real progress rather than a count. */
+$totalTests = count($results);
+$filledTests = 0;
+foreach ($results as $row) {
+    if (trim((string) ($row['result'] ?? '')) !== '') {
+        $filledTests++;
+    }
+}
+$pct = $totalTests > 0 ? (int) round(($filledTests / $totalTests) * 100) : 0;
+
+/* Abnormal count, surfaced at the top instead of buried in the table. */
+$abnormalCount = 0;
+foreach ($results as $row) {
+    if (in_array($row['flag'] ?? 'normal', ['high', 'low', 'critical'], true)) {
+        $abnormalCount++;
+    }
+}
+
+$flagOptions = ['normal' => 'Normal', 'high' => 'High', 'low' => 'Low', 'critical' => 'Critical'];
+$technologist = esc(session()->get('full_name') ?: '—');
+
+/*
+ * Gender-based avatar for the hero.
+ *
+ * Avatar PNGs must exist at:
+ *   public/assets/images/man-avatar.png
+ *   public/assets/images/woman-avatar.png
+ */
+$genderRaw = strtolower(trim((string) ($request['gender'] ?? '')));
+$isMale    = in_array($genderRaw, ['male', 'm', 'man', 'boy'], true);
+$isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
+?>
+
+<div class="lab<?= $isReleased ? ' lab--locked' : '' ?>">
+
     <?php if (session()->getFlashdata('success')): ?>
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            <i class="bi bi-check-circle me-2"></i><?= session()->getFlashdata('success') ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <div class="lab-msg lab-msg--ok">
+            <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+            <span><?= esc(session()->getFlashdata('success')) ?></span>
         </div>
     <?php endif; ?>
 
     <?php if (session()->getFlashdata('error')): ?>
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="bi bi-exclamation-circle me-2"></i><?= session()->getFlashdata('error') ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <div class="lab-msg lab-msg--err">
+            <i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i>
+            <span><?= esc(session()->getFlashdata('error')) ?></span>
         </div>
     <?php endif; ?>
 
-    <!-- Validation Errors -->
     <?php if (session()->getFlashdata('validation_errors')): ?>
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <strong><i class="bi bi-exclamation-triangle me-2"></i>Please fix the following:</strong>
-            <ul class="mb-0 mt-2">
-                <?php foreach (session()->getFlashdata('validation_errors') as $error): ?>
-                    <li><?= $error ?></li>
-                <?php endforeach; ?>
-            </ul>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <div class="lab-msg lab-msg--err">
+            <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+            <div>
+                <strong>Please fix the following before releasing:</strong>
+                <ul>
+                    <?php foreach (session()->getFlashdata('validation_errors') as $error): ?>
+                        <li><?= esc($error) ?></li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
         </div>
     <?php endif; ?>
 
-    <!-- ===== TOP FORM SECTION ===== -->
-    <div class="top-form-section">
-        <div class="row g-3">
-            <!-- Patient -->
-            <div class="col-md-6">
-                <label class="form-label">Patient</label>
-                <div class="input-group">
-                    <span class="input-group-text"><i class="bi bi-person"></i></span>
-                    <input type="text" class="form-control" value="<?= esc($request['patient_name']) ?>" readonly>
+
+    <!-- ============================================================
+         HERO
+         ============================================================ -->
+    <div class="lab-hero">
+        <div class="lab-hero-main">
+
+            <?php if ($isMale || $isFemale): ?>
+                <span class="lab-hero-avatar lab-hero-avatar--<?= $isFemale ? 'female' : 'male' ?>">
+                    <img src="<?= esc(base_url('assets/images/' . ($isFemale ? 'woman-avatar.png' : 'man-avatar.png')), 'attr') ?>"
+                         alt=""
+                         loading="lazy"
+                         decoding="async">
+                </span>
+            <?php else: ?>
+                <div class="lab-hero-icon" aria-hidden="true">
+                    <i class="bi bi-clipboard2-pulse"></i>
                 </div>
-            </div>
-            
-            <!-- Requesting Doctor -->
-            <div class="col-md-6">
-                <label class="form-label">Requesting Doctor</label>
-                <div class="input-group">
-                    <span class="input-group-text"><i class="bi bi-person-badge"></i></span>
-                    <input type="text" class="form-control" value="<?= $request['doctor_name'] ?? 'N/A' ?>" readonly>
+            <?php endif; ?>
+
+            <div class="lab-hero-text">
+                <div class="lab-hero-titleline">
+                    <h1 class="lab-hero-title"><?= esc($request['patient_name']) ?></h1>
+                    <span class="lab-pill lab-pill--<?= esc($statusTone, 'attr') ?>">
+                        <span class="lab-pill-dot" aria-hidden="true"></span><?= esc($statusLabel) ?>
+                    </span>
                 </div>
-            </div>
-            
-            <!-- Medical Technologist -->
-            <div class="col-md-6">
-                <label class="form-label">Medical Technologist</label>
-                <div class="input-group">
-                    <span class="input-group-text"><i class="bi bi-person"></i></span>
-                    <input type="text" class="form-control" value="<?= session()->get('full_name') ?? 'Medical Technologist' ?>" readonly>
-                </div>
-            </div>
-            
-            <!-- Date -->
-            <div class="col-md-6">
-                <label class="form-label">Date</label>
-                <input type="date" class="form-control" value="<?= date('Y-m-d', strtotime($request['request_date'])) ?>" readonly>
-            </div>
-            
-            <!-- Report Template -->
-            <div class="col-md-6">
-                <label class="form-label">Report Template</label>
-                <select class="form-select" id="templateSelect" onchange="loadTemplate(this.value)">
-                    <option value="cbc">Complete Blood Count (CBC)</option>
-                    <option value="urinalysis">Urinalysis</option>
-                    <option value="blood_chemistry">Blood Chemistry</option>
-                    <option value="lipid_profile">Lipid Profile</option>
-                    <option value="thyroid">Thyroid Panel</option>
-                </select>
-            </div>
-            
-            <!-- Upload Image -->
-            <div class="col-md-6 d-flex align-items-end">
-                <form action="<?= base_url('medtech/request/upload/' . $request['id']) ?>" 
-                      method="POST" 
-                      enctype="multipart/form-data"
-                      class="w-100">
-                    <?= csrf_field() ?>
-                    <div class="d-flex gap-2">
-                        <input type="file" name="lab_image" accept="image/*" style="display:none;" id="imageUpload" onchange="document.getElementById('uploadSubmit').click()">
-                        <button type="button" class="btn btn-outline-secondary w-100" onclick="document.getElementById('imageUpload').click()">
-                            <i class="bi bi-upload"></i> Upload Image
-                        </button>
-                        <button type="submit" class="btn btn-primary-custom d-none" id="uploadSubmit">
-                            <i class="bi bi-check"></i>
-                        </button>
-                    </div>
-                </form>
+                <p class="lab-hero-sub">
+                    <span class="lab-ref"><?= esc($refNo) ?></span>
+                    <span class="lab-dot" aria-hidden="true"></span>
+                    <?= esc($request['age']) ?> / <?= esc($request['gender']) ?>
+                    <span class="lab-dot" aria-hidden="true"></span>
+                    Collected <?= date('M j, Y', strtotime($request['request_date'])) ?>
+                </p>
             </div>
         </div>
-        
-        <!-- Action Buttons -->
-        <div class="action-buttons-row mt-3 d-flex justify-content-between align-items-center">
-            <div class="d-flex gap-2">
-                <button type="button" class="btn btn-primary-custom" onclick="generatePDF()">
-                    <i class="bi bi-download"></i> Generate PDF
+
+        <div class="lab-hero-actions">
+            <a href="<?= base_url('medtech/requests') ?>" class="lab-btn lab-btn--ghost">
+                <i class="bi bi-arrow-left" aria-hidden="true"></i>
+                <span>Back</span>
+            </a>
+            <a href="<?= base_url('medtech/request/print/' . (int) $request['id']) ?>"
+               target="_blank" rel="noopener"
+               class="lab-btn">
+                <i class="bi bi-printer" aria-hidden="true"></i>
+                <span>Print</span>
+            </a>
+            <?php if (!$isReleased): ?>
+                <button type="button" class="lab-btn lab-btn--go" onclick="releaseResult(<?= (int) $request['id'] ?>)">
+                    <i class="bi bi-check2-circle" aria-hidden="true"></i>
+                    <span>Release result</span>
                 </button>
-                <button type="button" class="btn btn-outline-custom" onclick="window.print()">
-                    <i class="bi bi-printer"></i> Print
-                </button>
-            </div>
-            <div class="d-flex gap-2">
-                <?php if ($request['status'] !== 'released'): ?>
-                    <button type="button" class="btn btn-success-custom" onclick="releaseResult(<?= $request['id'] ?>)">
-                        <i class="bi bi-check-circle"></i> Release Result
-                    </button>
-                <?php endif; ?>
-            </div>
+            <?php endif; ?>
         </div>
     </div>
 
-    <!-- ===== REPORT PREVIEW / EDIT SECTION ===== -->
-    <div class="report-preview-section mt-4">
-        <div class="report-preview-header">
-            <div class="d-flex align-items-center gap-2">
-                <i class="bi bi-file-earmark-text"></i>
-                <span>Report Preview</span>
-            </div>
-            <span class="badge-draft"><?= ucfirst(str_replace('_', ' ', $request['status'])) ?></span>
+
+    <!-- ============================================================
+         PATIENT STRIP
+         ============================================================ -->
+    <div class="lab-strip">
+        <div class="lab-strip-cell">
+            <span class="lab-strip-label">Patient</span>
+            <span class="lab-strip-value"><?= esc($request['patient_name']) ?></span>
         </div>
-        
-        <div class="report-preview-body">
-            <!-- PolyMedic Header -->
-            <div class="polymedic-header">
-                <div class="d-flex align-items-start gap-3">
-                    <div class="polymedic-logo">
-                        <i class="bi bi-clipboard2-pulse"></i>
-                    </div>
-                    <div class="polymedic-info">
-                        <h3>POLYMEDIC DIAGNOSTIC CENTER</h3>
-                        <p>123 Medical Drive, Makati City, Metro Manila</p>
-                        <p>Tel: (02) 8888-1234 · Email: lab@polymedic.ph</p>
-                        <p>LTO No.: 4A-2024-0321 · PhilHealth Accredited</p>
-                    </div>
-                </div>
-                <div class="lab-result-header text-end">
-                    <h4>LABORATORY RESULT</h4>
-                    <p>Ref No.: LAB-2026-<?= str_pad($request['id'], 4, '0', STR_PAD_LEFT) ?></p>
-                    <p>Date: <?= date('F d, Y', strtotime($request['request_date'])) ?></p>
-                </div>
+        <div class="lab-strip-cell">
+            <span class="lab-strip-label">Age / Sex</span>
+            <span class="lab-strip-value"><?= esc($request['age']) ?> / <?= esc($request['gender']) ?></span>
+        </div>
+        <div class="lab-strip-cell">
+            <span class="lab-strip-label">Date collected</span>
+            <span class="lab-strip-value"><?= date('M j, Y', strtotime($request['request_date'])) ?></span>
+        </div>
+        <div class="lab-strip-cell">
+            <span class="lab-strip-label">Technologist</span>
+            <span class="lab-strip-value"><?= $technologist ?></span>
+        </div>
+        <div class="lab-strip-cell">
+            <span class="lab-strip-label">Requesting MD</span>
+            <span class="lab-strip-value"><?= esc($request['doctor_name'] ?: '—') ?></span>
+        </div>
+        <div class="lab-strip-cell">
+            <span class="lab-strip-label">Reference</span>
+            <span class="lab-strip-value lab-mono"><?= esc($refNo) ?></span>
+        </div>
+    </div>
+
+
+    <!-- ============================================================
+         REPORT PANEL
+         ============================================================ -->
+    <div class="lab-panel">
+
+        <div class="lab-panel-head">
+            <div class="lab-panel-head-text">
+                <h2 class="lab-panel-title">Laboratory Results</h2>
+                <span class="lab-panel-count">
+                    <?= number_format($totalTests) ?> <?= $totalTests === 1 ? 'test' : 'tests' ?>
+                    across
+                    <?= number_format(count($grouped)) ?> <?= count($grouped) === 1 ? 'service' : 'services' ?>
+                    <?php if ($abnormalCount > 0): ?>
+                        <span class="lab-abn-pill">
+                            <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+                            <?= $abnormalCount ?> abnormal
+                        </span>
+                    <?php endif; ?>
+                </span>
             </div>
-            
-            <div class="divider-line"></div>
-            
-            <!-- Patient Details -->
-            <div class="patient-details-row">
-                <div class="row">
-                    <div class="col-md-3">
-                        <p class="detail-label">Patient Name:</p>
-                        <p class="detail-value"><?= esc($request['patient_name']) ?></p>
-                    </div>
-                    <div class="col-md-3">
-                        <p class="detail-label">Requesting MD:</p>
-                        <p class="detail-value"><?= $request['doctor_name'] ?? 'N/A' ?></p>
-                    </div>
-                    <div class="col-md-3">
-                        <p class="detail-label">Age / Sex:</p>
-                        <p class="detail-value"><?= esc($request['age']) ?> / <?= esc($request['gender']) ?></p>
-                    </div>
-                    <div class="col-md-3">
-                        <p class="detail-label">Status:</p>
-                        <p class="detail-value"><?= ucfirst(str_replace('_', ' ', $request['status'])) ?></p>
-                    </div>
-                    <div class="col-md-3">
-                        <p class="detail-label">Lab Services:</p>
-                        <p class="detail-value"><?= esc($request['lab_services']) ?></p>
-                    </div>
-                    <div class="col-md-3">
-                        <p class="detail-label">Date Collected:</p>
-                        <p class="detail-value"><?= date('F d, Y', strtotime($request['request_date'])) ?></p>
+
+            <?php if (!$isReleased): ?>
+                <div class="lab-progress" id="labProgress"
+                     data-total="<?= (int) $totalTests ?>"
+                     data-filled="<?= (int) $filledTests ?>"
+                     role="img"
+                     aria-label="<?= (int) $filledTests ?> of <?= (int) $totalTests ?> results entered">
+                    <svg viewBox="0 0 44 44" class="lab-ring" aria-hidden="true">
+                        <circle class="lab-ring-bg" cx="22" cy="22" r="18"></circle>
+                        <circle class="lab-ring-fg" cx="22" cy="22" r="18"
+                                style="--pct: <?= (int) $pct ?>"></circle>
+                    </svg>
+                    <div class="lab-progress-text">
+                        <span class="lab-progress-num" id="labProgressNum"><?= (int) $filledTests ?></span>
+                        <span class="lab-progress-of">/ <?= (int) $totalTests ?></span>
                     </div>
                 </div>
-            </div>
-            
-            <div class="divider-line"></div>
-            
-            <!-- Test Results Section -->
-            <div class="test-results-section">
-                <h5 class="test-section-title">LABORATORY RESULTS</h5>
-                
-                <?php if ($request['status'] === 'released'): ?>
-                    <!-- VIEW ONLY MODE -->
-                    <div class="table-responsive">
-                        <table class="table lab-results-table">
-                            <thead>
-                                <tr>
-                                    <th>Test</th>
-                                    <th>Result</th>
-                                    <th>Unit</th>
-                                    <th>Reference Range</th>
-                                    <th>Flag</th>
+            <?php endif; ?>
+        </div>
+
+
+        <?php if ($isReleased): ?>
+
+            <!-- ================= VIEW ONLY ================= -->
+            <div class="lab-table-wrap">
+                <table class="lab-table">
+                    <thead>
+                        <tr>
+                            <th>Test</th>
+                            <th class="lab-right">Result</th>
+                            <th>Unit</th>
+                            <th>Reference range</th>
+                            <th class="lab-center">Flag</th>
+                        </tr>
+                    </thead>
+                    <?php foreach ($grouped as $svcName => $rows): ?>
+                        <tbody class="lab-group">
+                            <tr class="lab-group-head">
+                                <td colspan="5">
+                                    <span class="lab-group-bar" aria-hidden="true"></span>
+                                    <span class="lab-group-name"><?= esc($svcName) ?></span>
+                                    <span class="lab-group-count">
+                                        <?= count($rows) ?> <?= count($rows) === 1 ? 'test' : 'tests' ?>
+                                    </span>
+                                </td>
+                            </tr>
+                            <?php foreach ($rows as $result): ?>
+                                <?php
+                                $flag  = (string) ($result['flag'] ?? 'normal');
+                                $isBad = in_array($flag, ['high', 'low', 'critical'], true);
+                                ?>
+                                <tr class="lab-row<?= $isBad ? ' is-bad' : '' ?>">
+                                    <td data-label="Test" class="lab-cell-name"><?= esc($result['test_name']) ?></td>
+                                    <td data-label="Result" class="lab-right <?= $isBad ? 'lab-bad' : '' ?>"><?= esc($result['result']) ?></td>
+                                    <td data-label="Unit" class="lab-cell-soft"><?= esc($result['unit']) ?></td>
+                                    <td data-label="Reference range" class="lab-cell-soft"><?= esc($result['reference_range']) ?></td>
+                                    <td data-label="Flag" class="lab-center">
+                                        <?php if ($flag === 'high'): ?>
+                                            <span class="lab-flag lab-flag--high"><i class="bi bi-arrow-up"></i> High</span>
+                                        <?php elseif ($flag === 'low'): ?>
+                                            <span class="lab-flag lab-flag--low"><i class="bi bi-arrow-down"></i> Low</span>
+                                        <?php elseif ($flag === 'critical'): ?>
+                                            <span class="lab-flag lab-flag--critical"><i class="bi bi-exclamation-triangle-fill"></i> Critical</span>
+                                        <?php elseif ($flag === 'normal'): ?>
+                                            <span class="lab-flag lab-flag--ok">Normal</span>
+                                        <?php else: ?>
+                                            <span class="lab-flag lab-flag--ok">—</span>
+                                        <?php endif; ?>
+                                    </td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                <?php if (!empty($results)): ?>
-                                    <?php foreach ($results as $result): ?>
-                                        <tr>
-                                            <td><?= esc($result['test_name']) ?></td>
-                                            <td class="<?= $result['flag'] === 'high' || $result['flag'] === 'low' ? 'text-danger' : '' ?>">
-                                                <?= esc($result['result']) ?>
-                                            </td>
-                                            <td><?= esc($result['unit']) ?></td>
-                                            <td><?= esc($result['reference_range']) ?></td>
-                                            <td>
-                                                <?php if ($result['flag'] === 'normal'): ?>
-                                                    <span class="flag-text text-success">N</span>
-                                                <?php elseif ($result['flag'] === 'high'): ?>
-                                                    <span class="flag-text text-danger"><i class="bi bi-arrow-up"></i> H</span>
-                                                <?php elseif ($result['flag'] === 'low'): ?>
-                                                    <span class="flag-text text-danger"><i class="bi bi-arrow-down"></i> L</span>
-                                                <?php elseif ($result['flag'] === 'critical'): ?>
-                                                    <span class="flag-text text-danger"><i class="bi bi-exclamation-triangle"></i> C</span>
-                                                <?php endif; ?>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <!-- Remarks -->
-                    <div class="remarks-box mt-3">
-                        <span class="remarks-label">Remarks:</span>
-                        <span class="remarks-text"><?= esc($request['remarks'] ?? 'No remarks') ?></span>
-                    </div>
-                    
-                    <div class="divider-line"></div>
-                    
-                    <!-- Signatures -->
-                    <div class="signatures-row mt-4">
-                        <div class="row">
-                            <div class="col-md-6 text-center">
-                                <div class="signature-line"></div>
-                                <p class="signature-name"><?= session()->get('full_name') ?? 'Medical Technologist' ?></p>
-                                <p class="signature-role">Medical Technologist · Lic. No. 12345</p>
-                            </div>
-                            <div class="col-md-6 text-center">
-                                <div class="signature-line"></div>
-                                <p class="signature-name"><?= $request['doctor_name'] ?? 'Pathologist' ?></p>
-                                <p class="signature-role">Pathologist · PRC No. 67890</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                <?php else: ?>
-                    <!-- EDIT MODE -->
-                    <form action="<?= base_url('medtech/request/release-directly/' . $request['id']) ?>" method="POST" id="releaseForm">
-                        <?= csrf_field() ?>
-                        
-                        <div class="table-responsive">
-                            <table class="table lab-results-table" id="resultsTable">
-                                <thead>
-                                    <tr>
-                                        <th style="width: 25%;">Test</th>
-                                        <th style="width: 15%;">Result <span class="text-danger">*</span></th>
-                                        <th style="width: 15%;">Unit <span class="text-danger">*</span></th>
-                                        <th style="width: 20%;">Reference Range <span class="text-danger">*</span></th>
-                                        <th style="width: 15%;">Flag</th>
-                                        <th style="width: 10%;">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="resultsBody">
-                                    <?php if (!empty($results)): ?>
-                                        <?php foreach ($results as $index => $result): ?>
-                                            <tr>
-                                                <td>
-                                                    <input type="text" class="form-control form-control-sm" 
-                                                           name="test_name[]" value="<?= esc($result['test_name']) ?>" required>
-                                                </td>
-                                                <td>
-                                                    <input type="text" class="form-control form-control-sm result-input" 
-                                                           name="result[]" value="<?= esc($result['result']) ?>" required>
-                                                </td>
-                                                <td>
-                                                    <input type="text" class="form-control form-control-sm" 
-                                                           name="unit[]" value="<?= esc($result['unit']) ?>" required>
-                                                </td>
-                                                <td>
-                                                    <input type="text" class="form-control form-control-sm" 
-                                                           name="reference_range[]" value="<?= esc($result['reference_range']) ?>" required>
-                                                </td>
-                                                <td>
-                                                    <select class="form-select form-select-sm" name="flag[]">
-                                                        <option value="normal" <?= $result['flag'] === 'normal' ? 'selected' : '' ?>>Normal</option>
-                                                        <option value="high" <?= $result['flag'] === 'high' ? 'selected' : '' ?>>High</option>
-                                                        <option value="low" <?= $result['flag'] === 'low' ? 'selected' : '' ?>>Low</option>
-                                                        <option value="critical" <?= $result['flag'] === 'critical' ? 'selected' : '' ?>>Critical</option>
-                                                    </select>
-                                                </td>
-                                                <td>
-                                                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">
-                                                        <i class="bi bi-trash"></i>
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    <?php else: ?>
-                                        <tr id="emptyRow">
-                                            <td colspan="6" class="text-center text-muted py-3">
-                                                No results yet. Select a template above to load tests.
-                                            </td>
-                                        </tr>
-                                    <?php endif; ?>
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div class="mt-3">
-                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addResultRow()">
-                                <i class="bi bi-plus-circle"></i> Add Row
-                            </button>
-                        </div>
-
-                        <!-- Findings & Remarks -->
-                        <div class="findings-remarks-section mt-4">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label class="form-label">Findings / Interpretation <span class="text-danger">*</span></label>
-                                        <textarea class="form-control" name="findings" rows="4" 
-                                                  placeholder="Enter laboratory findings..." required><?= $request['findings'] ?? '' ?></textarea>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label class="form-label">Remarks</label>
-                                        <textarea class="form-control" name="remarks" rows="4" 
-                                                  placeholder="Enter any remarks..."><?= $request['remarks'] ?? '' ?></textarea>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Action Buttons -->
-                        <div class="action-buttons mt-3 d-flex gap-2 flex-wrap">
-                            <button type="submit" class="btn btn-success-custom">
-                                <i class="bi bi-check-all"></i> Release Directly
-                            </button>
-                            <button type="button" class="btn btn-primary-custom" onclick="saveResults()">
-                                <i class="bi bi-save"></i> Save as Draft
-                            </button>
-                            <button type="button" class="btn btn-warning-custom" onclick="saveAndComplete(<?= $request['id'] ?>)">
-                                <i class="bi bi-check-circle"></i> Complete
-                            </button>
-                            <?php if ($request['status'] === 'completed' || $request['status'] === 'draft'): ?>
-                                <a href="<?= base_url('medtech/request/release/' . $request['id']) ?>" 
-                                   class="btn btn-success-custom"
-                                   onclick="return confirm('Release this result? This will make it available for printing.')">
-                                    <i class="bi bi-check-all"></i> Release Result
-                                </a>
-                            <?php endif; ?>
-                        </div>
-                    </form>
-
-                    <!-- Separate form for findings only -->
-                    <form action="<?= base_url('medtech/request/save-findings/' . $request['id']) ?>" method="POST" id="findingsForm">
-                        <?= csrf_field() ?>
-                        <input type="hidden" name="action" id="findingsAction" value="save">
-                    </form>
-
-                    <!-- Separate form for saving results only -->
-                    <form action="<?= base_url('medtech/request/save-results/' . $request['id']) ?>" method="POST" id="saveResultsForm">
-                        <?= csrf_field() ?>
-                    </form>
-                <?php endif; ?>
+                            <?php endforeach; ?>
+                        </tbody>
+                    <?php endforeach; ?>
+                </table>
             </div>
-        </div>
+
+            <?php if (!empty($request['findings']) || !empty($request['remarks'])): ?>
+                <div class="lab-notes">
+                    <?php if (!empty($request['findings'])): ?>
+                        <div class="lab-note">
+                            <span class="lab-note-key">Findings</span>
+                            <p><?= nl2br(esc($request['findings'])) ?></p>
+                        </div>
+                    <?php endif; ?>
+                    <?php if (!empty($request['remarks'])): ?>
+                        <div class="lab-note">
+                            <span class="lab-note-key">Remarks</span>
+                            <p><?= nl2br(esc($request['remarks'])) ?></p>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
+
+            <div class="lab-sign">
+                <div class="lab-sign-col">
+                    <div class="lab-sign-line"></div>
+                    <div class="lab-sign-name"><?= esc(session()->get('full_name') ?: 'Medical Technologist') ?></div>
+                    <div class="lab-sign-role">Medical Technologist</div>
+                </div>
+                <div class="lab-sign-col">
+                    <div class="lab-sign-line"></div>
+                    <div class="lab-sign-name"><?= esc($request['doctor_name'] ?: 'Pathologist') ?></div>
+                    <div class="lab-sign-role">Pathologist</div>
+                </div>
+            </div>
+
+        <?php else: ?>
+
+            <!-- ================= EDIT ================= -->
+            <form action="<?= base_url('medtech/request/release-directly/' . (int) $request['id']) ?>"
+                  method="POST"
+                  id="mainResultForm"
+                  novalidate>
+
+                <?= csrf_field() ?>
+                <input type="hidden" name="submit_action" id="submitAction" value="save">
+
+                <div class="lab-table-wrap">
+                    <table class="lab-table lab-table--edit" id="resultsTable">
+                        <thead>
+                            <tr>
+                                <th class="lab-w-test">Test</th>
+                                <th class="lab-right lab-w-result">Result <span class="lab-req" title="Required">*</span></th>
+                                <th class="lab-w-unit">Unit <span class="lab-req" title="Required">*</span></th>
+                                <th class="lab-w-range">Reference range <span class="lab-req" title="Required">*</span></th>
+                                <th class="lab-w-flag">Flag</th>
+                                <th class="lab-right lab-w-action"><span class="visually-hidden">Actions</span></th>
+                            </tr>
+                        </thead>
+
+                        <?php foreach ($grouped as $svcName => $rows): ?>
+                            <tbody class="lab-group" data-service="<?= esc($svcName, 'attr') ?>">
+                                <tr class="lab-group-head">
+                                    <td colspan="6">
+                                        <button type="button" class="lab-group-toggle" data-toggle-group
+                                                aria-expanded="true"
+                                                aria-label="Collapse <?= esc($svcName, 'attr') ?>">
+                                            <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                                        </button>
+                                        <span class="lab-group-bar" aria-hidden="true"></span>
+                                        <span class="lab-group-name"><?= esc($svcName) ?></span>
+                                        <span class="lab-group-count">
+                                            <span data-count><?= count($rows) ?></span>
+                                            <?= count($rows) === 1 ? 'test' : 'tests' ?>
+                                        </span>
+                                        <span class="lab-group-progress" data-group-progress></span>
+                                    </td>
+                                </tr>
+
+                                <?php foreach ($rows as $result): ?>
+                                    <?php
+                                    $flag = (string) ($result['flag'] ?? 'normal');
+
+                                    /*
+                                     * Alignment: numeric values are right-aligned,
+                                     * text values stay left. Empty fields default
+                                     * to left because typing a word is more common
+                                     * in an empty field than typing a number.
+                                     */
+                                    $existingResult = trim((string) ($result['result'] ?? ''));
+                                    $looksNumeric   = $existingResult !== '' && is_numeric($existingResult);
+
+                                    /*
+                                     * Placeholder: match the shape of the row.
+                                     *   has a unit              -> "0.0"
+                                     *   has a reference range   -> "e.g. <range>"
+                                     *   neither                 -> "Type result"
+                                     */
+                                    $rowUnit      = trim((string) ($result['unit'] ?? ''));
+                                    $rowReference = trim((string) ($result['reference_range'] ?? ''));
+
+                                    if ($rowUnit !== '') {
+                                        $resultPlaceholder = '0.0';
+                                    } elseif ($rowReference !== '') {
+                                        $resultPlaceholder = 'e.g. ' . $rowReference;
+                                    } else {
+                                        $resultPlaceholder = 'Type result';
+                                    }
+                                    ?>
+                                    <tr class="lab-row is-flag-<?= esc($flag, 'attr') ?>">
+                                        <td data-label="Test">
+                                            <input type="text" class="lab-input" name="test_name[]"
+                                                   value="<?= esc($result['test_name']) ?>"
+                                                   data-required autocomplete="off"
+                                                   autocorrect="off" autocapitalize="off" spellcheck="false"
+                                                   enterkeyhint="next">
+                                            <input type="hidden" name="service_name[]"
+                                                   value="<?= esc($svcName, 'attr') ?>">
+                                        </td>
+                                        <td data-label="Result">
+                                            <input type="text"
+                                                   class="lab-input result-input<?= $looksNumeric ? ' lab-input--num' : '' ?>"
+                                                   name="result[]"
+                                                   value="<?= esc($result['result']) ?>"
+                                                   placeholder="<?= esc($resultPlaceholder, 'attr') ?>"
+                                                   data-required autocomplete="off"
+                                                   autocorrect="off" autocapitalize="off" spellcheck="false"
+                                                   enterkeyhint="next"
+                                                   inputmode="text">
+                                        </td>
+                                        <td data-label="Unit">
+                                            <input type="text" class="lab-input" name="unit[]"
+                                                   value="<?= esc($result['unit']) ?>"
+                                                   data-required autocomplete="off"
+                                                   autocorrect="off" autocapitalize="off" spellcheck="false"
+                                                   enterkeyhint="next" list="labUnits">
+                                        </td>
+                                        <td data-label="Reference range">
+                                            <input type="text" class="lab-input" name="reference_range[]"
+                                                   value="<?= esc($result['reference_range']) ?>"
+                                                   data-required autocomplete="off"
+                                                   autocorrect="off" autocapitalize="off" spellcheck="false"
+                                                   enterkeyhint="next">
+                                        </td>
+                                        <td data-label="Flag">
+                                            <select class="lab-select lab-select--<?= esc($flag, 'attr') ?>" name="flag[]">
+                                                <?php foreach ($flagOptions as $val => $lbl): ?>
+                                                    <option value="<?= esc($val, 'attr') ?>" <?= $flag === $val ? 'selected' : '' ?>><?= esc($lbl) ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </td>
+                                        <td data-label="Action" class="lab-right">
+                                            <button type="button" class="lab-trash" data-remove-row
+                                                    aria-label="Remove this row">
+                                                <i class="bi bi-trash3" aria-hidden="true"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        <?php endforeach; ?>
+                    </table>
+
+                    <div class="lab-empty" id="emptyRow" <?= !empty($grouped) ? 'hidden' : '' ?>>
+                        <i class="bi bi-clipboard-plus" aria-hidden="true"></i>
+                        <p>No tests matched the ordered services. Use <strong>Add row</strong> below to enter them manually.</p>
+                    </div>
+                </div>
+
+                <div class="lab-add-row">
+                    <button type="button" class="lab-btn lab-btn--ghost" id="labAddRow">
+                        <i class="bi bi-plus-lg" aria-hidden="true"></i>
+                        <span>Add row</span>
+                    </button>
+                    <span class="lab-hint" id="labHint"></span>
+                </div>
+
+                <div class="lab-notes-edit">
+                    <div class="lab-field">
+                        <label for="vrFindings">Findings / Interpretation <span class="lab-req" title="Required">*</span></label>
+                        <textarea id="vrFindings" name="findings" rows="5"
+                                  data-required data-autogrow
+                                  autocorrect="off" autocapitalize="sentences" spellcheck="true"
+                                  placeholder="Enter laboratory findings..."><?= esc($request['findings'] ?? '') ?></textarea>
+                    </div>
+                    <div class="lab-field">
+                        <label for="vrRemarks">Remarks</label>
+                        <textarea id="vrRemarks" name="remarks" rows="5"
+                                  data-autogrow
+                                  autocorrect="off" autocapitalize="sentences" spellcheck="true"
+                                  placeholder="Enter any remarks..."><?= esc($request['remarks'] ?? '') ?></textarea>
+                    </div>
+                </div>
+
+                <div class="lab-actions">
+                    <div class="lab-actions-status" id="labStatus">
+                        <i class="bi bi-info-circle" aria-hidden="true"></i>
+                        <span>Fill in every result, then release or save as draft.</span>
+                    </div>
+                    <div class="lab-actions-btns">
+                        <button type="submit" class="lab-btn lab-btn--ghost" data-action="save">
+                            <i class="bi bi-save" aria-hidden="true"></i>
+                            <span>Save as draft</span>
+                        </button>
+                        <button type="submit" class="lab-btn lab-btn--ghost" data-action="complete">
+                            <i class="bi bi-check2" aria-hidden="true"></i>
+                            <span>Complete</span>
+                        </button>
+                        <button type="submit" class="lab-btn lab-btn--go" data-action="release">
+                            <i class="bi bi-check2-all" aria-hidden="true"></i>
+                            <span>Release result</span>
+                        </button>
+                    </div>
+                </div>
+
+            </form>
+
+            <datalist id="labUnits">
+                <option value="mg/dL"></option>
+                <option value="g/dL"></option>
+                <option value="mmol/L"></option>
+                <option value="µmol/L"></option>
+                <option value="IU/L"></option>
+                <option value="U/L"></option>
+                <option value="ng/dL"></option>
+                <option value="ng/mL"></option>
+                <option value="pg/mL"></option>
+                <option value="µIU/mL"></option>
+                <option value="10^9/L"></option>
+                <option value="10^12/L"></option>
+                <option value="%"></option>
+                <option value="fL"></option>
+                <option value="pg"></option>
+                <option value="K/uL"></option>
+                <option value="M/uL"></option>
+                <option value="uIU/mL"></option>
+                <option value="ug/dL"></option>
+            </datalist>
+
+            <template id="labRowTemplate">
+                <tr class="lab-row is-flag-normal">
+                    <td data-label="Test">
+                        <input type="text" class="lab-input" name="test_name[]"
+                               placeholder="Test name" data-required autocomplete="off"
+                               autocorrect="off" autocapitalize="off" spellcheck="false"
+                               enterkeyhint="next">
+                        <input type="hidden" name="service_name[]" value="">
+                    </td>
+                    <td data-label="Result">
+                        <input type="text" class="lab-input result-input" name="result[]"
+                               placeholder="Type result"
+                               data-required autocomplete="off"
+                               autocorrect="off" autocapitalize="off" spellcheck="false"
+                               enterkeyhint="next"
+                               inputmode="text">
+                    </td>
+                    <td data-label="Unit">
+                        <input type="text" class="lab-input" name="unit[]"
+                               data-required autocomplete="off"
+                               autocorrect="off" autocapitalize="off" spellcheck="false"
+                               enterkeyhint="next" list="labUnits">
+                    </td>
+                    <td data-label="Reference range">
+                        <input type="text" class="lab-input" name="reference_range[]"
+                               data-required autocomplete="off"
+                               autocorrect="off" autocapitalize="off" spellcheck="false"
+                               enterkeyhint="next">
+                    </td>
+                    <td data-label="Flag">
+                        <select class="lab-select lab-select--normal" name="flag[]">
+                            <?php foreach ($flagOptions as $val => $lbl): ?>
+                                <option value="<?= esc($val, 'attr') ?>"><?= esc($lbl) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </td>
+                    <td data-label="Action" class="lab-right">
+                        <button type="button" class="lab-trash" data-remove-row aria-label="Remove this row">
+                            <i class="bi bi-trash3" aria-hidden="true"></i>
+                        </button>
+                    </td>
+                </tr>
+            </template>
+
+            <template id="labGroupTemplate">
+                <tbody class="lab-group" data-service="Additional tests">
+                    <tr class="lab-group-head">
+                        <td colspan="6">
+                            <button type="button" class="lab-group-toggle" data-toggle-group
+                                    aria-expanded="true" aria-label="Collapse group">
+                                <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                            </button>
+                            <span class="lab-group-bar" aria-hidden="true"></span>
+                            <span class="lab-group-name">Additional tests</span>
+                            <span class="lab-group-count"><span data-count>0</span> tests</span>
+                            <span class="lab-group-progress" data-group-progress></span>
+                        </td>
+                    </tr>
+                </tbody>
+            </template>
+
+        <?php endif; ?>
+
     </div>
+
 </div>
 
+
 <style>
-/* ===== VIEW REQUEST CONTAINER ===== */
-.view-request-container {
-    padding: 0;
+/* =========================================================
+   LABORATORY REPORT
+   ========================================================= */
+
+.lab {
+    --lab-ink:         #0f172a;
+    --lab-text:        #334155;
+    --lab-muted:       #64748b;
+    --lab-faint:       #94a3b8;
+    --lab-line:        #e2e8f0;
+    --lab-line-soft:   #f1f5f9;
+    --lab-surface:     #ffffff;
+    --lab-canvas:      #f8fafc;
+    --lab-rail:        #f9fafb;
+
+    --lab-accent:      #0d9488;
+    --lab-accent-dark: #0f766e;
+    --lab-accent-soft: #e6fbf6;
+
+    --lab-danger:      #dc2626;
+    --lab-danger-soft: #fef2f2;
+    --lab-amber:       #b45309;
+    --lab-amber-soft:  #fef3c7;
+    --lab-green:       #047857;
+    --lab-green-soft:  #ecfdf5;
+    --lab-blue:        #1d4ed8;
+    --lab-blue-soft:   #eff6ff;
+
+    --lab-radius:      14px;
+    --lab-radius-sm:   9px;
+    --lab-mono:        ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+    --lab-shadow:      0 1px 2px rgba(15, 23, 42, 0.04);
+
+    color: var(--lab-text);
+    -webkit-font-smoothing: antialiased;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    display: block;
+    box-sizing: border-box;
 }
 
-/* ===== TOP FORM SECTION ===== */
-.top-form-section {
-    background: #fcfcfc;
-    border-radius: 12px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-    border: 1px solid #e5e7eb;
-    padding: 1.5rem;
+.lab *,
+.lab *::before,
+.lab *::after { box-sizing: border-box; }
+
+.lab *:focus-visible {
+    outline: 2px solid var(--lab-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
 }
 
-.form-label {
-    font-weight: 600;
-    color: #374151;
+.lab .visually-hidden {
+    position: absolute; width: 1px; height: 1px;
+    padding: 0; margin: -1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+.lab-mono { font-family: var(--lab-mono); }
+
+/* ---------- Messages ---------- */
+
+.lab-msg {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    padding: 0.8rem 1rem;
+    margin-bottom: 1rem;
     font-size: 0.85rem;
-    margin-bottom: 0.4rem;
+    line-height: 1.5;
+    border-radius: var(--lab-radius-sm);
 }
 
-.input-group-text {
-    background: #f0f7f8  !important;
-    border: 1px solid #a8a8a8;
-    border-right: none;
-    color: #9096a0;
+.lab-msg > i:first-child { margin-top: 0.15rem; }
+.lab-msg > div { min-width: 0; }
+.lab-msg strong { display: block; margin-bottom: 0.35rem; }
+.lab-msg ul { margin: 0.3rem 0 0; padding-left: 1.1rem; }
+
+.lab-msg--ok  { background: var(--lab-green-soft);  color: #166534; border: 1px solid #bbf7d0; }
+.lab-msg--err { background: var(--lab-danger-soft); color: #991b1b; border: 1px solid #fecaca; }
+
+/* ---------- Hero ---------- */
+
+.lab-hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.25rem;
+    flex-wrap: wrap;
+    padding: 1.1rem 1.25rem;
+    margin-bottom: 0.85rem;
+    background:
+        radial-gradient(120% 140% at 0% 0%, #f0fdfa 0%, rgba(240, 253, 250, 0) 55%),
+        var(--lab-surface);
+    border: 1px solid var(--lab-line);
+    border-radius: var(--lab-radius);
+    box-shadow: var(--lab-shadow);
 }
 
-.form-select, 
-.form-control {
-    border: 1px solid #a8a8a8;
-    border-radius: 8px;
-    font-size: 0.9rem;
-    padding: 0.65rem 1rem;
-    color: #374151;
-    background-color: #ffffff !important;
+.lab-hero-main {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    min-width: 0;
+}
+
+.lab-hero-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 46px;
     height: 46px;
+    flex-shrink: 0;
+    font-size: 1.35rem;
+    color: var(--lab-accent-dark);
+    background: var(--lab-accent-soft);
+    border: 1px solid rgba(13, 148, 136, 0.18);
+    border-radius: var(--lab-radius-sm);
 }
 
-.form-select:focus,
-.form-control:focus {
-    background-color: #ffffff !important;
-    border-color: #1976d2;
-    box-shadow: 0 0 0 4px rgba(25, 118, 210, 0.1);
-    outline: none;
-}
-
-.input-group .form-select,
-.input-group .form-control {
-    border-top-left-radius: 0;
-    border-bottom-left-radius: 0;
-}
-
-.form-control[readonly] {
-    background-color: #f0f7f8 !important;
-    cursor: default;
-}
-
-.form-select:disabled {
-    background-color: #eff0f1 !important;
-    cursor: default;
-}
-
-/* Action Buttons */
-.action-buttons-row {
-    padding-top: 1rem;
-    border-top: 1px solid #f3f4f6;
-}
-
-.btn-primary-custom {
-    background: #1976d2;
-    border: none;
-    color: white;
-    padding: 0.65rem 1.5rem;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 0.85rem;
-    transition: all 0.2s ease;
+.lab-hero-avatar {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
-    box-shadow: 0 2px 8px rgba(25, 118, 210, 0.2);
+    justify-content: center;
+    width: 46px;
+    height: 46px;
+    flex-shrink: 0;
+    overflow: hidden;
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.06);
 }
 
-.btn-primary-custom:hover {
-    background: #1565c0;
-    box-shadow: 0 4px 12px rgba(25, 118, 210, 0.3);
-    transform: translateY(-1px);
-    color: white;
+.lab-hero-avatar--male   {
+    background: #eaf2fe;
+    box-shadow: inset 0 0 0 1px rgba(29, 78, 216, 0.12);
 }
 
-.btn-outline-custom {
-    background: #ffffff;
-    border: 1px solid #d1d5db;
-    color: #374151;
-    padding: 0.65rem 1.5rem;
-    border-radius: 8px;
+.lab-hero-avatar--female {
+    background: #fce9ee;
+    box-shadow: inset 0 0 0 1px rgba(179, 46, 80, 0.12);
+}
+
+.lab-hero-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.lab-hero-text { min-width: 0; }
+
+.lab-hero-titleline {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+}
+
+.lab-hero-title {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--lab-ink);
+    overflow-wrap: anywhere;
+}
+
+.lab-hero-sub {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0.2rem 0 0;
+    font-size: 0.8rem;
+    color: var(--lab-muted);
+}
+
+.lab-dot {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--lab-faint);
+}
+
+.lab-ref {
+    font-family: var(--lab-mono);
+    font-size: 0.76rem;
     font-weight: 600;
-    font-size: 0.85rem;
-    transition: all 0.2s ease;
-    display: inline-flex;
+    color: var(--lab-ink);
+}
+
+.lab-hero-actions {
+    display: flex;
     align-items: center;
     gap: 0.5rem;
+    flex-wrap: wrap;
 }
 
-.btn-outline-custom:hover {
-    background: #f3f4f6;
-    border-color: #9ca3af;
-    color: #111827;
+/* ---------- Status pill ---------- */
+
+.lab-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    border-radius: 999px;
+    white-space: nowrap;
 }
 
-.btn-outline-secondary {
-    background: #f9fafb !important;
-    border: 1px solid #e5e7eb;
-    color: #374151;
-    padding: 0.65rem 1.5rem;
-    border-radius: 8px;
+.lab-pill-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+.lab-pill--amber { background: var(--lab-amber-soft);  color: var(--lab-amber); }
+.lab-pill--blue  { background: var(--lab-blue-soft);   color: var(--lab-blue); }
+.lab-pill--green { background: var(--lab-green-soft);  color: var(--lab-green); }
+.lab-pill--teal  { background: var(--lab-accent-soft); color: var(--lab-accent-dark); }
+.lab-pill--slate { background: var(--lab-line-soft);   color: var(--lab-muted); }
+
+/* ---------- Buttons ---------- */
+
+.lab-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    height: 36px;
+    padding: 0 0.9rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--lab-ink);
+    background: var(--lab-surface);
+    border: 1px solid var(--lab-line);
+    border-radius: var(--lab-radius-sm);
+    box-shadow: 0 1px 1px rgba(15, 23, 42, 0.03);
+    white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease,
+                color 0.15s ease, transform 0.12s ease;
+}
+
+.lab-btn:hover { background: var(--lab-canvas); border-color: #cbd5e1; color: var(--lab-ink); }
+.lab-btn:active { transform: translateY(1px); }
+.lab-btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+.lab-btn i { font-size: 0.9em; }
+
+.lab-btn--ghost { background: transparent; border-color: var(--lab-line); color: var(--lab-muted); }
+.lab-btn--ghost:hover { background: var(--lab-line-soft); color: var(--lab-ink); }
+
+.lab-btn--go {
+    color: #ffffff;
+    background: var(--lab-accent);
+    border-color: var(--lab-accent);
+    box-shadow: 0 1px 2px rgba(13, 148, 136, 0.28);
+}
+
+.lab-btn--go:hover { background: var(--lab-accent-dark); border-color: var(--lab-accent-dark); color: #ffffff; }
+
+/* ---------- Patient strip ---------- */
+
+.lab-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem 1.25rem;
+    padding: 1rem 1.25rem;
+    margin-bottom: 0.85rem;
+    background: var(--lab-surface);
+    border: 1px solid var(--lab-line);
+    border-radius: var(--lab-radius);
+    box-shadow: var(--lab-shadow);
+}
+
+.lab-strip-cell { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
+
+.lab-strip-label {
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--lab-faint);
+}
+
+.lab-strip-value {
+    font-size: 0.875rem;
     font-weight: 500;
-    font-size: 0.85rem;
-    transition: all 0.2s ease;
+    color: var(--lab-ink);
+    overflow-wrap: anywhere;
 }
 
-.btn-outline-secondary:hover {
-    background: #ffffff !important;
-    border-color: #9ca3af;
-    color: #111827;
-}
+/* ---------- Panel ---------- */
 
-.btn-warning-custom {
-    background: linear-gradient(135deg, #f59e0b, #d97706);
-    border: none;
-    color: white;
-    padding: 0.65rem 1.5rem;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 0.85rem;
-    transition: all 0.2s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.btn-warning-custom:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
-    color: white;
-}
-
-.btn-success-custom {
-    background: #e8f5e9;
-    border: 1px solid #a5d6a7;
-    color: #2e7d32;
-    padding: 0.65rem 1.5rem;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 0.85rem;
-    transition: all 0.2s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.btn-success-custom:hover {
-    background: #c8e6c9;
-    color: #1b5e20;
-}
-
-/* ===== REPORT PREVIEW SECTION ===== */
-.report-preview-section {
-    background: #ffffff;
-    border-radius: 12px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-    border: 1px solid #e5e7eb;
+.lab-panel {
+    background: var(--lab-surface);
+    border: 1px solid var(--lab-line);
+    border-radius: var(--lab-radius);
+    box-shadow: var(--lab-shadow);
     overflow: hidden;
 }
 
-.report-preview-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.85rem 1.5rem;
-    background: #f8fafc;
-    border-bottom: 1px solid #e5e7eb;
-}
-
-.report-preview-header .d-flex {
-    gap: 0.5rem;
-    color: #374151;
-    font-weight: 600;
-    font-size: 0.9rem;
-}
-
-.report-preview-header .d-flex i {
-    color: #1976d2;
-}
-
-.badge-draft {
-    background: #fef3c7;
-    color: #d97706;
-    padding: 0.25rem 0.75rem;
-    border-radius: 30px;
-    font-size: 0.7rem;
-    font-weight: 600;
-}
-
-.report-preview-body {
-    padding: 2rem 2.5rem;
-}
-
-/* PolyMedic Header */
-.polymedic-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 1.5rem;
-}
-
-.polymedic-logo {
-    width: 56px;
-    height: 56px;
-    background: #e3f2fd;
-    border-radius: 12px;
+.lab-panel-head {
     display: flex;
     align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.1rem 1.25rem;
+    border-bottom: 1px solid var(--lab-line);
 }
 
-.polymedic-logo i {
-    font-size: 1.8rem;
-    color: #1976d2;
-}
+.lab-panel-head-text { min-width: 0; }
 
-.polymedic-info h3 {
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: #1976d2;
-    margin: 0 0 0.25rem;
-    letter-spacing: 0.5px;
-}
-
-.polymedic-info p {
-    font-size: 0.8rem;
-    color: #6b7280;
-    margin: 0.15rem 0;
-    line-height: 1.4;
-}
-
-.lab-result-header h4 {
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: #111827;
-    margin: 0 0 0.5rem;
-    letter-spacing: 1px;
-}
-
-.lab-result-header p {
-    font-size: 0.8rem;
-    color: #6b7280;
-    margin: 0.1rem 0;
-}
-
-.divider-line {
-    height: 2px;
-    background: linear-gradient(90deg, #1976d2, #42a5f5);
-    margin: 1rem 0;
-    border-radius: 2px;
-}
-
-/* Patient Details */
-.patient-details-row {
-    padding: 1rem 0;
-}
-
-.detail-label {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: #6b7280;
+.lab-panel-title {
     margin: 0 0 0.15rem;
-}
-
-.detail-value {
-    font-size: 0.9rem;
-    font-weight: 500;
-    color: #111827;
-    margin: 0;
-}
-
-/* Test Results Section */
-.test-results-section {
-    margin-top: 1rem;
-}
-
-.test-section-title {
-    font-size: 0.85rem;
+    font-size: 1rem;
     font-weight: 700;
-    color: #1976d2;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 0.75rem;
+    letter-spacing: -0.01em;
+    color: var(--lab-ink);
 }
 
-.lab-results-table {
-    width: 100%;
-    border-collapse: collapse;
+.lab-panel-count {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    font-size: 0.78rem;
+    color: var(--lab-muted);
 }
 
-.lab-results-table thead th {
-    background: #1976d2;
-    color: #ffffff;
-    padding: 0.75rem 1rem;
-    font-size: 0.8rem;
-    font-weight: 600;
-    text-align: left;
-    border: none;
-}
-
-.lab-results-table thead th:first-child {
-    border-top-left-radius: 8px;
-}
-
-.lab-results-table thead th:last-child {
-    border-top-right-radius: 8px;
-}
-
-.lab-results-table tbody td {
-    padding: 0.75rem 1rem;
-    font-size: 0.85rem;
-    color: #374151;
-    border-bottom: 1px solid #f3f4f6;
-}
-
-.lab-results-table tbody tr:last-child td {
-    border-bottom: none;
-}
-
-.lab-results-table tbody tr:hover {
-    background: #f8fafc;
-}
-
-.text-danger {
-    color: #dc2626 !important;
-    font-weight: 600;
-}
-
-.text-success {
-    color: #16a34a !important;
-}
-
-/* Flag Text */
-.flag-text {
+.lab-abn-pill {
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
-    font-weight: 600;
-    font-size: 0.8rem;
-}
-
-/* Remarks Box */
-.remarks-box {
-    background: #fffbeb;
-    border: 1px solid #fcd34d;
-    border-radius: 8px;
-    padding: 0.75rem 1rem;
-    font-size: 0.85rem;
-    color: #92400e;
-}
-
-.remarks-label {
+    padding: 0.12rem 0.5rem;
+    font-size: 0.7rem;
     font-weight: 700;
+    color: var(--lab-danger);
+    background: var(--lab-danger-soft);
+    border: 1px solid #fecaca;
+    border-radius: 999px;
 }
 
-.remarks-text {
-    font-style: italic;
+/* ---------- Progress ring ---------- */
+
+.lab-progress {
+    position: relative;
+    flex-shrink: 0;
+    width: 52px;
+    height: 52px;
 }
 
-/* Signatures */
-.signatures-row {
-    padding-top: 1rem;
+.lab-ring { width: 100%; height: 100%; transform: rotate(-90deg); }
+
+.lab-ring circle {
+    fill: none;
+    stroke-width: 4;
+    stroke-linecap: round;
 }
 
-.signature-line {
-    border-top: 1px solid #d1d5db;
-    width: 200px;
-    margin: 0 auto 0.5rem;
+.lab-ring-bg { stroke: var(--lab-line); }
+
+.lab-ring-fg {
+    stroke: var(--lab-accent);
+    stroke-dasharray: 113.1;
+    stroke-dashoffset: calc(113.1 - (113.1 * var(--pct, 0) / 100));
+    transition: stroke-dashoffset 0.4s ease;
 }
 
-.signature-name {
+.lab-progress-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    font-size: 0.62rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--lab-muted);
+}
+
+.lab-progress-num { font-size: 0.8rem; font-weight: 700; color: var(--lab-ink); }
+
+/* ---------- Table ---------- */
+
+.lab-table-wrap { width: 100%; min-width: 0; overflow-x: auto; }
+
+.lab-table {
+    width: 100%;
+    border-collapse: collapse;
     font-size: 0.85rem;
+}
+
+.lab-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    padding: 0.65rem 0.9rem;
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    text-align: left;
+    color: var(--lab-faint);
+    background: var(--lab-canvas);
+    border-bottom: 1px solid var(--lab-line);
+    white-space: nowrap;
+}
+
+.lab-table td {
+    padding: 0.55rem 0.9rem;
+    border-bottom: 1px solid var(--lab-line-soft);
+    vertical-align: middle;
+}
+
+.lab-table--edit td { padding: 0.4rem 0.6rem; }
+
+.lab-right  { text-align: right; }
+.lab-center { text-align: center; }
+
+.lab-w-test   { width: 24%; }
+.lab-w-result { width: 16%; }
+.lab-w-unit   { width: 14%; }
+.lab-w-range  { width: 20%; }
+.lab-w-flag   { width: 16%; }
+.lab-w-action { width: 56px; }
+
+.lab-cell-name { font-weight: 600; color: var(--lab-ink); }
+.lab-cell-soft { color: var(--lab-muted); font-size: 0.8rem; }
+
+.lab-bad { font-weight: 700; color: var(--lab-danger); }
+.lab-row.is-bad { background: #fffbfb; }
+
+.lab-req { color: var(--lab-danger); font-weight: 700; }
+
+/* ---------- Service groups ---------- */
+
+.lab-group-head td {
+    position: sticky;
+    top: 33px;
+    z-index: 2;
+    padding: 0.55rem 0.9rem !important;
+    background: linear-gradient(90deg, #f6fdfb 0%, var(--lab-canvas) 60%);
+    border-top: 1px solid var(--lab-line);
+    border-bottom: 1px solid var(--lab-line);
+}
+
+.lab-group:first-of-type .lab-group-head td { border-top: 0; }
+
+.lab-group-bar {
+    display: inline-block;
+    width: 3px;
+    height: 13px;
+    margin-right: 0.5rem;
+    vertical-align: -2px;
+    background: var(--lab-accent);
+    border-radius: 2px;
+}
+
+.lab-group-name {
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--lab-accent-dark);
+}
+
+.lab-group-count {
+    margin-left: 0.5rem;
+    font-size: 0.7rem;
+    color: var(--lab-faint);
+    font-variant-numeric: tabular-nums;
+}
+
+.lab-group-progress {
+    margin-left: 0.5rem;
+    font-size: 0.7rem;
     font-weight: 600;
-    color: #111827;
-    margin: 0;
+    color: var(--lab-faint);
 }
 
-.signature-role {
-    font-size: 0.75rem;
-    color: #6b7280;
-    margin: 0;
+.lab-group-progress.is-done { color: var(--lab-green); }
+
+.lab-group-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    margin-right: 0.15rem;
+    vertical-align: -4px;
+    font-size: 0.7rem;
+    color: var(--lab-muted);
+    background: none;
+    border: 0;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: transform 0.18s ease, background-color 0.15s ease;
 }
 
-/* Form Controls inside table */
-.form-control-sm,
-.form-select-sm {
-    border: 1px solid #e5e7eb;
-    border-radius: 6px;
+.lab-group-toggle:hover { background: rgba(15, 23, 42, 0.06); }
+.lab-group.is-collapsed .lab-group-toggle { transform: rotate(-90deg); }
+.lab-group.is-collapsed .lab-row { display: none; }
+
+/* ---------- Inputs ---------- */
+
+.lab-input,
+.lab-select,
+.lab-field textarea {
+    width: 100%;
+    font-size: 0.82rem;
+    color: var(--lab-ink);
+    background: var(--lab-surface);
+    border: 1px solid var(--lab-line);
+    border-radius: var(--lab-radius-sm);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.lab-input,
+.lab-select { height: 34px; padding: 0 0.6rem; }
+
+.lab-input::placeholder,
+.lab-field textarea::placeholder { color: #cbd5e1; font-style: italic; }
+
+.lab-input:hover,
+.lab-select:hover,
+.lab-field textarea:hover { border-color: #cbd5e1; }
+
+.lab-input:focus,
+.lab-select:focus,
+.lab-field textarea:focus {
+    outline: none;
+    border-color: var(--lab-accent);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+}
+
+/* Numeric values right-aligned; text values stay left-aligned. */
+.lab-input--num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+.lab-input--num.is-filled { background: #fbfffe; border-color: #cdeae4; }
+
+.lab-input.is-invalid,
+.lab-field textarea.is-invalid {
+    border-color: var(--lab-danger);
+    background: var(--lab-danger-soft);
+}
+
+.lab-select {
+    appearance: none;
+    padding-right: 1.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%2364748b'%3E%3Cpath d='M4.5 6.5 8 10l3.5-3.5z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.45rem center;
+    background-size: 14px;
+}
+
+.lab-select--normal   { color: var(--lab-muted); }
+.lab-select--high     { color: var(--lab-danger); background-color: var(--lab-danger-soft); border-color: #fecaca; }
+.lab-select--low      { color: var(--lab-blue);   background-color: var(--lab-blue-soft);   border-color: #bfdbfe; }
+.lab-select--critical {
+    color: #ffffff;
+    background-color: var(--lab-danger);
+    border-color: var(--lab-danger);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23ffffff'%3E%3Cpath d='M4.5 6.5 8 10l3.5-3.5z'/%3E%3C/svg%3E");
+}
+
+.lab-row.is-flag-high td,
+.lab-row.is-flag-low  td { background: #fcfdff; }
+.lab-row.is-flag-critical td { background: #fff5f5; }
+
+/* ---------- Trash ---------- */
+
+.lab-trash {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
     font-size: 0.8rem;
-    padding: 0.4rem 0.6rem;
-    background-color: #f9fafb !important;
+    color: var(--lab-faint);
+    background: none;
+    border: 1px solid transparent;
+    border-radius: var(--lab-radius-sm);
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
-.form-control-sm:focus,
-.form-select-sm:focus {
-    background-color: #ffffff !important;
-    border-color: #1976d2;
-    box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+.lab-trash:hover { color: var(--lab-danger); background: var(--lab-danger-soft); border-color: #fecaca; }
+
+/* ---------- Empty ---------- */
+
+.lab-empty {
+    padding: 2.75rem 1rem;
+    text-align: center;
+    color: var(--lab-muted);
+    background: var(--lab-canvas);
 }
 
-.text-danger {
-    color: #dc3545 !important;
+.lab-empty i { display: block; margin-bottom: 0.5rem; font-size: 1.6rem; color: var(--lab-faint); }
+.lab-empty p { margin: 0; font-size: 0.82rem; }
+
+/* ---------- Add row ---------- */
+
+.lab-add-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--lab-line-soft);
 }
 
-/* ============================================
-   RESPONSIVE
-   ============================================ */
+.lab-hint { font-size: 0.75rem; color: var(--lab-faint); }
 
-@media (max-width: 992px) {
-    .report-preview-body {
-        padding: 1.5rem;
-    }
-    
-    .polymedic-header {
-        flex-direction: column;
-        gap: 1rem;
-    }
-    
-    .lab-result-header {
-        text-align: left !important;
-    }
+/* ---------- Notes ---------- */
+
+.lab-notes,
+.lab-notes-edit {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1rem;
+    padding: 1.1rem 1.25rem;
+    border-top: 1px solid var(--lab-line);
+}
+
+.lab-notes-edit { background: var(--lab-canvas); }
+
+.lab-note { display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; }
+
+.lab-note-key {
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--lab-faint);
+}
+
+.lab-note p {
+    margin: 0;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    color: var(--lab-text);
+    overflow-wrap: anywhere;
+}
+
+.lab-field { display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; }
+
+.lab-field label { font-size: 0.78rem; font-weight: 600; color: var(--lab-text); }
+
+.lab-field textarea {
+    padding: 0.6rem 0.7rem;
+    line-height: 1.55;
+    resize: vertical;
+    min-height: 104px;
+}
+
+/* ---------- Flags ---------- */
+
+.lab-flag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.16rem 0.5rem;
+    font-size: 0.71rem;
+    font-weight: 700;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.lab-flag--ok       { background: var(--lab-line-soft);   color: var(--lab-muted); }
+.lab-flag--high     { background: var(--lab-danger-soft); color: var(--lab-danger); }
+.lab-flag--low      { background: var(--lab-blue-soft);   color: var(--lab-blue); }
+.lab-flag--critical { background: var(--lab-danger);      color: #ffffff; }
+
+/* ---------- Signatures ---------- */
+
+.lab-sign {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 2rem;
+    padding: 2.5rem 1.25rem 1.5rem;
+    border-top: 1px solid var(--lab-line);
+}
+
+.lab-sign-col { text-align: center; }
+.lab-sign-line { height: 1px; margin-bottom: 0.5rem; background: var(--lab-ink); }
+.lab-sign-name { font-size: 0.85rem; font-weight: 700; color: var(--lab-ink); }
+.lab-sign-role { font-size: 0.72rem; color: var(--lab-muted); }
+
+/* ---------- Action bar ---------- */
+
+.lab-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding: 0.85rem 1.25rem;
+    border-top: 1px solid var(--lab-line);
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.lab-actions-status {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    color: var(--lab-muted);
+}
+
+.lab-actions-status.is-warn { color: var(--lab-amber); }
+.lab-actions-status.is-ready { color: var(--lab-green); }
+
+.lab-actions-btns { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 900px) {
+    .lab-hero { flex-direction: column; align-items: stretch; }
+    .lab-hero-actions { width: 100%; }
+    .lab-hero-actions .lab-btn { flex: 1; }
 }
 
 @media (max-width: 768px) {
-    .top-form-section {
-        padding: 1rem;
+    .lab-table,
+    .lab-table thead,
+    .lab-table tbody,
+    .lab-table th,
+    .lab-table td,
+    .lab-table tr { display: block; width: 100%; }
+
+    .lab-table thead { display: none; }
+
+    .lab-group-head td {
+        position: static;
+        padding: 0.6rem 0.75rem !important;
+        border-radius: 0;
     }
-    
-    .report-preview-body {
-        padding: 1rem;
-    }
-    
-    .polymedic-info h3 {
-        font-size: 0.95rem;
-    }
-    
-    .polymedic-info p {
-        font-size: 0.7rem;
-    }
-    
-    .lab-results-table thead th,
-    .lab-results-table tbody td {
+
+    .lab-row {
+        margin: 0.6rem 0.75rem;
         padding: 0.5rem;
-        font-size: 0.75rem;
+        border: 1px solid var(--lab-line);
+        border-radius: var(--lab-radius-sm);
+        background: var(--lab-surface);
+        box-shadow: var(--lab-shadow);
     }
-    
-    .signatures-row .col-md-6 {
-        margin-bottom: 1.5rem;
-    }
-    
-    .action-buttons-row {
-        flex-direction: column;
+
+    .lab-table td {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
         gap: 0.75rem;
-        align-items: stretch;
+        padding: 0.35rem;
+        border-bottom: 0;
+        text-align: left;
     }
-    
-    .action-buttons-row .d-flex {
-        flex-direction: column;
-        gap: 0.5rem;
+
+    .lab-table td::before {
+        content: attr(data-label);
+        flex-shrink: 0;
+        font-size: 0.66rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--lab-faint);
     }
-    
-    .action-buttons-row .btn {
-        width: 100%;
-    }
-    
-    .action-buttons {
-        flex-direction: column;
-    }
-    
-    .action-buttons .btn {
-        width: 100%;
-    }
-    
-    .findings-remarks-section .row {
-        flex-direction: column;
+
+    .lab-table td.lab-right { text-align: right; }
+    .lab-input, .lab-select { max-width: 60%; }
+
+    .lab-strip { padding: 0.9rem 1rem; }
+    .lab-panel-head { flex-direction: row; align-items: flex-start; }
+
+    .lab-actions { flex-direction: column; align-items: stretch; }
+    .lab-actions-btns { width: 100%; }
+    .lab-actions-btns .lab-btn { flex: 1; }
+}
+
+@media (max-width: 480px) {
+    .lab-hero-title { font-size: 1.05rem; }
+    .lab-hero-icon,
+    .lab-hero-avatar { width: 40px; height: 40px; }
+    .lab-hero-icon { font-size: 1.15rem; }
+    .lab-input, .lab-select { max-width: 55%; }
+    .lab-notes, .lab-notes-edit { padding: 1rem; }
+}
+
+@media print {
+    .lab-hero-actions,
+    .lab-actions,
+    .lab-add-row,
+    .lab-progress,
+    .lab-group-toggle,
+    .lab-trash,
+    .lab-msg,
+    .lab-w-action,
+    td[data-label="Action"] { display: none !important; }
+
+    .lab-hero,
+    .lab-strip,
+    .lab-panel { border: 0; box-shadow: none; background: none; }
+
+    .lab-table thead th { position: static; background: none; color: #000; border-bottom: 1px solid #000; }
+    .lab-group-head td { position: static; background: none; border-top: 1px solid #000; }
+    .lab-table td { border-bottom: 1px solid #ddd; }
+    .lab-bad { color: #000; text-decoration: underline; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lab *, .lab *::before, .lab *::after {
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
     }
 }
 
-@media (max-width: 576px) {
-    .report-preview-body {
-        padding: 0.75rem;
-    }
-    
-    .polymedic-logo {
-        width: 40px;
-        height: 40px;
-    }
-    
-    .polymedic-logo i {
-        font-size: 1.4rem;
-    }
-    
-    .polymedic-info h3 {
-        font-size: 0.85rem;
-    }
-    
-    .lab-results-table {
-        font-size: 0.7rem;
-    }
-    
-    .lab-results-table thead th,
-    .lab-results-table tbody td {
-        padding: 0.4rem;
-        font-size: 0.7rem;
-    }
-}
+.lab-hero, .lab-hero-text, .lab-strip, .lab-strip-cell,
+.lab-panel, .lab-panel-head, .lab-panel-head-text,
+.lab-notes, .lab-notes-edit, .lab-field,
+.lab-actions, .lab-actions-status, .lab-msg, .lab-msg > div { min-width: 0; }
 </style>
 
+
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Auto-calculate flags based on results
-    document.querySelectorAll('.result-input').forEach(input => {
-        input.addEventListener('change', function() {
-            // You can add auto-flag logic here if needed
+(function () {
+    'use strict';
+
+    var form = document.getElementById('mainResultForm');
+    if (!form) { return; }
+
+    var table    = document.getElementById('resultsTable');
+    var rowTpl   = document.getElementById('labRowTemplate');
+    var groupTpl = document.getElementById('labGroupTemplate');
+    var addBtn   = document.getElementById('labAddRow');
+    var emptyBox = document.getElementById('emptyRow');
+    var hintEl   = document.getElementById('labHint');
+    var statusEl = document.getElementById('labStatus');
+    var progress = document.getElementById('labProgress');
+    var progNum  = document.getElementById('labProgressNum');
+    var ringFg   = progress ? progress.querySelector('.lab-ring-fg') : null;
+    var actionEl = document.getElementById('submitAction');
+
+    var dirty = false;
+    var submitting = false;
+
+    /* Toggle the numeric alignment class based on the current value. */
+    function syncAlignment(el) {
+        var value = el.value.trim();
+        var numeric = value !== '' && !isNaN(parseFloat(value)) && isFinite(value);
+        el.classList.toggle('lab-input--num', numeric);
+    }
+
+    function refresh() {
+        var rows = table.querySelectorAll('tr.lab-row');
+        var total = rows.length;
+        var filled = 0;
+
+        rows.forEach(function (row) {
+            var res = row.querySelector('input[name="result[]"]');
+            if (res) {
+                var has = res.value.trim() !== '';
+                res.classList.toggle('is-filled', has);
+                if (has) { filled++; }
+            }
+        });
+
+        table.querySelectorAll('tbody.lab-group').forEach(function (group) {
+            var gRows = group.querySelectorAll('tr.lab-row');
+            var gFilled = 0;
+
+            gRows.forEach(function (row) {
+                var res = row.querySelector('input[name="result[]"]');
+                if (res && res.value.trim() !== '') { gFilled++; }
+            });
+
+            var counter = group.querySelector('[data-count]');
+            if (counter) { counter.textContent = gRows.length; }
+
+            var prog = group.querySelector('[data-group-progress]');
+            if (prog) {
+                var done = gRows.length > 0 && gFilled === gRows.length;
+                prog.textContent = gRows.length ? (gFilled + '/' + gRows.length + ' entered') : '';
+                prog.classList.toggle('is-done', done);
+            }
+
+            if (gRows.length === 0) { group.remove(); }
+        });
+
+        if (emptyBox) { emptyBox.hidden = total > 0; }
+        if (hintEl) { hintEl.textContent = total === 0 ? 'Add at least one test before releasing.' : ''; }
+
+        if (progNum) { progNum.textContent = filled; }
+        if (progress) {
+            progress.dataset.filled = filled;
+            progress.dataset.total = total;
+            progress.setAttribute('aria-label', filled + ' of ' + total + ' results entered');
+        }
+        if (ringFg) {
+            ringFg.style.setProperty('--pct', total > 0 ? Math.round((filled / total) * 100) : 0);
+        }
+
+        if (statusEl) {
+            var span = statusEl.querySelector('span');
+            statusEl.classList.remove('is-warn', 'is-ready');
+
+            if (total === 0) {
+                statusEl.classList.add('is-warn');
+                span.textContent = 'No tests yet. Add a row before releasing.';
+            } else if (filled < total) {
+                statusEl.classList.add('is-warn');
+                span.textContent = (total - filled) + ' of ' + total + ' results still empty.';
+            } else {
+                statusEl.classList.add('is-ready');
+                span.textContent = 'All results entered. Ready to release.';
+            }
+        }
+    }
+
+    function addRow() {
+        var group = table.querySelector('tbody.lab-group[data-service="Additional tests"]');
+
+        if (!group) {
+            group = groupTpl.content.firstElementChild.cloneNode(true);
+            table.appendChild(group);
+        }
+
+        var service = group.getAttribute('data-service') || 'Additional tests';
+        var row = rowTpl.content.firstElementChild.cloneNode(true);
+
+        var hidden = row.querySelector('input[name="service_name[]"]');
+        if (hidden) { hidden.value = service; }
+
+        group.appendChild(row);
+        group.classList.remove('is-collapsed');
+
+        refresh();
+        dirty = true;
+
+        var first = row.querySelector('input[name="test_name[]"]');
+        if (first) { first.focus(); }
+    }
+
+    if (addBtn) { addBtn.addEventListener('click', addRow); }
+
+    table.addEventListener('click', function (e) {
+        var toggle = e.target.closest('[data-toggle-group]');
+        if (toggle) {
+            var grp = toggle.closest('tbody.lab-group');
+            var collapsed = grp.classList.toggle('is-collapsed');
+            toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            return;
+        }
+
+        var del = e.target.closest('[data-remove-row]');
+        if (!del) { return; }
+
+        var row = del.closest('tr');
+        var name = row.querySelector('input[name="test_name[]"]');
+
+        if (name && name.value.trim() !== '' &&
+            !confirm('Remove "' + name.value.trim() + '" from this report?')) {
+            return;
+        }
+
+        row.remove();
+        refresh();
+        dirty = true;
+    });
+
+    table.addEventListener('change', function (e) {
+        var sel = e.target.closest('select[name="flag[]"]');
+        if (!sel) { return; }
+
+        sel.className = 'lab-select lab-select--' + sel.value;
+        var row = sel.closest('tr');
+        if (row) { row.className = 'lab-row is-flag-' + sel.value; }
+    });
+
+    /*
+     * Live sync of the result alignment. Runs on every input, no debounce
+     * because the check is trivial.
+     */
+    form.addEventListener('input', function (e) {
+        dirty = true;
+
+        var el = e.target;
+
+        if (el.name === 'result[]') {
+            syncAlignment(el);
+            refresh();
+        }
+
+        if (el.classList.contains('is-invalid')) {
+            el.classList.remove('is-invalid');
+        }
+    });
+
+    /*
+     * On load: ensure any pre-filled numeric result is right-aligned even
+     * if the server-side class missed it.
+     */
+    form.querySelectorAll('.result-input').forEach(syncAlignment);
+
+    form.querySelectorAll('[data-autogrow]').forEach(function (ta) {
+        var grow = function () {
+            ta.style.height = 'auto';
+            ta.style.height = Math.max(ta.scrollHeight, 104) + 'px';
+        };
+        ta.addEventListener('input', grow);
+        grow();
+    });
+
+    function validateForRelease() {
+        var bad = [];
+
+        form.querySelectorAll('.is-invalid').forEach(function (el) {
+            el.classList.remove('is-invalid');
+        });
+
+        if (table.querySelectorAll('tr.lab-row').length === 0) {
+            alert('Add at least one test row before releasing this report.');
+            return false;
+        }
+
+        form.querySelectorAll('[data-required]').forEach(function (el) {
+            if (el.value.trim() === '') {
+                el.classList.add('is-invalid');
+                bad.push(el);
+            }
+        });
+
+        if (bad.length > 0) {
+            var grp = bad[0].closest('tbody.lab-group');
+            if (grp) { grp.classList.remove('is-collapsed'); }
+
+            alert('Fill in every highlighted field before releasing. ' +
+                  bad.length + ' field' + (bad.length === 1 ? ' is' : 's are') + ' still empty.');
+            bad[0].focus();
+            bad[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
+            return false;
+        }
+
+        return true;
+    }
+
+    /*
+     * Submit handler.
+     *
+     * Do not disable the button that triggered the submit inside the
+     * same click handler; the browser cancels the form submit if the
+     * triggering element is disabled when the default action runs.
+     * Defer the disable to the next tick.
+     */
+    form.querySelectorAll('button[type="submit"][data-action]').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+            var action = btn.dataset.action;
+
+            if (action === 'release') {
+                if (!validateForRelease()) { e.preventDefault(); return; }
+                if (!confirm('Release this result? It becomes final and visible to the receptionist.')) {
+                    e.preventDefault();
+                    return;
+                }
+            }
+
+            actionEl.value = action;
+            submitting = true;
+
+            setTimeout(function () {
+                form.querySelectorAll('button[type="submit"]').forEach(function (b) {
+                    if (b !== btn) { b.disabled = true; }
+                });
+            }, 0);
         });
     });
-});
 
-function addResultRow() {
-    const tbody = document.getElementById('resultsBody');
-    const emptyRow = document.getElementById('emptyRow');
-    if (emptyRow) {
-        emptyRow.remove();
-    }
-    
-    const row = document.createElement('tr');
-    row.innerHTML = `
-        <td>
-            <input type="text" class="form-control form-control-sm" name="test_name[]" placeholder="Enter test name" required>
-        </td>
-        <td>
-            <input type="text" class="form-control form-control-sm result-input" name="result[]" placeholder="Result" required>
-        </td>
-        <td>
-            <input type="text" class="form-control form-control-sm" name="unit[]" placeholder="Unit" required>
-        </td>
-        <td>
-            <input type="text" class="form-control form-control-sm" name="reference_range[]" placeholder="Range" required>
-        </td>
-        <td>
-            <select class="form-select form-select-sm" name="flag[]">
-                <option value="normal">Normal</option>
-                <option value="high">High</option>
-                <option value="low">Low</option>
-                <option value="critical">Critical</option>
-            </select>
-        </td>
-        <td>
-            <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">
-                <i class="bi bi-trash"></i>
-            </button>
-        </td>
-    `;
-    tbody.appendChild(row);
-}
+    window.addEventListener('beforeunload', function (e) {
+        if (!dirty || submitting) { return; }
+        e.preventDefault();
+        e.returnValue = '';
+    });
 
-function loadTemplate(template) {
-    const tbody = document.getElementById('resultsBody');
-    const emptyRow = document.getElementById('emptyRow');
-    if (emptyRow) {
-        emptyRow.remove();
-    }
-    
-    tbody.innerHTML = `
-        <tr>
-            <td colspan="6" class="text-center py-3">
-                <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
-                Loading template...
-            </td>
-        </tr>
-    `;
-    
-    fetch('<?= base_url('medtech/template/') ?>' + template)
-        .then(response => response.json())
-        .then(data => {
-            tbody.innerHTML = '';
-            data.forEach(test => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>
-                        <input type="text" class="form-control form-control-sm" name="test_name[]" value="${test.test_name}" required>
-                    </td>
-                    <td>
-                        <input type="text" class="form-control form-control-sm result-input" name="result[]" placeholder="Result" required>
-                    </td>
-                    <td>
-                        <input type="text" class="form-control form-control-sm" name="unit[]" value="${test.unit || ''}" required>
-                    </td>
-                    <td>
-                        <input type="text" class="form-control form-control-sm" name="reference_range[]" value="${test.reference_range || ''}" required>
-                    </td>
-                    <td>
-                        <select class="form-select form-select-sm" name="flag[]">
-                            <option value="normal">Normal</option>
-                            <option value="high">High</option>
-                            <option value="low">Low</option>
-                            <option value="critical">Critical</option>
-                        </select>
-                    </td>
-                    <td>
-                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </td>
-                `;
-                tbody.appendChild(row);
-            });
-        })
-        .catch(err => {
-            console.error('Error loading template:', err);
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="6" class="text-center text-muted py-3">
-                        Error loading template. Please try again.
-                    </td>
-                </tr>
-            `;
-        });
-}
+    refresh();
 
-function generatePDF() {
-    window.print();
-}
+    window.addResultRow = addRow;
+    window.removeRow = function (btn) {
+        var row = btn.closest('tr');
+        if (row) { row.remove(); refresh(); dirty = true; }
+    };
+})();
 
 function releaseResult(id) {
     if (confirm('Release this result? This will make it available for printing.')) {
         window.location.href = '<?= base_url('medtech/request/release/') ?>' + id;
     }
-}
-
-function saveAndComplete(id) {
-    if (confirm('Mark this request as completed? This will save all findings.')) {
-        document.getElementById('findingsAction').value = 'complete';
-        document.getElementById('findingsForm').submit();
-    }
-}
-
-function saveResults() {
-    document.getElementById('saveResultsForm').submit();
 }
 </script>
 

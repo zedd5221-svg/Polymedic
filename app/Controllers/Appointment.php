@@ -18,9 +18,8 @@ class Appointment extends BaseController
     
     public function book(): string
     {
-        // Get services from database
         $serviceModel = new ServiceModel();
-        $data['labServices'] = $serviceModel->getServicesByCategory('laboratory');
+        $data['labServices']  = $serviceModel->getServicesByCategory('laboratory');
         $data['xrayServices'] = $serviceModel->getServicesByCategory('xray');
         
         return view('Appointment/book', $data);
@@ -28,47 +27,43 @@ class Appointment extends BaseController
     
     public function submit()
     {
-        // Validation rules
         $rules = [
             'appointment_date' => 'required|valid_date',
             'appointment_time' => 'required',
-            'email' => 'required|valid_email',
-            'phone' => 'required|min_length[10]',
-            'full_name' => 'required|min_length[2]',
-            'age' => 'required|numeric|greater_than[0]',
-            'gender' => 'required',
-            'other_requests' => 'permit_empty'
+            'email'            => 'required|valid_email',
+            'phone'            => 'required|min_length[10]',
+            'full_name'        => 'required|min_length[2]',
+            'age'              => 'required|numeric|greater_than[0]',
+            'gender'           => 'required',
+            'other_requests'   => 'permit_empty',
         ];
         
         if ($this->validate($rules)) {
-            // Get selected services
-            $labServices = $this->request->getPost('lab_services') ?? [];
+            $labServices  = $this->request->getPost('lab_services') ?? [];
             $xrayServices = $this->request->getPost('xray_services') ?? [];
-            $serviceType = $this->request->getPost('service_type') ?? 'laboratory';
+            $serviceType  = $this->request->getPost('service_type') ?? 'laboratory';
             
-            // Generate reference number
             $reference = 'APPT-' . date('Ymd') . '-' . strtoupper(substr(uniqid(), -6));
             
-            // Prepare data for appointment
             $appointmentData = [
                 'reference_number' => $reference,
                 'appointment_date' => $this->request->getPost('appointment_date'),
                 'appointment_time' => $this->request->getPost('appointment_time'),
-                'full_name' => $this->request->getPost('full_name'),
-                'age' => $this->request->getPost('age'),
-                'gender' => $this->request->getPost('gender'),
-                'email' => $this->request->getPost('email'),
-                'phone' => $this->request->getPost('phone'),
-                'service_type' => $serviceType,
-                'lab_services' => !empty($labServices) ? json_encode($labServices) : null,
-                'xray_services' => !empty($xrayServices) ? json_encode($xrayServices) : null,
-                'other_requests' => $this->request->getPost('other_requests'),
-                'status' => 'pending'
+                'full_name'        => $this->request->getPost('full_name'),
+                'age'              => $this->request->getPost('age'),
+                'gender'           => $this->request->getPost('gender'),
+                'email'            => $this->request->getPost('email'),
+                'phone'            => $this->request->getPost('phone'),
+                'service_type'     => $serviceType,
+                'lab_services'     => !empty($labServices) ? json_encode($labServices) : null,
+                'xray_services'    => !empty($xrayServices) ? json_encode($xrayServices) : null,
+                'other_requests'   => $this->request->getPost('other_requests'),
+                'status'           => 'pending',
             ];
             
             // ===== SAVE APPOINTMENT =====
             $appointmentModel = new AppointmentModel();
-            $appointmentId = $appointmentModel->insert($appointmentData);
+            $appointmentId    = $appointmentModel->insert($appointmentData);
             
             if (!$appointmentId) {
                 log_message('error', 'Failed to save appointment for: ' . $appointmentData['full_name']);
@@ -77,7 +72,7 @@ class Appointment extends BaseController
             
             // ===== CREATE/UPDATE PATIENT RECORD =====
             $patientModel = new PatientModel();
-            $patient = $patientModel->findOrCreateFromAppointment($appointmentData);
+            $patient      = $patientModel->findOrCreateFromAppointment($appointmentData);
             
             if ($patient) {
                 log_message('info', 'Patient created/found from online booking: ' . $appointmentData['full_name'] . ' (Code: ' . $patient['patient_code'] . ')');
@@ -86,59 +81,50 @@ class Appointment extends BaseController
             }
             
             // ============================================================
-            // ❌ REMOVED: Auto-creation of lab requests on booking
-            // ❌ REMOVED: Auto-creation of x-ray requests on booking
-            // ✅ Diagnostic requests will now be created ONLY when the
-            //    receptionist approves the appointment in Receptionist::approveAppointment()
+            // SINGLE dispatch call - NotificationModel::AUDIENCE already
+            // fans out to both 'admin' and 'receptionist' with the correct
+            // can_open flag per role. Calling notify() twice would create
+            // duplicate rows.
+            //
+            // Pass the patient's gender so the receptionist view can pick
+            // the correct avatar (man-avatar.png / woman-avatar.png).
             // ============================================================
-            
-            // ===== TRIGGER ADMIN NOTIFICATION =====
-            NotificationModel::notify(
+            NotificationModel::dispatch(
                 'appointment',
                 'New Appointment Request: ' . $reference,
-                'New appointment request from ' . $appointmentData['full_name'] . ' for ' . date('M d, Y', strtotime($appointmentData['appointment_date'])),
+                'New appointment request from ' . $appointmentData['full_name']
+                    . ' for ' . date('M d, Y', strtotime($appointmentData['appointment_date'])),
                 $appointmentId,
-                'admin/appointment/view/' . $appointmentId
+                null,
+                true,
+                $appointmentData['gender']
             );
             
-            // ===== TRIGGER RECEPTIONIST NOTIFICATION =====
-            NotificationModel::notify(
-                'appointment',
-                'New Appointment: ' . $reference,
-                'New appointment request from ' . $appointmentData['full_name'] . ' for ' . date('M d, Y', strtotime($appointmentData['appointment_date'])),
-                $appointmentId,
-                'receptionist/appointment/view/' . $appointmentId
-            );
-            
-            // Store in session for success page
             session()->set('appointment_data', $appointmentData);
             
             return redirect()->to(base_url('appointment/success/' . $reference))
                             ->with('message', 'Appointment booked successfully!');
-        } else {
-            return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
         }
+        
+        return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
     }
     
     public function success($reference = null)
     {
         $model = new AppointmentModel();
         $data['appointment'] = $model->where('reference_number', $reference)->first();
-        $data['reference'] = $reference;
+        $data['reference']   = $reference;
         return view('Appointment/success', $data);
     }
     
-    /**
-     * API endpoint to get service prices
-     */
     public function getServicePrices()
     {
         $serviceModel = new ServiceModel();
-        $services = $serviceModel->getActiveServices();
+        $services     = $serviceModel->getActiveServices();
         
         $prices = [];
         foreach ($services as $service) {
-            $prices[$service['service_name']] = (float)$service['charge'];
+            $prices[$service['service_name']] = (float) $service['charge'];
         }
         
         return $this->response->setJSON($prices);

@@ -8,21 +8,21 @@
     <!-- Main CSS -->
     <link href="/polymedic/public/assets/css/AppointmentStyle.css" rel="stylesheet">
     <link href="/polymedic/public/assets/css/admin.css" rel="stylesheet">
-    
+
     <!-- Bootstrap & Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    
+
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <!-- AOS for animations -->
-    <script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script> 
+    <script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script>
 </head>
 <body>
     <!-- Initialize AOS -->
     <script> AOS.init({ duration: 800, once: true }); </script>
-    
+
     <div class="admin-wrapper">
         <!-- Sidebar -->
         <aside class="admin-sidebar medtech-sidebar" id="adminSidebar">
@@ -35,7 +35,7 @@
                     <i class="bi bi-x-lg"></i>
                 </button>
             </div>
-            
+
             <nav class="sidebar-nav">
                 <ul>
                     <li class="nav-section">LABORATORY</li>
@@ -56,10 +56,10 @@
                                 <path d="M8.5 2h7" />
                             </svg>
                             <span>Lab Requests</span>
-                            <?php 
+                            <?php
                             $labModel = new \App\Models\LabRequestModel();
                             $pendingCount = $labModel->where('status', 'pending')->countAllResults();
-                            if ($pendingCount > 0): 
+                            if ($pendingCount > 0):
                             ?>
                                 <span class="badge-notif-med"><?= $pendingCount ?></span>
                             <?php endif; ?>
@@ -68,7 +68,7 @@
                             <?php endif; ?>
                         </a>
                     </li>
-                    
+
                     <li class="nav-section">REPORTS</li>
                     <li class="menu-item <?= strpos(current_url(), 'medtech/reports') !== false ? 'active' : '' ?>">
                         <a href="/polymedic/public/medtech/reports" class="menu-btn">
@@ -79,9 +79,9 @@
                             <?php endif; ?>
                         </a>
                     </li>
-                    
+
                     <li class="nav-divider"></li>
-                    
+
                     <li class="menu-item logout-item">
                         <a href="/polymedic/public/logout" class="menu-btn">
                             <i class="bi bi-box-arrow-right menu-icon"></i>
@@ -91,10 +91,10 @@
                 </ul>
             </nav>
         </aside>
-        
+
         <!-- Mobile Overlay -->
         <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
-        
+
         <!-- Main Content -->
         <main class="admin-main">
             <!-- Top Navbar -->
@@ -104,13 +104,14 @@
                         <i class="bi bi-list"></i>
                     </button>
                     <div class="header-title-group">
-                        <?php 
+                        <?php
                             $pageTitle = $this->renderSection('pageTitle') ?: 'Dashboard';
                             $iconMap = [
                                 'Dashboard' => 'statisctics.png',
                                 'Laboratory Requests' => 'lab-icon.png',
                                 'Lab Requests' => 'lab-icon.png',
                                 'View Lab Request' => 'lab-icon.png',
+                                'Laboratory Findings' => 'lab-icon.png',
                                 'Reports' => 'reports-icon.png'
                             ];
                             $iconFile = $iconMap[$pageTitle] ?? 'lab-icon.png';
@@ -126,7 +127,7 @@
                             <span><?= date('D, M j · h:i:s A') ?></span>
                         </div>
                         <span class="divider-icon">|</span>
-                        
+
                         <!-- NOTIFICATION DROPDOWN -->
                         <div class="dropdown notif-dropdown-wrapper">
                             <button class="notif-btn" type="button" id="notifDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false">
@@ -156,7 +157,7 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <span class="divider-icon">|</span>
                         <div class="header-user">
                             <div class="avatar-small medtech-avatar">
@@ -170,7 +171,7 @@
                     </div>
                 </div>
             </header>
-            
+
             <!-- Page Content -->
             <div class="admin-content">
                 <?php echo $this->renderSection('medtechContent'); ?>
@@ -445,14 +446,14 @@
 
     /* ===== MAIN CONTENT ===== */
     .admin-main {
-        flex: 1;
         margin-left: var(--sidebar-width);
         min-height: 100vh;
         display: flex;
         flex-direction: column;
         background: var(--bg-light);
-        width: calc(100% - var(--sidebar-width));
-        max-width: 100%;
+        width: auto;
+        max-width: none;
+        box-sizing: border-box;
     }
 
     /* ===== HEADER - FIXED FOR MOBILE ===== */
@@ -804,7 +805,8 @@
 
     /* ===== CONTENT AREA ===== */
     .admin-content {
-        flex: 1;
+        flex: 1 1 auto;
+        min-width: 0;
         padding: 1.5rem 2rem 2rem;
         width: 100%;
         max-width: 100%;
@@ -981,7 +983,7 @@
 
         .admin-main {
             margin-left: 0;
-            width: 100%;
+            width: auto;
         }
 
         .hamburger-btn {
@@ -1034,15 +1036,7 @@
         }
 
         .header-datetime {
-            display: none; /* Hide datetime on mobile */
-        }
-
-        .header-datetime span {
-            font-size: 0.6rem;
-        }
-
-        .header-datetime i {
-            font-size: 0.65rem;
+            display: none;
         }
 
         .header-info-group .divider-icon {
@@ -1180,7 +1174,7 @@
         }
 
         .header-user {
-            display: none; /* Hide user entirely on very small screens */
+            display: none;
         }
 
         .admin-content {
@@ -1301,6 +1295,44 @@
             height: 180px;
         }
     }
+
+    /* ============================================================
+       MOBILE SAFETY NET
+       Guarantees that below the 992px breakpoint the sidebar does
+       not push the content off-screen, regardless of any
+       conflicting rule from admin.css or any browser extension.
+       Uses !important because we have observed that other rules
+       on this page can override the mobile media query.
+       ============================================================ */
+    @media (max-width: 992px) {
+        html,
+        body {
+            max-width: 100vw;
+            overflow-x: hidden;
+        }
+
+        .admin-wrapper {
+            max-width: 100vw;
+            overflow-x: hidden;
+            display: block;
+        }
+
+        .admin-main {
+            margin-left: 0 !important;
+            width: 100% !important;
+            max-width: 100vw !important;
+        }
+
+        .admin-content {
+            width: 100% !important;
+            max-width: 100vw !important;
+            padding: 1rem !important;
+        }
+
+        .medtech-sidebar {
+            max-width: 100vw;
+        }
+    }
     </style>
 
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"></script>
@@ -1370,7 +1402,7 @@
                 const unreadClass = item.is_read == 0 ? 'unread' : '';
                 let iconClass = 'bi-bell-fill';
                 let colorClass = 'system';
-                
+
                 if (item.type === 'appointment') {
                     iconClass = 'bi-calendar-check';
                     colorClass = 'appointment';
@@ -1381,9 +1413,9 @@
                     iconClass = 'bi-x-ray';
                     colorClass = 'xray';
                 }
-                
+
                 const link = item.link || '#';
-                
+
                 html += `
                     <a href="${link}" class="notif-item ${unreadClass}" onclick="markNotificationRead(${item.id}, event)">
                         <div class="notif-icon-box ${colorClass}">

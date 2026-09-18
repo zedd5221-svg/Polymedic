@@ -92,7 +92,7 @@ $statCards = [
     [
         'key'   => 'patients',
         // TODO: replace with your PNG for "All Patients"
-        'icon'  => 'user (1).png',
+        'icon'  => 'people-blue.png',
         'tone'  => 'icon-cyan',
         'label' => 'All Patients',
         'value' => number_format((int) ($total_patients ?? 0)),
@@ -122,7 +122,7 @@ $statCards = [
     [
         'key'   => 'completed',
         // TODO: replace with your PNG for "Completed Today"
-        'icon'  => 'check-mark.png',
+        'icon'  => 'people-check-blue.png',
         'tone'  => 'icon-green',
         'label' => 'Completed Today',
         'value' => number_format((int) ($today_completed ?? 0)),
@@ -132,7 +132,7 @@ $statCards = [
     [
         'key'   => 'diagnostics',
         // TODO: replace with your PNG for "Pending Diagnostics"
-        'icon'  => 'time.png',
+        'icon'  => 'clock (4).png',
         'tone'  => 'icon-blue',
         'label' => 'Pending Diagnostics',
         'value' => number_format((int) ($pending_diagnostic ?? 0)),
@@ -142,7 +142,7 @@ $statCards = [
     [
         'key'   => 'unpaid',
         // TODO: replace with your PNG for "Unpaid Bills"
-        'icon'  => 'decline.png',
+        'icon'  => 'no-money-red.png',
         'tone'  => 'icon-pink',
         'label' => 'Unpaid Bills',
         'value' => number_format((int) ($unpaid_bills ?? 0)),
@@ -152,7 +152,7 @@ $statCards = [
     [
         'key'   => 'collections',
         // TODO: replace with your PNG for "Today's Collections"
-        'icon'  => 'money.png',
+        'icon'  => 'money-yellow.png',
         'tone'  => 'icon-yellow',
         'label' => "Today's Collections",
         'value' => '&#8369;' . number_format((float) ($today_collections ?? 0), 2),
@@ -578,8 +578,8 @@ $statCards = [
    The tile itself is now transparent — see the .icon-* rules
    below — so the PNG sits directly on the card. */
 .dashboard-container .stat-img {
-    width: 30px;
-    height: 30px;
+    width: 25px;
+    height: 25px;
     object-fit: contain;
     display: block;
 }

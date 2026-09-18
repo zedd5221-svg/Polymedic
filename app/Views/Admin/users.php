@@ -89,6 +89,7 @@ $initials = static function ($name) {
                     <th scope="col">Username</th>
                     <th scope="col">Email</th>
                     <th scope="col">Role</th>
+                    <th scope="col">PRC License</th>
                     <th scope="col">Status</th>
                     <th scope="col" class="col-actions">Actions</th>
                 </tr>
@@ -120,6 +121,13 @@ $initials = static function ($name) {
                                     <?= esc($roleLabel) ?>
                                 </span>
                             </td>
+                            <td data-label="PRC License">
+                                <?php if (!empty($user['prc_license'])): ?>
+                                    <span class="cell-mono"><?= esc($user['prc_license']) ?></span>
+                                <?php else: ?>
+                                    <span class="cell-empty">—</span>
+                                <?php endif; ?>
+                            </td>
                             <td data-label="Status">
                                 <span class="status-badge <?= esc($statusKey, 'attr') ?>">
                                     <span class="status-dot" aria-hidden="true"></span><?= esc($statusText) ?>
@@ -135,6 +143,7 @@ $initials = static function ($name) {
                                             data-fullname="<?= esc($user['full_name'] ?? '', 'attr') ?>"
                                             data-email="<?= esc($user['email'] ?? '', 'attr') ?>"
                                             data-role="<?= esc($user['role'] ?? '', 'attr') ?>"
+                                            data-prc="<?= esc($user['prc_license'] ?? '', 'attr') ?>"
                                             data-status="<?= esc($statusKey, 'attr') ?>"
                                             data-bs-toggle="modal"
                                             data-bs-target="#editUserModal">
@@ -168,7 +177,7 @@ $initials = static function ($name) {
                     <?php endforeach; ?>
                 <?php else: ?>
                     <tr data-empty-row>
-                        <td colspan="6">
+                        <td colspan="7">
                             <div class="empty-state">
                                 <i class="bi bi-people" aria-hidden="true"></i>
                                 <p class="empty-title">No users found</p>
@@ -180,7 +189,7 @@ $initials = static function ($name) {
 
                 <!-- Shown only while a search filters every row out -->
                 <tr data-noresults-row hidden>
-                    <td colspan="6">
+                    <td colspan="7">
                         <div class="empty-state">
                             <i class="bi bi-search" aria-hidden="true"></i>
                             <p class="empty-title">No matching users</p>
@@ -239,6 +248,14 @@ $initials = static function ($name) {
                             <option value="med_tech">Medical Technologist</option>
                             <option value="radiologist">Radiologist</option>
                         </select>
+                    </div>
+                    <div class="mb-3" id="add_prc_wrap" hidden>
+                        <label class="form-label" for="add_prc_license">
+                            PRC License No. <span class="req">*</span>
+                        </label>
+                        <input type="text" class="form-control" id="add_prc_license" name="prc_license"
+                               autocomplete="off" maxlength="30" placeholder="e.g. 0123456">
+                        <small class="field-hint">Required for Medical Technologist and Radiologist accounts.</small>
                     </div>
                     <div class="mb-0">
                         <label class="form-label" for="add_status">Status</label>
@@ -301,6 +318,14 @@ $initials = static function ($name) {
                             <option value="med_tech">Medical Technologist</option>
                             <option value="radiologist">Radiologist</option>
                         </select>
+                    </div>
+                    <div class="mb-3" id="edit_prc_wrap" hidden>
+                        <label class="form-label" for="edit_prc_license">
+                            PRC License No. <span class="req">*</span>
+                        </label>
+                        <input type="text" class="form-control" name="prc_license" id="edit_prc_license"
+                               autocomplete="off" maxlength="30" placeholder="e.g. 0123456">
+                        <small class="field-hint">Required for Medical Technologist and Radiologist accounts.</small>
                     </div>
                     <div class="mb-0">
                         <label class="form-label" for="edit_status">Status</label>
@@ -590,6 +615,8 @@ $initials = static function ($name) {
     color: var(--um-text);
 }
 
+.cell-empty { color: var(--um-faint); }
+
 .cell-email {
     color: var(--um-text);
     overflow-wrap: anywhere;
@@ -830,6 +857,9 @@ $initials = static function ($name) {
 
 .modal-note.danger { color: var(--um-danger); }
 
+/* ===== HIDDEN HELPER ===== */
+[hidden] { display: none !important; }
+
 /* ============================================
    RESPONSIVE
    ============================================ */
@@ -849,7 +879,6 @@ $initials = static function ($name) {
 
     .btn-add-user { justify-content: center; width: 100%; }
 
-    /* Stacked card layout so the table never needs sideways scrolling */
     .table-responsive { overflow: visible; }
 
     .admin-table thead { display: none; }
@@ -923,7 +952,6 @@ $initials = static function ($name) {
     .cell-email { font-size: 0.8rem; }
 }
 
-/* ===== MOTION PREFERENCES ===== */
 @media (prefers-reduced-motion: reduce) {
     .table-card *,
     .admin-modal * {
@@ -932,7 +960,6 @@ $initials = static function ($name) {
     }
 }
 
-/* ===== PRINT ===== */
 @media print {
     .table-card { box-shadow: none; border: none; padding: 0; }
     .table-toolbar,
@@ -950,9 +977,41 @@ $initials = static function ($name) {
     var BASE_DELETE = '<?= base_url('admin/users/delete') ?>';
     var BASE_TOGGLE = '<?= base_url('admin/users/toggle') ?>';
 
+    /* Roles that must carry a PRC license number. */
+    var PRC_ROLES = ['med_tech', 'radiologist'];
+
     function setValue(id, value) {
         var el = document.getElementById(id);
         if (el) { el.value = value == null ? '' : value; }
+    }
+
+    /*
+     * Show or hide the PRC license field based on the selected role.
+     * The field is only meaningful for med_tech and radiologist.
+     */
+    function togglePrcVisibility(selectEl, wrapEl) {
+        if (!selectEl || !wrapEl) { return; }
+        var show = PRC_ROLES.indexOf(selectEl.value) !== -1;
+        wrapEl.hidden = !show;
+    }
+
+    /* Wire the two role selects. */
+    var addRoleSelect  = document.getElementById('add_role');
+    var addPrcWrap     = document.getElementById('add_prc_wrap');
+    var editRoleSelect = document.getElementById('edit_role');
+    var editPrcWrap    = document.getElementById('edit_prc_wrap');
+
+    if (addRoleSelect && addPrcWrap) {
+        addRoleSelect.addEventListener('change', function () {
+            togglePrcVisibility(addRoleSelect, addPrcWrap);
+        });
+        togglePrcVisibility(addRoleSelect, addPrcWrap);
+    }
+
+    if (editRoleSelect && editPrcWrap) {
+        editRoleSelect.addEventListener('change', function () {
+            togglePrcVisibility(editRoleSelect, editPrcWrap);
+        });
     }
 
     // ============================================
@@ -967,8 +1026,11 @@ $initials = static function ($name) {
             setValue('edit_full_name', this.dataset.fullname);
             setValue('edit_email', this.dataset.email);
             setValue('edit_role', this.dataset.role);
+            setValue('edit_prc_license', this.dataset.prc);
             setValue('edit_status', this.dataset.status);
             setValue('edit_password', '');
+
+            togglePrcVisibility(editRoleSelect, editPrcWrap);
 
             var form = document.getElementById('editUserForm');
             if (form) { form.action = BASE_UPDATE + '/' + encodeURIComponent(id); }
@@ -992,9 +1054,7 @@ $initials = static function ($name) {
     });
 
     // ============================================
-    // Toggle Status - confirm in a modal, falling back
-    // to the native prompt if Bootstrap is unavailable.
-    // Destination URL is unchanged.
+    // Toggle Status
     // ============================================
     document.querySelectorAll('.toggle-status').forEach(function (btn) {
         btn.addEventListener('click', function () {
@@ -1055,8 +1115,7 @@ $initials = static function ($name) {
     });
 
     // ============================================
-    // Search - filters user rows only, never the
-    // empty or no-results placeholder rows
+    // Search
     // ============================================
     var searchInput = document.getElementById('searchUsers');
     var table = document.getElementById('usersTable');
@@ -1100,7 +1159,7 @@ $initials = static function ($name) {
     }
 
     // ============================================
-    // Prevent duplicate submissions on valid forms
+    // Prevent duplicate submissions
     // ============================================
     document.querySelectorAll('form[data-guard-submit]').forEach(function (form) {
         form.addEventListener('submit', function () {
@@ -1115,7 +1174,6 @@ $initials = static function ($name) {
         });
     });
 
-    // Re-enable the submit button if a modal is closed and reopened
     document.querySelectorAll('.admin-modal').forEach(function (modalEl) {
         modalEl.addEventListener('show.bs.modal', function () {
             var submitBtn = modalEl.querySelector('button[type="submit"]');
@@ -1126,7 +1184,6 @@ $initials = static function ($name) {
         });
     });
 
-    // Focus the first field when the Add modal opens
     var addModal = document.getElementById('addUserModal');
     if (addModal) {
         addModal.addEventListener('shown.bs.modal', function () {

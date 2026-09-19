@@ -101,6 +101,17 @@
                         <?php endif; ?>
                     </a>
                 </li>
+                   
+                  <!-- Diagnostic Request -->
+                <li class="menu-item <?= strpos(current_url(), 'admin/diagnostic-requests') !== false ? 'active' : '' ?>">
+                    <a href="<?= base_url('admin/diagnostic-requests') ?>" class="menu-btn" data-tooltip="Diagnostic Requests">
+                         <i class="bi bi-file-earmark-medical menu-icon"></i>
+                         <span>Diagnostic Requests</span>
+                         <?php if (strpos(current_url(), 'admin/diagnostic-requests') !== false): ?>
+                              <i class="bi bi-chevron-right menu-arrow"></i>
+                         <?php endif; ?>
+                    </a>
+                </li>
 
                 <!-- PATIENTS -->
                 <li class="menu-item <?= current_url() == base_url('admin/patients') ? 'active' : '' ?>">
@@ -203,7 +214,7 @@
                         'Patients' => 'sick-patient.png',
                         'Diagnostic Requests' => 'stethoscope.png',
                         'Laboratory Findings' => 'lab-icon.png',
-                        'User Management' => 'user-management-icon.png',
+                        'User Management' => 'profile.png',
                         'Notifications' => 'appointment1.png',
                         'Radiologist Dashboard' => 'xray-icon.png',
                         'X-Ray Examinations' => 'xray-icon.png',

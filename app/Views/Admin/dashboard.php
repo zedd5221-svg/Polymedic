@@ -10,11 +10,18 @@
    they only stop the view from failing when a variable is missing.
    ------------------------------------------------------------------ */
 $revenueDataArr  = $revenueData  ?? ['labels' => [], 'values' => []];
-$visitsDataArr   = $visitsData   ?? ['labels' => [], 'values' => []];
+$visitsDataArr   = $visitsData   ?? ['labels' => [], 'lab' => [], 'xray' => []];
 $requestsDataArr = $requestsData ?? ['labels' => [], 'requested' => [], 'completed' => []];
 
 $hasRevenueChart  = !empty($revenueDataArr['labels'])  && !empty($revenueDataArr['values']);
-$hasVisitsChart   = !empty($visitsDataArr['labels'])   && !empty($visitsDataArr['values']);
+$hasVisitsChart   = !empty($visitsDataArr['labels'])
+                    && (!empty($visitsDataArr['lab']) || !empty($visitsDataArr['xray']));
+
+/* Pending appointments shown in the mini approval panel. */
+$pendingAppointmentsArr = $pendingAppointments ?? [];
+$pendingPerPage         = 4;
+$pendingTotal           = count($pendingAppointmentsArr);
+$pendingPages           = (int) max(1, ceil($pendingTotal / $pendingPerPage));
 $hasRequestsChart = !empty($requestsDataArr['labels']) && !empty($requestsDataArr['requested']);
 
 $monthlyRevenueVal = (float) ($monthlyRevenue ?? 0);
@@ -30,148 +37,135 @@ $safeColor = static function ($color, $fallback = '#0D9488') {
 };
 
 $jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
+
+/* ------------------------------------------------------------------
+   STAT CARDS
+
+   Values and labels are unchanged from the previous version — only
+   the card appearance changed to match the receptionist dashboard:
+   a PNG icon inside a transparent 40x40 wrapper, the label and
+   subtitle stack, and a chevron on the right for cards that link.
+
+   Each card carries an 'icon' key naming a PNG in
+   public/assets/images/. If the file is missing the card still
+   renders — the image just shows a broken-image placeholder.
+   ------------------------------------------------------------------ */
+$statCards = [
+    [
+        'key'   => 'patients',
+        'icon'  => 'people-blue.png',
+        'tone'  => 'icon-cyan',
+        'label' => 'Total Patients',
+        'value' => number_format((int) ($totalPatients ?? 0)),
+        'note'  => 'All registered patients',
+        'link'  => base_url('admin/patients'),
+    ],
+    [
+        'key'   => 'today',
+        'icon'  => 'document.png',
+        'tone'  => 'icon-teal',
+        'label' => "Today's Patients",
+        'value' => number_format((int) ($todayPatients ?? 0)),
+        'note'  => 'Checked in today',
+        'link'  => base_url('admin/visits'),
+    ],
+    [
+        'key'   => 'pending',
+        'icon'  => 'file (1).png',
+        'tone'  => 'icon-orange',
+        'label' => 'Pending Requests',
+        'value' => number_format((int) ($pendingRequests ?? 0)),
+        'note'  => 'Awaiting processing',
+        'link'  => base_url('admin/requests'),
+    ],
+    [
+        'key'   => 'completed',
+        'icon'  => 'people-check-blue.png',
+        'tone'  => 'icon-green',
+        'label' => 'Completed Requests',
+        'value' => number_format((int) ($completedRequests ?? 0)),
+        'note'  => 'Results encoded',
+        'link'  => base_url('admin/requests'),
+    ],
+    [
+        'key'   => 'released',
+        'icon'  => 'clock (4).png',
+        'tone'  => 'icon-blue',
+        'label' => 'Released Results',
+        'value' => number_format((int) ($releasedResults ?? 0)),
+        'note'  => 'Sent to doctors',
+        'link'  => base_url('admin/results'),
+    ],
+    [
+        'key'   => 'revenue_today',
+        'icon'  => 'money-yellow.png',
+        'tone'  => 'icon-yellow',
+        'label' => "Today's Revenue",
+        'value' => '&#8369;' . number_format((float) ($todayRevenue ?? 0), 2),
+        'note'  => 'Collected today',
+        'raw'   => true,
+        'link'  => base_url('admin/payments'),
+    ],
+    [
+        'key'   => 'revenue_month',
+        'icon'  => 'money-yellow.png',
+        'tone'  => 'icon-pink',
+        'label' => 'Monthly Revenue',
+        'value' => '&#8369;' . number_format($monthlyRevenueVal, 2),
+        'note'  => date('F Y'),
+        'raw'   => true,
+        'link'  => base_url('admin/reports/revenue'),
+    ],
+];
 ?>
 
 <div class="dashboard-wrapper">
 
     <!-- ===== TOP STATS ROW (7 Cards) ===== -->
     <div class="stats-row">
+        <?php foreach ($statCards as $card): ?>
+            <?php
+                $tag  = !empty($card['link']) ? 'a' : 'div';
+                $href = !empty($card['link']) ? ' href="' . esc($card['link'], 'attr') . '"' : '';
+                $icon = (string) ($card['icon'] ?? '');
+            ?>
+            <<?= $tag ?> class="stat-card"<?= $href ?>>
 
-        <!-- Total Patients -->
-        <a class="stat-card" href="<?= base_url('admin/patients') ?>">
-            <div class="stat-top">
-                <div class="stat-icon icon-cyan">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="9" cy="7" r="4"></circle>
-                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                    </svg>
-                </div>
-                <svg class="stat-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <polyline points="9 18 15 12 9 6"></polyline>
-                </svg>
-            </div>
-            <div class="stat-value"><?= number_format($totalPatients ?? 0) ?></div>
-            <div class="stat-label">Total Patients</div>
-            <div class="stat-sub">All registered patients</div>
-        </a>
+                <div class="stat-top">
 
-        <!-- Today's Patients -->
-        <a class="stat-card" href="<?= base_url('admin/visits') ?>">
-            <div class="stat-top">
-                <div class="stat-icon icon-teal">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="12" cy="7" r="4"></circle>
-                    </svg>
-                </div>
-                <svg class="stat-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <polyline points="9 18 15 12 9 6"></polyline>
-                </svg>
-            </div>
-            <div class="stat-value"><?= number_format($todayPatients ?? 0) ?></div>
-            <div class="stat-label">Today's Patients</div>
-            <div class="stat-sub">Checked in today</div>
-        </a>
+                    <div class="stat-icon <?= esc($card['tone'], 'attr') ?>">
+                        <?php if ($icon !== ''): ?>
+                            <img src="<?= esc(base_url('assets/images/' . $icon), 'attr') ?>"
+                                 alt=""
+                                 class="stat-img"
+                                 loading="lazy"
+                                 decoding="async">
+                        <?php endif; ?>
+                    </div>
 
-        <!-- Pending Requests -->
-        <a class="stat-card" href="<?= base_url('admin/requests') ?>">
-            <div class="stat-top">
-                <div class="stat-icon icon-orange">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <polyline points="12 6 12 12 16 14"></polyline>
-                    </svg>
-                </div>
-                <svg class="stat-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <polyline points="9 18 15 12 9 6"></polyline>
-                </svg>
-            </div>
-            <div class="stat-value"><?= number_format($pendingRequests ?? 0) ?></div>
-            <div class="stat-label">Pending Requests</div>
-            <div class="stat-sub">Awaiting processing</div>
-        </a>
+                    <?php if (!empty($card['link'])): ?>
+                        <svg class="stat-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                             stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                             stroke-linejoin="round" aria-hidden="true">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    <?php endif; ?>
 
-        <!-- Completed Requests -->
-        <a class="stat-card" href="<?= base_url('admin/requests') ?>">
-            <div class="stat-top">
-                <div class="stat-icon icon-green">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                    </svg>
                 </div>
-                <svg class="stat-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <polyline points="9 18 15 12 9 6"></polyline>
-                </svg>
-            </div>
-            <div class="stat-value"><?= number_format($completedRequests ?? 0) ?></div>
-            <div class="stat-label">Completed Requests</div>
-            <div class="stat-sub">Results encoded</div>
-        </a>
 
-        <!-- Released Results -->
-        <a class="stat-card" href="<?= base_url('admin/results') ?>">
-            <div class="stat-top">
-                <div class="stat-icon icon-blue">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                        <line x1="16" y1="13" x2="8" y2="13"></line>
-                        <line x1="16" y1="17" x2="8" y2="17"></line>
-                        <polyline points="10 9 9 9 8 9"></polyline>
-                    </svg>
+                <div class="stat-value<?= !empty($card['raw']) ? ' stat-value-money' : '' ?>">
+                    <?= !empty($card['raw']) ? $card['value'] : esc($card['value']) ?>
                 </div>
-                <svg class="stat-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <polyline points="9 18 15 12 9 6"></polyline>
-                </svg>
-            </div>
-            <div class="stat-value"><?= number_format($releasedResults ?? 0) ?></div>
-            <div class="stat-label">Released Results</div>
-            <div class="stat-sub">Sent to doctors</div>
-        </a>
 
-        <!-- Today's Revenue -->
-        <a class="stat-card" href="<?= base_url('admin/payments') ?>">
-            <div class="stat-top">
-                <div class="stat-icon icon-yellow">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
-                        <line x1="1" y1="10" x2="23" y2="10"></line>
-                    </svg>
-                </div>
-                <svg class="stat-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <polyline points="9 18 15 12 9 6"></polyline>
-                </svg>
-            </div>
-            <div class="stat-value stat-value-money">&#8369;<?= number_format($todayRevenue ?? 0, 2) ?></div>
-            <div class="stat-label">Today's Revenue</div>
-            <div class="stat-sub">Collected today</div>
-        </a>
+                <div class="stat-label"><?= esc($card['label']) ?></div>
 
-        <!-- Monthly Revenue -->
-        <a class="stat-card" href="<?= base_url('admin/reports/revenue') ?>">
-            <div class="stat-top">
-                <div class="stat-icon icon-pink">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <line x1="18" y1="20" x2="18" y2="10"></line>
-                        <line x1="12" y1="20" x2="12" y2="4"></line>
-                        <line x1="6" y1="20" x2="6" y2="14"></line>
-                        <line x1="3" y1="20" x2="21" y2="20"></line>
-                    </svg>
-                </div>
-                <svg class="stat-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <polyline points="9 18 15 12 9 6"></polyline>
-                </svg>
-            </div>
-            <div class="stat-value stat-value-money">&#8369;<?= number_format($monthlyRevenueVal, 2) ?></div>
-            <div class="stat-label">Monthly Revenue</div>
-            <div class="stat-sub"><?= date('F Y') ?></div>
-        </a>
+                <div class="stat-sub"><?= esc($card['note']) ?></div>
+
+            </<?= $tag ?>>
+        <?php endforeach; ?>
     </div>
 
-    <!-- ===== MAIN ROW: Revenue Chart + Top Lab Tests ===== -->
+    <!-- ===== MAIN ROW: Revenue Chart + Pending Appointments ===== -->
     <div class="main-row">
 
         <!-- Revenue Overview Chart -->
@@ -201,6 +195,191 @@ $jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
             <?php else: ?>
                 <div class="empty-state empty-state-chart">
                     <p>No revenue data recorded yet</p>
+                </div>
+            <?php endif; ?>
+        </div>
+
+        <!-- Pending Appointments - approve without leaving the dashboard -->
+        <div class="chart-card pending-card">
+            <div class="card-header">
+                <div class="card-title-group">
+                    <h5 class="card-title">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="16" y1="2" x2="16" y2="6"></line>
+                            <line x1="8" y1="2" x2="8" y2="6"></line>
+                            <line x1="3" y1="10" x2="21" y2="10"></line>
+                        </svg>
+                        Pending Appointments
+                    </h5>
+                    <span class="card-subtitle">Approve without leaving this page</span>
+                </div>
+                <?php if ($pendingTotal > 0): ?>
+                    <span class="badge-time badge-pending"><?= (int) $pendingTotal ?> waiting</span>
+                <?php endif; ?>
+            </div>
+
+            <?php if ($pendingTotal > 0): ?>
+
+                <div class="pending-list" id="pendingList">
+                    <?php foreach ($pendingAppointmentsArr as $i => $appt): ?>
+                        <?php
+                        $apptId   = (int) ($appt['id'] ?? 0);
+                        $apptName = (string) ($appt['full_name'] ?? 'Unknown patient');
+                        $apptRef  = (string) ($appt['reference_number'] ?? ('#' . $apptId));
+                        $apptDate = !empty($appt['appointment_date'])
+                            ? date('M j', strtotime($appt['appointment_date']))
+                            : '';
+                        $apptTime = !empty($appt['appointment_time'])
+                            ? date('g:i A', strtotime($appt['appointment_time']))
+                            : '';
+                        $svcType  = strtolower((string) ($appt['service_type'] ?? ''));
+
+                        /* Initials keep the row readable without an avatar image. */
+                        $parts    = preg_split('/\s+/', trim($apptName));
+                        $initials = mb_strtoupper(
+                            mb_substr($parts[0] ?? '', 0, 1) .
+                            (count($parts) > 1 ? mb_substr(end($parts), 0, 1) : '')
+                        );
+                        if ($initials === '') { $initials = '?'; }
+                        ?>
+                        <article class="pending-item"
+                                 data-page="<?= (int) floor($i / $pendingPerPage) ?>"
+                                 <?= $i >= $pendingPerPage ? 'hidden' : '' ?>>
+
+                            <span class="pending-avatar" aria-hidden="true"><?= esc($initials) ?></span>
+
+                            <div class="pending-body">
+                                <div class="pending-name-row">
+                                    <span class="pending-name"><?= esc($apptName) ?></span>
+                                    <span class="pending-ref"><?= esc($apptRef) ?></span>
+                                </div>
+                                <div class="pending-meta">
+                                    <?php if ($apptDate !== ''): ?>
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <polyline points="12 6 12 12 16 14"></polyline>
+                                        </svg>
+                                        <?= esc($apptDate) ?><?= $apptTime !== '' ? ' &middot; ' . esc($apptTime) : '' ?>
+                                    <?php endif; ?>
+                                    <?php if ($svcType !== ''): ?>
+                                        <span class="pending-tag pending-tag--<?= esc($svcType, 'attr') ?>"><?= esc(ucfirst($svcType)) ?></span>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+
+                            <div class="pending-actions">
+                                <a href="<?= base_url('admin/appointment/view/' . $apptId) ?>"
+                                   class="pending-btn pending-btn--ghost"
+                                   title="View details">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                        <circle cx="12" cy="12" r="3"></circle>
+                                    </svg>
+                                    <span class="visually-hidden">View <?= esc($apptName) ?></span>
+                                </a>
+                                <a href="<?= base_url('admin/appointment/approve/' . $apptId) ?>?from=dashboard"
+                                   class="pending-btn pending-btn--approve"
+                                   data-name="<?= esc($apptName, 'attr') ?>"
+                                   data-confirm-approve>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                    </svg>
+                                    <span>Approve</span>
+                                </a>
+                            </div>
+                        </article>
+                    <?php endforeach; ?>
+                </div>
+
+                <?php if ($pendingPages > 1): ?>
+                    <div class="pending-pager">
+                        <button type="button" class="pager-btn" id="pendingPrev" aria-label="Previous page" disabled>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <polyline points="15 18 9 12 15 6"></polyline>
+                            </svg>
+                        </button>
+                        <span class="pager-status">
+                            Page <span id="pendingPageNum">1</span> of <?= (int) $pendingPages ?>
+                        </span>
+                        <button type="button" class="pager-btn" id="pendingNext" aria-label="Next page">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </button>
+                    </div>
+                <?php endif; ?>
+
+                <a href="<?= base_url('admin/appointments') ?>" class="pending-all">
+                    View all appointments
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                </a>
+
+            <?php else: ?>
+                <div class="empty-state">
+                    <p>No appointments waiting for approval</p>
+                    <a href="<?= base_url('admin/appointments') ?>" class="pending-all">
+                        View all appointments
+                    </a>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- ===== BOTTOM ROW: Daily Patient Visits + Diagnostic Requests + Top Lab Tests ===== -->
+    <div class="bottom-row">
+
+        <!-- Daily Patient Visits -->
+        <div class="chart-card">
+            <div class="card-header">
+                <div class="card-title-group">
+                    <h5 class="card-title">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="16" y1="2" x2="16" y2="6"></line>
+                            <line x1="8" y1="2" x2="8" y2="6"></line>
+                            <line x1="3" y1="10" x2="21" y2="10"></line>
+                        </svg>
+                        Department Patient Volume
+                    </h5>
+                    <span class="card-subtitle">Laboratory vs X-Ray</span>
+                </div>
+                <span class="badge-time">This Week</span>
+            </div>
+            <?php if ($hasVisitsChart): ?>
+                <div class="chart-container">
+                    <canvas id="visitsChart"></canvas>
+                </div>
+            <?php else: ?>
+                <div class="empty-state empty-state-chart">
+                    <p>No department activity this week</p>
+                </div>
+            <?php endif; ?>
+        </div>
+
+        <!-- Diagnostic Requests -->
+        <div class="chart-card">
+            <div class="card-header">
+                <div class="card-title-group">
+                    <h5 class="card-title">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                        </svg>
+                        Diagnostic Requests
+                    </h5>
+                    <span class="card-subtitle">Requested vs Completed</span>
+                </div>
+                <span class="badge-time">This Week</span>
+            </div>
+            <?php if ($hasRequestsChart): ?>
+                <div class="chart-container">
+                    <canvas id="requestsChart"></canvas>
+                </div>
+            <?php else: ?>
+                <div class="empty-state empty-state-chart">
+                    <p>No diagnostic requests this week</p>
                 </div>
             <?php endif; ?>
         </div>
@@ -245,188 +424,6 @@ $jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
                     </div>
                 <?php endif; ?>
             </div>
-        </div>
-    </div>
-
-    <!-- ===== BOTTOM ROW: Daily Patient Visits + Diagnostic Requests + Quick Actions ===== -->
-    <div class="bottom-row">
-
-        <!-- Daily Patient Visits -->
-        <div class="chart-card">
-            <div class="card-header">
-                <div class="card-title-group">
-                    <h5 class="card-title">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                            <line x1="16" y1="2" x2="16" y2="6"></line>
-                            <line x1="8" y1="2" x2="8" y2="6"></line>
-                            <line x1="3" y1="10" x2="21" y2="10"></line>
-                        </svg>
-                        Daily Patient Visits
-                    </h5>
-                    <span class="card-subtitle">This week</span>
-                </div>
-                <span class="badge-time">This Week</span>
-            </div>
-            <?php if ($hasVisitsChart): ?>
-                <div class="chart-container">
-                    <canvas id="visitsChart"></canvas>
-                </div>
-            <?php else: ?>
-                <div class="empty-state empty-state-chart">
-                    <p>No visits recorded this week</p>
-                </div>
-            <?php endif; ?>
-        </div>
-
-        <!-- Diagnostic Requests -->
-        <div class="chart-card">
-            <div class="card-header">
-                <div class="card-title-group">
-                    <h5 class="card-title">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
-                        </svg>
-                        Diagnostic Requests
-                    </h5>
-                    <span class="card-subtitle">Requested vs Completed</span>
-                </div>
-                <span class="badge-time">This Week</span>
-            </div>
-            <?php if ($hasRequestsChart): ?>
-                <div class="chart-container">
-                    <canvas id="requestsChart"></canvas>
-                </div>
-            <?php else: ?>
-                <div class="empty-state empty-state-chart">
-                    <p>No diagnostic requests this week</p>
-                </div>
-            <?php endif; ?>
-        </div>
-
-        <!-- Quick Actions -->
-        <div class="chart-card quick-actions-card">
-            <div class="card-header">
-                <div class="card-title-group">
-                    <h5 class="card-title">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
-                        </svg>
-                        Quick Actions
-                    </h5>
-                    <span class="card-subtitle">Navigation shortcuts</span>
-                </div>
-            </div>
-            <div class="quick-actions-grid">
-                <a href="<?= base_url('admin/patients/add') ?>" class="quick-action-item">
-                    <div class="qa-icon qa-blue">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                            <circle cx="8.5" cy="7" r="4"></circle>
-                            <line x1="20" y1="8" x2="20" y2="14"></line>
-                            <line x1="23" y1="11" x2="17" y2="11"></line>
-                        </svg>
-                    </div>
-                    <div class="qa-text">
-                        <span class="qa-title">New Patient</span>
-                        <span class="qa-desc">Register patient</span>
-                    </div>
-                    <svg class="qa-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <polyline points="9 18 15 12 9 6"></polyline>
-                    </svg>
-                </a>
-                <a href="<?= base_url('admin/appointments') ?>" class="quick-action-item">
-                    <div class="qa-icon qa-teal">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                            <line x1="16" y1="2" x2="16" y2="6"></line>
-                            <line x1="8" y1="2" x2="8" y2="6"></line>
-                            <line x1="3" y1="10" x2="21" y2="10"></line>
-                            <line x1="12" y1="14" x2="12" y2="18"></line>
-                            <line x1="10" y1="16" x2="14" y2="16"></line>
-                        </svg>
-                    </div>
-                    <div class="qa-text">
-                        <span class="qa-title">New Appointment</span>
-                        <span class="qa-desc">Schedule visit</span>
-                    </div>
-                    <svg class="qa-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <polyline points="9 18 15 12 9 6"></polyline>
-                    </svg>
-                </a>
-                <a href="<?= base_url('admin/requests') ?>" class="quick-action-item">
-                    <div class="qa-icon qa-orange">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-                            <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-                            <line x1="9" y1="14" x2="15" y2="14"></line>
-                            <line x1="9" y1="18" x2="15" y2="18"></line>
-                            <line x1="9" y1="10" x2="11" y2="10"></line>
-                        </svg>
-                    </div>
-                    <div class="qa-text">
-                        <span class="qa-title">Create Request</span>
-                        <span class="qa-desc">Lab or X-Ray</span>
-                    </div>
-                    <svg class="qa-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <polyline points="9 18 15 12 9 6"></polyline>
-                    </svg>
-                </a>
-                <a href="<?= base_url('admin/reports') ?>" class="quick-action-item">
-                    <div class="qa-icon qa-slate">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                            <polyline points="14 2 14 8 20 8"></polyline>
-                            <line x1="16" y1="13" x2="8" y2="13"></line>
-                            <line x1="16" y1="17" x2="8" y2="17"></line>
-                            <polyline points="10 9 9 9 8 9"></polyline>
-                        </svg>
-                    </div>
-                    <div class="qa-text">
-                        <span class="qa-title">Reports</span>
-                        <span class="qa-desc">Generate reports</span>
-                    </div>
-                    <svg class="qa-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <polyline points="9 18 15 12 9 6"></polyline>
-                    </svg>
-                </a>
-            </div>
-        </div>
-    </div>
-
-    <!-- ===== RECENT ACTIVITY ===== -->
-    <div class="chart-card full-width">
-        <div class="card-header">
-            <div class="card-title-group">
-                <h5 class="card-title">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <polyline points="12 6 12 12 16 14"></polyline>
-                    </svg>
-                    Recent Activity
-                </h5>
-                <span class="card-subtitle">Latest system updates</span>
-            </div>
-            <button type="button" class="btn-refresh" onclick="refreshActivity()" aria-label="Refresh activity" title="Refresh activity">
-                <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
-            </button>
-        </div>
-        <div class="activity-list">
-            <?php if (!empty($recentActivity)): ?>
-                <?php foreach ($recentActivity as $activity): ?>
-                    <div class="activity-item">
-                        <span class="activity-dot" style="background: <?= $safeColor($activity['color'] ?? '') ?>;"></span>
-                        <div class="activity-content">
-                            <p><?= esc($activity['message'] ?? '') ?></p>
-                            <small><?= !empty($activity['time']) ? esc(date('M d, Y h:i A', strtotime($activity['time']))) : '' ?></small>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            <?php else: ?>
-                <div class="empty-state">
-                    <p>No recent activity</p>
-                </div>
-            <?php endif; ?>
         </div>
     </div>
 
@@ -477,7 +474,9 @@ $jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
     border-radius: var(--db-radius-xs);
 }
 
-/* ===== STATS ROW ===== */
+/* ===== STATS ROW =====
+   Fixed seven-track grid, matching the receptionist dashboard. */
+
 .stats-row {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -495,6 +494,9 @@ $jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
     text-decoration: none;
     color: inherit;
     transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .stat-card:hover,
@@ -509,11 +511,21 @@ $jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
     color: var(--db-text-soft);
 }
 
+/* Grid, not flex, so the icon stays pinned to the left edge and the
+   chevron to the right edge regardless of the card's width. */
 .stat-top {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: 40px 1fr 16px;
     align-items: center;
     margin-bottom: 14px;
+    width: 100%;
+}
+
+.stat-top > .stat-icon  { grid-column: 1; }
+.stat-top > .stat-arrow { grid-column: 3; justify-self: end; }
+
+.stat-top:not(:has(.stat-arrow)) {
+    grid-template-columns: 40px 1fr;
 }
 
 .stat-icon {
@@ -526,19 +538,33 @@ $jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
     flex-shrink: 0;
 }
 
+/* PNG icon sits directly on the card. The wrapper is 40x40 but
+   transparent, so no colored tile is drawn behind the image. */
+.stat-img {
+    width: 25px;
+    height: 25px;
+    object-fit: contain;
+    display: block;
+}
+
 .stat-arrow {
     color: #CBD5E1;
     flex-shrink: 0;
     transition: color 0.18s ease;
+    justify-self: end;
 }
 
-.icon-cyan   { background: #E6F7F7; color: #0D9488; }
-.icon-teal   { background: #E3F7ED; color: #059669; }
-.icon-orange { background: #FFF4E5; color: #D97706; }
-.icon-green  { background: #E3F7ED; color: #059669; }
-.icon-blue   { background: #EAF2FE; color: #2563EB; }
-.icon-yellow { background: #FEF3C7; color: #B45309; }
-.icon-pink   { background: #FCE7F3; color: #DB2777; }
+/* Tone hooks retained on the icon wrapper for future use, but with
+   transparent backgrounds so no colored tile is drawn. */
+.icon-cyan,
+.icon-teal,
+.icon-orange,
+.icon-green,
+.icon-blue,
+.icon-yellow,
+.icon-pink {
+    background: transparent;
+}
 
 .stat-value {
     font-size: 1.65rem;
@@ -756,80 +782,214 @@ $jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
     transition: width 0.5s ease;
 }
 
-/* ===== QUICK ACTIONS ===== */
-.quick-actions-card {
+/* ============================================
+   PENDING APPOINTMENTS PANEL
+   ============================================ */
+
+.pending-card {
     display: flex;
     flex-direction: column;
 }
 
-.quick-actions-grid {
+.badge-pending {
+    color: #B45309;
+    background: #FEF3C7;
+    border-color: #FDE68A;
+}
+
+.pending-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 0.5rem;
     flex: 1;
+    min-height: 0;
 }
 
-.quick-action-item {
+.pending-item {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 11px 12px;
-    background: var(--db-surface);
-    border: 1px solid var(--db-border);
-    border-radius: var(--db-radius-sm);
+    gap: 0.7rem;
+    padding: 0.65rem 0.7rem;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    background: #FFFFFF;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+    animation: pendingIn 0.28s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+.pending-item:hover {
+    border-color: #CBD5E1;
+    box-shadow: 0 4px 12px -6px rgba(15, 23, 42, 0.2);
+    transform: translateY(-1px);
+}
+
+@keyframes pendingIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: none; }
+}
+
+.pending-item[hidden] { display: none; }
+
+.pending-avatar {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #0F766E;
+    background: #E6FBF6;
+    border-radius: 50%;
+}
+
+.pending-body { flex: 1; min-width: 0; }
+
+.pending-name-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.pending-name {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #1E293B;
+    overflow-wrap: anywhere;
+}
+
+.pending-ref {
+    font-size: 0.66rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: #94A3B8;
+}
+
+.pending-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-top: 0.15rem;
+    font-size: 0.7rem;
+    color: #64748B;
+}
+
+.pending-tag {
+    margin-left: 0.25rem;
+    padding: 0.05rem 0.4rem;
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    border-radius: 999px;
+    color: #475569;
+    background: #F1F5F9;
+}
+
+.pending-tag--laboratory { color: #15803D; background: #DCFCE7; }
+.pending-tag--xray       { color: #6D28D9; background: #EDE9FE; }
+
+.pending-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    flex-shrink: 0;
+}
+
+.pending-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    height: 30px;
+    padding: 0 0.6rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    border-radius: 7px;
     text-decoration: none;
-    transition: background-color 0.18s ease, border-color 0.18s ease;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
-.quick-action-item:hover,
-.quick-action-item:focus-visible {
-    background: var(--db-canvas);
-    border-color: var(--db-border-strong);
-    text-decoration: none;
+.pending-btn--ghost {
+    width: 30px;
+    padding: 0;
+    color: #64748B;
+    background: transparent;
+    border: 1px solid #E2E8F0;
 }
 
-.quick-action-item:hover .qa-arrow {
-    color: var(--db-text-soft);
+.pending-btn--ghost:hover { color: #1E293B; background: #F8FAFC; border-color: #CBD5E1; }
+
+.pending-btn--approve {
+    color: #FFFFFF;
+    background: #0D9488;
+    border: 1px solid #0D9488;
 }
 
-.qa-icon {
-    width: 36px;
-    height: 36px;
-    border-radius: var(--db-radius-xs);
+.pending-btn--approve:hover { background: #0F766E; border-color: #0F766E; color: #FFFFFF; }
+
+.pending-pager {
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-shrink: 0;
+    gap: 0.6rem;
+    padding-top: 0.7rem;
+    margin-top: 0.7rem;
+    border-top: 1px solid #E2E8F0;
 }
 
-.qa-blue   { background: #EAF2FE; color: #2563EB; }
-.qa-teal   { background: #E6F7F7; color: #0D9488; }
-.qa-orange { background: #FFF4E5; color: #D97706; }
-.qa-slate  { background: #EEF2F6; color: #475569; }
-
-.qa-text {
-    flex: 1;
-    min-width: 0;
+.pager-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    color: #64748B;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.qa-title {
-    display: block;
-    font-size: 0.83rem;
-    font-weight: 600;
-    color: var(--db-text);
-    margin-bottom: 1px;
-}
+.pager-btn:hover:not(:disabled) { color: #0D9488; background: #F0FDFA; border-color: #99F6E4; }
+.pager-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-.qa-desc {
-    display: block;
+.pager-status {
     font-size: 0.72rem;
-    color: var(--db-text-muted);
+    color: #64748B;
+    font-variant-numeric: tabular-nums;
 }
 
-.qa-arrow {
-    color: #CBD5E1;
-    flex-shrink: 0;
-    transition: color 0.18s ease;
+.pending-all {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    margin-top: 0.7rem;
+    padding: 0.45rem;
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: #0D9488;
+    text-decoration: none;
+    border-radius: 7px;
+    transition: background-color 0.15s ease;
+}
+
+.pending-all:hover { background: #F0FDFA; color: #0F766E; }
+
+.visually-hidden {
+    position: absolute; width: 1px; height: 1px;
+    padding: 0; margin: -1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+@media (max-width: 560px) {
+    .pending-item { flex-wrap: wrap; }
+    .pending-actions { width: 100%; justify-content: flex-end; }
 }
 
 /* ===== ACTIVITY ===== */
@@ -975,6 +1135,7 @@ $jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
 
 /* ============================================
    RESPONSIVE
+   Same cascade as the receptionist dashboard.
    ============================================ */
 
 @media (max-width: 1500px) {
@@ -1038,7 +1199,7 @@ $jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
     .stat-card,
     .chart-card { box-shadow: none; break-inside: avoid; page-break-inside: avoid; }
     .btn-refresh,
-    .quick-actions-card,
+    .pending-card,
     #toastContainer { display: none !important; }
 }
 </style>
@@ -1144,6 +1305,93 @@ function dbInitChart(canvasId, config) {
 }
 
 // ============================================
+// ANIMATION
+// ============================================
+// One place to tune motion for every chart. Honours the operating
+// system's reduced-motion setting, so the dashboard stays still for
+// anyone who has asked for that.
+
+const DB_REDUCED_MOTION =
+    window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Bars grow up from the baseline, staggered left to right.
+function dbBarAnimation(stagger) {
+    if (DB_REDUCED_MOTION) { return { duration: 0 }; }
+
+    const step = typeof stagger === 'number' ? stagger : 40;
+
+    return {
+        duration: 700,
+        easing: 'easeOutQuart',
+        delay: function (context) {
+            // Delay each point once, on its first draw only, so hovering
+            // and tooltips never replay the stagger.
+            if (context.type === 'data' && context.mode === 'default' && !context.dropped) {
+                context.dropped = true;
+                return context.dataIndex * step + context.datasetIndex * 90;
+            }
+            return 0;
+        }
+    };
+}
+
+// The revenue line draws itself left to right, rising from the baseline.
+function dbLineAnimation() {
+    if (DB_REDUCED_MOTION) { return { duration: 0 }; }
+
+    return {
+        duration: 900,
+        easing: 'easeOutQuart',
+        x: {
+            type: 'number',
+            easing: 'linear',
+            duration: 22,
+            from: NaN,
+            delay: function (context) {
+                if (context.type !== 'data' || context.xStarted) { return 0; }
+                context.xStarted = true;
+                return context.index * 22;
+            }
+        },
+        y: {
+            type: 'number',
+            easing: 'easeOutQuart',
+            duration: 320,
+            from: function (context) {
+                return context.chart.scales.y.getPixelForValue(0);
+            },
+            delay: function (context) {
+                if (context.type !== 'data' || context.yStarted) { return 0; }
+                context.yStarted = true;
+                return context.index * 22;
+            }
+        }
+    };
+}
+
+// Replays a chart's entry animation the first time it scrolls into view,
+// so charts below the fold are not already finished when reached.
+function dbAnimateOnView(chart, canvasId) {
+    if (!chart || DB_REDUCED_MOTION || !('IntersectionObserver' in window)) { return; }
+
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) { return; }
+
+    const observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+            if (entry.isIntersecting) {
+                chart.reset();
+                chart.update();
+                observer.unobserve(entry.target);
+            }
+        });
+    }, { threshold: 0.25 });
+
+    observer.observe(canvas);
+}
+
+
+// ============================================
 // 1. REVENUE CHART
 // ============================================
 
@@ -1181,62 +1429,108 @@ dbInitChart('revenueChart', {
                 }
             })
         },
+        animation: dbLineAnimation(),
         scales: dbScales(function (value) { return dbCompactPeso(value); })
     }
 });
 
 // ============================================
-// 2. DAILY PATIENT VISITS CHART
+// 2. DEPARTMENT PATIENT VOLUME CHART
 // ============================================
-// The optional "Target" series is drawn only when the controller supplies a
-// real visitsData.targets array. No placeholder values are generated here.
+// Laboratory vs X-Ray patient counts per day, supplied by
+// Admin::getDepartmentData(). The bars are stacked, so each column's
+// height reads as the total patients handled that day.
 
-const visitsDatasets = [{
-    label: 'Visits',
-    data: visitsData.values,
-    backgroundColor: DB_COLORS.accent,
-    borderRadius: 4,
-    borderSkipped: false,
-    barPercentage: 0.7,
-    categoryPercentage: 0.8,
-    maxBarThickness: 34
-}];
+const deptLab  = Array.isArray(visitsData.lab)  ? visitsData.lab  : [];
+const deptXray = Array.isArray(visitsData.xray) ? visitsData.xray : [];
 
-if (Array.isArray(visitsData.targets) && visitsData.targets.length) {
-    visitsDatasets.push({
-        label: 'Target',
-        data: visitsData.targets,
-        backgroundColor: DB_COLORS.muted,
-        borderRadius: 4,
-        borderSkipped: false,
-        barPercentage: 0.7,
-        categoryPercentage: 0.8,
-        maxBarThickness: 34
-    });
-}
-
-dbInitChart('visitsChart', {
+const deptChart = dbInitChart('visitsChart', {
     type: 'bar',
     data: {
         labels: visitsData.labels,
-        datasets: visitsDatasets
+        datasets: [
+            {
+                label: 'Laboratory',
+                data: deptLab,
+                backgroundColor: DB_COLORS.accent,
+                hoverBackgroundColor: '#0F766E',
+                borderRadius: { topLeft: 0, topRight: 0, bottomLeft: 4, bottomRight: 4 },
+                borderSkipped: false,
+                barPercentage: 0.7,
+                categoryPercentage: 0.8,
+                maxBarThickness: 34,
+                stack: 'departments'
+            },
+            {
+                label: 'X-Ray',
+                data: deptXray,
+                backgroundColor: '#7C3AED',
+                hoverBackgroundColor: '#6D28D9',
+                borderRadius: { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 },
+                borderSkipped: false,
+                barPercentage: 0.7,
+                categoryPercentage: 0.8,
+                maxBarThickness: 34,
+                stack: 'departments'
+            }
+        ]
     },
     options: {
         responsive: true,
         maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        animation: dbBarAnimation(45),
         plugins: {
-            legend: Object.assign({}, dbBaseLegend, { display: visitsDatasets.length > 1 }),
-            tooltip: Object.assign({}, dbBaseTooltip, { displayColors: true })
+            legend: dbBaseLegend,
+            tooltip: Object.assign({}, dbBaseTooltip, {
+                displayColors: true,
+                footerColor: DB_COLORS.text,
+                footerFont: { size: 11, weight: '600' },
+                callbacks: {
+                    label: function (context) {
+                        const n = Number(context.parsed.y) || 0;
+                        return context.dataset.label + ': ' + n + (n === 1 ? ' patient' : ' patients');
+                    },
+                    // Combined total for the day, shown under the two rows.
+                    footer: function (items) {
+                        let total = 0;
+                        items.forEach(function (item) { total += Number(item.parsed.y) || 0; });
+                        return 'Total: ' + total + (total === 1 ? ' patient' : ' patients');
+                    }
+                }
+            })
         },
-        scales: dbScales(undefined)
+        scales: {
+            y: {
+                beginAtZero: true,
+                stacked: true,
+                border: { display: false },
+                grid: { color: DB_COLORS.grid, drawBorder: false, drawTicks: false },
+                ticks: {
+                    color: DB_COLORS.tick,
+                    font: { size: 11 },
+                    padding: 8,
+                    maxTicksLimit: 6,
+                    precision: 0
+                }
+            },
+            x: {
+                stacked: true,
+                border: { display: false },
+                grid: { display: false, drawBorder: false },
+                ticks: { color: DB_COLORS.tick, font: { size: 11 }, padding: 6 }
+            }
+        }
     }
 });
+
+dbAnimateOnView(deptChart, 'visitsChart');
 
 // ============================================
 // 3. DIAGNOSTIC REQUESTS CHART
 // ============================================
 
-dbInitChart('requestsChart', {
+const requestsChart = dbInitChart('requestsChart', {
     type: 'bar',
     data: {
         labels: requestsData.labels,
@@ -1266,6 +1560,7 @@ dbInitChart('requestsChart', {
     options: {
         responsive: true,
         maintainAspectRatio: false,
+        animation: dbBarAnimation(45),
         plugins: {
             legend: dbBaseLegend,
             tooltip: Object.assign({}, dbBaseTooltip, { displayColors: true })
@@ -1273,6 +1568,8 @@ dbInitChart('requestsChart', {
         scales: dbScales(undefined)
     }
 });
+
+dbAnimateOnView(requestsChart, 'requestsChart');
 
 // ============================================
 // TOAST NOTIFICATIONS
@@ -1318,6 +1615,78 @@ function showToast(message, type = 'info') {
         setTimeout(() => toast.remove(), 300);
     }, 5000);
 }
+
+// ============================================
+// PENDING APPOINTMENTS PANEL
+// ============================================
+// Four rows per page. Every row is already in the DOM, so paging is
+// instant and costs no extra request.
+
+(function () {
+    const list = document.getElementById('pendingList');
+    if (!list) { return; }
+
+    const items = Array.prototype.slice.call(list.querySelectorAll('.pending-item'));
+    if (!items.length) { return; }
+
+    const prev  = document.getElementById('pendingPrev');
+    const next  = document.getElementById('pendingNext');
+    const label = document.getElementById('pendingPageNum');
+
+    const perPage = 4;
+    const pages   = Math.ceil(items.length / perPage);
+    let page = 0;
+
+    function render() {
+        items.forEach(function (item, i) {
+            const onPage = Math.floor(i / perPage) === page;
+            item.hidden = !onPage;
+
+            if (onPage) {
+                // Restart the entry animation so each page fades in.
+                item.style.animation = 'none';
+                void item.offsetWidth;
+                item.style.animation = '';
+                item.style.animationDelay = ((i % perPage) * 45) + 'ms';
+            }
+        });
+
+        if (label) { label.textContent = page + 1; }
+        if (prev)  { prev.disabled = page === 0; }
+        if (next)  { next.disabled = page >= pages - 1; }
+    }
+
+    if (prev) {
+        prev.addEventListener('click', function () {
+            if (page > 0) { page--; render(); }
+        });
+    }
+
+    if (next) {
+        next.addEventListener('click', function () {
+            if (page < pages - 1) { page++; render(); }
+        });
+    }
+
+    // Confirm approval by patient name. Bound here rather than with an
+    // inline onclick, so the name never has to be escaped into an
+    // attribute string.
+    list.addEventListener('click', function (event) {
+        const link = event.target.closest('[data-confirm-approve]');
+        if (!link) { return; }
+
+        const name = link.dataset.name || 'this patient';
+        if (!confirm('Approve the appointment for ' + name + '?')) {
+            event.preventDefault();
+            return;
+        }
+
+        link.style.pointerEvents = 'none';
+        link.style.opacity = '0.6';
+    });
+
+    render();
+})();
 
 function refreshActivity() {
     const btn = document.querySelector('.btn-refresh');

@@ -4,8 +4,7 @@ namespace App\Controllers;
 
 use App\Models\AppointmentModel;
 use App\Models\UserModel;
-use App\Models\XrayExaminationModel;
-use App\Models\LabRequestModel;
+use App\Models\DiagnosticRequestModel;
 use App\Models\NotificationModel;
 use App\Models\ServiceModel;
 use App\Models\PatientModel;
@@ -43,16 +42,15 @@ class Admin extends BaseController
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
 
-        $appointmentModel = new AppointmentModel();
-        $labRequestModel = new LabRequestModel();
-        $xrayModel = new XrayExaminationModel();
+        $appointmentModel  = new AppointmentModel();
+        $diagnosticModel   = new DiagnosticRequestModel();
         $notificationModel = new NotificationModel();
-        $patientModel = new PatientModel();
-        $paymentModel = new PaymentModel();
+        $patientModel      = new PatientModel();
+        $paymentModel      = new PaymentModel();
 
         $today = date('Y-m-d');
         $month = date('m');
-        $year = date('Y');
+        $year  = date('Y');
 
         // ===== TOTAL PATIENTS =====
         $totalPatients = $patientModel->countAll();
@@ -63,26 +61,17 @@ class Admin extends BaseController
             ->countAllResults();
 
         // ===== PENDING REQUESTS (Lab + X-Ray) =====
-        $pendingRequests = $labRequestModel
-            ->where('status', 'pending')
-            ->countAllResults();
-        $pendingRequests += $xrayModel
+        $pendingRequests = $diagnosticModel
             ->where('status', 'pending')
             ->countAllResults();
 
         // ===== COMPLETED REQUESTS (Lab + X-Ray) =====
-        $completedRequests = $labRequestModel
-            ->where('status', 'completed')
-            ->countAllResults();
-        $completedRequests += $xrayModel
+        $completedRequests = $diagnosticModel
             ->where('status', 'completed')
             ->countAllResults();
 
         // ===== RELEASED RESULTS (Lab + X-Ray) =====
-        $releasedResults = $labRequestModel
-            ->where('status', 'released')
-            ->countAllResults();
-        $releasedResults += $xrayModel
+        $releasedResults = $diagnosticModel
             ->where('status', 'released')
             ->countAllResults();
 
@@ -110,8 +99,11 @@ class Admin extends BaseController
         // ===== REVENUE DATA (Last 12 Months) =====
         $revenueData = $this->getRevenueData();
 
-        // ===== VISITS DATA (Last 7 Days) =====
-        $visitsData = $this->getVisitsData();
+        // ===== DEPARTMENT VOLUME (Lab vs X-Ray, this week) =====
+        $visitsData = $this->getDepartmentData();
+
+        // ===== PENDING APPOINTMENTS (mini approval panel) =====
+        $pendingAppointments = $this->getPendingAppointments(20);
 
         // ===== REQUESTS DATA (Last 7 Days) =====
         $requestsData = $this->getRequestsData();
@@ -133,6 +125,7 @@ class Admin extends BaseController
             'monthlyRevenue' => $monthlyRevenue,
             'revenueData' => $revenueData,
             'visitsData' => $visitsData,
+            'pendingAppointments' => $pendingAppointments,
             'requestsData' => $requestsData,
             'topTests' => $topTests,
             'recentActivity' => $recentActivity,
@@ -190,29 +183,61 @@ class Admin extends BaseController
         ];
     }
 
-    private function getVisitsData()
+    /**
+     * Patients handled by each department, per day of the current week.
+     *
+     * Both department counts come from the merged table now, split by
+     * the type column. A patient with both lab and xray requests is
+     * counted once under each department, which is what the stacked
+     * chart is meant to show.
+     */
+    private function getDepartmentData()
     {
-        $days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        $visits = [];
+        $days  = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         $start = date('Y-m-d', strtotime('monday this week'));
-        $appointmentModel = new AppointmentModel();
+
+        $labModel  = new DiagnosticRequestModel();
+        $xrayModel = new DiagnosticRequestModel();
+
+        $lab  = [];
+        $xray = [];
 
         for ($i = 0; $i < 7; $i++) {
             $date = date('Y-m-d', strtotime($start . ' +' . $i . ' days'));
-            $visits[] = $appointmentModel
-                ->where('appointment_date', $date)
+
+            $lab[] = $labModel
+                ->where('type', DiagnosticRequestModel::TYPE_LAB)
+                ->where('DATE(request_date)', $date)
+                ->countAllResults();
+
+            $xray[] = $xrayModel
+                ->where('type', DiagnosticRequestModel::TYPE_XRAY)
+                ->where('DATE(request_date)', $date)
                 ->countAllResults();
         }
 
-        if (empty(array_filter($visits))) {
-            $visits = [5, 8, 12, 10, 15, 6, 4];
-        }
-
+        // No placeholder numbers here on purpose. A dashboard showing
+        // invented patient counts is worse than one showing an empty
+        // week, and the view already handles the empty case.
         return [
             'labels' => $days,
-            'values' => $visits,
-            'targets' => array_fill(0, 7, 10)
+            'lab'    => $lab,
+            'xray'   => $xray,
         ];
+    }
+
+    /**
+     * Appointments waiting for approval, soonest first.
+     * The dashboard panel pages through these four at a time.
+     */
+    private function getPendingAppointments(int $limit = 20)
+    {
+        $model = new AppointmentModel();
+
+        return $model->where('status', 'pending')
+                     ->orderBy('appointment_date', 'ASC')
+                     ->orderBy('appointment_time', 'ASC')
+                     ->findAll($limit);
     }
 
     private function getRequestsData()
@@ -245,7 +270,10 @@ class Admin extends BaseController
 
     private function getTopTests()
     {
-        $labRequests = (new LabRequestModel())->findAll();
+        $labRequests = (new DiagnosticRequestModel())
+            ->where('type', DiagnosticRequestModel::TYPE_LAB)
+            ->findAll();
+
         $testCounts = [];
 
         foreach ($labRequests as $req) {
@@ -316,15 +344,24 @@ class Admin extends BaseController
 
     // =============================================
     // PATIENTS - COMPLETE FIX (ALL SOURCES)
+    //
+    // A patient only exists once they've been registered. That means:
+    //   - a row in the patients table, OR
+    //   - an appointment that has been approved (pending bookings
+    //     are not patients yet), OR
+    //   - a real lab or x-ray request (not cancelled).
+    //
+    // Pending online bookings are deliberately excluded here. They
+    // show on the Appointments page until the front desk approves
+    // them, which is what creates the patients-table row.
     // =============================================
     public function patients()
     {
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
 
-        $patientModel = new PatientModel();
-        $labRequestModel = new LabRequestModel();
-        $xrayModel = new XrayExaminationModel();
+        $patientModel     = new PatientModel();
+        $diagnosticModel  = new DiagnosticRequestModel();
         $appointmentModel = new AppointmentModel();
 
         $allPatients = [];
@@ -360,10 +397,14 @@ class Admin extends BaseController
             log_message('error', 'Patients - Patients table error: ' . $e->getMessage());
         }
 
-        // ========== 2. FROM APPOINTMENTS ==========
+        // ========== 2. FROM APPOINTMENTS (APPROVED / COMPLETED ONLY) ==========
+        // A pending online booking is not a patient yet. The front
+        // desk must approve it first. Filtering on status here stops
+        // unapproved bookings from appearing on the Patients page.
         try {
             $appointmentPatients = $appointmentModel
                 ->select('id, full_name, email, phone, age, gender, MAX(appointment_date) as last_visit, MIN(created_at) as created_at')
+                ->whereIn('status', ['approved', 'completed'])
                 ->groupBy('full_name')
                 ->orderBy('full_name', 'ASC')
                 ->findAll();
@@ -392,10 +433,12 @@ class Admin extends BaseController
             log_message('error', 'Patients - Appointments error: ' . $e->getMessage());
         }
 
-        // ========== 3. FROM LAB REQUESTS ==========
+        // ========== 3. FROM LAB REQUESTS (NON-CANCELLED) ==========
         try {
-            $labPatients = $labRequestModel
+            $labPatients = $diagnosticModel
                 ->select('id, patient_name as full_name, age, gender, MAX(request_date) as last_visit, MIN(created_at) as created_at')
+                ->where('type', DiagnosticRequestModel::TYPE_LAB)
+                ->whereIn('status', ['pending', 'in_progress', 'completed', 'released'])
                 ->groupBy('patient_name')
                 ->orderBy('patient_name', 'ASC')
                 ->findAll();
@@ -424,10 +467,12 @@ class Admin extends BaseController
             log_message('error', 'Patients - Lab Requests error: ' . $e->getMessage());
         }
 
-        // ========== 4. FROM X-RAY EXAMINATIONS ==========
+        // ========== 4. FROM X-RAY EXAMINATIONS (NON-CANCELLED) ==========
         try {
-            $xrayPatients = $xrayModel
-                ->select('id, patient_name as full_name, age, gender, MAX(exam_date) as last_visit, MIN(created_at) as created_at')
+            $xrayPatients = $diagnosticModel
+                ->select('id, patient_name as full_name, age, gender, MAX(request_date) as last_visit, MIN(created_at) as created_at')
+                ->where('type', DiagnosticRequestModel::TYPE_XRAY)
+                ->whereIn('status', ['pending', 'in_progress', 'completed', 'released'])
                 ->groupBy('patient_name')
                 ->orderBy('patient_name', 'ASC')
                 ->findAll();
@@ -835,16 +880,22 @@ class Admin extends BaseController
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
 
+        // The dashboard's approval panel links carry ?from=dashboard,
+        // so the user is returned to wherever they approved from.
+        $returnTo = $this->request->getGet('from') === 'dashboard'
+            ? base_url('admin/dashboard')
+            : base_url('admin/appointments');
+
         $model = new AppointmentModel();
         $appointment = $model->find($id);
 
         if (!$appointment) {
-            return redirect()->to(base_url('admin/appointments'))
+            return redirect()->to($returnTo)
                             ->with('error', 'Appointment not found');
         }
 
         if (in_array($appointment['status'], ['completed', 'cancelled', 'no_show'])) {
-            return redirect()->to(base_url('admin/appointments'))
+            return redirect()->to($returnTo)
                             ->with('error', 'This appointment cannot be approved');
         }
 
@@ -857,23 +908,32 @@ class Admin extends BaseController
         $patientModel = new PatientModel();
         $patient = $patientModel->findOrCreateFromAppointment($appointment);
 
+        $diagnosticModel = new DiagnosticRequestModel();
+
         // ===== LAB REQUEST =====
         $labServices = json_decode($appointment['lab_services'], true) ?? [];
         if (!empty($labServices)) {
-            $labRequestModel = new LabRequestModel();
-            $existing = $labRequestModel->where('appointment_id', $id)->first();
+            $existing = $diagnosticModel
+                ->where('appointment_id', $id)
+                ->where('type', DiagnosticRequestModel::TYPE_LAB)
+                ->first();
 
             if (!$existing) {
-                $examType = $this->formatLabServices($labServices);
+                $serviceList = $this->formatLabServices($labServices);
 
-                $labRequestModel->insert([
-                    'appointment_id' => $id,
-                    'patient_name' => $appointment['full_name'],
-                    'age' => $appointment['age'],
-                    'gender' => $appointment['gender'],
-                    'lab_services' => $examType,
-                    'request_date' => $appointment['appointment_date'],
-                    'status' => 'pending'
+                $diagnosticModel->insert([
+                    'reference_number' => 'LAB-' . date('y') . '-' . strtoupper(bin2hex(random_bytes(3))),
+                    'type'             => DiagnosticRequestModel::TYPE_LAB,
+                    'appointment_id'   => $id,
+                    'patient_name'     => $appointment['full_name'],
+                    'age'              => $appointment['age'],
+                    'gender'           => $appointment['gender'],
+                    'email'            => $appointment['email'] ?? null,
+                    'phone'            => $appointment['phone'] ?? null,
+                    'services'         => $serviceList,
+                    'request_date'     => $appointment['appointment_date'],
+                    'priority'         => 'routine',
+                    'status'           => DiagnosticRequestModel::STATUS_PENDING,
                 ]);
 
                 NotificationModel::notify(
@@ -889,21 +949,27 @@ class Admin extends BaseController
         // ===== X-RAY REQUEST =====
         $xrayServices = json_decode($appointment['xray_services'], true) ?? [];
         if (!empty($xrayServices)) {
-            $xrayModel = new XrayExaminationModel();
-            $existing = $xrayModel->where('appointment_id', $id)->first();
+            $existing = $diagnosticModel
+                ->where('appointment_id', $id)
+                ->where('type', DiagnosticRequestModel::TYPE_XRAY)
+                ->first();
 
             if (!$existing) {
                 $examType = $this->formatXrayServices($xrayServices);
 
-                $xrayModel->insert([
-                    'appointment_id' => $id,
-                    'patient_name' => $appointment['full_name'],
-                    'age' => $appointment['age'],
-                    'gender' => $appointment['gender'],
-                    'exam_type' => $examType,
-                    'exam_date' => $appointment['appointment_date'],
-                    'priority' => 'Routine',
-                    'status' => 'pending'
+                $diagnosticModel->insert([
+                    'reference_number' => 'XR-' . date('y') . '-' . strtoupper(bin2hex(random_bytes(3))),
+                    'type'             => DiagnosticRequestModel::TYPE_XRAY,
+                    'appointment_id'   => $id,
+                    'patient_name'     => $appointment['full_name'],
+                    'age'              => $appointment['age'],
+                    'gender'           => $appointment['gender'],
+                    'email'            => $appointment['email'] ?? null,
+                    'phone'            => $appointment['phone'] ?? null,
+                    'services'         => $examType,
+                    'request_date'     => $appointment['appointment_date'],
+                    'priority'         => 'Routine',
+                    'status'           => DiagnosticRequestModel::STATUS_PENDING,
                 ]);
 
                 NotificationModel::notify(
@@ -921,7 +987,7 @@ class Admin extends BaseController
             $message .= ' Patient Code: ' . $patient['patient_code'];
         }
 
-        return redirect()->to(base_url('admin/appointments'))
+        return redirect()->to($returnTo)
                         ->with('success', $message);
     }
 
@@ -998,7 +1064,7 @@ class Admin extends BaseController
         if ($redirect) return $redirect;
 
         $appointmentModel = new AppointmentModel();
-        $xrayModel = new XrayExaminationModel();
+        $diagnosticModel  = new DiagnosticRequestModel();
 
         $appointments = $appointmentModel
             ->where('status', 'approved')
@@ -1014,20 +1080,25 @@ class Admin extends BaseController
                 continue;
             }
 
-            $existing = $xrayModel->where('appointment_id', $appt['id'])->first();
+            $existing = $diagnosticModel
+                ->where('appointment_id', $appt['id'])
+                ->where('type', DiagnosticRequestModel::TYPE_XRAY)
+                ->first();
 
             if (!$existing) {
                 $examType = $this->formatXrayServices($xrayServices);
 
-                $xrayModel->insert([
-                    'appointment_id' => $appt['id'],
-                    'patient_name' => $appt['full_name'],
-                    'age' => $appt['age'],
-                    'gender' => $appt['gender'],
-                    'exam_type' => $examType,
-                    'exam_date' => $appt['appointment_date'],
-                    'priority' => 'Routine',
-                    'status' => 'pending'
+                $diagnosticModel->insert([
+                    'reference_number' => 'XR-' . date('y') . '-' . strtoupper(bin2hex(random_bytes(3))),
+                    'type'             => DiagnosticRequestModel::TYPE_XRAY,
+                    'appointment_id'   => $appt['id'],
+                    'patient_name'     => $appt['full_name'],
+                    'age'              => $appt['age'],
+                    'gender'           => $appt['gender'],
+                    'services'         => $examType,
+                    'request_date'     => $appt['appointment_date'],
+                    'priority'         => 'Routine',
+                    'status'           => DiagnosticRequestModel::STATUS_PENDING,
                 ]);
                 $created++;
             } else {
@@ -1045,7 +1116,7 @@ class Admin extends BaseController
         if ($redirect) return $redirect;
 
         $appointmentModel = new AppointmentModel();
-        $labRequestModel = new LabRequestModel();
+        $diagnosticModel  = new DiagnosticRequestModel();
 
         $appointments = $appointmentModel
             ->where('lab_services IS NOT NULL')
@@ -1067,19 +1138,25 @@ class Admin extends BaseController
                 continue;
             }
 
-            $existing = $labRequestModel->where('appointment_id', $appt['id'])->first();
+            $existing = $diagnosticModel
+                ->where('appointment_id', $appt['id'])
+                ->where('type', DiagnosticRequestModel::TYPE_LAB)
+                ->first();
 
             if (!$existing) {
                 $examType = $this->formatLabServices($labServices);
 
-                $labRequestModel->insert([
-                    'appointment_id' => $appt['id'],
-                    'patient_name' => $appt['full_name'],
-                    'age' => $appt['age'],
-                    'gender' => $appt['gender'],
-                    'lab_services' => $examType,
-                    'request_date' => $appt['appointment_date'],
-                    'status' => 'pending'
+                $diagnosticModel->insert([
+                    'reference_number' => 'LAB-' . date('y') . '-' . strtoupper(bin2hex(random_bytes(3))),
+                    'type'             => DiagnosticRequestModel::TYPE_LAB,
+                    'appointment_id'   => $appt['id'],
+                    'patient_name'     => $appt['full_name'],
+                    'age'              => $appt['age'],
+                    'gender'           => $appt['gender'],
+                    'services'         => $examType,
+                    'request_date'     => $appt['appointment_date'],
+                    'priority'         => 'routine',
+                    'status'           => DiagnosticRequestModel::STATUS_PENDING,
                 ]);
                 $created++;
             } else {
@@ -1095,46 +1172,69 @@ class Admin extends BaseController
 
     public function services()
     {
-        $redirect = $this->checkAuth();
-        if ($redirect) return $redirect;
+    $redirect = $this->checkAuth();
+    if ($redirect) return $redirect;
 
-        $serviceModel = new ServiceModel();
+    $serviceModel = new ServiceModel();
 
-        $perPage = 10;
-        $page = (int)($this->request->getGet('page') ?? 1);
-        if ($page < 1) $page = 1;
+    $perPage = 10;
+    $page = (int) ($this->request->getGet('page') ?? 1);
+    if ($page < 1) $page = 1;
+    $offset = ($page - 1) * $perPage;
+
+    /*
+     * Category filter. Accepts 'laboratory', 'xray', or 'other'.
+     * Anything else — including 'all' and empty string — is treated
+     * as "no filter". This is what makes the tabs on the services
+     * page actually narrow the list.
+     */
+    $categoryFilter = strtolower(trim((string) $this->request->getGet('category')));
+    $allowed        = ['laboratory', 'xray', 'other'];
+
+    if (!in_array($categoryFilter, $allowed, true)) {
+        $categoryFilter = null;
+    }
+
+    if ($categoryFilter !== null) {
+        $serviceModel->where('category', $categoryFilter);
+    }
+
+    $total      = $serviceModel->countAllResults(false);
+    $totalPages = max(1, (int) ceil($total / $perPage));
+
+    if ($page > $totalPages) {
+        $page   = $totalPages;
         $offset = ($page - 1) * $perPage;
+    }
 
-        $total = $serviceModel->countAll();
-        $totalPages = max(1, ceil($total / $perPage));
+    $services = $serviceModel
+        ->orderBy('category', 'ASC')
+        ->orderBy('service_name', 'ASC')
+        ->limit($perPage, $offset)
+        ->findAll();
 
-        if ($page > $totalPages) {
-            $page = $totalPages;
-            $offset = ($page - 1) * $perPage;
-        }
+    /*
+     * The category counts must always reflect the entire table,
+     * not the current filter. A fresh model instance is used so
+     * the where('category', ...) above does not carry over.
+     */
+    $counts = (new ServiceModel())->getCountByCategory();
 
-        $services = $serviceModel
-            ->orderBy('category', 'ASC')
-            ->orderBy('service_name', 'ASC')
-            ->limit($perPage, $offset)
-            ->findAll();
+    $data = [
+        'services'        => $services,
+        'total'           => $total,
+        'lab_count'       => $counts['laboratory'] ?? 0,
+        'xray_count'      => $counts['xray'] ?? 0,
+        'other_count'     => $counts['other'] ?? 0,
+        'currentPage'     => $page,
+        'perPage'         => $perPage,
+        'totalPages'      => $totalPages,
+        'startRow'        => $total > 0 ? $offset + 1 : 0,
+        'endRow'          => min($offset + $perPage, $total),
+        'active_category' => $categoryFilter ?? 'all',
+    ];
 
-        $counts = $serviceModel->getCountByCategory();
-
-        $data = [
-            'services' => $services,
-            'total' => $total,
-            'lab_count' => $counts['laboratory'] ?? 0,
-            'xray_count' => $counts['xray'] ?? 0,
-            'other_count' => $counts['other'] ?? 0,
-            'currentPage' => $page,
-            'perPage' => $perPage,
-            'totalPages' => $totalPages,
-            'startRow' => $offset + 1,
-            'endRow' => min($offset + $perPage, $total)
-        ];
-
-        return view('Admin/services', $data);
+    return view('Admin/services', $data);
     }
 
     public function createService()
@@ -1242,5 +1342,454 @@ class Admin extends BaseController
 
         return redirect()->to(base_url('admin/services'))
                         ->with('success', 'Service status updated successfully!');
+    }
+
+    // =============================================
+    // DIAGNOSTIC REQUESTS
+    // Same queue the receptionist handles at the front desk, exposed
+    // here so an administrator can create, adjust, and print requests
+    // without leaving the admin area.
+    // =============================================
+
+    public function diagnosticRequests()
+    {
+        $redirect = $this->checkAuth();
+        if ($redirect) return $redirect;
+
+        $diagnosticModel = new DiagnosticRequestModel();
+        $serviceModel    = new ServiceModel();
+
+        /*
+         * All diagnostic rows live in one table now. A single query
+         * returns every request, and each row carries its own type.
+         * The view and the client script read the same shape as before.
+         */
+        $rows = $diagnosticModel
+            ->orderBy('created_at', 'DESC')
+            ->findAll();
+
+        $requests = [];
+        foreach ($rows as $row) {
+            $requests[] = $this->buildDiagnosticRow($row, $row['type'] ?? 'lab');
+        }
+
+        $counts = [
+            'total'       => count($requests),
+            'pending'     => 0,
+            'processing'  => 0,
+            'completed'   => 0,
+            'released'    => 0,
+            'cancelled'   => 0,
+        ];
+        foreach ($requests as $r) {
+            $s = $r['status'] ?? 'pending';
+            if ($s === 'in_progress') { $s = 'processing'; }
+            if (isset($counts[$s])) { $counts[$s]++; }
+        }
+
+        $data = [
+            'requests'     => $requests,
+            'counts'       => $counts,
+            'labServices'  => $serviceModel->where('category', 'laboratory')
+                                           ->where('is_active', 1)
+                                           ->orderBy('service_name', 'ASC')
+                                           ->findAll(),
+            'xrayServices' => $serviceModel->where('category', 'xray')
+                                           ->where('is_active', 1)
+                                           ->orderBy('service_name', 'ASC')
+                                           ->findAll(),
+        ];
+
+        return view('Admin/diagnostic_requests', $data);
+    }
+
+    /**
+     * Reduce one diagnostic_requests row to the shape the view expects.
+     *
+     * Source is derived from the appointment_id foreign key, the same
+     * way the receptionist controller does it. A populated appointment_id
+     * means the request came from an approved online booking; zero or
+     * NULL means it was created by hand at the front desk.
+     *
+     * The DiagnosticRequestModel decorates each row with both the new
+     * (services) and the legacy (lab_services / exam_type) column
+     * names, so this method doesn't need to know which side the row
+     * originally came from.
+     */
+    private function buildDiagnosticRow(array $row, string $type): array
+    {
+        if ($type === 'xray') {
+            $servicesRaw = $row['services'] ?? $row['exam_type'] ?? '';
+            $requestType = 'X-Ray';
+            $priority    = $row['priority'] ?? 'Routine';
+        } else {
+            $servicesRaw = $row['services'] ?? $row['lab_services'] ?? '';
+            $requestType = 'Laboratory';
+            $priority    = $row['priority'] ?? 'routine';
+        }
+
+        $services = $this->splitServices($servicesRaw);
+        $isStat   = strtolower((string) $priority) === 'stat';
+
+        return [
+            'id'             => $row['id'] ?? 0,
+            'type'           => $type,
+            'reference'      => $this->diagnosticReference($row, $type),
+            'patient_name'   => $row['patient_name'] ?? 'Unknown',
+            'patient_age'    => $row['age'] ?? '',
+            'patient_gender' => $row['gender'] ?? '',
+            'request_type'   => $requestType,
+            'source'         => !empty($row['appointment_id']) ? 'Online' : 'Walk-in',
+            'status'         => $row['status'] ?? 'pending',
+            'priority'       => $isStat ? 'stat' : 'routine',
+            'doctor_name'    => $row['doctor_name'] ?? '',
+            'phone'          => $row['phone'] ?? '',
+            'email'          => $row['email'] ?? '',
+            'services'       => $services,
+            'created_at'     => $row['created_at'] ?? null,
+            'updated_at'     => $row['updated_at'] ?? null,
+            'released_at'    => $row['released_at'] ?? null,
+            'findings'       => $row['findings'] ?? '',
+            'interpretation' => $row['interpretation'] ?? '',
+            'remarks'        => $row['remarks'] ?? '',
+        ];
+    }
+
+    private function splitServices($raw): array
+    {
+        if (is_array($raw)) {
+            return array_values(array_filter(array_map('trim', $raw)));
+        }
+        if (!is_string($raw) || trim($raw) === '') {
+            return [];
+        }
+        return array_values(array_filter(array_map('trim', explode(',', $raw))));
+    }
+
+    private function diagnosticReference(array $row, string $type): string
+    {
+        if (!empty($row['reference_number'])) {
+            return (string) $row['reference_number'];
+        }
+        $prefix = $type === 'xray' ? 'XR' : 'LAB';
+        $year   = !empty($row['created_at']) ? date('y', strtotime($row['created_at'])) : date('y');
+        return $prefix . '-' . $year . '-' . str_pad((string) ($row['id'] ?? 0), 4, '0', STR_PAD_LEFT);
+    }
+
+    public function createDiagnosticRequest()
+    {
+    $redirect = $this->checkAuth();
+    if ($redirect) return $redirect;
+
+    $post = $this->request->getPost();
+
+    $errors = [];
+
+    if (trim((string) ($post['patient_name'] ?? '')) === '') {
+        $errors[] = 'Patient name is required.';
+    }
+    if (!is_numeric($post['age'] ?? null) || (int) $post['age'] < 0 || (int) $post['age'] > 130) {
+        $errors[] = 'Age must be a number between 0 and 130.';
+    }
+    if (!in_array($post['gender'] ?? '', ['Male', 'Female'], true)) {
+        $errors[] = 'Sex must be Male or Female.';
+    }
+    if (!in_array($post['request_type'] ?? '', ['lab', 'xray'], true)) {
+        $errors[] = 'Select Laboratory or X-Ray as the request type.';
+    }
+    $services = $post['services'] ?? [];
+    if (!is_array($services) || count(array_filter($services)) === 0) {
+        $errors[] = 'Select at least one service.';
+    }
+
+    if (!empty($errors)) {
+        return redirect()->back()
+                         ->withInput()
+                         ->with('validation_errors', $errors);
+    }
+
+    $requestType = $post['request_type'];
+    $serviceList = implode(', ', array_map('trim', (array) $services));
+    $priority    = ($post['priority'] ?? 'routine') === 'stat' ? 'stat' : 'routine';
+    $patientName = trim((string) $post['patient_name']);
+    $age         = (int) $post['age'];
+    $gender      = (string) $post['gender'];
+    $doctor      = trim((string) ($post['doctor_name'] ?? ''));
+    $phone       = trim((string) ($post['phone'] ?? ''));
+    $email       = trim((string) ($post['email'] ?? ''));
+    $today       = date('Y-m-d');
+
+    // ===== CREATE OR REUSE PATIENT RECORD =====
+    // This is the step the admin path was missing. It matches the
+    // receptionist's logic so both create the same patient row with
+    // a generated patient_code.
+    $patientModel = new PatientModel();
+    $patientCode  = null;
+
+    try {
+        $existingPatient = null;
+
+        // 1. Match by email (most reliable)
+        if (!empty($email)) {
+            $existingPatient = $patientModel->where('email', $email)->first();
+        }
+
+        // 2. Match by name + age + gender
+        if (!$existingPatient) {
+            $existingPatient = $patientModel->where('full_name', $patientName)
+                                            ->where('age', $age)
+                                            ->where('gender', $gender)
+                                            ->first();
+        }
+
+        // 3. Match by phone, but only if name/age/gender also line up
+        if (!$existingPatient && !empty($phone)) {
+            $byPhone = $patientModel->where('phone', $phone)->first();
+
+            if ($byPhone
+                && $byPhone['full_name'] === $patientName
+                && (int) $byPhone['age'] === $age
+                && $byPhone['gender'] === $gender) {
+                $existingPatient = $byPhone;
+            }
+        }
+
+        if ($existingPatient) {
+            // Fill in any blank fields on the existing record.
+            $updates = [];
+            if (empty($existingPatient['email']) && !empty($email)) {
+                $updates['email'] = $email;
+            }
+            if (empty($existingPatient['phone']) && !empty($phone)) {
+                $updates['phone'] = $phone;
+            }
+            if (($existingPatient['source'] ?? '') !== 'walk-in') {
+                $updates['source'] = 'walk-in';
+            }
+            if (!empty($updates)) {
+                $patientModel->update($existingPatient['id'], $updates);
+            }
+
+            $patient     = $patientModel->find($existingPatient['id']);
+            $patientCode = $patient['patient_code'] ?? null;
+        } else {
+            // New patient — generate a code and insert.
+            $newCode = $patientModel->generatePatientCode();
+
+            $patientModel->insert([
+                'patient_code' => $newCode,
+                'full_name'    => $patientName,
+                'email'        => $email !== '' ? $email : null,
+                'phone'        => $phone !== '' ? $phone : null,
+                'age'          => $age,
+                'gender'       => $gender,
+                'source'       => 'walk-in',
+            ]);
+
+            $patientCode = $newCode;
+        }
+    } catch (\Exception $e) {
+        log_message('error', 'Admin walk-in patient creation failed: ' . $e->getMessage());
+        // Continue without a patient code rather than failing the request.
+    }
+
+    // ===== CREATE THE DIAGNOSTIC REQUEST =====
+    try {
+        $model = new DiagnosticRequestModel();
+
+        $prefix = $requestType === 'xray' ? 'XR' : 'LAB';
+
+        $model->insert([
+            'reference_number' => $prefix . '-' . date('y') . '-' . strtoupper(bin2hex(random_bytes(3))),
+            'type'             => $requestType,
+            'appointment_id'   => 0,
+            'patient_name'     => $patientName,
+            'patient_code'     => $patientCode,   // <- now populated
+            'age'              => $age,
+            'gender'           => $gender,
+            'email'            => $email !== '' ? $email : null,
+            'phone'            => $phone !== '' ? $phone : null,
+            'services'         => $serviceList,
+            'request_date'     => $today,
+            'doctor_name'      => $doctor,
+            'priority'         => $requestType === 'xray'
+                                    ? ($priority === 'stat' ? 'STAT' : 'Routine')
+                                    : $priority,
+            'status'           => DiagnosticRequestModel::STATUS_PENDING,
+        ]);
+
+        NotificationModel::dispatch(
+            $requestType,
+            $requestType === 'lab' ? 'New Laboratory Request' : 'New X-Ray Request',
+            'New ' . ($requestType === 'lab' ? 'laboratory' : 'x-ray') . ' request for ' . $patientName,
+            null,
+            null,
+            true,
+            $gender
+        );
+
+    } catch (\Exception $e) {
+        log_message('error', 'Create diagnostic request error: ' . $e->getMessage());
+        return redirect()->back()->withInput()->with('error', 'Could not create the request.');
+    }
+
+    return redirect()->to(base_url('admin/diagnostic-requests'))
+                     ->with('success', 'Diagnostic request created.');
+    }
+
+    public function updateDiagnosticStatus($id, $type, $status)
+    {
+        $redirect = $this->checkAuth();
+        if ($redirect) return $redirect;
+
+        $type   = strtolower((string) $type);
+        $status = strtolower((string) $status);
+
+        if (!in_array($type, ['lab', 'xray'], true)) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Unknown request type.']);
+        }
+        if (!in_array($status, ['pending', 'in_progress', 'completed', 'released', 'cancelled'], true)) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Unknown status.']);
+        }
+
+        try {
+            $model = new DiagnosticRequestModel();
+
+            $row = $model
+                ->where('id', (int) $id)
+                ->where('type', $type)
+                ->first();
+
+            if (!$row) {
+                return $this->response->setJSON(['success' => false, 'message' => 'Request not found.']);
+            }
+
+            $update = ['status' => $status];
+            if ($status === 'released') {
+                $update['released_at'] = date('Y-m-d H:i:s');
+            }
+
+            $model->update((int) $id, $update);
+
+            return $this->response->setJSON(['success' => true, 'message' => 'Status updated.']);
+
+        } catch (\Exception $e) {
+            log_message('error', 'Update diagnostic status error: ' . $e->getMessage());
+            return $this->response->setJSON(['success' => false, 'message' => 'Could not update the status.']);
+        }
+    }
+
+    public function deleteDiagnosticRequest($id, $type)
+    {
+        $redirect = $this->checkAuth();
+        if ($redirect) return $redirect;
+
+        $type = strtolower((string) $type);
+        if (!in_array($type, ['lab', 'xray'], true)) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Unknown request type.']);
+        }
+
+        try {
+            $model = new DiagnosticRequestModel();
+
+            $row = $model
+                ->where('id', (int) $id)
+                ->where('type', $type)
+                ->first();
+
+            if (!$row) {
+                return $this->response->setJSON(['success' => false, 'message' => 'Request not found.']);
+            }
+
+            $model->delete((int) $id);
+
+            return $this->response->setJSON(['success' => true, 'message' => 'Request deleted.']);
+
+        } catch (\Exception $e) {
+            log_message('error', 'Delete diagnostic request error: ' . $e->getMessage());
+            return $this->response->setJSON(['success' => false, 'message' => 'Could not delete the request.']);
+        }
+    }
+
+    public function getRequestDetails($id, $type)
+    {
+        $redirect = $this->checkAuth();
+        if ($redirect) return $redirect;
+
+        $type = strtolower((string) $type);
+        if (!in_array($type, ['lab', 'xray'], true)) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Unknown request type.']);
+        }
+
+        try {
+            $model = new DiagnosticRequestModel();
+
+            $row = $model
+                ->where('id', (int) $id)
+                ->where('type', $type)
+                ->first();
+
+            if (!$row) {
+                return $this->response->setJSON(['success' => false, 'message' => 'Request not found.']);
+            }
+
+            $data = [
+                'patient_name'   => $row['patient_name'] ?? '',
+                'age'            => $row['age'] ?? '',
+                'gender'         => $row['gender'] ?? '',
+                'phone'          => $row['phone'] ?? '',
+                'email'          => $row['email'] ?? '',
+                'doctor_name'    => $row['doctor_name'] ?? '',
+                'source'         => !empty($row['appointment_id']) ? 'Online' : 'Walk-in',
+                'status'         => $row['status'] ?? 'pending',
+                'priority'       => $row['priority'] ?? 'routine',
+                'services'       => $row['services'] ?? '',
+                'created_at'     => $row['created_at'] ?? null,
+                'updated_at'     => $row['updated_at'] ?? null,
+                'released_at'    => $row['released_at'] ?? null,
+                'findings'       => $row['findings'] ?? '',
+                'interpretation' => $row['interpretation'] ?? '',
+                'remarks'        => $row['remarks'] ?? '',
+                'patient_code'   => $row['patient_code'] ?? null,
+            ];
+
+            return $this->response->setJSON(['success' => true, 'data' => $data]);
+
+        } catch (\Exception $e) {
+            log_message('error', 'Get request details error: ' . $e->getMessage());
+            return $this->response->setJSON(['success' => false, 'message' => 'Could not load the request.']);
+        }
+    }
+
+    public function printRequest($id, $type)
+    {
+        $redirect = $this->checkAuth();
+        if ($redirect) return $redirect;
+
+        $type = strtolower((string) $type);
+        if (!in_array($type, ['lab', 'xray'], true)) {
+            return redirect()->to(base_url('admin/diagnostic-requests'));
+        }
+
+        $model = new DiagnosticRequestModel();
+
+        $row = $model
+            ->where('id', (int) $id)
+            ->where('type', $type)
+            ->first();
+
+        if (!$row) {
+            return redirect()->to(base_url('admin/diagnostic-requests'))
+                             ->with('error', 'Request not found.');
+        }
+
+        /*
+         * The print view already handles both types. It reads a `type`
+         * key from the row, so add it here rather than duplicating the
+         * print template.
+         */
+        $row['type'] = $type;
+
+        return view('Receptionist/print_request', ['request' => $row, 'type' => $type]);
     }
 }

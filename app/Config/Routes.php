@@ -31,12 +31,21 @@ $routes->group('admin', ['filter' => 'auth:admin'], function ($routes) {
     $routes->get('appointment/complete/(:num)', 'Admin::completeAppointment/$1');
     $routes->get('appointment/delete/(:num)', 'Admin::deleteAppointment/$1');
 
+    // Diagnostic requests
+    $routes->get('diagnostic-requests', 'Admin::diagnosticRequests');
+    $routes->post('create-diagnostic-request', 'Admin::createDiagnosticRequest');
+    $routes->post('update-diagnostic-status/(:num)/(:any)/(:any)', 'Admin::updateDiagnosticStatus/$1/$2/$3');
+    $routes->delete('delete-diagnostic-request/(:num)/(:any)', 'Admin::deleteDiagnosticRequest/$1/$2');
+    $routes->get('get-request-details/(:num)/(:any)', 'Admin::getRequestDetails/$1/$2');
+    $routes->get('print-request/(:num)/(:any)', 'Admin::printRequest/$1/$2');
+
     // Notifications
     $routes->get('notifications', 'NotificationController::index');
     $routes->get('notifications/fetch', 'NotificationController::fetch');
     $routes->get('notifications/mark-read/(:num)', 'NotificationController::markRead/$1');
     $routes->get('notifications/mark-all-read', 'NotificationController::markAllRead');
     $routes->get('notifications/delete/(:num)', 'NotificationController::delete/$1');
+    $routes->post('notifications/delete-batch', 'NotificationController::deleteBatch');
 
     // Services
     $routes->get('services', 'Admin::services');
@@ -78,6 +87,7 @@ $routes->group('receptionist', ['filter' => 'auth:receptionist'], function ($rou
     $routes->get('notifications/mark-read/(:num)', 'NotificationController::receptionistMarkRead/$1');
     $routes->get('notifications/mark-all-read', 'NotificationController::receptionistMarkAllRead');
     $routes->get('notifications/delete/(:num)', 'NotificationController::receptionistDelete/$1');
+    $routes->post('notifications/delete-batch', 'NotificationController::deleteBatch');
 
     // Diagnostic requests
     $routes->get('diagnostic-requests', 'Receptionist::diagnosticRequests');
@@ -113,13 +123,12 @@ $routes->group('radiologist', ['filter' => 'auth:radiologist'], function ($route
     $routes->get('examination/print/(:num)', 'Radiologist::printResult/$1');
 
     // Notifications
-    // CHANGED: was 'Radiologist::notifications', which skipped the
-    // role scoping and queried a user_role column that did not exist.
     $routes->get('notifications', 'NotificationController::radiologistIndex');
     $routes->get('notifications/fetch', 'NotificationController::radiologistFetch');
     $routes->get('notifications/mark-read/(:num)', 'NotificationController::radiologistMarkRead/$1');
     $routes->get('notifications/mark-all-read', 'NotificationController::radiologistMarkAllRead');
     $routes->get('notifications/delete/(:num)', 'NotificationController::radiologistDelete/$1');
+    $routes->post('notifications/delete-batch', 'NotificationController::deleteBatch');
 });
 
 
@@ -141,12 +150,12 @@ $routes->group('medtech', ['filter' => 'auth:med_tech'], function ($routes) {
     $routes->get('template/(:any)', 'MedTech::getTemplate/$1');
 
     // Notifications
-    // CHANGED: was 'MedTech::notifications'.
     $routes->get('notifications', 'NotificationController::medtechIndex');
     $routes->get('notifications/fetch', 'NotificationController::medtechFetch');
     $routes->get('notifications/mark-read/(:num)', 'NotificationController::medtechMarkRead/$1');
     $routes->get('notifications/mark-all-read', 'NotificationController::medtechMarkAllRead');
     $routes->get('notifications/delete/(:num)', 'NotificationController::medtechDelete/$1');
+    $routes->post('notifications/delete-batch', 'NotificationController::deleteBatch');
 });
 
 

@@ -3,7 +3,7 @@
 namespace App\Controllers;
 
 use App\Models\AppointmentModel;
-use App\Models\LabRequestModel;
+use App\Models\DiagnosticRequestModel;
 use App\Models\LabResultModel;
 use App\Models\NotificationModel;
 use App\Models\UserModel;
@@ -30,6 +30,24 @@ class MedTech extends BaseController
         return null;
     }
 
+    /**
+     * Statuses the MedTech is allowed to see in their worklist.
+     *
+     * 'pending' is deliberately excluded. A walk-in request created
+     * by the receptionist stays in the front-desk queue until they
+     * press Start, which flips the status to 'in_progress'. Only at
+     * that point does the request appear in the lab.
+     */
+    private function departmentStatuses(): array
+    {
+        return [
+            DiagnosticRequestModel::STATUS_IN_PROGRESS,
+            DiagnosticRequestModel::STATUS_DRAFT,
+            DiagnosticRequestModel::STATUS_COMPLETED,
+            DiagnosticRequestModel::STATUS_RELEASED,
+        ];
+    }
+
     // =============================================
     // DASHBOARD
     // =============================================
@@ -38,30 +56,63 @@ class MedTech extends BaseController
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
 
-        $labRequestModel = new LabRequestModel();
+        $labRequestModel = new DiagnosticRequestModel();
         $labResultModel  = new LabResultModel();
+        $type            = DiagnosticRequestModel::TYPE_LAB;
 
-        $data['counts'] = $labRequestModel->getCounts();
+        $data['counts'] = $labRequestModel->getCounts($type);
 
         $perPage = 5;
         $page    = $this->request->getGet('page') ?? 1;
         $offset  = ($page - 1) * $perPage;
 
+        $departmentStatuses = $this->departmentStatuses();
+
+        $labRequestModel->resetQuery();
         $data['allRequests'] = $labRequestModel
+            ->where('type', $type)
+            ->whereIn('status', $departmentStatuses)
             ->orderBy('created_at', 'DESC')
             ->limit($perPage, $offset)
             ->findAll();
 
-        $data['totalRequests']   = $labRequestModel->countAll();
-        $data['currentPage']     = (int) $page;
-        $data['perPage']         = $perPage;
-        $data['totalPages']      = ceil($data['totalRequests'] / $perPage);
-        $data['pendingRequests'] = $labRequestModel->getPendingRequests();
-        $data['recentRequests']  = $labRequestModel->getRequests(null, 10);
+        $labRequestModel->resetQuery();
+        $data['totalRequests'] = $labRequestModel
+            ->where('type', $type)
+            ->whereIn('status', $departmentStatuses)
+            ->countAllResults();
 
+        $data['currentPage'] = (int) $page;
+        $data['perPage']     = $perPage;
+        $data['totalPages']  = ceil($data['totalRequests'] / $perPage);
+
+        // "Pending" on the MedTech side means sent to the lab but not
+        // started here yet. That is in_progress and draft, not the raw
+        // pending state.
+        $labRequestModel->resetQuery();
+        $data['pendingRequests'] = $labRequestModel
+            ->where('type', $type)
+            ->whereIn('status', [
+                DiagnosticRequestModel::STATUS_IN_PROGRESS,
+                DiagnosticRequestModel::STATUS_DRAFT,
+            ])
+            ->orderBy('request_date', 'ASC')
+            ->orderBy('created_at', 'ASC')
+            ->findAll();
+
+        $labRequestModel->resetQuery();
+        $data['recentRequests'] = $labRequestModel
+            ->where('type', $type)
+            ->whereIn('status', $departmentStatuses)
+            ->orderBy('created_at', 'DESC')
+            ->limit(10)
+            ->findAll();
+
+        $labRequestModel->resetQuery();
         $data['todayCompleted'] = $labRequestModel
+            ->where('type', $type)
             ->where('DATE(updated_at)', date('Y-m-d'))
-            ->where('status', LabRequestModel::STATUS_COMPLETED)
+            ->where('status', DiagnosticRequestModel::STATUS_COMPLETED)
             ->countAllResults();
 
         $data['intakeData']     = $this->getHourlyIntake($labRequestModel);
@@ -76,6 +127,7 @@ class MedTech extends BaseController
         $today  = date('Y-m-d');
         $hours  = [];
         $counts = [];
+        $type   = DiagnosticRequestModel::TYPE_LAB;
 
         for ($h = 0; $h <= 23; $h++) {
             $hourStr = str_pad($h, 2, '0', STR_PAD_LEFT) . ':00';
@@ -84,7 +136,9 @@ class MedTech extends BaseController
             $startTime = $today . ' ' . str_pad($h, 2, '0', STR_PAD_LEFT) . ':00:00';
             $endTime   = $today . ' ' . str_pad($h, 2, '0', STR_PAD_LEFT) . ':59:59';
 
+            $labRequestModel->resetQuery();
             $count = $labRequestModel
+                ->where('type', $type)
                 ->where('DATE(created_at)', $today)
                 ->where('TIME(created_at) >=', date('H:i:s', strtotime($startTime)))
                 ->where('TIME(created_at) <=', date('H:i:s', strtotime($endTime)))
@@ -101,8 +155,12 @@ class MedTech extends BaseController
 
     private function getSectionBreakdown($labRequestModel)
     {
-        $today    = date('Y-m-d');
+        $today = date('Y-m-d');
+        $type  = DiagnosticRequestModel::TYPE_LAB;
+
+        $labRequestModel->resetQuery();
         $requests = $labRequestModel
+            ->where('type', $type)
             ->where('DATE(created_at)', $today)
             ->findAll();
 
@@ -193,9 +251,12 @@ class MedTech extends BaseController
         ];
 
         $result = [];
+        $type   = DiagnosticRequestModel::TYPE_LAB;
 
+        $labRequestModel->resetQuery();
         $releasedRequests = $labRequestModel
-            ->where('status', LabRequestModel::STATUS_RELEASED)
+            ->where('type', $type)
+            ->where('status', DiagnosticRequestModel::STATUS_RELEASED)
             ->where('released_at IS NOT NULL')
             ->findAll();
 
@@ -280,12 +341,35 @@ class MedTech extends BaseController
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
 
-        $labRequestModel = new LabRequestModel();
+        $labRequestModel = new DiagnosticRequestModel();
         $status          = $this->request->getGet('status');
+        $type            = DiagnosticRequestModel::TYPE_LAB;
 
-        $data['requests']      = $labRequestModel->getRequests($status);
+        $departmentStatuses = $this->departmentStatuses();
+
+        // If the user selected a department-facing status, honour it.
+        // Otherwise list everything the lab has been sent, which is
+        // all statuses except 'pending' and 'cancelled'.
+        if ($status !== null && $status !== '' && in_array($status, $departmentStatuses, true)) {
+            $labRequestModel->resetQuery();
+            $data['requests'] = $labRequestModel
+                ->where('type', $type)
+                ->where('status', $status)
+                ->orderBy('request_date', 'DESC')
+                ->orderBy('created_at', 'DESC')
+                ->findAll();
+        } else {
+            $labRequestModel->resetQuery();
+            $data['requests'] = $labRequestModel
+                ->where('type', $type)
+                ->whereIn('status', $departmentStatuses)
+                ->orderBy('request_date', 'DESC')
+                ->orderBy('created_at', 'DESC')
+                ->findAll();
+        }
+
         $data['currentStatus'] = $status;
-        $data['counts']        = $labRequestModel->getCounts();
+        $data['counts']        = $labRequestModel->getCounts($type);
 
         return view('MedTech/requests', $data);
     }
@@ -298,7 +382,7 @@ class MedTech extends BaseController
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
 
-        $labRequestModel  = new LabRequestModel();
+        $labRequestModel  = new DiagnosticRequestModel();
         $labResultModel   = new LabResultModel();
         $appointmentModel = new AppointmentModel();
 
@@ -353,7 +437,7 @@ class MedTech extends BaseController
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
 
-        $labRequestModel = new LabRequestModel();
+        $labRequestModel = new DiagnosticRequestModel();
         $labResultModel  = new LabResultModel();
 
         $request = $labRequestModel->find($id);
@@ -382,7 +466,7 @@ class MedTech extends BaseController
         }
 
         $labResultModel->saveResults($id, $resultData, false);
-        $labRequestModel->update($id, ['status' => LabRequestModel::STATUS_IN_PROGRESS]);
+        $labRequestModel->update($id, ['status' => DiagnosticRequestModel::STATUS_IN_PROGRESS]);
 
         return redirect()->to(base_url('medtech/request/view/' . $id))
                         ->with('success', 'Results saved successfully!');
@@ -396,7 +480,7 @@ class MedTech extends BaseController
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
 
-        $labRequestModel = new LabRequestModel();
+        $labRequestModel = new DiagnosticRequestModel();
         $request         = $labRequestModel->find($id);
 
         if (!$request) {
@@ -408,9 +492,9 @@ class MedTech extends BaseController
         $remarks  = $this->request->getPost('remarks');
         $action   = $this->request->getPost('action') ?? 'save';
 
-        $status = LabRequestModel::STATUS_DRAFT;
+        $status = DiagnosticRequestModel::STATUS_DRAFT;
         if ($action === 'complete') {
-            $status = LabRequestModel::STATUS_COMPLETED;
+            $status = DiagnosticRequestModel::STATUS_COMPLETED;
         }
 
         $labRequestModel->update($id, [
@@ -435,7 +519,7 @@ class MedTech extends BaseController
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
 
-        $labRequestModel = new LabRequestModel();
+        $labRequestModel = new DiagnosticRequestModel();
         $labResultModel  = new LabResultModel();
 
         $request = $labRequestModel->find($id);
@@ -449,7 +533,7 @@ class MedTech extends BaseController
             return redirect()->back()->with('error', 'Please enter test results first');
         }
 
-        $labRequestModel->updateStatus($id, LabRequestModel::STATUS_RELEASED);
+        $labRequestModel->updateStatus($id, DiagnosticRequestModel::STATUS_RELEASED);
 
         NotificationModel::notify(
             'lab',
@@ -471,7 +555,7 @@ class MedTech extends BaseController
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
 
-        $labRequestModel = new LabRequestModel();
+        $labRequestModel = new DiagnosticRequestModel();
         $labResultModel  = new LabResultModel();
 
         $request = $labRequestModel->find($id);
@@ -543,16 +627,16 @@ class MedTech extends BaseController
         $replaceAll = ($action === 'release');
         $labResultModel->saveResults($id, $resultData, $replaceAll);
 
-        $status = LabRequestModel::STATUS_DRAFT;
+        $status = DiagnosticRequestModel::STATUS_DRAFT;
         $update = [
             'findings' => $findings,
             'remarks'  => $remarks,
         ];
 
         if ($action === 'complete') {
-            $status = LabRequestModel::STATUS_COMPLETED;
+            $status = DiagnosticRequestModel::STATUS_COMPLETED;
         } elseif ($action === 'release') {
-            $status = LabRequestModel::STATUS_RELEASED;
+            $status = DiagnosticRequestModel::STATUS_RELEASED;
             $update['released_at'] = date('Y-m-d H:i:s');
         }
 
@@ -589,7 +673,7 @@ class MedTech extends BaseController
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
 
-        $labRequestModel  = new LabRequestModel();
+        $labRequestModel  = new DiagnosticRequestModel();
         $labResultModel   = new LabResultModel();
         $appointmentModel = new AppointmentModel();
         $userModel        = new UserModel();
@@ -603,24 +687,6 @@ class MedTech extends BaseController
         $data['appointment'] = $appointmentModel->find($data['request']['appointment_id']);
         $data['results']     = $labResultModel->getByRequest($id);
 
-        /*
-         * Signature row data.
-         *
-         * The print view shows three signatures:
-         *   - the technologist who prepared the report (the current user)
-         *   - a second technologist column (blank by design; signed by hand)
-         *   - the pathologist who reviewed the report
-         *
-         * The technologist is read from the current session's user record
-         * so their PRC license number appears under their name.
-         *
-         * The pathologist is not a system user in this build, so the
-         * column falls back to the requesting doctor's name with a blank
-         * PRC line. If you add a 'pathologist' role to the users table,
-         * swap the null for a lookup:
-         *
-         *     $data['pathologistUser'] = $userModel->where('role', 'pathologist')->first();
-         */
         $currentUserId = (int) session()->get('user_id');
 
         $data['technologistUser'] = $currentUserId > 0
@@ -661,10 +727,11 @@ class MedTech extends BaseController
         if ($redirect) return $redirect;
 
         try {
-            $labRequestModel  = new LabRequestModel();
+            $labRequestModel  = new DiagnosticRequestModel();
             $appointmentModel = new AppointmentModel();
+            $type             = DiagnosticRequestModel::TYPE_LAB;
 
-            $counts    = $labRequestModel->getCounts();
+            $counts    = $labRequestModel->getCounts($type);
             $data['counts'] = [
                 'pending'     => $counts['pending']     ?? 0,
                 'in_progress' => $counts['in_progress'] ?? 0,
@@ -678,9 +745,20 @@ class MedTech extends BaseController
                         + $data['counts']['draft']   + $data['counts']['completed']
                         + $data['counts']['released'];
             $data['totalCount'] = $totalCount > 0 ? $totalCount : 1;
-            $data['requests']   = $labRequestModel->getRequests() ?? [];
 
+            // Same rule as the requests page — reports cover only rows
+            // that have actually reached the department.
+            $labRequestModel->resetQuery();
+            $data['requests'] = $labRequestModel
+                ->where('type', $type)
+                ->whereIn('status', $this->departmentStatuses())
+                ->orderBy('request_date', 'DESC')
+                ->orderBy('created_at', 'DESC')
+                ->findAll();
+
+            $labRequestModel->resetQuery();
             $monthlyStats = $labRequestModel
+                ->where('type', $type)
                 ->select('DATE_FORMAT(created_at, "%Y-%m") as month, COUNT(*) as total, status')
                 ->groupBy('month, status')
                 ->orderBy('month', 'DESC')
@@ -718,7 +796,10 @@ class MedTech extends BaseController
                 ->where('lab_services !=', 'null')
                 ->countAllResults();
 
+            $labRequestModel->resetQuery();
             $recentReports = $labRequestModel
+                ->where('type', $type)
+                ->whereIn('status', $this->departmentStatuses())
                 ->orderBy('created_at', 'DESC')
                 ->limit(10)
                 ->findAll();

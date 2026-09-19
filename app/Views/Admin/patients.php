@@ -4,910 +4,1065 @@
 
 <?= $this->section('adminContent') ?>
 
-<div class="patients-container">
+<?php
+    $patients = (isset($patients) && is_array($patients)) ? $patients : [];
 
-    <!-- ===== PAGE HEADER ===== -->
-    <div class="page-header">
+    /* Counts computed once so the tabs and the stat cards use the
+       same numbers the table was rendered with. */
+    $onlineCount  = 0;
+    $walkinCount  = 0;
+    $activeCount  = 0;
+    $inactiveCount = 0;
+
+    foreach ($patients as $p) {
+        $src = strtolower((string) ($p['source'] ?? ''));
+        if (strpos($src, 'walk-in') !== false) { $walkinCount++; }
+        elseif (strpos($src, 'online') !== false) { $onlineCount++; }
+
+        $lastVisit = $p['last_visit'] ?? $p['created_at'] ?? null;
+        if ($lastVisit && strtotime($lastVisit) > strtotime('-30 days')) {
+            $activeCount++;
+        } else {
+            $inactiveCount++;
+        }
+    }
+
+    $initialsOf = static function ($name) {
+        $parts = preg_split('/\s+/', trim((string) $name));
+        $first = mb_substr($parts[0] ?? '', 0, 1);
+        $last  = count($parts) > 1 ? mb_substr(end($parts), 0, 1) : '';
+        return mb_strtoupper($first . $last);
+    };
+
+    /* PNG avatar filenames inside public/assets/images/. */
+    $maleAvatar   = 'man-avatar.png';
+    $femaleAvatar = 'woman-avatar.png';
+
+    /* PNG stat-card icon filenames. */
+    $statIcons = [
+        'total'  => 'multiple-users-silhouette.png',
+        'online' => 'worldwide.png',
+        'walkin' => 'walk.png',
+    ];
+?>
+
+<div class="pt">
+
+    <!-- PAGE HEADER -->
+    <header class="pt-head">
         <div>
-            <h4 class="page-title">Patient Management</h4>
-            <p class="page-subtitle">Manage all registered patients (<?= $total ?? 0 ?> total)</p>
+            <h2 class="pt-title">Patient management</h2>
+            <p class="pt-lede">
+                <strong><?= number_format($total ?? count($patients)) ?></strong> registered
+                <span aria-hidden="true">·</span>
+                <strong><?= number_format($activeCount) ?></strong> active
+                <span aria-hidden="true">·</span>
+                <strong><?= number_format($inactiveCount) ?></strong> inactive
+            </p>
         </div>
-        <div class="header-actions">
-            <button class="btn btn-export" onclick="exportPatients()">
-                <i class="bi bi-download"></i>
-                <span>Export</span>
+
+        <div class="pt-head-actions">
+            <button type="button" class="pt-btn" onclick="exportPatients()">
+                <i class="bi bi-download" aria-hidden="true"></i>
+                Export
             </button>
-            <button class="btn btn-primary" onclick="window.location.href='<?= base_url('admin/patient/add') ?>'">
-                <i class="bi bi-person-plus"></i>
-                <span>Add Patient</span>
-            </button>
+            <a class="pt-btn pt-btn--primary"
+               href="<?= base_url('admin/patient/add') ?>">
+                <i class="bi bi-person-plus" aria-hidden="true"></i>
+                Add Patient
+            </a>
+        </div>
+    </header>
+
+
+    <!-- STATS -->
+    <div class="pt-stats">
+        <div class="pt-stat">
+            <div class="pt-stat-icon pt-stat-icon--teal">
+                <img src="<?= esc(base_url('assets/images/' . $statIcons['total']), 'attr') ?>"
+                     alt=""
+                     class="pt-stat-img"
+                     loading="lazy"
+                     decoding="async">
+            </div>
+            <div class="pt-stat-body">
+                <div class="pt-stat-value"><?= number_format($total ?? count($patients)) ?></div>
+                <div class="pt-stat-label">Total patients</div>
+                <div class="pt-stat-sub">All registered patients</div>
+            </div>
+        </div>
+
+        <div class="pt-stat">
+            <div class="pt-stat-icon pt-stat-icon--blue">
+                <img src="<?= esc(base_url('assets/images/' . $statIcons['online']), 'attr') ?>"
+                     alt=""
+                     class="pt-stat-img"
+                     loading="lazy"
+                     decoding="async">
+            </div>
+            <div class="pt-stat-body">
+                <div class="pt-stat-value"><?= number_format($onlineCount) ?></div>
+                <div class="pt-stat-label">Online patients</div>
+                <div class="pt-stat-sub">Booked online</div>
+            </div>
+        </div>
+
+        <div class="pt-stat">
+            <div class="pt-stat-icon pt-stat-icon--amber">
+                <img src="<?= esc(base_url('assets/images/' . $statIcons['walkin']), 'attr') ?>"
+                     alt=""
+                     class="pt-stat-img"
+                     loading="lazy"
+                     decoding="async">
+            </div>
+            <div class="pt-stat-body">
+                <div class="pt-stat-value"><?= number_format($walkinCount) ?></div>
+                <div class="pt-stat-label">Walk-in patients</div>
+                <div class="pt-stat-sub">Registered at the desk</div>
+            </div>
         </div>
     </div>
 
-    <!-- ===== TABLE TOOLBAR ===== -->
-    <div class="table-toolbar">
-        <div class="search-wrapper">
-            <i class="bi bi-search"></i>
-            <input type="text" class="form-control" placeholder="Search by name, code, email, or phone..." id="searchPatients">
-        </div>
-        
-        <div class="select-wrapper filter-wrapper">
-            <select class="form-select filter-select" id="filterSource">
-                <option value="">All Sources</option>
-                <option value="online">Online</option>
-                <option value="walk-in">Walk-in</option>
-                <option value="referral">Referral</option>
-            </select>
-        </div>
-        
-        <div class="select-wrapper filter-wrapper">
-            <select class="form-select filter-select" id="filterStatus">
-                <option value="">All Status</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-            </select>
-        </div>
-        
-        <div class="select-wrapper sort-wrapper">
-            <select class="form-select sort-select" id="sortBy">
-                <option value="created_at">Sort by: Newest</option>
-                <option value="full_name">Sort by: Patient Name</option>
-                <option value="age">Sort by: Age</option>
-                <option value="created_at_oldest">Sort by: Oldest</option>
-            </select>
-        </div>
-    </div>
 
-    <!-- Success/Error Messages -->
+    <!-- ALERTS -->
     <?php if (session()->getFlashdata('success')): ?>
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            <i class="bi bi-check-circle-fill me-2"></i><?= session()->getFlashdata('success') ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <div class="pt-alert pt-alert--success alert alert-dismissible fade show" role="status">
+            <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+            <span><?= esc(session()->getFlashdata('success')) ?></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss"></button>
         </div>
     <?php endif; ?>
 
     <?php if (session()->getFlashdata('error')): ?>
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="bi bi-exclamation-circle-fill me-2"></i><?= session()->getFlashdata('error') ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <div class="pt-alert pt-alert--error alert alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i>
+            <span><?= esc(session()->getFlashdata('error')) ?></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss"></button>
         </div>
     <?php endif; ?>
 
-    <!-- ===== TABLE CARD ===== -->
-    <div class="table-card">
-        <div class="table-responsive">
-            <table class="table patients-table" id="patientsTable">
+
+    <!-- TABLE -->
+    <section class="pt-panel">
+
+        <div class="pt-tabs" role="group" aria-label="Filter by source">
+            <button type="button" class="pt-tab is-active" data-source="all" aria-pressed="true">
+                All
+                <span class="pt-tab-count"><?= (int) count($patients) ?></span>
+            </button>
+            <button type="button" class="pt-tab" data-source="online" aria-pressed="false">
+                Online
+                <span class="pt-tab-count"><?= (int) $onlineCount ?></span>
+            </button>
+            <button type="button" class="pt-tab" data-source="walk-in" aria-pressed="false">
+                Walk-in
+                <span class="pt-tab-count"><?= (int) $walkinCount ?></span>
+            </button>
+        </div>
+
+        <div class="pt-filters">
+            <div class="pt-search">
+                <i class="bi bi-search" aria-hidden="true"></i>
+                <label class="visually-hidden" for="searchPatients">Search patients</label>
+                <input type="text"
+                       class="pt-input"
+                       id="searchPatients"
+                       placeholder="Search by name, code, email or phone"
+                       autocomplete="off">
+            </div>
+
+            <label class="visually-hidden" for="filterStatus">Status</label>
+            <select class="pt-select" id="filterStatus">
+                <option value="">All status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+            </select>
+
+            <label class="visually-hidden" for="sortBy">Sort</label>
+            <select class="pt-select" id="sortBy">
+                <option value="created_at">Sort: Newest</option>
+                <option value="full_name">Sort: Name</option>
+                <option value="age">Sort: Age</option>
+                <option value="created_at_oldest">Sort: Oldest</option>
+            </select>
+        </div>
+
+        <div class="pt-table-wrap">
+            <table class="pt-table" id="patientsTable">
                 <thead>
                     <tr>
-                        <th>Patient Code</th>
-                        <th>Patient Name</th>
-                        <th>Source</th>
-                        <th>Gender</th>
-                        <th>Age</th>
-                        <th>Phone</th>
-                        <th>Email</th>
-                        <th>Registered</th>
-                        <th>Status</th>
-                        <th>Actions</th>
+                        <th scope="col">Patient code</th>
+                        <th scope="col">Patient name</th>
+                        <th scope="col">Source</th>
+                        <th scope="col">Sex</th>
+                        <th scope="col">Age</th>
+                        <th scope="col">Phone</th>
+                        <th scope="col">Email</th>
+                        <th scope="col">Registered</th>
+                        <th scope="col">Status</th>
+                        <th scope="col" class="pt-c-actions"><span class="visually-hidden">Actions</span></th>
                     </tr>
                 </thead>
                 <tbody id="patientsTableBody">
-                    <?php if (!empty($patients) && is_array($patients)): ?>
-                        <?php foreach ($patients as $patient): ?>
-                            <?php 
-                            // Determine if patient is active (visited within last 30 days)
+                    <?php if (count($patients) > 0): ?>
+                        <?php foreach ($patients as $patient):
                             $lastVisit = $patient['last_visit'] ?? $patient['created_at'] ?? null;
-                            $isActive = $lastVisit && strtotime($lastVisit) > strtotime('-30 days');
-                            
-                            // Clean source display
-                            $source = $patient['source'] ?? 'walk-in';
-                            $sourceDisplay = ucfirst(strtolower($source));
-                            
-                            // Get patient code or fallback
-                            $patientCode = $patient['patient_code'] ?? 'N/A';
-                            
-                            // Check if patient is approved (has patient_code)
-                            $isApproved = $patientCode !== 'N/A' && !empty($patientCode);
-                            
-                            // Get patient ID
-                            $patientId = $patient['id'] ?? 0;
-                            ?>
-                            <tr data-patient-row
+                            $isActive  = $lastVisit && strtotime($lastVisit) > strtotime('-30 days');
+
+                            $isWalkin = strpos(strtolower((string) ($patient['source'] ?? '')), 'walk-in') !== false;
+                            $source   = $isWalkin ? 'walk-in' : 'online';
+
+                            $name   = (string) ($patient['full_name'] ?? 'Unknown');
+                            $code   = (string) ($patient['patient_code'] ?? 'N/A');
+                            $gender = (string) ($patient['gender'] ?? 'N/A');
+                            $age    = (string) ($patient['age'] ?? 'N/A');
+                            $email  = (string) ($patient['email'] ?? '');
+                            $phone  = (string) ($patient['phone'] ?? '');
+
+                            $isApproved = $code !== 'N/A' && $code !== '';
+                            $patientId  = (int) ($patient['id'] ?? 0);
+
+                            $genderRaw  = strtolower(trim($gender));
+                            $isMale     = $genderRaw === 'male'   || $genderRaw === 'm';
+                            $isFemale   = $genderRaw === 'female' || $genderRaw === 'f';
+                            $avatarKind = $isMale ? 'male' : ($isFemale ? 'female' : 'neutral');
+                        ?>
+                            <tr class="pt-row pt-row--<?= esc($source, 'attr') ?>"
+                                data-patient-row
+                                data-source="<?= esc($source, 'attr') ?>"
                                 data-status="<?= $isActive ? 'active' : 'inactive' ?>"
-                                data-source="<?= esc(strtolower($source), 'attr') ?>"
-                                data-name="<?= esc(strtolower($patient['full_name'] ?? ''), 'attr') ?>"
+                                data-name="<?= esc(strtolower($name), 'attr') ?>"
                                 data-age="<?= esc((string) (int) ($patient['age'] ?? 0), 'attr') ?>"
-                                data-created="<?= isset($patient['created_at']) ? esc(date('Y-m-d H:i:s', strtotime($patient['created_at'])), 'attr') : '' ?>">
-                                <td>
-                                    <span class="patient-code <?= $isApproved ? 'approved' : 'pending' ?>">
-                                        <?= esc($patientCode) ?>
+                                data-created="<?= $patient['created_at'] ? esc(date('Y-m-d H:i:s', strtotime($patient['created_at'])), 'attr') : '' ?>">
+
+                                <td data-label="Code" class="pt-c-code">
+                                    <span class="pt-code<?= $isApproved ? '' : ' pt-code--pending' ?>">
+                                        <?= esc($code) ?>
                                         <?php if (!$isApproved): ?>
-                                            <span class="pending-badge">Pending</span>
+                                            <span class="pt-pending-badge">Pending</span>
                                         <?php endif; ?>
                                     </span>
                                 </td>
-                                <td>
-                                    <div class="patient-cell">
-                                        <span class="patient-avatar">
-                                            <?php 
-                                                $nameParts = preg_split('/\s+/', trim($patient['full_name'] ?? 'Unknown'));
-                                                $first = $nameParts[0] ?? 'U';
-                                                $last = $nameParts[count($nameParts) - 1] ?? 'N';
-                                                $initials = strtoupper(mb_substr($first, 0, 1) . mb_substr($last, 0, 1));
-                                                echo esc($initials);
-                                            ?>
-                                        </span>
-                                        <div class="patient-meta">
-                                            <span class="patient-name"><?= esc($patient['full_name'] ?? 'Unknown') ?></span>
-                                            <?php if ($isApproved): ?>
-                                                <small class="patient-code-small"><?= esc($patientCode) ?></small>
+
+                                <td data-label="Patient">
+                                    <div class="pt-patient">
+                                        <span class="pt-avatar pt-avatar--<?= esc($avatarKind, 'attr') ?>" aria-hidden="true">
+                                            <?php if ($isMale): ?>
+                                                <img src="<?= esc(base_url('assets/images/' . $maleAvatar), 'attr') ?>"
+                                                     alt=""
+                                                     class="pt-avatar-img"
+                                                     loading="lazy"
+                                                     decoding="async">
+                                            <?php elseif ($isFemale): ?>
+                                                <img src="<?= esc(base_url('assets/images/' . $femaleAvatar), 'attr') ?>"
+                                                     alt=""
+                                                     class="pt-avatar-img"
+                                                     loading="lazy"
+                                                     decoding="async">
+                                            <?php else: ?>
+                                                <?= esc($initialsOf($name)) ?>
                                             <?php endif; ?>
+                                        </span>
+                                        <div class="pt-patient-body">
+                                            <span class="pt-name"><?= esc($name) ?></span>
+                                            <span class="pt-sub">
+                                                <?= $gender !== 'N/A' ? esc($gender) : '—' ?>
+                                                ·
+                                                <?= $age !== 'N/A' ? esc($age) : '—' ?>
+                                            </span>
                                         </div>
                                     </div>
                                 </td>
-                                <td>
-                                    <span class="source-badge <?= strtolower($source) ?>">
-                                        <i class="bi <?= strtolower($source) === 'online' ? 'bi-globe' : (strtolower($source) === 'walk-in' ? 'bi-person-walking' : 'bi-person-arms-up') ?>"></i>
-                                        <?= $sourceDisplay ?>
+
+                                <td data-label="Source">
+                                    <span class="pt-source pt-source--<?= esc($source, 'attr') ?>">
+                                        <i class="bi <?= $isWalkin ? 'bi-person-walking' : 'bi-globe' ?>" aria-hidden="true"></i>
+                                        <?= esc($patient['source'] ?? 'Unknown') ?>
                                     </span>
                                 </td>
-                                <td><?= esc($patient['gender'] ?? 'N/A') ?></td>
-                                <td><?= esc($patient['age'] ?? 'N/A') ?></td>
-                                <td><?= esc($patient['phone'] ?? 'N/A') ?></td>
-                                <td><?= esc($patient['email'] ?? 'N/A') ?></td>
-                                <td>
-                                    <div class="date-cell">
-                                        <i class="bi bi-calendar3"></i>
-                                        <span><?= isset($patient['created_at']) ? date('M d, Y', strtotime($patient['created_at'])) : '—' ?></span>
-                                    </div>
+
+                                <td data-label="Sex" class="pt-c-sex"><?= esc($gender !== '' ? $gender : '—') ?></td>
+
+                                <td data-label="Age" class="pt-c-age"><?= esc($age !== '' ? $age : '—') ?></td>
+
+                                <td data-label="Phone" class="pt-c-phone">
+                                    <?php if ($phone !== ''): ?>
+                                        <a href="tel:<?= esc($phone, 'attr') ?>" class="pt-link"><?= esc($phone) ?></a>
+                                    <?php else: ?>
+                                        <span class="pt-muted">—</span>
+                                    <?php endif; ?>
                                 </td>
-                                <td>
-                                    <span class="status-badge <?= $isActive ? 'active' : 'inactive' ?>">
-                                        <i class="bi bi-circle-fill"></i>
+
+                                <td data-label="Email" class="pt-c-email">
+                                    <?php if ($email !== ''): ?>
+                                        <a href="mailto:<?= esc($email, 'attr') ?>" class="pt-link"><?= esc($email) ?></a>
+                                    <?php else: ?>
+                                        <span class="pt-muted">—</span>
+                                    <?php endif; ?>
+                                </td>
+
+                                <td data-label="Registered" class="pt-c-date">
+                                    <time datetime="<?= $patient['created_at'] ? esc(date('c', strtotime($patient['created_at'])), 'attr') : '' ?>">
+                                        <?= $patient['created_at'] ? esc(date('M j, Y', strtotime($patient['created_at']))) : '—' ?>
+                                    </time>
+                                </td>
+
+                                <td data-label="Status">
+                                    <span class="pt-status pt-status--<?= $isActive ? 'active' : 'inactive' ?>">
                                         <?= $isActive ? 'Active' : 'Inactive' ?>
                                     </span>
                                 </td>
-                                <td class="action-cell">
-                                    <!-- Approve Button - Only show if not approved -->
-                                    <?php if (!$isApproved && $patientId > 0): ?>
-                                        <button class="action-icon-btn approve" onclick="approvePatient(<?= $patientId ?>)" title="Approve Patient">
-                                            <i class="bi bi-check-circle"></i>
+
+                                <td data-label="Actions" class="pt-c-actions">
+                                    <div class="pt-actions">
+                                        <?php if (!$isApproved && $patientId > 0): ?>
+                                            <button type="button" class="pt-icon-btn pt-icon-btn--approve"
+                                                    title="Approve patient"
+                                                    aria-label="Approve <?= esc($name, 'attr') ?>"
+                                                    onclick="approvePatient(<?= $patientId ?>)">
+                                                <i class="bi bi-check-circle" aria-hidden="true"></i>
+                                            </button>
+                                        <?php endif; ?>
+
+                                        <button type="button" class="pt-icon-btn"
+                                                title="View patient"
+                                                aria-label="View <?= esc($name, 'attr') ?>"
+                                                onclick="viewPatient(<?= $patientId ?>)">
+                                            <i class="bi bi-eye" aria-hidden="true"></i>
                                         </button>
-                                    <?php endif; ?>
-                                    
-                                    <button class="action-icon-btn view" onclick="viewPatient(<?= $patientId ?>)" title="View">
-                                        <i class="bi bi-eye"></i>
-                                    </button>
-                                    
-                                    <button class="action-icon-btn edit" onclick="editPatient(<?= $patientId ?>)" title="Edit">
-                                        <i class="bi bi-pencil"></i>
-                                    </button>
-                                    
-                                    <?php if (!empty($patient['email'])): ?>
-                                        <a href="mailto:<?= esc($patient['email']) ?>" class="action-icon-btn email" title="Email">
-                                            <i class="bi bi-envelope"></i>
-                                        </a>
-                                    <?php endif; ?>
-                                    
-                                    <?php if (!empty($patient['phone'])): ?>
-                                        <a href="tel:<?= esc($patient['phone']) ?>" class="action-icon-btn phone" title="Call">
-                                            <i class="bi bi-telephone"></i>
-                                        </a>
-                                    <?php endif; ?>
+
+                                        <button type="button" class="pt-icon-btn"
+                                                title="Edit patient"
+                                                aria-label="Edit <?= esc($name, 'attr') ?>"
+                                                onclick="editPatient(<?= $patientId ?>)">
+                                            <i class="bi bi-pencil" aria-hidden="true"></i>
+                                        </button>
+
+                                        <?php if ($email !== ''): ?>
+                                            <a href="mailto:<?= esc($email, 'attr') ?>"
+                                               class="pt-icon-btn"
+                                               title="Email patient"
+                                               aria-label="Email <?= esc($name, 'attr') ?>">
+                                                <i class="bi bi-envelope" aria-hidden="true"></i>
+                                            </a>
+                                        <?php endif; ?>
+
+                                        <?php if ($phone !== ''): ?>
+                                            <a href="tel:<?= esc($phone, 'attr') ?>"
+                                               class="pt-icon-btn"
+                                               title="Call patient"
+                                               aria-label="Call <?= esc($name, 'attr') ?>">
+                                                <i class="bi bi-telephone" aria-hidden="true"></i>
+                                            </a>
+                                        <?php endif; ?>
+                                    </div>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
-                        <tr data-empty-row>
+                        <tr class="pt-row-empty" data-empty-row>
                             <td colspan="10">
-                                <div class="empty-state">
-                                    <i class="bi bi-people"></i>
-                                    <p>No patients found</p>
-                                    <small>Patients will appear here once registered</small>
+                                <div class="pt-empty">
+                                    <div class="pt-empty-icon"><i class="bi bi-people" aria-hidden="true"></i></div>
+                                    <h3>No patients registered yet</h3>
+                                    <p>Patients will appear here once they book online or are registered at the desk.</p>
+                                    <a class="pt-btn pt-btn--primary" href="<?= base_url('admin/patient/add') ?>">
+                                        <i class="bi bi-person-plus" aria-hidden="true"></i>
+                                        Add patient
+                                    </a>
                                 </div>
                             </td>
                         </tr>
                     <?php endif; ?>
 
                     <!-- Shown only when search/filters match nothing -->
-                    <tr data-noresults-row style="display: none;">
+                    <tr class="pt-row-empty" data-noresults-row style="display: none;">
                         <td colspan="10">
-                            <div class="empty-state">
-                                <i class="bi bi-search"></i>
-                                <p>No matching patients</p>
-                                <small>Try a different search term or clear the filters</small>
+                            <div class="pt-empty">
+                                <div class="pt-empty-icon"><i class="bi bi-search" aria-hidden="true"></i></div>
+                                <h3>No matching patients</h3>
+                                <p>Try a different search term or clear the filters.</p>
+                                <button type="button" class="pt-btn" id="ptClearFilters">Clear filters</button>
                             </div>
                         </td>
                     </tr>
                 </tbody>
             </table>
         </div>
-        
-        <!-- ===== TABLE FOOTER / PAGINATION ===== -->
-        <div class="table-footer">
-            <span id="showingText">Showing <?= count($patients ?? []) ?> of <?= $total ?? count($patients ?? []) ?> patients</span>
-            <div class="pagination" id="paginationControls">
-                <button class="page-btn" id="prevBtn" disabled><i class="bi bi-chevron-left"></i></button>
-                <button class="page-btn active">1</button>
-                <button class="page-btn" id="nextBtn"><i class="bi bi-chevron-right"></i></button>
-            </div>
-        </div>
-    </div>
+
+        <footer class="pt-foot">
+            <span id="showingText">
+                Showing <strong><?= count($patients) ?></strong> of <strong><?= number_format($total ?? count($patients)) ?></strong> patients
+            </span>
+            <nav class="pt-pager" id="paginationControls" aria-label="Pagination"></nav>
+        </footer>
+
+    </section>
+
 </div>
 
 <style>
-/* ============================================
-   ADMIN PATIENTS - ENHANCED UI
-   ============================================ */
+/* =========================================================
+   PATIENTS
+   Namespaced under .pt so the layout's generic card and table
+   rules can't leak in. Visual tokens match the receptionist
+   patient page.
+   ========================================================= */
 
-.patients-container {
-    --ink: #101828;
-    --ink-soft: #64748B;
-    --ink-faint: #94A3B8;
-    --line: #E5E9ED;
-    --surface: #FFFFFF;
-    --surface-alt: #F8FAFB;
-    --blue: #1D4ED8;
-    --blue-soft: #E8EFFE;
-    --green: #15803D;
-    --green-soft: #E7F6EC;
-    --red: #dc2626;
-    --red-soft: #FEF2F2;
-    --orange: #C2410C;
-    --orange-soft: #FFF1E6;
-    --purple: #7c3aed;
-    --purple-soft: #ede9fe;
-    --gold: #f59e0b;
-    --gold-soft: #fef3c7;
-    font-family: 'Inter', sans-serif;
+.pt {
+    --pt-ink:         #0f172a;
+    --pt-text:        #334155;
+    --pt-muted:       #64748b;
+    --pt-faint:       #94a3b8;
+    --pt-line:        #e2e8f0;
+    --pt-line-soft:   #f1f5f9;
+    --pt-surface:     #ffffff;
+    --pt-subtle:      #f8fafc;
+    --pt-accent:      #0d9488;
+    --pt-accent-dark: #0f766e;
+    --pt-accent-soft: #e6f7f7;
+    --pt-gold:        #b45309;
+    --pt-gold-soft:   #fef3c7;
+    --pt-radius:      10px;
+    --pt-radius-sm:   7px;
+    --pt-ring:        0 0 0 3px rgba(13, 148, 136, 0.18);
+    --pt-mono:        ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+    color: var(--pt-text);
 }
 
-/* ===== PAGE HEADER ===== */
-.page-header {
+.pt *:focus-visible { outline: 2px solid var(--pt-accent); outline-offset: 2px; }
+
+/* ---------- Page header ---------- */
+
+.pt-head {
     display: flex;
+    align-items: flex-end;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.5rem;
     gap: 1rem;
     flex-wrap: wrap;
-}
-
-.page-title {
-    font-weight: 800;
-    color: var(--ink);
-    margin: 0;
-    font-size: 1.4rem;
-    letter-spacing: -0.02em;
-}
-
-.page-subtitle {
-    color: var(--ink-soft);
-    font-size: 0.85rem;
-    margin: 0.15rem 0 0;
-    font-weight: 400;
-}
-
-.header-actions {
-    display: flex;
-    gap: 0.75rem;
-    align-items: center;
-}
-
-.btn-export {
-    background: var(--surface);
-    border: 1px solid var(--line);
-    color: var(--ink-soft);
-    padding: 0.6rem 1.2rem;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 0.85rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.btn-export:hover {
-    background: var(--surface-alt);
-    border-color: var(--blue);
-    color: var(--blue);
-}
-
-.btn-primary {
-    background: var(--blue);
-    color: #ffffff;
-    border: none;
-    padding: 0.6rem 1.2rem;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 0.85rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.btn-primary:hover {
-    background: #1e40af;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(29, 78, 216, 0.2);
-    color: #ffffff;
-}
-
-/* ===== TABLE TOOLBAR ===== */
-.table-toolbar {
-    display: flex;
-    gap: 1rem;
     margin-bottom: 1.25rem;
-    flex-wrap: wrap;
-    align-items: center;
 }
 
-.search-wrapper {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    padding: 0.5rem 0.85rem;
-    flex: 1;
-    min-width: 250px;
-    transition: all 0.2s ease;
-    height: 42px;
+.pt-title {
+    margin: 0 0 0.2rem;
+    font-size: 1.25rem;
+    font-weight: 650;
+    letter-spacing: -0.015em;
+    color: var(--pt-ink);
 }
 
-.search-wrapper:focus-within {
-    border-color: var(--blue);
-    box-shadow: 0 0 0 4px rgba(29, 78, 216, 0.08);
-}
-
-.search-wrapper i {
-    color: var(--ink-faint);
-}
-
-.search-wrapper .form-control {
-    border: none;
-    padding: 0;
-    font-size: 0.85rem;
-    background: transparent;
-    color: var(--ink);
-}
-
-.search-wrapper .form-control::placeholder {
-    color: var(--ink-faint);
-}
-
-.search-wrapper .form-control:focus {
-    box-shadow: none;
-}
-
-/* ===== SELECT WRAPPER ===== */
-.select-wrapper {
-    position: relative;
-    min-width: 160px;
-}
-
-.select-wrapper.filter-wrapper::before {
-    content: '\F64E';
-    font-family: "bootstrap-icons";
-    position: absolute;
-    left: 0.85rem;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--ink-faint);
-    font-size: 0.9rem;
-    pointer-events: none;
-    z-index: 2;
-}
-
-.select-wrapper.sort-wrapper::before {
-    content: '\F174';
-    font-family: "bootstrap-icons";
-    position: absolute;
-    left: 0.85rem;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--ink-faint);
-    font-size: 0.9rem;
-    pointer-events: none;
-    z-index: 2;
-}
-
-.form-select {
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    font-size: 0.85rem;
-    padding: 0.45rem 2.5rem 0.45rem 2.3rem;
-    color: var(--ink);
-    background-color: var(--surface);
-    height: 42px;
-    cursor: pointer;
-    appearance: none;
-    -webkit-appearance: none;
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
-    background-repeat: no-repeat;
-    background-position: right 0.75rem center;
-    background-size: 16px 12px;
-}
-
-.form-select:focus {
-    border-color: var(--blue);
-    box-shadow: 0 0 0 4px rgba(29, 78, 216, 0.08);
-}
-
-/* ===== TABLE CARD ===== */
-.table-card {
-    background: var(--surface);
-    border-radius: 16px;
-    padding: 1.5rem;
-    box-shadow: 0 1px 3px rgba(16, 24, 40, 0.06);
-    border: 1px solid var(--line);
-}
-
-/* ===== TABLE ===== */
-.patients-table {
+.pt-lede {
     margin: 0;
-    border-collapse: separate;
-    border-spacing: 0 8px;
-    width: 100%;
+    font-size: 0.8125rem;
+    color: var(--pt-muted);
 }
 
-.patients-table thead th {
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--ink-faint);
-    font-weight: 600;
-    border: none;
-    padding: 0.75rem 1rem;
-    background: transparent;
-    white-space: nowrap;
-    text-align: left;
-}
+.pt-lede strong { font-weight: 600; color: var(--pt-ink); }
+.pt-lede span { margin: 0 0.2rem; color: var(--pt-faint); }
 
-.patients-table tbody tr {
-    background: var(--surface);
-    border-radius: 12px;
-    transition: all 0.2s ease;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
-    border: 1px solid var(--line);
-}
+.pt-head-actions { display: flex; gap: 0.5rem; }
 
-.patients-table tbody tr:hover {
-    background: var(--surface-alt);
-    box-shadow: 0 4px 12px rgba(16, 24, 40, 0.06);
-}
+/* ---------- Alerts ---------- */
 
-.patients-table tbody td {
-    padding: 0.85rem 1rem;
-    vertical-align: middle;
-    font-size: 0.85rem;
-    color: var(--ink);
-    border: none;
-    white-space: nowrap;
-    background: transparent;
-}
-
-.patients-table tbody td:first-child {
-    border-radius: 12px 0 0 12px;
-}
-
-.patients-table tbody td:last-child {
-    border-radius: 0 12px 12px 0;
-}
-
-/* Patient Code */
-.patient-code {
-    font-family: 'SFMono-Regular', Consolas, monospace;
-    font-size: 0.75rem;
-    font-weight: 600;
-    padding: 0.15rem 0.5rem;
-    border-radius: 4px;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-}
-
-.patient-code.approved {
-    color: var(--blue);
-    background: var(--blue-soft);
-}
-
-.patient-code.pending {
-    color: var(--gold);
-    background: var(--gold-soft);
-}
-
-.pending-badge {
-    font-size: 0.6rem;
-    font-weight: 700;
-    color: var(--gold);
-    background: var(--gold-soft);
-    padding: 0.05rem 0.4rem;
-    border-radius: 12px;
-    text-transform: uppercase;
-}
-
-.patient-code-small {
-    font-size: 0.65rem;
-    color: var(--ink-faint);
-    font-family: 'SFMono-Regular', Consolas, monospace;
-}
-
-/* Patient Cell */
-.patient-cell {
+.pt-alert {
     display: flex;
     align-items: center;
     gap: 0.6rem;
-}
-
-.patient-avatar {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: var(--blue-soft);
-    color: var(--blue);
-    font-size: 0.65rem;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-}
-
-.patient-meta {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-}
-
-.patient-name {
-    font-weight: 600;
-    color: var(--ink);
-}
-
-/* Date Cell */
-.date-cell {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    color: var(--ink);
-}
-
-.date-cell i {
-    color: var(--ink-faint);
-    font-size: 0.9rem;
-}
-
-/* Status Badge */
-.status-badge {
-    padding: 0.3rem 0.8rem;
-    border-radius: 30px;
-    font-size: 0.7rem;
-    font-weight: 600;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    white-space: nowrap;
-}
-
-.status-badge .bi-circle-fill {
-    font-size: 0.4rem;
-}
-
-.status-badge.active {
-    background: var(--green-soft);
-    color: var(--green);
-}
-
-.status-badge.inactive {
-    background: var(--red-soft);
-    color: var(--red);
-}
-
-/* Source Badge */
-.source-badge {
-    padding: 0.3rem 0.8rem;
-    border-radius: 30px;
-    font-size: 0.7rem;
-    font-weight: 600;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    white-space: nowrap;
-}
-
-.source-badge i {
-    font-size: 0.65rem;
-}
-
-.source-badge.online {
-    background: var(--blue-soft);
-    color: var(--blue);
-}
-
-.source-badge.walk-in {
-    background: var(--orange-soft);
-    color: var(--orange);
-}
-
-.source-badge.referral {
-    background: var(--purple-soft);
-    color: var(--purple);
-}
-
-/* ===== ACTION BUTTONS ===== */
-.action-cell {
-    display: flex;
-    gap: 0.4rem;
-    align-items: center;
-}
-
-.action-icon-btn {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.9rem;
-    text-decoration: none;
-    transition: all 0.2s ease;
-    border: 1px solid transparent;
-    background: transparent;
-    color: var(--ink-faint);
-    cursor: pointer;
-}
-
-.action-icon-btn:hover {
-    background: var(--blue-soft);
-    color: var(--blue);
-    transform: translateY(-1px);
-}
-
-.action-icon-btn.approve {
-    color: var(--gold);
-    border-color: var(--gold-soft);
-}
-
-.action-icon-btn.approve:hover {
-    background: var(--gold-soft);
-    color: var(--gold);
-    border-color: var(--gold);
-}
-
-.action-icon-btn.view:hover {
-    background: var(--blue-soft);
-    color: var(--blue);
-}
-
-.action-icon-btn.edit:hover {
-    background: var(--orange-soft);
-    color: var(--orange);
-}
-
-.action-icon-btn.email:hover {
-    background: var(--green-soft);
-    color: var(--green);
-}
-
-.action-icon-btn.phone:hover {
-    background: var(--purple-soft);
-    color: var(--purple);
-}
-
-/* ===== ALERTS ===== */
-.alert {
-    border-radius: 12px;
     padding: 0.75rem 1rem;
-    border: none;
-    font-size: 0.85rem;
-    display: flex;
+    margin-bottom: 1rem;
+    border: 1px solid transparent;
+    border-radius: var(--pt-radius);
+    font-size: 0.8125rem;
+}
+
+.pt-alert > span { flex: 1; min-width: 0; }
+.pt-alert.alert-dismissible { padding-right: 0.75rem; }
+.pt-alert .btn-close { position: static; padding: 0.5rem; margin-left: auto; font-size: 0.7rem; }
+.pt-alert--success { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+.pt-alert--error   { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+
+/* ---------- Buttons ---------- */
+
+.pt-btn {
+    display: inline-flex;
     align-items: center;
-}
-
-.alert-success {
-    background: var(--green-soft);
-    color: var(--green);
-}
-
-.alert-danger {
-    background: var(--red-soft);
-    color: var(--red);
-}
-
-/* ===== EMPTY STATE ===== */
-.empty-state {
-    text-align: center;
-    padding: 2.5rem 1rem;
-}
-
-.empty-state i {
-    font-size: 2.5rem;
-    color: var(--ink-faint);
-    display: block;
-    margin-bottom: 0.75rem;
-}
-
-.empty-state p {
-    color: var(--ink);
+    justify-content: center;
+    gap: 0.4rem;
+    height: 36px;
+    padding: 0 0.9rem;
+    font-size: 0.8125rem;
     font-weight: 600;
-    margin: 0;
+    line-height: 1;
+    color: var(--pt-text);
+    background: var(--pt-surface);
+    border: 1px solid var(--pt-line);
+    border-radius: var(--pt-radius-sm);
+    box-shadow: 0 1px 1px rgba(15, 23, 42, 0.03);
+    white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.empty-state small {
-    color: var(--ink-soft);
+.pt-btn:hover { background: var(--pt-subtle); border-color: #cbd5e1; color: var(--pt-ink); }
+.pt-btn i { font-size: 0.9em; }
+
+.pt-btn--primary,
+.pt-btn--primary:hover { color: #ffffff; }
+.pt-btn--primary { background: var(--pt-accent); border-color: var(--pt-accent); }
+.pt-btn--primary:hover { background: var(--pt-accent-dark); border-color: var(--pt-accent-dark); }
+
+/* ---------- Stats ---------- */
+
+.pt-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.9rem;
+    margin-bottom: 1.25rem;
 }
 
-/* ===== TABLE FOOTER ===== */
-.table-footer {
+.pt-stat {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-top: 1.25rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--line);
-    flex-wrap: wrap;
-    gap: 0.75rem;
+    gap: 0.85rem;
+    min-width: 0;
+    padding: 0.9rem 1rem;
+    background: var(--pt-surface);
+    border: 1px solid var(--pt-line);
+    border-radius: var(--pt-radius);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
-.table-footer span {
-    font-size: 0.85rem;
-    color: var(--ink-soft);
+.pt-stat-icon {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--pt-radius-sm);
 }
 
-.pagination {
+.pt-stat-icon--teal  { background: transparent; }
+.pt-stat-icon--blue  { background: transparent; }
+.pt-stat-icon--amber { background: transparent; }
+
+.pt-stat-img {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+    display: block;
+}
+
+.pt-stat-body { min-width: 0; }
+
+.pt-stat-value {
+    font-size: 1.35rem;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    color: var(--pt-ink);
+    font-variant-numeric: tabular-nums;
+}
+
+.pt-stat-label {
+    margin-top: 0.15rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--pt-text);
+}
+
+.pt-stat-sub {
+    font-size: 0.72rem;
+    color: var(--pt-muted);
+}
+
+/* ---------- Panel ---------- */
+
+.pt-panel {
+    background: var(--pt-surface);
+    border: 1px solid var(--pt-line);
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    overflow: hidden;
+}
+
+/* ---------- Tabs ---------- */
+
+.pt-tabs {
     display: flex;
     gap: 0.25rem;
-    flex-wrap: wrap;
-    justify-content: flex-end;
+    padding: 0 0.75rem;
+    border-bottom: 1px solid var(--pt-line);
+    overflow-x: auto;
+    scrollbar-width: none;
 }
 
-.page-btn {
-    width: 32px;
-    height: 32px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: var(--surface);
-    color: var(--ink-soft);
-    font-size: 0.85rem;
+.pt-tabs::-webkit-scrollbar { display: none; }
+
+.pt-tab {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.85rem 0.6rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--pt-muted);
+    background: none;
+    border: 0;
+    white-space: nowrap;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: color 0.15s ease;
+}
+
+.pt-tab::after {
+    content: "";
+    position: absolute;
+    left: 0.4rem;
+    right: 0.4rem;
+    bottom: -1px;
+    height: 2px;
+    border-radius: 2px 2px 0 0;
+    background: transparent;
+}
+
+.pt-tab:hover { color: var(--pt-ink); }
+.pt-tab.is-active { color: var(--pt-ink); }
+.pt-tab.is-active::after { background: var(--pt-accent); }
+
+.pt-tab-count {
+    min-width: 1.4rem;
+    padding: 0.05rem 0.4rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    color: var(--pt-muted);
+    background: var(--pt-line-soft);
+    border-radius: 999px;
+}
+
+.pt-tab.is-active .pt-tab-count { color: var(--pt-accent); background: var(--pt-accent-soft); }
+
+/* ---------- Filters ---------- */
+
+.pt-filters {
     display: flex;
     align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    padding: 0.75rem 1rem;
+}
+
+.pt-search { position: relative; flex: 1 1 280px; max-width: 420px; }
+
+.pt-search > i {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.8rem;
+    color: var(--pt-faint);
+    pointer-events: none;
+}
+
+.pt-input,
+.pt-select {
+    width: 100%;
+    height: 36px;
+    padding: 0 0.75rem;
+    font-size: 0.8125rem;
+    color: var(--pt-ink);
+    background-color: var(--pt-surface);
+    border: 1px solid var(--pt-line);
+    border-radius: var(--pt-radius-sm);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pt-input { padding-left: 2.1rem; }
+.pt-input::placeholder { color: var(--pt-faint); }
+
+.pt-input:focus,
+.pt-select:focus {
+    outline: none;
+    border-color: var(--pt-accent);
+    box-shadow: var(--pt-ring);
+}
+
+.pt-select {
+    width: auto;
+    padding-right: 2rem;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m3 6 5 5 5-5'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.65rem center;
+    background-size: 12px;
+    cursor: pointer;
+}
+
+/* ---------- Table ---------- */
+
+.pt-table-wrap { overflow-x: auto; border-top: 1px solid var(--pt-line); }
+
+.pt-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+    color: var(--pt-text);
+}
+
+.pt-table th {
+    padding: 0.65rem 1rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    text-align: left;
+    white-space: nowrap;
+    color: var(--pt-muted);
+    background: var(--pt-subtle);
+    border-bottom: 1px solid var(--pt-line);
+}
+
+.pt-table td {
+    padding: 0.85rem 1rem;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--pt-line-soft);
+}
+
+.pt-table tbody tr:last-child td { border-bottom: 0; }
+
+.pt-row { transition: background-color 0.12s ease; }
+.pt-row:hover { background: #fafbfd; }
+
+/* Source rail */
+.pt-row td:first-child { position: relative; }
+
+.pt-row td:first-child::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--rail, transparent);
+}
+
+.pt-row--online  { --rail: #3b82f6; }
+.pt-row--walk-in { --rail: #f59e0b; }
+
+.pt-c-code { white-space: nowrap; }
+
+.pt-code {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.15rem 0.5rem;
+    font-family: var(--pt-mono);
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: var(--pt-ink);
+    background: var(--pt-line-soft);
+    border-radius: 5px;
+}
+
+.pt-code--pending { color: var(--pt-gold); background: var(--pt-gold-soft); }
+
+.pt-pending-badge {
+    padding: 0.05rem 0.4rem;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--pt-gold);
+    background: #fffbeb;
+    border-radius: 12px;
+}
+
+.pt-patient { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
+
+.pt-avatar {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--pt-accent);
+    background: var(--pt-accent-soft);
+    border-radius: 50%;
+    overflow: hidden;
+}
+
+.pt-avatar--male    { background: #eaf2fe; color: #1d4ed8; }
+.pt-avatar--female  { background: #fce9ee; color: #b32e50; }
+.pt-avatar--neutral { background: var(--pt-accent-soft); color: var(--pt-accent); }
+
+.pt-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.pt-patient-body { min-width: 0; }
+
+.pt-name {
+    display: block;
+    font-weight: 600;
+    color: var(--pt-ink);
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pt-sub { display: block; font-size: 0.72rem; color: var(--pt-muted); }
+
+.pt-c-sex,
+.pt-c-age { white-space: nowrap; color: var(--pt-text); }
+
+.pt-c-phone,
+.pt-c-email { white-space: nowrap; }
+
+.pt-c-date { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.pt-link {
+    color: var(--pt-text);
+    text-decoration: none;
+}
+
+.pt-link:hover { color: var(--pt-accent-dark); text-decoration: underline; text-underline-offset: 2px; }
+
+.pt-muted { color: var(--pt-faint); }
+
+.pt-source {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.15rem 0.55rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.pt-source--online  { color: #047857; background: #ecfdf5; }
+.pt-source--walk-in { color: #b45309; background: #fff4e5; }
+
+.pt-source i { font-size: 0.72em; }
+
+.pt-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.15rem 0.55rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.pt-status--active   { color: #15803d; background: #e7f6ec; }
+.pt-status--inactive { color: #b91c1c; background: #fdeaea; }
+
+.pt-status::before {
+    content: "";
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.pt-c-actions { width: 1%; text-align: right; white-space: nowrap; }
+
+.pt-actions { display: inline-flex; align-items: center; gap: 0.25rem; }
+
+.pt-icon-btn {
+    display: inline-flex;
+    align-items: center;
     justify-content: center;
-}
-
-.page-btn:hover:not(.active):not(:disabled) {
-    background: var(--surface-alt);
-    border-color: var(--blue);
-    color: var(--blue);
-}
-
-.page-btn.active {
-    background: var(--blue);
-    border-color: var(--blue);
-    color: #ffffff;
-}
-
-.page-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.page-btn.page-gap {
-    border-color: transparent;
+    width: 32px;
+    height: 32px;
+    font-size: 0.85rem;
+    color: var(--pt-muted);
     background: transparent;
-    cursor: default;
-    opacity: 1;
-    color: var(--ink-faint);
-    width: 20px;
+    border: 1px solid transparent;
+    border-radius: var(--pt-radius-sm);
+    cursor: pointer;
+    text-decoration: none;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
-/* ============================================
-   RESPONSIVE
-   ============================================ */
+.pt-icon-btn:hover {
+    background: var(--pt-accent-soft);
+    color: var(--pt-accent-dark);
+    border-color: #99f6e4;
+}
+
+.pt-icon-btn--approve { color: var(--pt-gold); }
+.pt-icon-btn--approve:hover {
+    background: #fffbeb;
+    color: var(--pt-gold);
+    border-color: #fcd34d;
+}
+
+/* ---------- Empty states ---------- */
+
+.pt-empty { padding: 3.5rem 1rem; text-align: center; }
+
+.pt-empty-icon {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    margin: 0 auto 0.85rem;
+    font-size: 1.2rem;
+    color: var(--pt-faint);
+    background: var(--pt-line-soft);
+    border-radius: 10px;
+}
+
+.pt-empty h3 { margin: 0 0 0.25rem; font-size: 0.95rem; font-weight: 600; color: var(--pt-ink); }
+.pt-empty p { max-width: 26rem; margin: 0 auto 1rem; font-size: 0.8125rem; color: var(--pt-muted); }
+
+/* ---------- Footer ---------- */
+
+.pt-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding: 0.7rem 1rem;
+    font-size: 0.78rem;
+    color: var(--pt-muted);
+    border-top: 1px solid var(--pt-line);
+}
+
+.pt-foot strong { font-weight: 600; color: var(--pt-ink); font-variant-numeric: tabular-nums; }
+
+.pt-pager { display: flex; align-items: center; gap: 0.25rem; }
+
+.pt-page {
+    min-width: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.45rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--pt-text);
+    background: var(--pt-surface);
+    border: 1px solid var(--pt-line);
+    border-radius: var(--pt-radius-sm);
+    cursor: pointer;
+}
+
+.pt-page:hover:not(:disabled) { background: var(--pt-subtle); border-color: #cbd5e1; }
+.pt-page:disabled { opacity: 0.45; cursor: not-allowed; }
+.pt-page[aria-current="page"] { color: var(--pt-accent); background: var(--pt-accent-soft); border-color: #bcd6f3; }
+.pt-page-gap { min-width: 20px; text-align: center; color: var(--pt-faint); }
+
+/* ---------- Responsive ---------- */
 
 @media (max-width: 992px) {
-    .table-toolbar {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .search-wrapper,
-    .select-wrapper {
-        min-width: 100%;
-    }
+    .pt-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 @media (max-width: 768px) {
-    .page-header {
-        flex-direction: column;
-        align-items: stretch;
+    .pt-head { flex-direction: column; align-items: stretch; }
+    .pt-head-actions .pt-btn { flex: 1; }
+
+    .pt-stats { grid-template-columns: minmax(0, 1fr); gap: 0.6rem; }
+
+    .pt-filters .pt-search { flex-basis: 100%; max-width: none; }
+    .pt-filters .pt-select { flex: 1; }
+
+    .pt-table thead { display: none; }
+
+    .pt-table,
+    .pt-table tbody,
+    .pt-table tr,
+    .pt-table td { display: block; width: 100%; }
+
+    .pt-table tr.pt-row {
+        padding: 0.9rem 1rem;
+        border-bottom: 1px solid var(--pt-line);
     }
-    
-    .header-actions {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .header-actions .btn {
-        justify-content: center;
-    }
-    
-    .table-toolbar {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .search-wrapper {
-        max-width: 100%;
-    }
-    
-    .table-footer {
-        flex-direction: column;
+
+    .pt-row td:first-child::before { top: 0; bottom: 0; }
+
+    .pt-table td {
+        display: flex;
         align-items: center;
-        gap: 0.75rem;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.25rem 0;
+        text-align: right;
+        border: 0;
     }
+
+    .pt-table td[data-label]::before {
+        content: attr(data-label);
+        flex-shrink: 0;
+        font-size: 0.75rem;
+        font-weight: 400;
+        color: var(--pt-muted);
+        text-align: left;
+    }
+
+    .pt-table td.pt-c-code,
+    .pt-table td:nth-child(2) { display: block; text-align: left; }
+    .pt-table td.pt-c-code::before,
+    .pt-table td:nth-child(2)::before { content: none; }
+    .pt-table td:nth-child(2) { margin: 0.35rem 0 0.5rem; }
+
+    .pt-table td.pt-c-actions { justify-content: flex-end; margin-top: 0.5rem; }
+
+    .pt-c-email,
+    .pt-c-phone { white-space: normal; }
+    .pt-c-email a,
+    .pt-c-phone a { display: inline-block; max-width: 100%; overflow-wrap: anywhere; }
+
+    .pt-foot { justify-content: center; }
 }
 
-@media (max-width: 576px) {
-    .patients-table {
-        font-size: 0.72rem;
-    }
-    
-    .patients-table thead th,
-    .patients-table tbody td {
-        padding: 0.5rem;
-        font-size: 0.72rem;
-    }
-    
-    .patient-avatar {
-        width: 28px;
-        height: 28px;
-        font-size: 0.55rem;
-    }
-    
-    .page-btn {
-        width: 28px;
-        height: 28px;
-        font-size: 0.75rem;
-    }
-    
-    .action-icon-btn {
-        width: 28px;
-        height: 28px;
-        font-size: 0.8rem;
-    }
+@media (prefers-reduced-motion: reduce) {
+    .pt *, .pt *::before, .pt *::after { transition: none !important; }
+}
+
+@media print {
+    .pt-head-actions,
+    .pt-tabs,
+    .pt-filters,
+    .pt-c-actions { display: none !important; }
+
+    .pt-panel { border: 0; box-shadow: none; }
+    .pt-row { display: table-row !important; }
 }
 </style>
 
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-    // ============================================
-    // TABLE STATE
-    // --------------------------------------------
-    // Single source of truth. `filteredRows` is derived from search +
-    // source + status together, and `render()` is the ONLY thing that
-    // touches row.style.display. Nothing ever reads display state back,
-    // which is what previously made hidden rows unrecoverable.
-    // ============================================
+(function () {
+    'use strict';
 
     var tbody              = document.getElementById('patientsTableBody');
-    var showingText        = document.getElementById('showingText');
     var paginationControls = document.getElementById('paginationControls');
+    var showingText        = document.getElementById('showingText');
     var searchInput        = document.getElementById('searchPatients');
-    var filterSource       = document.getElementById('filterSource');
     var filterStatus       = document.getElementById('filterStatus');
     var sortSelect         = document.getElementById('sortBy');
+    var tabs               = Array.prototype.slice.call(document.querySelectorAll('.pt-tab'));
+    var clearBtn           = document.getElementById('ptClearFilters');
 
     if (!tbody) { return; }
 
-    // Rows shown per page. Change this one value to adjust page size.
-    var PAGE_SIZE = 5;
+    /* Rows per page. Change this one value to adjust page size. */
+    var PAGE_SIZE = 10;
 
     var allRows      = Array.prototype.slice.call(tbody.querySelectorAll('tr[data-patient-row]'));
     var emptyRow     = tbody.querySelector('tr[data-empty-row]');
@@ -917,41 +1072,36 @@ document.addEventListener('DOMContentLoaded', function () {
     var serverTotal  = <?= (int) ($total ?? 0) ?>;
 
     var filteredRows = allRows.slice();
-    var currentPage  = 1;
+    var state = { source: 'all', status: '', term: '', page: 1 };
 
     function getTotalPages() {
         return Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
     }
 
-    // ============================================
-    // FILTERING - search, source and status combined
-    // ============================================
+    /* ============================================
+       FILTERING
+       ============================================ */
     function applyFilters(resetPage) {
-        var term   = searchInput  ? searchInput.value.toLowerCase().trim() : '';
-        var source = filterSource ? filterSource.value.toLowerCase() : '';
-        var status = filterStatus ? filterStatus.value.toLowerCase() : '';
-
         filteredRows = allRows.filter(function (row) {
-            if (term && row.textContent.toLowerCase().indexOf(term) === -1) {
+            if (state.term && row.textContent.toLowerCase().indexOf(state.term) === -1) {
                 return false;
             }
-            if (source && (row.dataset.source || '').toLowerCase() !== source) {
+            if (state.source !== 'all' && (row.dataset.source || '') !== state.source) {
                 return false;
             }
-            if (status && (row.dataset.status || '').toLowerCase() !== status) {
+            if (state.status && (row.dataset.status || '') !== state.status) {
                 return false;
             }
             return true;
         });
 
-        if (resetPage !== false) { currentPage = 1; }
+        if (resetPage !== false) { state.page = 1; }
         render();
     }
 
-    // ============================================
-    // SORTING - reorders the DOM and the row array
-    // together, then re-paginates from page 1
-    // ============================================
+    /* ============================================
+       SORTING
+       ============================================ */
     function applySort() {
         var mode = sortSelect ? sortSelect.value : 'created_at';
 
@@ -963,9 +1113,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 case 'age':
                     return (parseInt(a.dataset.age, 10) || 0) - (parseInt(b.dataset.age, 10) || 0);
                 case 'created_at_oldest':
-                    // ISO timestamps, so a plain string compare is chronological
                     return (a.dataset.created || '').localeCompare(b.dataset.created || '');
-                default: // created_at (newest first)
+                default:
                     return (b.dataset.created || '').localeCompare(a.dataset.created || '');
             }
         });
@@ -975,18 +1124,18 @@ document.addEventListener('DOMContentLoaded', function () {
         if (noResultsRow) { tbody.appendChild(noResultsRow); }
 
         allRows = sorted;
-        applyFilters(true);
+        applyFilters(false);
     }
 
-    // ============================================
-    // RENDER - hide every row, then reveal this page
-    // ============================================
+    /* ============================================
+       RENDER
+       ============================================ */
     function render() {
         var pages = getTotalPages();
-        if (currentPage > pages) { currentPage = pages; }
-        if (currentPage < 1) { currentPage = 1; }
+        if (state.page > pages) { state.page = pages; }
+        if (state.page < 1) { state.page = 1; }
 
-        var start = (currentPage - 1) * PAGE_SIZE;
+        var start = (state.page - 1) * PAGE_SIZE;
 
         allRows.forEach(function (row) { row.style.display = 'none'; });
 
@@ -1004,9 +1153,6 @@ document.addEventListener('DOMContentLoaded', function () {
         renderPagination(pages);
     }
 
-    // ============================================
-    // FOOTER TEXT
-    // ============================================
     function updateShowingText(start, shown) {
         if (!showingText) { return; }
 
@@ -1031,9 +1177,9 @@ document.addEventListener('DOMContentLoaded', function () {
         showingText.textContent = text;
     }
 
-    // ============================================
-    // PAGINATION CONTROLS - rebuilt on every render
-    // ============================================
+    /* ============================================
+       PAGINATION
+       ============================================ */
     function buildPageList(pages, current) {
         var list = [];
         var i;
@@ -1043,19 +1189,17 @@ document.addEventListener('DOMContentLoaded', function () {
             return list;
         }
 
-        var first = 1;
-        var last  = pages;
-        var from  = Math.max(2, current - 1);
-        var to    = Math.min(pages - 1, current + 1);
+        var from = Math.max(2, current - 1);
+        var to   = Math.min(pages - 1, current + 1);
 
         if (current <= 3)         { from = 2;         to = 4; }
         if (current >= pages - 2) { from = pages - 3; to = pages - 1; }
 
-        list.push(first);
+        list.push(1);
         if (from > 2) { list.push('gap'); }
         for (i = from; i <= to; i++) { list.push(i); }
         if (to < pages - 1) { list.push('gap'); }
-        list.push(last);
+        list.push(pages);
 
         return list;
     }
@@ -1063,142 +1207,179 @@ document.addEventListener('DOMContentLoaded', function () {
     function renderPagination(pages) {
         if (!paginationControls) { return; }
 
-        var html = '<button type="button" class="page-btn" id="prevBtn" aria-label="Previous page"' +
-                   (currentPage === 1 ? ' disabled' : '') +
-                   '><i class="bi bi-chevron-left"></i></button>';
+        if (pages <= 1) { paginationControls.innerHTML = ''; return; }
 
-        buildPageList(pages, currentPage).forEach(function (item) {
+        var html = '<button type="button" class="pt-page" data-nav="-1" aria-label="Previous page"' +
+                   (state.page === 1 ? ' disabled' : '') +
+                   '><i class="bi bi-chevron-left" aria-hidden="true"></i></button>';
+
+        buildPageList(pages, state.page).forEach(function (item) {
             if (item === 'gap') {
-                html += '<button type="button" class="page-btn page-gap" disabled aria-hidden="true">...</button>';
+                html += '<span class="pt-page-gap" aria-hidden="true">…</span>';
                 return;
             }
-            html += '<button type="button" class="page-btn' + (item === currentPage ? ' active' : '') +
-                    '" data-page="' + item + '" aria-label="Page ' + item + '"' +
-                    (item === currentPage ? ' aria-current="page"' : '') +
-                    '>' + item + '</button>';
+            html += '<button type="button" class="pt-page" data-page="' + item + '"' +
+                    (item === state.page ? ' aria-current="page"' : '') +
+                    ' aria-label="Page ' + item + '">' + item + '</button>';
         });
 
-        html += '<button type="button" class="page-btn" id="nextBtn" aria-label="Next page"' +
-                (currentPage >= pages ? ' disabled' : '') +
-                '><i class="bi bi-chevron-right"></i></button>';
+        html += '<button type="button" class="pt-page" data-nav="1" aria-label="Next page"' +
+                (state.page >= pages ? ' disabled' : '') +
+                '><i class="bi bi-chevron-right" aria-hidden="true"></i></button>';
 
         paginationControls.innerHTML = html;
     }
 
-    // Delegated once on the container, so rebuilding the buttons
-    // above can never detach the click handlers.
     if (paginationControls) {
-        paginationControls.addEventListener('click', function (event) {
-            var btn = event.target.closest('.page-btn');
-            if (!btn || btn.disabled || !paginationControls.contains(btn)) { return; }
+        paginationControls.addEventListener('click', function (e) {
+            var btn = e.target.closest('.pt-page');
+            if (!btn || btn.disabled) { return; }
 
-            if (btn.id === 'prevBtn') { window.changePage(-1); return; }
-            if (btn.id === 'nextBtn') { window.changePage(1);  return; }
-
+            var nav  = parseInt(btn.dataset.nav, 10);
             var page = parseInt(btn.dataset.page, 10);
-            if (!isNaN(page)) { window.goToPage(page); }
+
+            var pages = getTotalPages();
+
+            if (!isNaN(nav)) {
+                state.page = Math.min(Math.max(1, state.page + nav), pages);
+            } else if (!isNaN(page)) {
+                state.page = page;
+            } else {
+                return;
+            }
+
+            render();
         });
     }
 
-    window.changePage = function (direction) {
-        window.goToPage(currentPage + direction);
-    };
+    /* ============================================
+       EVENT WIRING
+       ============================================ */
+    tabs.forEach(function (tab) {
+        tab.addEventListener('click', function () {
+            state.source = tab.dataset.source || 'all';
 
-    window.goToPage = function (page) {
-        var pages = getTotalPages();
-        page = parseInt(page, 10);
-        if (isNaN(page) || page < 1 || page > pages || page === currentPage) { return; }
-        currentPage = page;
-        render();
-    };
+            tabs.forEach(function (t) {
+                var on = t === tab;
+                t.classList.toggle('is-active', on);
+                t.setAttribute('aria-pressed', on ? 'true' : 'false');
+            });
 
-    // ============================================
-    // EVENT WIRING
-    // ============================================
+            applyFilters(true);
+        });
+    });
+
     if (searchInput) {
-        searchInput.addEventListener('input',  function () { applyFilters(true); });
-        searchInput.addEventListener('search', function () { applyFilters(true); });
+        searchInput.addEventListener('input', function () {
+            state.term = searchInput.value.toLowerCase().trim();
+            applyFilters(true);
+        });
+        searchInput.addEventListener('search', function () {
+            state.term = searchInput.value.toLowerCase().trim();
+            applyFilters(true);
+        });
     }
-    if (filterSource) {
-        filterSource.addEventListener('change', function () { applyFilters(true); });
-    }
+
     if (filterStatus) {
-        filterStatus.addEventListener('change', function () { applyFilters(true); });
+        filterStatus.addEventListener('change', function () {
+            state.status = filterStatus.value.toLowerCase();
+            applyFilters(true);
+        });
     }
+
     if (sortSelect) {
         sortSelect.addEventListener('change', applySort);
     }
 
-    applyFilters(true);
-});
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function () {
+            if (searchInput)  { searchInput.value = ''; }
+            if (filterStatus) { filterStatus.value = ''; }
+            state.term = '';
+            state.status = '';
+            state.source = 'all';
 
-// ===== APPROVE PATIENT =====
+            tabs.forEach(function (t) {
+                var on = t.dataset.source === 'all';
+                t.classList.toggle('is-active', on);
+                t.setAttribute('aria-pressed', on ? 'true' : 'false');
+            });
+
+            applyFilters(true);
+        });
+    }
+
+    applyFilters(true);
+})();
+
+
+/* ============================================
+   ROW ACTIONS
+   ============================================ */
+
 function approvePatient(patientId) {
     if (!patientId || patientId === 0) {
         alert('Patient ID not available. Please sync patients first.');
         return;
     }
-    
-    if (!confirm('Are you sure you want to approve this patient? This will generate a patient code.')) {
+
+    if (!confirm('Approve this patient? A patient code will be generated.')) {
         return;
     }
-    
-    // Show loading state
-    const btn = event?.target?.closest('.approve') || document.querySelector(`.approve[data-id="${patientId}"]`);
+
+    var btn = event && event.currentTarget ? event.currentTarget : null;
     if (btn) {
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
         btn.disabled = true;
+        var original = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span>';
     }
-    
-    fetch(`/polymedic/public/admin/approve-patient/${patientId}`, {
+
+    fetch('/polymedic/public/admin/approve-patient/' + patientId, {
         method: 'POST',
         headers: {
             'X-Requested-With': 'XMLHttpRequest',
             'Content-Type': 'application/json'
         }
     })
-    .then(response => response.json())
-    .then(data => {
+    .then(function (response) { return response.json(); })
+    .then(function (data) {
         if (data.success) {
-            alert('Patient approved successfully! Patient Code: ' + data.patient_code);
+            alert('Patient approved. Code: ' + data.patient_code);
             location.reload();
         } else {
             alert('Error: ' + data.message);
             if (btn) {
-                btn.innerHTML = '<i class="bi bi-check-circle"></i>';
+                btn.innerHTML = original;
                 btn.disabled = false;
             }
         }
     })
-    .catch(error => {
+    .catch(function (error) {
         console.error('Error:', error);
         alert('Error approving patient. Please try again.');
         if (btn) {
-            btn.innerHTML = '<i class="bi bi-check-circle"></i>';
+            btn.innerHTML = original;
             btn.disabled = false;
         }
     });
 }
 
-// ===== VIEW PATIENT =====
 function viewPatient(patientId) {
     if (!patientId || patientId === 0) {
         alert('Patient details not available.');
         return;
     }
-    window.location.href = `/polymedic/public/admin/patient/view/${patientId}`;
+    window.location.href = '/polymedic/public/admin/patient/view/' + patientId;
 }
 
-// ===== EDIT PATIENT =====
 function editPatient(patientId) {
     if (!patientId || patientId === 0) {
         alert('Patient cannot be edited.');
         return;
     }
-    window.location.href = `/polymedic/public/admin/patient/edit/${patientId}`;
+    window.location.href = '/polymedic/public/admin/patient/edit/' + patientId;
 }
 
-// ===== EXPORT FUNCTION =====
 function exportPatients() {
     alert('Export functionality coming soon!');
 }

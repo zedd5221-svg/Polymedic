@@ -27,22 +27,8 @@ $slug = static function ($value, $fallback = '') {
     return $value !== '' ? $value : $fallback;
 };
 
-/* Initials for the avatar, taken from the real stored name. */
-$initials = static function ($name) {
-    $name = trim((string) $name);
-    if ($name === '') {
-        return '?';
-    }
-    $parts = preg_split('/\s+/', $name);
-    $first = function_exists('mb_substr') ? mb_substr($parts[0], 0, 1) : substr($parts[0], 0, 1);
-    $last  = '';
-    if (count($parts) > 1) {
-        $lastPart = end($parts);
-        $last = function_exists('mb_substr') ? mb_substr($lastPart, 0, 1) : substr($lastPart, 0, 1);
-    }
-    $out = $first . $last;
-    return function_exists('mb_strtoupper') ? mb_strtoupper($out) : strtoupper($out);
-};
+/* PNG avatar filename inside public/assets/images/. */
+$userAvatar = 'default-avatar.png';
 ?>
 
 <div class="table-card">
@@ -107,7 +93,13 @@ $initials = static function ($name) {
                         <tr data-user-row data-search="<?= esc($roleKey . ' ' . str_replace('_', ' ', $roleKey) . ' ' . $statusKey, 'attr') ?>">
                             <td data-label="User">
                                 <div class="user-cell">
-                                    <span class="user-avatar avatar-<?= esc($roleKey, 'attr') ?>" aria-hidden="true"><?= esc($initials($user['full_name'] ?? '')) ?></span>
+                                    <span class="user-avatar" aria-hidden="true">
+                                        <img src="<?= esc(base_url('assets/images/' . $userAvatar), 'attr') ?>"
+                                             alt=""
+                                             class="user-avatar-img"
+                                             loading="lazy"
+                                             decoding="async">
+                                    </span>
                                     <span class="user-name"><?= esc($user['full_name'] ?? '') ?></span>
                                     <?php if ($isSelf): ?>
                                         <span class="self-chip">You</span>
@@ -207,67 +199,158 @@ $initials = static function ($name) {
     </div>
 </div>
 
-<!-- ===== ADD USER MODAL ===== -->
-<div class="modal fade admin-modal" id="addUserModal" tabindex="-1" aria-labelledby="addUserModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+<!-- ===== ADD USER MODAL (REDESIGNED) ===== -->
+<div class="modal fade admin-modal add-user-modal" id="addUserModal" tabindex="-1" aria-labelledby="addUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="addUserModalLabel"><i class="bi bi-person-plus me-2" aria-hidden="true"></i>Add New User</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form action="<?= base_url('admin/users/create') ?>" method="POST" data-guard-submit>
-                <?= csrf_field() ?>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label" for="add_full_name">Full Name <span class="req">*</span></label>
-                        <input type="text" class="form-control" id="add_full_name" name="full_name" autocomplete="name" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label" for="add_username">Username <span class="req">*</span></label>
-                        <input type="text" class="form-control" id="add_username" name="username" autocomplete="off" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label" for="add_email">Email <span class="req">*</span></label>
-                        <input type="email" class="form-control" id="add_email" name="email" autocomplete="email" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label" for="add_password">Password <span class="req">*</span></label>
-                        <div class="password-field">
-                            <input type="password" class="form-control" id="add_password" name="password" autocomplete="new-password" required>
-                            <button type="button" class="password-toggle" data-toggle-password="add_password" aria-label="Show password" title="Show password">
-                                <i class="bi bi-eye" aria-hidden="true"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label" for="add_role">Role <span class="req">*</span></label>
-                        <select class="form-select" id="add_role" name="role" required>
-                            <option value="">Select Role</option>
-                            <option value="admin">Administrator</option>
-                            <option value="receptionist">Receptionist</option>
-                            <option value="med_tech">Medical Technologist</option>
-                            <option value="radiologist">Radiologist</option>
-                        </select>
-                    </div>
-                    <div class="mb-3" id="add_prc_wrap" hidden>
-                        <label class="form-label" for="add_prc_license">
-                            PRC License No. <span class="req">*</span>
-                        </label>
-                        <input type="text" class="form-control" id="add_prc_license" name="prc_license"
-                               autocomplete="off" maxlength="30" placeholder="e.g. 0123456">
-                        <small class="field-hint">Required for Medical Technologist and Radiologist accounts.</small>
-                    </div>
-                    <div class="mb-0">
-                        <label class="form-label" for="add_status">Status</label>
-                        <select class="form-select" id="add_status" name="status">
-                            <option value="active">Active</option>
-                            <option value="inactive">Inactive</option>
-                        </select>
+
+            <div class="modal-header add-user-header">
+                <div class="add-user-heading">
+                    <span class="add-user-heading-icon" aria-hidden="true">
+                        <i class="bi bi-person-plus-fill"></i>
+                    </span>
+                    <div class="add-user-heading-text">
+                        <h5 class="modal-title" id="addUserModalLabel">Add new user</h5>
+                        <p class="add-user-sub">Create an account for a new member of the staff.</p>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Create User</button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <form action="<?= base_url('admin/users/create') ?>" method="POST" data-guard-submit>
+                <?= csrf_field() ?>
+
+                <div class="modal-body add-user-body">
+
+                    <!-- ================= ACCOUNT ================= -->
+                    <section class="add-user-section">
+                        <h6 class="add-user-section-title">Account</h6>
+
+                        <div class="add-user-grid">
+                            <div class="add-user-field">
+                                <label class="form-label" for="add_full_name">
+                                    Full name <span class="req" aria-hidden="true">*</span>
+                                </label>
+                                <input type="text"
+                                       class="form-control"
+                                       id="add_full_name"
+                                       name="full_name"
+                                       autocomplete="name"
+                                       placeholder="e.g. Juan Dela Cruz"
+                                       required>
+                            </div>
+
+                            <div class="add-user-field">
+                                <label class="form-label" for="add_username">
+                                    Username <span class="req" aria-hidden="true">*</span>
+                                </label>
+                                <input type="text"
+                                       class="form-control"
+                                       id="add_username"
+                                       name="username"
+                                       autocomplete="off"
+                                       spellcheck="false"
+                                       placeholder="e.g. jdelacruz"
+                                       required>
+                                <small class="field-hint">Cannot be changed after creation.</small>
+                            </div>
+
+                            <div class="add-user-field">
+                                <label class="form-label" for="add_email">
+                                    Email <span class="req" aria-hidden="true">*</span>
+                                </label>
+                                <input type="email"
+                                       class="form-control"
+                                       id="add_email"
+                                       name="email"
+                                       autocomplete="email"
+                                       placeholder="user@polymedic.example"
+                                       required>
+                            </div>
+
+                            <div class="add-user-field">
+                                <label class="form-label" for="add_password">
+                                    Password <span class="req" aria-hidden="true">*</span>
+                                </label>
+                                <div class="password-field">
+                                    <input type="password"
+                                           class="form-control"
+                                           id="add_password"
+                                           name="password"
+                                           autocomplete="new-password"
+                                           placeholder="Minimum 8 characters"
+                                           required>
+                                    <button type="button"
+                                            class="password-toggle"
+                                            data-toggle-password="add_password"
+                                            aria-label="Show password"
+                                            title="Show password">
+                                        <i class="bi bi-eye" aria-hidden="true"></i>
+                                    </button>
+                                </div>
+                                <small class="field-hint">Stored as a bcrypt hash. Share it with the user securely.</small>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- ================= ACCESS ================= -->
+                    <section class="add-user-section">
+                        <h6 class="add-user-section-title">Access</h6>
+
+                        <div class="add-user-grid">
+                            <div class="add-user-field">
+                                <label class="form-label" for="add_role">
+                                    Role <span class="req" aria-hidden="true">*</span>
+                                </label>
+                                <select class="form-select" id="add_role" name="role" required>
+                                    <option value="">Select a role</option>
+                                    <option value="admin">Administrator</option>
+                                    <option value="receptionist">Receptionist</option>
+                                    <option value="med_tech">Medical Technologist</option>
+                                    <option value="radiologist">Radiologist</option>
+                                </select>
+                                <small class="field-hint">Determines what the user can see and do.</small>
+                            </div>
+
+                            <div class="add-user-field">
+                                <label class="form-label" for="add_status">Status</label>
+                                <select class="form-select" id="add_status" name="status">
+                                    <option value="active">Active</option>
+                                    <option value="inactive">Inactive</option>
+                                </select>
+                                <small class="field-hint">Inactive accounts cannot sign in.</small>
+                            </div>
+
+                            <div class="add-user-field add-user-field--full" id="add_prc_wrap" hidden>
+                                <label class="form-label" for="add_prc_license">
+                                    PRC License No. <span class="req" aria-hidden="true">*</span>
+                                </label>
+                                <input type="text"
+                                       class="form-control"
+                                       id="add_prc_license"
+                                       name="prc_license"
+                                       autocomplete="off"
+                                       maxlength="30"
+                                       placeholder="e.g. 0123456">
+                                <small class="field-hint">Required for Medical Technologist and Radiologist accounts.</small>
+                            </div>
+                        </div>
+                    </section>
+
+                </div>
+
+                <div class="modal-footer add-user-footer">
+                    <span class="add-user-footer-note">
+                        <i class="bi bi-shield-lock" aria-hidden="true"></i>
+                        The user can change their password after signing in.
+                    </span>
+                    <div class="add-user-footer-actions">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check2" aria-hidden="true"></i>
+                            Create user
+                        </button>
+                    </div>
                 </div>
             </form>
         </div>
@@ -574,18 +657,18 @@ $initials = static function ($name) {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.02em;
     flex-shrink: 0;
+    overflow: hidden;
     background: #eef2f7;
-    color: #475569;
+    border: 1px solid var(--um-line);
 }
 
-.avatar-admin        { background: #e6f0fa; color: #0148ca; }
-.avatar-receptionist { background: #e0f2f4; color: #0e7490; }
-.avatar-med_tech     { background: #e7f6ee; color: #047857; }
-.avatar-radiologist  { background: #fdf0e2; color: #b45309; }
+.user-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
 
 .user-name {
     font-weight: 600;
@@ -747,7 +830,10 @@ $initials = static function ($name) {
 
 .filter-count { color: var(--um-accent); font-weight: 600; }
 
-/* ===== MODALS ===== */
+/* ============================================
+   MODALS (shared)
+   ============================================ */
+
 .admin-modal .modal-content {
     border: 1px solid var(--um-line);
     border-radius: var(--um-radius);
@@ -857,11 +943,159 @@ $initials = static function ($name) {
 
 .modal-note.danger { color: var(--um-danger); }
 
+/* ============================================
+   ADD USER MODAL
+   ============================================ */
+
+/* ---- header ---- */
+
+.add-user-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.15rem 1.35rem;
+}
+
+.add-user-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    min-width: 0;
+}
+
+.add-user-heading-icon {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
+    color: var(--um-accent);
+    background: #eef4fd;
+    border: 1px solid #d6e4fa;
+    border-radius: 10px;
+}
+
+.add-user-heading-text { min-width: 0; }
+
+.add-user-heading-text .modal-title {
+    font-size: 1.02rem;
+    font-weight: 650;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+    display: block;
+}
+
+.add-user-sub {
+    margin: 0.15rem 0 0;
+    font-size: 0.8rem;
+    color: var(--um-muted);
+    line-height: 1.4;
+}
+
+/* ---- body ---- */
+
+.add-user-body {
+    padding: 0.5rem 1.35rem 1rem;
+}
+
+.add-user-section {
+    padding: 1rem 0;
+    border-top: 1px solid var(--um-line-soft);
+}
+
+.add-user-section:first-child {
+    border-top: 0;
+    padding-top: 0.6rem;
+}
+
+.add-user-section-title {
+    margin: 0 0 0.75rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--um-faint);
+}
+
+.add-user-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem 1.25rem;
+}
+
+.add-user-field {
+    min-width: 0;
+}
+
+.add-user-field--full {
+    grid-column: 1 / -1;
+}
+
+/* A subtle reveal when the PRC field appears. The hidden attribute
+   drives it: removing hidden triggers the animation once. */
+.add-user-field--full[hidden] { display: none !important; }
+
+.add-user-field--full:not([hidden]) {
+    animation: addUserFieldIn 0.22s ease;
+}
+
+@keyframes addUserFieldIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ---- footer ---- */
+
+.add-user-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.85rem;
+    flex-wrap: wrap;
+    padding: 0.85rem 1.35rem;
+    background: var(--um-canvas);
+}
+
+.add-user-footer-note {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.74rem;
+    color: var(--um-muted);
+}
+
+.add-user-footer-note i { font-size: 0.82rem; color: var(--um-faint); }
+
+.add-user-footer-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: auto;
+}
+
+.add-user-footer-actions .btn { margin: 0; }
+
+/* ---- responsive ---- */
+
+@media (max-width: 576px) {
+    .add-user-grid { grid-template-columns: minmax(0, 1fr); }
+
+    .add-user-header { padding: 1rem; }
+    .add-user-body { padding: 0.35rem 1rem 0.85rem; }
+    .add-user-footer { padding: 0.75rem 1rem; }
+
+    .add-user-footer-note { width: 100%; }
+    .add-user-footer-actions { width: 100%; }
+    .add-user-footer-actions .btn { flex: 1; }
+}
+
 /* ===== HIDDEN HELPER ===== */
 [hidden] { display: none !important; }
 
 /* ============================================
-   RESPONSIVE
+   RESPONSIVE (table)
    ============================================ */
 
 @media (max-width: 991px) {
@@ -985,17 +1219,13 @@ $initials = static function ($name) {
         if (el) { el.value = value == null ? '' : value; }
     }
 
-    /*
-     * Show or hide the PRC license field based on the selected role.
-     * The field is only meaningful for med_tech and radiologist.
-     */
+    /* Show or hide the PRC license field based on the selected role. */
     function togglePrcVisibility(selectEl, wrapEl) {
         if (!selectEl || !wrapEl) { return; }
         var show = PRC_ROLES.indexOf(selectEl.value) !== -1;
         wrapEl.hidden = !show;
     }
 
-    /* Wire the two role selects. */
     var addRoleSelect  = document.getElementById('add_role');
     var addPrcWrap     = document.getElementById('add_prc_wrap');
     var editRoleSelect = document.getElementById('edit_role');
@@ -1015,7 +1245,7 @@ $initials = static function ($name) {
     }
 
     // ============================================
-    // Edit User - populate modal
+    // Edit User
     // ============================================
     document.querySelectorAll('.edit-user').forEach(function (btn) {
         btn.addEventListener('click', function () {
@@ -1038,7 +1268,7 @@ $initials = static function ($name) {
     });
 
     // ============================================
-    // Delete User - populate modal
+    // Delete User
     // ============================================
     document.querySelectorAll('.delete-user').forEach(function (btn) {
         btn.addEventListener('click', function () {
@@ -1169,7 +1399,13 @@ $initials = static function ($name) {
             var submitBtn = form.querySelector('button[type="submit"]');
             if (submitBtn) {
                 submitBtn.disabled = true;
-                submitBtn.textContent = 'Saving...';
+                var original = submitBtn.innerHTML;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Saving…';
+
+                setTimeout(function () {
+                    submitBtn.innerHTML = original;
+                    submitBtn.disabled = false;
+                }, 8000);
             }
         });
     });
@@ -1179,7 +1415,9 @@ $initials = static function ($name) {
             var submitBtn = modalEl.querySelector('button[type="submit"]');
             if (submitBtn && submitBtn.disabled) {
                 submitBtn.disabled = false;
-                submitBtn.textContent = modalEl.id === 'addUserModal' ? 'Create User' : 'Update User';
+                submitBtn.textContent = modalEl.id === 'addUserModal'
+                    ? 'Create user'
+                    : 'Update User';
             }
         });
     });

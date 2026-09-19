@@ -170,6 +170,69 @@ class NotificationController extends BaseController
     }
 
     /**
+     * Bulk delete. Row IDs arrive as ids[] in the POST body.
+     *
+     * Only rows belonging to the caller's role are removed, so a
+     * crafted POST cannot reach across roles. The role filter is
+     * what makes this safe to expose from every notification page
+     * (admin, receptionist, radiologist, medtech) through the same
+     * route, because each caller only ever sees their own rows.
+     */
+    public function deleteBatch()
+    {
+        $role = (string) session()->get('role');
+
+        $pages = [
+            'admin'        => 'admin/notifications',
+            'receptionist' => 'receptionist/notifications',
+            'radiologist'  => 'radiologist/notifications',
+            'med_tech'     => 'medtech/notifications',
+        ];
+
+        if ($role === '' || !isset($pages[$role])) {
+            return redirect()->to(base_url('login'));
+        }
+
+        $ids = $this->request->getPost('ids');
+
+        if (!is_array($ids) || empty($ids)) {
+            return redirect()->to(base_url($pages[$role]))
+                             ->with('error', 'No notifications were selected.');
+        }
+
+        $clean = [];
+        foreach ($ids as $id) {
+            $n = (int) $id;
+            if ($n > 0) { $clean[$n] = $n; }
+        }
+
+        if (empty($clean)) {
+            return redirect()->to(base_url($pages[$role]))
+                             ->with('error', 'No valid notifications were selected.');
+        }
+
+        $clean = array_values($clean);
+
+        try {
+            $this->notificationModel
+                 ->whereIn('id', $clean)
+                 ->where('user_role', $role)
+                 ->delete();
+        } catch (\Exception $e) {
+            log_message('error', 'Bulk notification delete failed: ' . $e->getMessage());
+            return redirect()->to(base_url($pages[$role]))
+                             ->with('error', 'Could not delete the selected notifications.');
+        }
+
+        $count = count($clean);
+        $msg = $count === 1
+            ? '1 notification deleted.'
+            : $count . ' notifications deleted.';
+
+        return redirect()->to(base_url($pages[$role]))->with('success', $msg);
+    }
+
+    /**
      * ============================================================
      * RECEPTIONIST
      * ============================================================

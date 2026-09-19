@@ -3,8 +3,7 @@
 namespace App\Controllers;
 
 use App\Models\AppointmentModel;
-use App\Models\LabRequestModel;
-use App\Models\XrayExaminationModel;
+use App\Models\DiagnosticRequestModel;
 use App\Models\NotificationModel;
 use App\Models\ServiceModel;
 use App\Models\PatientModel;
@@ -17,7 +16,7 @@ class Receptionist extends BaseController
         if (!session()->get('is_logged_in')) {
             return redirect()->to(base_url('login'));
         }
-        
+
         $role = session()->get('role');
         if ($role !== 'receptionist') {
             if ($role === 'admin') {
@@ -35,56 +34,46 @@ class Receptionist extends BaseController
 
         $appointmentModel = new AppointmentModel();
         $paymentModel = new PaymentModel();
-        
-        // Get today's date
+
         $today = date('Y-m-d');
-        
-        // Get today's appointments
+
         $data['today_appointments'] = $appointmentModel
             ->where('appointment_date', $today)
             ->orderBy('appointment_time', 'ASC')
             ->findAll();
-        
-        // Get pending online appointments (all pending, not just today)
+
         $data['pending_appointments'] = $appointmentModel
             ->where('status', 'pending')
             ->countAllResults();
-        
-        // Get today's completed appointments
+
         $data['today_completed'] = $appointmentModel
             ->where('appointment_date', $today)
             ->where('status', 'completed')
             ->countAllResults();
-        
-        // Get pending diagnostic requests (approved appointments)
+
         $data['pending_diagnostic'] = $appointmentModel
             ->where('status', 'approved')
             ->countAllResults();
-        
-        // Get unpaid bills (approved appointments)
+
         $data['unpaid_bills'] = $appointmentModel
             ->where('status', 'approved')
             ->countAllResults();
-        
-        // Get today's collections from payments table
+
         $todayPayments = $paymentModel
             ->where('DATE(payment_date)', $today)
             ->where('payment_status', 'paid')
             ->findAll();
-        
+
         $todayCollections = 0;
         foreach ($todayPayments as $payment) {
             $todayCollections += floatval($payment['total_amount']);
         }
         $data['today_collections'] = $todayCollections;
 
-        // Get total patients (same deduped count as the Patients page)
         $data['total_patients'] = count($this->getAllPatients());
-        
-        // Get weekly appointment data for chart
+
         $data['weekly_appointments'] = $this->getWeeklyAppointmentData();
-        
-        // Get service distribution for today
+
         $serviceData = $this->getServiceDistributionData();
         $data['service_labels'] = $serviceData['labels'];
         $data['service_counts'] = $serviceData['counts'];
@@ -103,8 +92,7 @@ class Receptionist extends BaseController
     private function getAllPatients(): array
     {
         $patientModel     = new PatientModel();
-        $labRequestModel  = new LabRequestModel();
-        $xrayModel        = new XrayExaminationModel();
+        $diagnosticModel  = new DiagnosticRequestModel();
         $appointmentModel = new AppointmentModel();
 
         $allPatients = [];
@@ -137,10 +125,11 @@ class Receptionist extends BaseController
             log_message('error', 'Patients - Patients table error: ' . $e->getMessage());
         }
 
-        // ========== 2. FROM APPOINTMENTS (ONLINE - if not in patients table) ==========
+        // ========== 2. FROM APPOINTMENTS (APPROVED / COMPLETED ONLY) ==========
         try {
             $appointmentPatients = $appointmentModel
                 ->select('full_name, email, phone, age, gender, MAX(appointment_date) as last_visit')
+                ->whereIn('status', ['approved', 'completed'])
                 ->groupBy('full_name')
                 ->orderBy('full_name', 'ASC')
                 ->findAll();
@@ -166,10 +155,12 @@ class Receptionist extends BaseController
             log_message('error', 'Patients - Appointments error: ' . $e->getMessage());
         }
 
-        // ========== 3. FROM LAB REQUESTS (WALK-IN - if not in patients table) ==========
+        // ========== 3. FROM LAB REQUESTS (NON-CANCELLED) ==========
         try {
-            $labPatients = $labRequestModel
+            $labPatients = $diagnosticModel
                 ->select('patient_name as full_name, age, gender, MAX(request_date) as last_visit')
+                ->where('type', DiagnosticRequestModel::TYPE_LAB)
+                ->whereIn('status', ['pending', 'in_progress', 'completed', 'released'])
                 ->groupBy('patient_name')
                 ->orderBy('patient_name', 'ASC')
                 ->findAll();
@@ -195,10 +186,12 @@ class Receptionist extends BaseController
             log_message('error', 'Patients - Lab Requests error: ' . $e->getMessage());
         }
 
-        // ========== 4. FROM X-RAY EXAMINATIONS (WALK-IN - if not in patients table) ==========
+        // ========== 4. FROM X-RAY EXAMINATIONS (NON-CANCELLED) ==========
         try {
-            $xrayPatients = $xrayModel
-                ->select('patient_name as full_name, age, gender, MAX(exam_date) as last_visit')
+            $xrayPatients = $diagnosticModel
+                ->select('patient_name as full_name, age, gender, MAX(request_date) as last_visit')
+                ->where('type', DiagnosticRequestModel::TYPE_XRAY)
+                ->whereIn('status', ['pending', 'in_progress', 'completed', 'released'])
                 ->groupBy('patient_name')
                 ->orderBy('patient_name', 'ASC')
                 ->findAll();
@@ -239,23 +232,22 @@ class Receptionist extends BaseController
 
         try {
             $model = new AppointmentModel();
-            
-            // Check for late appointments if method exists
+
             if (method_exists($model, 'checkLateAppointments')) {
                 $model->checkLateAppointments();
             }
-            
+
             $data['appointments'] = $model->orderBy('appointment_date', 'DESC')
                                           ->orderBy('appointment_time', 'ASC')
                                           ->findAll();
-            
+
             $data['total']     = $model->countAll();
             $data['pending']   = $model->where('status', 'pending')->countAllResults();
             $data['approved']  = $model->where('status', 'approved')->countAllResults();
             $data['completed'] = $model->where('status', 'completed')->countAllResults();
             $data['cancelled'] = $model->where('status', 'cancelled')->countAllResults();
             $data['late']      = $model->where('status', 'late')->countAllResults();
-            
+
             return view('Receptionist/appointments', $data);
         } catch (\Exception $e) {
             log_message('error', 'Appointments error: ' . $e->getMessage());
@@ -267,18 +259,18 @@ class Receptionist extends BaseController
     {
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
-        
+
         $model = new AppointmentModel();
         $data['appointment'] = $model->find($id);
-        
+
         if (!$data['appointment']) {
             return redirect()->to(base_url('receptionist/appointments'))
                             ->with('error', 'Appointment not found');
         }
-        
+
         $data['lab_services']  = json_decode($data['appointment']['lab_services'], true) ?? [];
         $data['xray_services'] = json_decode($data['appointment']['xray_services'], true) ?? [];
-        
+
         $data['statusClass'] = [
             'pending'   => 'warning',
             'approved'  => 'primary',
@@ -286,7 +278,7 @@ class Receptionist extends BaseController
             'cancelled' => 'danger',
             'late'      => 'dark'
         ];
-        
+
         return view('Receptionist/appointment_view', $data);
     }
 
@@ -297,131 +289,131 @@ class Receptionist extends BaseController
     {
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
-        
+
         $model = new AppointmentModel();
         $appointment = $model->find($id);
-        
+
         if (!$appointment) {
             return redirect()->to(base_url('receptionist/appointments'))
                             ->with('error', 'Appointment not found');
         }
-        
+
         if (in_array($appointment['status'], ['completed', 'cancelled', 'no_show'])) {
             return redirect()->to(base_url('receptionist/appointments'))
                             ->with('error', 'This appointment cannot be approved');
         }
-        
+
         // Update appointment status to approved
         $model->update($id, [
             'status'       => 'approved',
             'arrival_time' => date('Y-m-d H:i:s')
         ]);
-        
+
         // ===== CREATE/UPDATE PATIENT RECORD =====
         $patientModel = new PatientModel();
         $patient = $patientModel->findOrCreateFromAppointment($appointment);
-        
+
         // ===== DECODE SERVICES FROM APPOINTMENT =====
         $labServices = json_decode($appointment['lab_services'], true) ?? [];
         $xrayServices = json_decode($appointment['xray_services'], true) ?? [];
         $successMessages = [];
-        
+
+        $diagnosticModel = new DiagnosticRequestModel();
+
         // ===== CREATE LAB REQUEST IF LAB SERVICES EXIST =====
         if (!empty($labServices)) {
-            $labRequestModel = new LabRequestModel();
-            
-            // Check if lab request already exists for this appointment
-            $existing = $labRequestModel->where('appointment_id', $id)->first();
-            
+            $existing = $diagnosticModel
+                ->where('appointment_id', $id)
+                ->where('type', DiagnosticRequestModel::TYPE_LAB)
+                ->first();
+
             if ($existing) {
                 $successMessages[] = 'Lab request already exists.';
             } else {
-                // Clean lab services - remove JSON escape characters
                 $cleanedServices = array_map(function($service) {
                     $service = str_replace('\/', '/', $service);
                     $service = str_replace('\\/', '/', $service);
                     $service = stripslashes($service);
                     return trim($service);
                 }, $labServices);
-                
-                // Create lab request
-                $labData = [
-                    'appointment_id' => $appointment['id'],
-                    'patient_name' => $appointment['full_name'],
-                    'age' => $appointment['age'],
-                    'gender' => $appointment['gender'],
-                    'email' => $appointment['email'] ?? null,
-                    'phone' => $appointment['phone'] ?? null,
-                    'lab_services' => implode(', ', $cleanedServices),
-                    'request_date' => date('Y-m-d'),
-                    'status' => 'pending'
-                ];
-                
-                $labRequestModel->insert($labData);
-                $labRequestId = $labRequestModel->getInsertID();
-                
-                // Create notification for MedTech
+
+                $diagnosticModel->insert([
+                    'reference_number' => 'LAB-' . date('y') . '-' . strtoupper(bin2hex(random_bytes(3))),
+                    'type'             => DiagnosticRequestModel::TYPE_LAB,
+                    'appointment_id'   => $appointment['id'],
+                    'patient_name'     => $appointment['full_name'],
+                    'age'              => $appointment['age'],
+                    'gender'           => $appointment['gender'],
+                    'email'            => $appointment['email'] ?? null,
+                    'phone'            => $appointment['phone'] ?? null,
+                    'services'         => implode(', ', $cleanedServices),
+                    'request_date'     => date('Y-m-d'),
+                    'priority'         => 'routine',
+                    'status'           => DiagnosticRequestModel::STATUS_PENDING,
+                ]);
+
+                $labRequestId = $diagnosticModel->getInsertID();
+
                 NotificationModel::notify(
                     'lab',
                     'New Lab Request (Online Booking)',
                     'New lab request for online patient ' . $appointment['full_name'],
                     $labRequestId,
-                    '/polymedic/public/medtech/request/view/' . $labRequestId
+                    'medtech/request/view/' . $labRequestId
                 );
-                
+
                 $successMessages[] = 'Lab request created successfully!';
                 log_message('info', 'Lab request created for appointment #' . $id . ' (Patient: ' . $appointment['full_name'] . ')');
             }
         }
-        
+
         // ===== CREATE X-RAY REQUEST IF X-RAY SERVICES EXIST =====
         if (!empty($xrayServices)) {
-            $xrayModel = new XrayExaminationModel();
-            
-            // Check if x-ray examination already exists
-            $existing = $xrayModel->where('appointment_id', $id)->first();
-            
+            $existing = $diagnosticModel
+                ->where('appointment_id', $id)
+                ->where('type', DiagnosticRequestModel::TYPE_XRAY)
+                ->first();
+
             if ($existing) {
                 $successMessages[] = 'X-Ray request already exists.';
             } else {
-                // Clean X-Ray services
                 $cleanedServices = array_map(function($service) {
                     $service = str_replace('\/', '/', $service);
                     $service = str_replace('\\/', '/', $service);
                     $service = stripslashes($service);
                     return trim($service);
                 }, $xrayServices);
-                
-                // Create x-ray examination
-                $xrayData = [
-                    'appointment_id' => $appointment['id'],
-                    'patient_name' => $appointment['full_name'],
-                    'age' => $appointment['age'],
-                    'gender' => $appointment['gender'],
-                    'email' => $appointment['email'] ?? null,
-                    'phone' => $appointment['phone'] ?? null,
-                    'exam_type' => implode(', ', $cleanedServices),
-                    'exam_date' => date('Y-m-d'),
-                    'status' => 'pending'
-                ];
-                
-                $xrayModel->insert($xrayData);
-                $xrayId = $xrayModel->getInsertID();
-                
-                // Create notification for Radiologist
+
+                $diagnosticModel->insert([
+                    'reference_number' => 'XR-' . date('y') . '-' . strtoupper(bin2hex(random_bytes(3))),
+                    'type'             => DiagnosticRequestModel::TYPE_XRAY,
+                    'appointment_id'   => $appointment['id'],
+                    'patient_name'     => $appointment['full_name'],
+                    'age'              => $appointment['age'],
+                    'gender'           => $appointment['gender'],
+                    'email'            => $appointment['email'] ?? null,
+                    'phone'            => $appointment['phone'] ?? null,
+                    'services'         => implode(', ', $cleanedServices),
+                    'request_date'     => date('Y-m-d'),
+                    'priority'         => 'Routine',
+                    'status'           => DiagnosticRequestModel::STATUS_PENDING,
+                ]);
+
+                $xrayId = $diagnosticModel->getInsertID();
+
                 NotificationModel::notify(
                     'xray',
                     'New X-Ray Request (Online Booking)',
                     'New X-Ray request for online patient ' . $appointment['full_name'],
                     $xrayId,
-                    '/polymedic/public/radiologist/examination/view/' . $xrayId
+                    'radiologist/examination/view/' . $xrayId
                 );
-                
+
                 $successMessages[] = 'X-Ray request created successfully!';
                 log_message('info', 'X-Ray request created for appointment #' . $id . ' (Patient: ' . $appointment['full_name'] . ')');
             }
         }
-        
+
         // Build success message
         $message = 'Appointment approved successfully!';
         if (!empty($successMessages)) {
@@ -430,12 +422,11 @@ class Receptionist extends BaseController
         if ($patient) {
             $message .= ' Patient Code: ' . $patient['patient_code'];
         }
-        
-        // If no services were selected, add a note
+
         if (empty($labServices) && empty($xrayServices)) {
             $message .= ' (No diagnostic services selected)';
         }
-        
+
         return redirect()->to(base_url('receptionist/appointments'))
                         ->with('success', $message);
     }
@@ -444,22 +435,22 @@ class Receptionist extends BaseController
     {
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
-        
+
         $model = new AppointmentModel();
         $appointment = $model->find($id);
-        
+
         if (!$appointment) {
             return redirect()->to(base_url('receptionist/appointments'))
                             ->with('error', 'Appointment not found');
         }
-        
+
         if ($appointment['status'] == 'completed') {
             return redirect()->to(base_url('receptionist/appointments'))
                             ->with('error', 'Completed appointments cannot be cancelled');
         }
-        
+
         $model->update($id, ['status' => 'cancelled']);
-        
+
         return redirect()->to(base_url('receptionist/appointments'))
                         ->with('success', 'Appointment cancelled successfully!');
     }
@@ -468,22 +459,22 @@ class Receptionist extends BaseController
     {
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
-        
+
         $model = new AppointmentModel();
         $appointment = $model->find($id);
-        
+
         if (!$appointment) {
             return redirect()->to(base_url('receptionist/appointments'))
                             ->with('error', 'Appointment not found');
         }
-        
+
         if ($appointment['status'] != 'approved') {
             return redirect()->to(base_url('receptionist/appointments'))
                             ->with('error', 'Only approved appointments can be marked as completed');
         }
-        
+
         $model->update($id, ['status' => 'completed']);
-        
+
         return redirect()->to(base_url('receptionist/appointments'))
                         ->with('success', 'Appointment marked as completed!');
     }
@@ -508,7 +499,7 @@ class Receptionist extends BaseController
     {
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
-        
+
         return view('Receptionist/billing');
     }
 
@@ -516,26 +507,23 @@ class Receptionist extends BaseController
     {
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
-        
-        // Load payment data
+
         $paymentModel = new PaymentModel();
         $payments = $paymentModel->orderBy('payment_date', 'DESC')->findAll();
-        
-        // Calculate stats
+
         $today = date('Y-m-d');
         $todayPayments = $paymentModel->where('DATE(payment_date)', $today)->where('payment_status', 'paid')->findAll();
         $todayTotal = 0;
         foreach ($todayPayments as $p) {
             $todayTotal += floatval($p['total_amount']);
         }
-        
+
         $monthlyPayments = $paymentModel->where('MONTH(payment_date)', date('m'))->where('YEAR(payment_date)', date('Y'))->where('payment_status', 'paid')->findAll();
         $monthlyTotal = 0;
         foreach ($monthlyPayments as $p) {
             $monthlyTotal += floatval($p['total_amount']);
         }
-        
-        // Get unique patients count
+
         $uniquePatients = [];
         foreach ($payments as $p) {
             if (!in_array($p['patient_name'], $uniquePatients)) {
@@ -543,11 +531,6 @@ class Receptionist extends BaseController
             }
         }
 
-        // Attach each patient's gender so the view can render a
-        // male/female avatar. Matched by patient_code, which is the
-        // unique key on the patients table. Payments whose
-        // patient_code is missing or does not match a patient row
-        // get a null gender, and the view falls back to initials.
         $patientModel = new PatientModel();
 
         $codes = [];
@@ -587,7 +570,7 @@ class Receptionist extends BaseController
             'monthly_total' => $monthlyTotal,
             'total_patients' => count($uniquePatients)
         ];
-        
+
         return view('Receptionist/payments', $data);
     }
 
@@ -595,10 +578,10 @@ class Receptionist extends BaseController
     {
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
-        
+
         return view('Receptionist/reports');
     }
-    
+
     // =============================================
     // MANUAL SYNC - Create lab requests for existing approved appointments
     // =============================================
@@ -606,63 +589,64 @@ class Receptionist extends BaseController
     {
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
-        
+
         $appointmentModel = new AppointmentModel();
-        $labRequestModel = new LabRequestModel();
-        $xrayModel = new XrayExaminationModel();
-        $patientModel = new PatientModel();
-        
-        // Get all approved appointments with lab services that don't have lab requests
+        $diagnosticModel  = new DiagnosticRequestModel();
+        $patientModel     = new PatientModel();
+
         $appointments = $appointmentModel
             ->where('status', 'approved')
             ->where('lab_services IS NOT NULL')
             ->where('lab_services !=', '[]')
             ->where('lab_services !=', 'null')
             ->findAll();
-        
+
         $created = 0;
         $skipped = 0;
         $patientsCreated = 0;
-        
+
         foreach ($appointments as $appointment) {
-            // Create patient if doesn't exist
             $patient = $patientModel->findOrCreateFromAppointment($appointment);
             if ($patient) {
                 $patientsCreated++;
             }
-            
-            // Check if lab request already exists
-            $existing = $labRequestModel->where('appointment_id', $appointment['id'])->first();
+
+            $existing = $diagnosticModel
+                ->where('appointment_id', $appointment['id'])
+                ->where('type', DiagnosticRequestModel::TYPE_LAB)
+                ->first();
+
             if ($existing) {
                 $skipped++;
                 continue;
             }
-            
+
             $labServices = json_decode($appointment['lab_services'], true) ?? [];
-            
+
             if (!empty($labServices)) {
-                // Clean lab services
                 $cleanedServices = array_map(function($service) {
                     $service = str_replace('\/', '/', $service);
                     $service = str_replace('\\/', '/', $service);
                     $service = stripslashes($service);
                     return trim($service);
                 }, $labServices);
-                
-                $labData = [
-                    'appointment_id' => $appointment['id'],
-                    'patient_name' => $appointment['full_name'],
-                    'age' => $appointment['age'],
-                    'gender' => $appointment['gender'],
-                    'lab_services' => implode(', ', $cleanedServices),
-                    'request_date' => $appointment['appointment_date'] ?? date('Y-m-d'),
-                    'status' => 'pending'
-                ];
-                $labRequestModel->insert($labData);
+
+                $diagnosticModel->insert([
+                    'reference_number' => 'LAB-' . date('y') . '-' . strtoupper(bin2hex(random_bytes(3))),
+                    'type'             => DiagnosticRequestModel::TYPE_LAB,
+                    'appointment_id'   => $appointment['id'],
+                    'patient_name'     => $appointment['full_name'],
+                    'age'              => $appointment['age'],
+                    'gender'           => $appointment['gender'],
+                    'services'         => implode(', ', $cleanedServices),
+                    'request_date'     => $appointment['appointment_date'] ?? date('Y-m-d'),
+                    'priority'         => 'routine',
+                    'status'           => DiagnosticRequestModel::STATUS_PENDING,
+                ]);
                 $created++;
             }
         }
-        
+
         // Also sync X-Ray for approved appointments
         $xrayAppointments = $appointmentModel
             ->where('status', 'approved')
@@ -670,19 +654,23 @@ class Receptionist extends BaseController
             ->where('xray_services !=', '[]')
             ->where('xray_services !=', 'null')
             ->findAll();
-        
+
         $xrayCreated = 0;
         $xraySkipped = 0;
-        
+
         foreach ($xrayAppointments as $appointment) {
-            $existing = $xrayModel->where('appointment_id', $appointment['id'])->first();
+            $existing = $diagnosticModel
+                ->where('appointment_id', $appointment['id'])
+                ->where('type', DiagnosticRequestModel::TYPE_XRAY)
+                ->first();
+
             if ($existing) {
                 $xraySkipped++;
                 continue;
             }
-            
+
             $xrayServices = json_decode($appointment['xray_services'], true) ?? [];
-            
+
             if (!empty($xrayServices)) {
                 $cleanedServices = array_map(function($service) {
                     $service = str_replace('\/', '/', $service);
@@ -690,21 +678,23 @@ class Receptionist extends BaseController
                     $service = stripslashes($service);
                     return trim($service);
                 }, $xrayServices);
-                
-                $xrayData = [
-                    'appointment_id' => $appointment['id'],
-                    'patient_name' => $appointment['full_name'],
-                    'age' => $appointment['age'],
-                    'gender' => $appointment['gender'],
-                    'exam_type' => implode(', ', $cleanedServices),
-                    'exam_date' => $appointment['appointment_date'] ?? date('Y-m-d'),
-                    'status' => 'pending'
-                ];
-                $xrayModel->insert($xrayData);
+
+                $diagnosticModel->insert([
+                    'reference_number' => 'XR-' . date('y') . '-' . strtoupper(bin2hex(random_bytes(3))),
+                    'type'             => DiagnosticRequestModel::TYPE_XRAY,
+                    'appointment_id'   => $appointment['id'],
+                    'patient_name'     => $appointment['full_name'],
+                    'age'              => $appointment['age'],
+                    'gender'           => $appointment['gender'],
+                    'services'         => implode(', ', $cleanedServices),
+                    'request_date'     => $appointment['appointment_date'] ?? date('Y-m-d'),
+                    'priority'         => 'Routine',
+                    'status'           => DiagnosticRequestModel::STATUS_PENDING,
+                ]);
                 $xrayCreated++;
             }
         }
-        
+
         return redirect()->to(base_url('receptionist/appointments'))
                         ->with('success', "Synced $created lab requests, $xrayCreated X-Ray requests, and $patientsCreated patients. Skipped $skipped lab and $xraySkipped X-Ray (already exist).");
     }
@@ -717,14 +707,11 @@ class Receptionist extends BaseController
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
 
-        $labRequestModel = new LabRequestModel();
-        $xrayModel = new XrayExaminationModel();
-        $serviceModel = new ServiceModel();
-        
-        // Get all diagnostic requests (lab + x-ray combined)
-        $data['requests'] = $this->getCombinedRequests($labRequestModel, $xrayModel);
-        
-        // Get counts for filters
+        $diagnosticModel = new DiagnosticRequestModel();
+        $serviceModel    = new ServiceModel();
+
+        $data['requests'] = $this->getCombinedRequests($diagnosticModel);
+
         $data['counts'] = [
             'total' => count($data['requests']),
             'pending' => $this->countRequestsByStatus($data['requests'], 'pending'),
@@ -733,91 +720,76 @@ class Receptionist extends BaseController
             'released' => $this->countRequestsByStatus($data['requests'], 'released'),
             'cancelled' => $this->countRequestsByStatus($data['requests'], 'cancelled')
         ];
-        
-        // Get services for the create modal
+
         $data['labServices'] = $serviceModel->getServicesByCategory('laboratory');
         $data['xrayServices'] = $serviceModel->getServicesByCategory('xray');
-        
+
         return view('Receptionist/diagnostic_requests', $data);
     }
 
     /**
-     * Get combined lab and x-ray requests
+     * Get combined lab and x-ray requests from the merged table.
+     *
+     * The model's row decoration means each row already carries both
+     * the new column names (services, request_date) and the legacy
+     * aliases (lab_services, exam_type, exam_date), so this method
+     * reads whichever name is convenient without needing two queries.
      */
-    private function getCombinedRequests($labRequestModel, $xrayModel)
+    private function getCombinedRequests($diagnosticModel)
     {
-        $labRequests = $labRequestModel
+        $rows = $diagnosticModel
             ->orderBy('created_at', 'DESC')
             ->findAll();
-        
-        $xrayRequests = $xrayModel
-            ->orderBy('created_at', 'DESC')
-            ->findAll();
-        
+
         $combined = [];
-        
-        foreach ($labRequests as $lab) {
-            // Determine priority
-            $priority = 'routine';
-            if (strpos(strtolower($lab['lab_services'] ?? ''), 'stat') !== false) {
-                $priority = 'stat';
+
+        foreach ($rows as $row) {
+            $type = $row['type'] ?? 'lab';
+
+            $rawServices = $type === 'xray'
+                ? ($row['exam_type'] ?? $row['services'] ?? '')
+                : ($row['lab_services'] ?? $row['services'] ?? '');
+
+            $priority = $row['priority'] ?? 'routine';
+            if ($type === 'lab') {
+                $priority = strpos(strtolower((string) $rawServices), 'stat') !== false
+                    ? 'stat'
+                    : 'routine';
+            } else {
+                $priority = strtolower((string) $priority) === 'stat' ? 'stat' : 'routine';
             }
-            
-            // Get service names as array
-            $services = explode(', ', $lab['lab_services'] ?? '');
-            $services = array_filter($services, function($s) { return !empty(trim($s)); });
-            
+
+            $services = explode(', ', (string) $rawServices);
+            $services = array_values(array_filter(array_map('trim', $services), 'strlen'));
+
+            $prefix = $type === 'xray' ? 'XRAY' : 'LAB';
+
             $combined[] = [
-                'id' => $lab['id'],
-                'type' => 'lab',
-                'reference' => 'LAB-' . date('y') . '-' . str_pad($lab['id'], 4, '0', STR_PAD_LEFT),
-                'patient_name' => $lab['patient_name'] ?? 'Unknown',
-                'patient_age' => $lab['age'] ?? 'N/A',
-                'patient_gender' => $lab['gender'] ?? 'N/A',
-                'email' => $lab['email'] ?? '',
-                'phone' => $lab['phone'] ?? '',
+                'id' => $row['id'],
+                'type' => $type,
+                'reference' => !empty($row['reference_number'])
+                    ? $row['reference_number']
+                    : $prefix . '-' . date('y') . '-' . str_pad((string) $row['id'], 4, '0', STR_PAD_LEFT),
+                'patient_name' => $row['patient_name'] ?? 'Unknown',
+                'patient_age' => $row['age'] ?? 'N/A',
+                'patient_gender' => $row['gender'] ?? 'N/A',
+                'email' => $row['email'] ?? '',
+                'phone' => $row['phone'] ?? '',
                 'services' => $services,
                 'services_display' => implode(', ', array_slice($services, 0, 3)) . (count($services) > 3 ? ' +' . (count($services) - 3) : ''),
-                'status' => $lab['status'] ?? 'pending',
+                'status' => $row['status'] ?? 'pending',
                 'priority' => $priority,
-                'doctor_name' => $lab['doctor_name'] ?? 'Dr. Ana Cruz',
-                'created_at' => $lab['created_at'],
-                'request_type' => 'Laboratory',
-                'source' => $lab['appointment_id'] > 0 ? 'Online' : 'Walk-in'
+                'doctor_name' => $row['doctor_name'] ?? 'Dr. Ana Cruz',
+                'created_at' => $row['created_at'],
+                'request_type' => $type === 'xray' ? 'X-Ray' : 'Laboratory',
+                'source' => !empty($row['appointment_id']) ? 'Online' : 'Walk-in',
             ];
         }
-        
-        foreach ($xrayRequests as $xray) {
-            $priority = $xray['priority'] ?? 'routine';
-            
-            $services = explode(', ', $xray['exam_type'] ?? '');
-            $services = array_filter($services, function($s) { return !empty(trim($s)); });
-            
-            $combined[] = [
-                'id' => $xray['id'],
-                'type' => 'xray',
-                'reference' => 'XRAY-' . date('y') . '-' . str_pad($xray['id'], 4, '0', STR_PAD_LEFT),
-                'patient_name' => $xray['patient_name'] ?? 'Unknown',
-                'patient_age' => $xray['age'] ?? 'N/A',
-                'patient_gender' => $xray['gender'] ?? 'N/A',
-                'email' => $xray['email'] ?? '',
-                'phone' => $xray['phone'] ?? '',
-                'services' => $services,
-                'services_display' => implode(', ', array_slice($services, 0, 3)) . (count($services) > 3 ? ' +' . (count($services) - 3) : ''),
-                'status' => $xray['status'] ?? 'pending',
-                'priority' => $priority,
-                'doctor_name' => $xray['doctor_name'] ?? 'Dr. Ana Cruz',
-                'created_at' => $xray['created_at'],
-                'request_type' => 'X-Ray',
-                'source' => $xray['appointment_id'] > 0 ? 'Online' : 'Walk-in'
-            ];
-        }
-        
-        // Sort by created_at descending (newest first)
+
         usort($combined, function($a, $b) {
             return strtotime($b['created_at']) - strtotime($a['created_at']);
         });
-        
+
         return $combined;
     }
 
@@ -836,13 +808,13 @@ class Receptionist extends BaseController
     }
 
     // =============================================
-    // CREATE WALK-IN DIAGNOSTIC REQUEST - COMPLETELY FIXED
+    // CREATE WALK-IN DIAGNOSTIC REQUEST
     // =============================================
     public function createDiagnosticRequest()
     {
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
-        
+
         $requestType = $this->request->getPost('request_type');
         $patientName = trim($this->request->getPost('patient_name'));
         $age = $this->request->getPost('age');
@@ -852,8 +824,7 @@ class Receptionist extends BaseController
         $doctorName = trim($this->request->getPost('doctor_name') ?? '');
         $email = trim($this->request->getPost('email') ?? '');
         $phone = trim($this->request->getPost('phone') ?? '');
-        
-        // Validation
+
         $errors = [];
         if (empty($patientName)) {
             $errors[] = 'Patient name is required';
@@ -867,29 +838,25 @@ class Receptionist extends BaseController
         if (empty($services) || !is_array($services) || count(array_filter($services)) === 0) {
             $errors[] = 'Please select at least one service';
         }
-        
+
         if (!empty($errors)) {
             return redirect()->back()
                             ->with('validation_errors', $errors)
                             ->with('error', 'Please fix the errors below')
                             ->withInput();
         }
-        
-        // Clean services
+
         $cleanedServices = array_map(function($service) {
             return trim($service);
         }, array_filter($services));
-        
-        // ===== CREATE/UPDATE PATIENT RECORD - FIXED: Phone is NOT the only criteria =====
+
         $patientModel = new PatientModel();
         $patient = null;
         $patientCode = 'N/A';
-        
+
         try {
-            // Log the attempt
             log_message('debug', 'Creating patient: ' . $patientName . ', Age: ' . $age . ', Gender: ' . $gender . ', Phone: ' . $phone);
-            
-            // STEP 1: Try to find by email (most reliable)
+
             $existingPatient = null;
             if (!empty($email)) {
                 $existingPatient = $patientModel->where('email', $email)->first();
@@ -897,8 +864,7 @@ class Receptionist extends BaseController
                     log_message('debug', 'Found existing patient by email: ' . $email);
                 }
             }
-            
-            // STEP 2: Try by name + age + gender (more reliable than phone alone)
+
             if (!$existingPatient) {
                 $existingPatient = $patientModel->where('full_name', $patientName)
                                                 ->where('age', $age)
@@ -908,29 +874,23 @@ class Receptionist extends BaseController
                     log_message('debug', 'Found existing patient by name/age/gender');
                 }
             }
-            
-            // STEP 3: ONLY try by phone if we haven't found a patient yet
-            // AND we have a phone number
+
             if (!$existingPatient && !empty($phone)) {
                 $existingPatient = $patientModel->where('phone', $phone)->first();
                 if ($existingPatient) {
                     log_message('debug', 'Found existing patient by phone: ' . $phone);
-                    
-                    // Check if the found patient has the same name/age
-                    // If not, this is a DIFFERENT person with the same phone number
-                    // We should create a new patient
-                    if ($existingPatient['full_name'] !== $patientName || 
-                        $existingPatient['age'] != $age || 
+
+                    if ($existingPatient['full_name'] !== $patientName ||
+                        $existingPatient['age'] != $age ||
                         $existingPatient['gender'] !== $gender) {
-                        
+
                         log_message('debug', 'Phone matches but name/age/gender are different. Creating new patient...');
-                        $existingPatient = null; // Reset to create new patient
+                        $existingPatient = null;
                     }
                 }
             }
-            
+
             if ($existingPatient) {
-                // Update existing patient info
                 $updateData = [];
                 if (empty($existingPatient['email']) && !empty($email)) {
                     $updateData['email'] = $email;
@@ -949,10 +909,9 @@ class Receptionist extends BaseController
                 $patientCode = $patient['patient_code'] ?? 'N/A';
                 log_message('debug', 'Using existing patient with code: ' . $patientCode);
             } else {
-                // Generate new patient code
                 $newPatientCode = $patientModel->generatePatientCode();
                 log_message('debug', 'Generated new patient code: ' . $newPatientCode);
-                
+
                 $patientData = [
                     'patient_code' => $newPatientCode,
                     'full_name' => $patientName,
@@ -962,12 +921,11 @@ class Receptionist extends BaseController
                     'gender' => $gender,
                     'source' => 'walk-in'
                 ];
-                
-                // Insert with error handling
+
                 try {
                     $patientModel->insert($patientData);
                     $patientId = $patientModel->getInsertID();
-                    
+
                     if ($patientId) {
                         $patient = $patientModel->find($patientId);
                         $patientCode = $patient['patient_code'] ?? $newPatientCode;
@@ -977,11 +935,9 @@ class Receptionist extends BaseController
                     }
                 } catch (\Exception $insertException) {
                     log_message('error', 'Patient insert exception: ' . $insertException->getMessage());
-                    
-                    // Check if it's a duplicate key error
+
                     if (strpos($insertException->getMessage(), 'Duplicate entry') !== false) {
                         log_message('debug', 'Duplicate entry detected, trying to find existing patient...');
-                        // Try to find the patient that was just created by another process
                         $existing = $patientModel->where('full_name', $patientName)
                                                 ->where('age', $age)
                                                 ->where('gender', $gender)
@@ -991,7 +947,6 @@ class Receptionist extends BaseController
                             $patientCode = $patient['patient_code'] ?? 'N/A';
                             log_message('debug', 'Found existing patient after duplicate error: ' . $patientCode);
                         } else {
-                            // Try with a fallback code
                             $fallbackCode = 'PAT-' . date('y') . '-' . date('Hi') . rand(10, 99);
                             log_message('debug', 'Using fallback code: ' . $fallbackCode);
                             $patientData['patient_code'] = $fallbackCode;
@@ -1013,75 +968,48 @@ class Receptionist extends BaseController
         } catch (\Exception $e) {
             log_message('error', 'Patient creation error: ' . $e->getMessage());
             log_message('error', 'Stack trace: ' . $e->getTraceAsString());
-            // Continue anyway to create the lab request
         }
-        
-        // Create lab or x-ray request
-        if ($requestType === 'lab') {
-            $labRequestModel = new LabRequestModel();
-            
-            $data = [
-                'appointment_id' => 0,
-                'patient_name' => $patientName,
-                'age' => $age,
-                'gender' => $gender,
-                'email' => $email ?: null,
-                'phone' => $phone ?: null,
-                'lab_services' => implode(', ', $cleanedServices),
-                'request_date' => date('Y-m-d'),
-                'doctor_name' => $doctorName,
-                'status' => 'pending',
-                'created_at' => date('Y-m-d H:i:s')
-            ];
-            
-            $labRequestModel->insert($data);
-            $requestId = $labRequestModel->getInsertID();
-            
-            // Create notification for MedTech
+
+        if ($requestType === 'lab' || $requestType === 'xray') {
+            $model = new DiagnosticRequestModel();
+
+            $prefix = $requestType === 'xray' ? 'XR' : 'LAB';
+
+            $model->insert([
+                'reference_number' => $prefix . '-' . date('y') . '-' . strtoupper(bin2hex(random_bytes(3))),
+                'type'             => $requestType,
+                'appointment_id'   => 0,
+                'patient_name'     => $patientName,
+                'patient_code'     => $patientCode !== 'N/A' ? $patientCode : null,
+                'age'              => $age,
+                'gender'           => $gender,
+                'email'            => $email ?: null,
+                'phone'            => $phone ?: null,
+                'services'         => implode(', ', $cleanedServices),
+                'request_date'     => date('Y-m-d'),
+                'doctor_name'      => $doctorName,
+                'priority'         => $requestType === 'xray'
+                                        ? ($priority === 'stat' ? 'STAT' : 'Routine')
+                                        : $priority,
+                'status'           => DiagnosticRequestModel::STATUS_PENDING,
+            ]);
+
+            $requestId = $model->getInsertID();
+
             NotificationModel::notify(
-                'lab',
-                'New Lab Request (Walk-in)',
-                'New lab request for walk-in patient ' . $patientName,
+                $requestType,
+                $requestType === 'lab' ? 'New Lab Request (Walk-in)' : 'New X-Ray Request (Walk-in)',
+                'New ' . ($requestType === 'lab' ? 'lab' : 'X-Ray') . ' request for walk-in patient ' . $patientName,
                 $requestId,
-                '/polymedic/public/medtech/request/view/' . $requestId
+                ($requestType === 'lab' ? 'medtech/request/view/' : 'radiologist/examination/view/') . $requestId
             );
-            
+
+            $label = $requestType === 'lab' ? 'Lab' : 'X-Ray';
+
             return redirect()->to(base_url('receptionist/diagnostic-requests'))
-                            ->with('success', 'Lab request created successfully for ' . $patientName . '! Patient Code: ' . $patientCode);
-                            
-        } elseif ($requestType === 'xray') {
-            $xrayModel = new XrayExaminationModel();
-            
-            $data = [
-                'appointment_id' => 0,
-                'patient_name' => $patientName,
-                'age' => $age,
-                'gender' => $gender,
-                'email' => $email ?: null,
-                'phone' => $phone ?: null,
-                'exam_type' => implode(', ', $cleanedServices),
-                'exam_date' => date('Y-m-d'),
-                'doctor_name' => $doctorName,
-                'priority' => $priority,
-                'status' => 'pending',
-                'created_at' => date('Y-m-d H:i:s')
-            ];
-            
-            $xrayModel->insert($data);
-            $requestId = $xrayModel->getInsertID();
-            
-            NotificationModel::notify(
-                'xray',
-                'New X-Ray Request (Walk-in)',
-                'New X-Ray request for walk-in patient ' . $patientName,
-                $requestId,
-                '/polymedic/public/radiologist/examination/view/' . $requestId
-            );
-            
-            return redirect()->to(base_url('receptionist/diagnostic-requests'))
-                            ->with('success', 'X-Ray request created successfully for ' . $patientName . '! Patient Code: ' . $patientCode);
+                            ->with('success', $label . ' request created successfully for ' . $patientName . '! Patient Code: ' . $patientCode);
         }
-        
+
         return redirect()->back()->with('error', 'Invalid request type');
     }
 
@@ -1092,64 +1020,50 @@ class Receptionist extends BaseController
     {
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
-        
+
         $validStatuses = ['pending', 'in_progress', 'completed', 'released', 'cancelled'];
         if (!in_array($status, $validStatuses)) {
             return $this->response->setJSON(['success' => false, 'message' => 'Invalid status']);
         }
-        
+
         try {
-            // Load models
-            $labRequestModel = new LabRequestModel();
-            $xrayModel = new XrayExaminationModel();
+            $model = new DiagnosticRequestModel();
             $paymentModel = new PaymentModel();
             $serviceModel = new ServiceModel();
-            
-            // Get the request data
-            if ($type === 'lab') {
-                $model = $labRequestModel;
-                $request = $model->find($id);
-                $servicesString = $request['lab_services'] ?? '';
-            } elseif ($type === 'xray') {
-                $model = $xrayModel;
-                $request = $model->find($id);
-                $servicesString = $request['exam_type'] ?? '';
-            } else {
-                return $this->response->setJSON(['success' => false, 'message' => 'Invalid request type']);
-            }
-            
+
+            $request = $model
+                ->where('id', (int) $id)
+                ->where('type', $type)
+                ->first();
+
             if (!$request) {
                 return $this->response->setJSON(['success' => false, 'message' => 'Request not found']);
             }
-            
+
+            $servicesString = $request['services'] ?? '';
+
             // ===== SPECIAL: When status changes to "in_progress" (Start Processing) =====
-            // This is when payment should be recorded
             if ($status === 'in_progress') {
-                
-                // Check if payment already exists for this request
+
                 $existingPayment = $paymentModel->getByRequest($id, $type);
-                
+
                 if ($existingPayment) {
-                    // Payment already exists, just update status
                     $model->update($id, ['status' => $status]);
-                    
+
                     return $this->response->setJSON([
-                        'success' => true, 
+                        'success' => true,
                         'message' => 'Status updated successfully. Payment already recorded.',
                         'payment_recorded' => true,
                         'payment_id' => $existingPayment['id']
                     ]);
                 }
-                
-                // Calculate total amount from services
+
                 $totalAmount = 0;
                 $servicesList = [];
-                
+
                 if (!empty($servicesString)) {
-                    // Get service names from the string
                     $serviceNames = array_map('trim', explode(',', $servicesString));
-                    
-                    // Fetch charges from services table
+
                     foreach ($serviceNames as $serviceName) {
                         if (!empty($serviceName)) {
                             $service = $serviceModel->where('service_name', $serviceName)->first();
@@ -1164,25 +1078,22 @@ class Receptionist extends BaseController
                         }
                     }
                 }
-                
-                // If no services found, use default consultation fee
+
                 if ($totalAmount == 0) {
-                    $totalAmount = 500.00; // Default consultation fee
+                    $totalAmount = 500.00;
                     $servicesList[] = [
                         'name' => 'Consultation Fee',
                         'charge' => 500.00
                     ];
                 }
-                
-                // Get patient code
+
                 $patientCode = 'N/A';
                 $patientModel = new PatientModel();
                 $patient = $patientModel->where('full_name', $request['patient_name'])->first();
                 if ($patient) {
                     $patientCode = $patient['patient_code'] ?? 'N/A';
                 }
-                
-                // Record payment
+
                 $paymentData = [
                     'request_id' => $id,
                     'request_type' => $type,
@@ -1191,24 +1102,22 @@ class Receptionist extends BaseController
                     'appointment_id' => $request['appointment_id'] ?? null,
                     'services' => json_encode($servicesList),
                     'total_amount' => $totalAmount,
-                    'amount_paid' => $totalAmount, // Full payment upfront
+                    'amount_paid' => $totalAmount,
                     'payment_method' => 'cash',
                     'received_by' => session()->get('username') ?? 'receptionist',
                     'notes' => 'Payment recorded when starting processing'
                 ];
-                
+
                 $paymentId = $paymentModel->recordPayment($paymentData);
-                
+
                 if ($paymentId) {
                     log_message('info', 'Payment recorded for request #' . $id . ' (Type: ' . $type . ', Amount: ₱' . $totalAmount . ')');
                 } else {
                     log_message('error', 'Failed to record payment for request #' . $id);
                 }
-                
-                // Update request status
+
                 $model->update($id, ['status' => $status]);
-                
-                // Return success with payment info
+
                 return $this->response->setJSON([
                     'success' => true,
                     'message' => 'Status updated to in_progress. Payment recorded: ₱' . number_format($totalAmount, 2),
@@ -1218,21 +1127,20 @@ class Receptionist extends BaseController
                     'patient_code' => $patientCode
                 ]);
             }
-            
+
             // ===== Handle other status updates =====
-            // Update request status
-            $model->update($id, ['status' => $status]);
-            
+            $update = ['status' => $status];
             if ($status === 'released') {
-                $model->update($id, ['released_at' => date('Y-m-d H:i:s')]);
+                $update['released_at'] = date('Y-m-d H:i:s');
             }
-            
+            $model->update($id, $update);
+
             return $this->response->setJSON([
                 'success' => true,
                 'message' => 'Status updated successfully',
                 'payment_recorded' => false
             ]);
-            
+
         } catch (\Exception $e) {
             log_message('error', 'Update diagnostic status error: ' . $e->getMessage());
             return $this->response->setJSON([
@@ -1249,25 +1157,27 @@ class Receptionist extends BaseController
     {
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
-        
+
         try {
-            if ($type === 'lab') {
-                $model = new LabRequestModel();
-            } elseif ($type === 'xray') {
-                $model = new XrayExaminationModel();
-            } else {
+            if (!in_array($type, ['lab', 'xray'], true)) {
                 return $this->response->setJSON(['success' => false, 'message' => 'Invalid request type']);
             }
-            
-            $request = $model->find($id);
+
+            $model = new DiagnosticRequestModel();
+
+            $request = $model
+                ->where('id', (int) $id)
+                ->where('type', $type)
+                ->first();
+
             if (!$request) {
                 return $this->response->setJSON(['success' => false, 'message' => 'Request not found']);
             }
-            
-            $model->delete($id);
-            
+
+            $model->delete((int) $id);
+
             return $this->response->setJSON(['success' => true, 'message' => 'Request deleted successfully']);
-            
+
         } catch (\Exception $e) {
             log_message('error', 'Delete diagnostic request error: ' . $e->getMessage());
             return $this->response->setJSON(['success' => false, 'message' => 'Error deleting request']);
@@ -1275,44 +1185,44 @@ class Receptionist extends BaseController
     }
 
     // =============================================
-    // GET REQUEST DETAILS FOR VIEW - FIXED WITH EMAIL & PHONE
+    // GET REQUEST DETAILS FOR VIEW
     // =============================================
     public function getRequestDetails($id, $type)
     {
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
-        
+
         try {
-            if ($type === 'lab') {
-                $model = new LabRequestModel();
-            } elseif ($type === 'xray') {
-                $model = new XrayExaminationModel();
-            } else {
+            if (!in_array($type, ['lab', 'xray'], true)) {
                 return $this->response->setJSON(['success' => false, 'message' => 'Invalid request type']);
             }
-            
-            $request = $model->find($id);
+
+            $model = new DiagnosticRequestModel();
+
+            $request = $model
+                ->where('id', (int) $id)
+                ->where('type', $type)
+                ->first();
+
             if (!$request) {
                 return $this->response->setJSON(['success' => false, 'message' => 'Request not found']);
             }
-            
-            // Get patient code from patients table
-            $patientCode = 'N/A';
-            $patientModel = new PatientModel();
-            $patient = $patientModel->where('full_name', $request['patient_name'])->first();
-            if ($patient) {
-                $patientCode = $patient['patient_code'] ?? 'N/A';
+
+            $patientCode = $request['patient_code'] ?? null;
+            if (empty($patientCode)) {
+                $patientModel = new PatientModel();
+                $patient = $patientModel->where('full_name', $request['patient_name'])->first();
+                if ($patient) {
+                    $patientCode = $patient['patient_code'] ?? 'N/A';
+                } else {
+                    $patientCode = 'N/A';
+                }
             }
-            
-            // Determine source
-            $source = ($request['appointment_id'] ?? 0) > 0 ? 'Online' : 'Walk-in';
-            
-            // Get priority
+
+            $source = !empty($request['appointment_id']) ? 'Online' : 'Walk-in';
             $priority = $request['priority'] ?? 'routine';
-            
-            // Get updated_at (use created_at if not set)
             $updatedAt = $request['updated_at'] ?? $request['created_at'] ?? null;
-            
+
             return $this->response->setJSON([
                 'success' => true,
                 'data' => [
@@ -1323,7 +1233,7 @@ class Receptionist extends BaseController
                     'gender' => $request['gender'] ?? 'N/A',
                     'email' => $request['email'] ?? '',
                     'phone' => $request['phone'] ?? '',
-                    'services' => $type === 'lab' ? ($request['lab_services'] ?? '') : ($request['exam_type'] ?? ''),
+                    'services' => $request['services'] ?? '',
                     'status' => $request['status'] ?? 'pending',
                     'doctor_name' => $request['doctor_name'] ?? 'Dr. Ana Cruz',
                     'created_at' => $request['created_at'] ?? date('Y-m-d H:i:s'),
@@ -1337,15 +1247,45 @@ class Receptionist extends BaseController
                     'med_tech_name' => $request['med_tech_name'] ?? null,
                     'interpretation' => $request['interpretation'] ?? null,
                     'image_path' => $request['image_path'] ?? null,
-                    'exam_date' => $request['exam_date'] ?? null,
+                    'exam_date' => $request['request_date'] ?? null,
                     'request_date' => $request['request_date'] ?? null
                 ]
             ]);
-            
+
         } catch (\Exception $e) {
             log_message('error', 'Get request details error: ' . $e->getMessage());
             return $this->response->setJSON(['success' => false, 'message' => 'Error fetching details']);
         }
+    }
+
+    // =============================================
+    // PRINT REQUEST
+    // =============================================
+    public function printRequest($id, $type)
+    {
+        $redirect = $this->checkAuth();
+        if ($redirect) return $redirect;
+
+        $type = strtolower((string) $type);
+        if (!in_array($type, ['lab', 'xray'], true)) {
+            return redirect()->to(base_url('receptionist/diagnostic-requests'));
+        }
+
+        $model = new DiagnosticRequestModel();
+
+        $row = $model
+            ->where('id', (int) $id)
+            ->where('type', $type)
+            ->first();
+
+        if (!$row) {
+            return redirect()->to(base_url('receptionist/diagnostic-requests'))
+                             ->with('error', 'Request not found.');
+        }
+
+        $row['type'] = $type;
+
+        return view('Receptionist/print_request', ['request' => $row, 'type' => $type]);
     }
 
     // =============================================
@@ -1355,10 +1295,10 @@ class Receptionist extends BaseController
     {
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
-        
+
         $patientModel = new PatientModel();
         $count = $patientModel->syncWalkInPatients();
-        
+
         return redirect()->to(base_url('receptionist/patients'))
                         ->with('success', "Synced {$count} walk-in patients to the patients table.");
     }
@@ -1370,14 +1310,13 @@ class Receptionist extends BaseController
     {
         $appointmentModel = new AppointmentModel();
         $weeklyData = [];
-        
-        // Get last 7 days
+
         for ($i = 6; $i >= 0; $i--) {
             $date = date('Y-m-d', strtotime("-$i days"));
             $count = $appointmentModel->where('appointment_date', $date)->countAllResults();
             $weeklyData[] = $count;
         }
-        
+
         return $weeklyData;
     }
 
@@ -1396,10 +1335,6 @@ class Receptionist extends BaseController
         $serviceCounts = [];
 
         foreach ($todayAppointments as $appt) {
-            // Derive the bucket from the actual service columns, not
-            // from service_type. The booking form writes 'laboratory'
-            // into service_type regardless of what the patient picked,
-            // so it cannot be trusted.
             $labList  = json_decode($appt['lab_services']  ?? '[]', true);
             $xrayList = json_decode($appt['xray_services'] ?? '[]', true);
 
@@ -1413,8 +1348,6 @@ class Receptionist extends BaseController
             } elseif ($hasLab) {
                 $type = 'Laboratory';
             } else {
-                // Neither column has data. Fall back to the stored
-                // service_type, then to "Unspecified".
                 $raw  = trim((string) ($appt['service_type'] ?? ''));
                 $type = $raw !== '' ? ucfirst(strtolower($raw)) : 'Unspecified';
             }
@@ -1422,8 +1355,6 @@ class Receptionist extends BaseController
             $serviceCounts[$type] = ($serviceCounts[$type] ?? 0) + 1;
         }
 
-        // If no data, provide an empty series so the view shows its
-        // own "No appointments today" empty state.
         if (empty($serviceCounts)) {
             return [
                 'labels' => [],
@@ -1444,18 +1375,18 @@ class Receptionist extends BaseController
     {
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
-        
+
         try {
             $data = [
                 'weekly_appointments' => $this->getWeeklyAppointmentData(),
                 'service_distribution' => $this->getServiceDistributionData()
             ];
-            
+
             return $this->response->setJSON([
                 'success' => true,
                 'data' => $data
             ]);
-            
+
         } catch (\Exception $e) {
             log_message('error', 'Get dashboard data error: ' . $e->getMessage());
             return $this->response->setJSON([
@@ -1472,20 +1403,20 @@ class Receptionist extends BaseController
     {
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
-        
+
         try {
             $paymentModel = new PaymentModel();
             $payment = $paymentModel->find($id);
-            
+
             if (!$payment) {
                 return $this->response->setJSON(['success' => false, 'message' => 'Payment not found']);
             }
-            
+
             return $this->response->setJSON([
                 'success' => true,
                 'data' => $payment
             ]);
-            
+
         } catch (\Exception $e) {
             log_message('error', 'Get payment details error: ' . $e->getMessage());
             return $this->response->setJSON(['success' => false, 'message' => 'Error fetching payment details']);
@@ -1499,25 +1430,24 @@ class Receptionist extends BaseController
     {
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
-        
+
         try {
             $paymentModel = new PaymentModel();
             $payment = $paymentModel->find($id);
-            
+
             if (!$payment) {
                 return redirect()->back()->with('error', 'Payment not found');
             }
-            
-            // Parse services
+
             $services = json_decode($payment['services'] ?? '[]', true);
-            
+
             $data = [
                 'payment' => $payment,
                 'services' => $services
             ];
-            
+
             return view('Receptionist/print_receipt', $data);
-            
+
         } catch (\Exception $e) {
             log_message('error', 'Print receipt error: ' . $e->getMessage());
             return redirect()->back()->with('error', 'Error generating receipt');
@@ -1531,28 +1461,28 @@ class Receptionist extends BaseController
     {
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
-        
+
         try {
             $paymentModel = new PaymentModel();
             $payment = $paymentModel->find($id);
-            
+
             if (!$payment) {
                 return $this->response->setJSON(['success' => false, 'message' => 'Payment not found']);
             }
-            
+
             if ($payment['payment_status'] !== 'paid') {
                 return $this->response->setJSON(['success' => false, 'message' => 'Only paid payments can be refunded']);
             }
-            
+
             $paymentModel->update($id, [
                 'payment_status' => 'refunded',
                 'notes' => ($payment['notes'] ?? '') . ' | Refunded on ' . date('Y-m-d H:i:s')
             ]);
-            
+
             log_message('info', 'Payment #' . $id . ' refunded');
-            
+
             return $this->response->setJSON(['success' => true, 'message' => 'Payment refunded successfully']);
-            
+
         } catch (\Exception $e) {
             log_message('error', 'Refund payment error: ' . $e->getMessage());
             return $this->response->setJSON(['success' => false, 'message' => 'Error refunding payment']);

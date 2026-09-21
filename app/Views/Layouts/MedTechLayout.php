@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
     <title>PolyMedic - Medical Technologist Dashboard</title>
@@ -9,1471 +11,1720 @@
     <link href="/polymedic/public/assets/css/AppointmentStyle.css" rel="stylesheet">
     <link href="/polymedic/public/assets/css/admin.css" rel="stylesheet">
 
-    <!-- Bootstrap & Icons -->
+    <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <!-- AOS for animations -->
+    <!-- AOS -->
     <script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script>
+
 </head>
+
 <body>
-    <!-- Initialize AOS -->
-    <script> AOS.init({ duration: 800, once: true }); </script>
 
-    <div class="admin-wrapper">
-        <!-- Sidebar -->
-        <aside class="admin-sidebar medtech-sidebar" id="adminSidebar">
-            <div class="sidebar-header">
-                <div class="sidebar-logo">
-                    <img src="/polymedic/public/assets/images/logo4.png" alt="PolyMedic">
-                    <span>PolyMedic<small>Laboratory System</small></span>
-                </div>
-                <button class="sidebar-close" onclick="toggleSidebar()">
-                    <i class="bi bi-x-lg"></i>
-                </button>
+<script>
+    AOS.init({
+        duration: 800,
+        once: true
+    });
+</script>
+
+<div class="admin-wrapper">
+
+    <!-- =====================================================
+         SIDEBAR
+         ===================================================== -->
+
+    <aside class="admin-sidebar" id="adminSidebar">
+
+        <!-- SIDEBAR HEADER -->
+        <div class="sidebar-header">
+            <div class="sidebar-logo">
+                <img src="/polymedic/public/assets/images/logo4.png" alt="PolyMedic">
+                <span>
+                    PolyMedic
+                    <small>Laboratory System</small>
+                </span>
             </div>
+        </div>
 
-            <nav class="sidebar-nav">
-                <ul>
-                    <li class="nav-section">LABORATORY</li>
-                    <li class="menu-item <?= current_url() == base_url('medtech/dashboard') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/medtech/dashboard" class="menu-btn">
-                            <i class="bi bi-grid-1x2-fill menu-icon"></i>
-                            <span>Dashboard</span>
-                            <?php if (current_url() == base_url('medtech/dashboard')): ?>
-                                <i class="bi bi-chevron-right menu-arrow"></i>
-                            <?php endif; ?>
-                        </a>
-                    </li>
-                    <li class="menu-item <?= strpos(current_url(), 'medtech/requests') !== false || strpos(current_url(), 'medtech/request') !== false ? 'active' : '' ?>">
-                        <a href="/polymedic/public/medtech/requests" class="menu-btn">
-                            <svg class="menu-icon-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2" />
-                                <path d="M6.453 15h11.094" />
-                                <path d="M8.5 2h7" />
-                            </svg>
-                            <span>Lab Requests</span>
-                            <?php
-                            $labModel = new \App\Models\LabRequestModel();
-                            $pendingCount = $labModel->where('status', 'pending')->countAllResults();
-                            if ($pendingCount > 0):
-                            ?>
-                                <span class="badge-notif-med"><?= $pendingCount ?></span>
-                            <?php endif; ?>
-                            <?php if (strpos(current_url(), 'medtech/requests') !== false || strpos(current_url(), 'medtech/request') !== false): ?>
-                                <i class="bi bi-chevron-right menu-arrow"></i>
-                            <?php endif; ?>
-                        </a>
-                    </li>
+        <!-- =================================================
+             NAVIGATION
+             ================================================= -->
 
-                    <li class="nav-section">REPORTS</li>
-                    <li class="menu-item <?= strpos(current_url(), 'medtech/reports') !== false ? 'active' : '' ?>">
-                        <a href="/polymedic/public/medtech/reports" class="menu-btn">
-                            <i class="bi bi-file-earmark-text menu-icon"></i>
-                            <span>Reports</span>
-                            <?php if (strpos(current_url(), 'medtech/reports') !== false): ?>
-                                <i class="bi bi-chevron-right menu-arrow"></i>
-                            <?php endif; ?>
-                        </a>
-                    </li>
+        <nav class="sidebar-nav">
+            <ul>
 
-                    <li class="nav-divider"></li>
+                <!-- =========================================
+                     SIDEBAR COLLAPSE BUTTON
+                     ========================================= -->
 
-                    <li class="menu-item logout-item">
-                        <a href="/polymedic/public/logout" class="menu-btn">
-                            <i class="bi bi-box-arrow-right menu-icon"></i>
-                            <span>Logout</span>
-                        </a>
-                    </li>
-                </ul>
-            </nav>
-        </aside>
-
-        <!-- Mobile Overlay -->
-        <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
-
-        <!-- Main Content -->
-        <main class="admin-main">
-            <!-- Top Navbar -->
-            <header class="admin-header medtech-header">
-                <div class="header-left">
-                    <button class="hamburger-btn" onclick="toggleSidebar()">
-                        <i class="bi bi-list"></i>
+                <li class="sidebar-toggle-item">
+                    <button type="button"
+                            class="sidebar-toggle-btn"
+                            id="sidebarCollapseBtn"
+                            onclick="toggleSidebarCollapse()"
+                            title="Collapse Sidebar">
+                        <i class="bi bi-layout-sidebar-inset"></i>
+                        <span>Collapse Sidebar</span>
                     </button>
-                    <div class="header-title-group">
+                </li>
+
+                <!-- =========================================
+                     LABORATORY
+                     ========================================= -->
+
+                <li class="nav-section">Laboratory</li>
+
+                <!-- DASHBOARD -->
+                <li class="menu-item <?= current_url() == base_url('medtech/dashboard') ? 'active' : '' ?>">
+                    <a href="/polymedic/public/medtech/dashboard" class="menu-btn" data-tooltip="Dashboard">
+                        <i class="bi bi-grid-1x2-fill menu-icon"></i>
+                        <span>Dashboard</span>
+                        <?php if (current_url() == base_url('medtech/dashboard')): ?>
+                            <i class="bi bi-chevron-right menu-arrow"></i>
+                        <?php endif; ?>
+                    </a>
+                </li>
+
+                <!-- LAB REQUESTS -->
+                <li class="menu-item <?= strpos(current_url(), 'medtech/requests') !== false || strpos(current_url(), 'medtech/request') !== false ? 'active' : '' ?>">
+                    <a href="/polymedic/public/medtech/requests" class="menu-btn" data-tooltip="Lab Requests">
+                        <svg class="menu-icon-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2" />
+                            <path d="M6.453 15h11.094" />
+                            <path d="M8.5 2h7" />
+                        </svg>
+                        <span>Lab Requests</span>
                         <?php
-                            $pageTitle = $this->renderSection('pageTitle') ?: 'Dashboard';
-                            $iconMap = [
-                                'Dashboard' => 'statisctics.png',
-                                'Laboratory Requests' => 'lab-icon.png',
-                                'Lab Requests' => 'lab-icon.png',
-                                'View Lab Request' => 'lab-icon.png',
-                                'Laboratory Findings' => 'lab-icon.png',
-                                'Reports' => 'reports-icon.png'
-                            ];
-                            $iconFile = $iconMap[$pageTitle] ?? 'lab-icon.png';
+                        $labModel = new \App\Models\LabRequestModel();
+                        $pendingCount = $labModel->where('status', 'pending')->countAllResults();
+                        if ($pendingCount > 0):
                         ?>
-                        <img src="/polymedic/public/assets/images/<?= $iconFile ?>" alt="<?= $pageTitle ?>" class="header-title-icon">
-                        <h4 class="page-title-header"><?= $pageTitle ?></h4>
-                    </div>
+                            <span class="badge-notif"><?= $pendingCount ?></span>
+                        <?php endif; ?>
+                        <?php if (strpos(current_url(), 'medtech/requests') !== false || strpos(current_url(), 'medtech/request') !== false): ?>
+                            <i class="bi bi-chevron-right menu-arrow"></i>
+                        <?php endif; ?>
+                    </a>
+                </li>
+
+                <!-- =========================================
+                     REPORTS
+                     ========================================= -->
+
+                <li class="nav-section">Reports</li>
+
+                <!-- REPORTS -->
+                <li class="menu-item <?= strpos(current_url(), 'medtech/reports') !== false ? 'active' : '' ?>">
+                    <a href="/polymedic/public/medtech/reports" class="menu-btn" data-tooltip="Reports">
+                        <i class="bi bi-file-earmark-text menu-icon"></i>
+                        <span>Reports</span>
+                        <?php if (strpos(current_url(), 'medtech/reports') !== false): ?>
+                            <i class="bi bi-chevron-right menu-arrow"></i>
+                        <?php endif; ?>
+                    </a>
+                </li>
+
+                <!-- DIVIDER -->
+                <li class="nav-divider"></li>
+
+                <!-- LOGOUT -->
+                <li class="menu-item logout-item">
+                    <a href="/polymedic/public/logout" class="menu-btn" data-tooltip="Logout">
+                        <i class="bi bi-box-arrow-right menu-icon"></i>
+                        <span>Logout</span>
+                    </a>
+                </li>
+
+            </ul>
+        </nav>
+
+    </aside>
+
+    <!-- =====================================================
+         MAIN
+         ===================================================== -->
+
+    <main class="admin-main" id="adminMain">
+
+        <!-- =================================================
+             HEADER
+             ================================================= -->
+
+        <header class="admin-header">
+
+            <!-- HEADER LEFT -->
+            <div class="header-left">
+
+                <!-- PAGE TITLE -->
+                <div class="header-title-group">
+
+                    <?php
+                    $pageTitle = $this->renderSection('pageTitle') ?: 'Dashboard';
+
+                    $iconMap = [
+                        'Dashboard' => 'statisctics.png',
+                        'Lab Requests' => 'lab-icon.png',
+                        'Laboratory Requests' => 'lab-icon.png',
+                        'View Lab Request' => 'lab-icon.png',
+                        'Laboratory Findings' => 'lab-icon.png',
+                        'Reports' => 'lab-icon.png',
+                        'MedTech Dashboard' => 'statisctics.png'
+                    ];
+
+                    $iconFile = $iconMap[$pageTitle] ?? 'lab-icon.png';
+                    ?>
+
+                    <img src="/polymedic/public/assets/images/<?= $iconFile ?>"
+                         alt="<?= esc($pageTitle) ?>"
+                         class="header-title-icon">
+
+                    <h4 class="page-title-header"><?= esc($pageTitle) ?></h4>
+
                 </div>
-                <div class="header-right">
-                    <div class="header-info-group">
-                        <div class="header-datetime">
-                            <i class="bi bi-clock"></i>
-                            <span><?= date('D, M j · h:i:s A') ?></span>
-                        </div>
-                        <span class="divider-icon">|</span>
 
-                        <!-- NOTIFICATION DROPDOWN -->
-                        <div class="dropdown notif-dropdown-wrapper">
-                            <button class="notif-btn" type="button" id="notifDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-bell-fill"></i>
-                                <span class="notif-badge" id="notifBadge" style="display: none;">0</span>
-                            </button>
-                            <div class="dropdown-menu dropdown-menu-end notif-dropdown-menu shadow-lg border-0" aria-labelledby="notifDropdownBtn">
-                                <div class="notif-dropdown-header d-flex justify-content-between align-items-center">
-                                    <div class="d-flex align-items-center gap-2">
-                                        <i class="bi bi-bell text-primary"></i>
-                                        <span class="fw-bold text-dark fs-6">Notifications</span>
-                                    </div>
-                                    <button type="button" class="btn btn-link btn-sm p-0 text-primary text-decoration-none small" onclick="markAllNotificationsRead(event)">
-                                        Mark all read
-                                    </button>
-                                </div>
-                                <div class="notif-dropdown-body" id="notifDropdownList">
-                                    <div class="p-3 text-center text-muted small">
-                                        <div class="spinner-border spinner-border-sm text-primary me-1" role="status"></div>
-                                        Loading notifications...
-                                    </div>
-                                </div>
-                                <div class="notif-dropdown-footer text-center">
-                                    <a href="<?= base_url('medtech/notifications') ?>" class="text-primary fw-semibold small text-decoration-none">
-                                        View All Notifications <i class="bi bi-arrow-right ms-1"></i>
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-
-                        <span class="divider-icon">|</span>
-                        <div class="header-user">
-                            <div class="avatar-small medtech-avatar">
-                                <i class="bi bi-person-fill"></i>
-                            </div>
-                            <div class="user-details">
-                                <span class="user-name-header"><?= session()->get('full_name') ?? 'Med Tech' ?></span>
-                                <span class="user-role-header medtech-role">Medical Technologist</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </header>
-
-            <!-- Page Content -->
-            <div class="admin-content">
-                <?php echo $this->renderSection('medtechContent'); ?>
             </div>
-        </main>
-    </div>
 
-    <style>
-    /* ============================================
-       MED TECH SIDEBAR - FULLY RESPONSIVE
-       ============================================ */
-    :root {
-        --sidebar-width: 280px;
-        --header-height: 64px;
-        --active-blue: #1976d2;
-        --active-blue-dark: #1565c0;
-        --active-blue-light: #e3f2fd;
-        --text-blue: #1e40af;
-        --icon-gray: #9ca3af;
-        --bg-light: #f8fafc;
+            <!-- =================================================
+                 HEADER RIGHT
+                 ================================================= -->
+
+            <div class="header-right">
+
+                <div class="header-info-group">
+
+                    <!-- DATE/TIME -->
+                    <div class="header-datetime">
+                        <i class="bi bi-clock"></i>
+                        <span><?= date('D, M j · h:i:s A') ?></span>
+                    </div>
+
+                    <span class="divider-icon">|</span>
+
+                    <!-- =================================================
+                         NOTIFICATIONS
+                         ================================================= -->
+
+                    <div class="dropdown notif-dropdown-wrapper">
+
+                        <button class="notif-btn"
+                                type="button"
+                                id="notifDropdownBtn"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false">
+                            <i class="bi bi-bell-fill"></i>
+                            <span class="notif-badge" id="notifBadge" style="display:none;">0</span>
+                        </button>
+
+                        <div class="dropdown-menu dropdown-menu-end notif-dropdown-menu shadow-lg border-0"
+                             aria-labelledby="notifDropdownBtn">
+
+                            <!-- NOTIFICATION HEADER -->
+                            <div class="notif-dropdown-header d-flex justify-content-between align-items-center">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="bi bi-bell text-primary"></i>
+                                    <span class="fw-bold text-dark fs-6">Notifications</span>
+                                </div>
+                                <button type="button"
+                                        class="btn btn-link btn-sm p-0 text-primary text-decoration-none small"
+                                        onclick="markAllNotificationsRead(event)">
+                                    Mark all read
+                                </button>
+                            </div>
+
+                            <!-- NOTIFICATION BODY -->
+                            <div class="notif-dropdown-body" id="notifDropdownList">
+                                <div class="p-3 text-center text-muted small">
+                                    <div class="spinner-border spinner-border-sm text-primary me-1" role="status"></div>
+                                    Loading notifications...
+                                </div>
+                            </div>
+
+                            <!-- NOTIFICATION FOOTER -->
+                            <div class="notif-dropdown-footer text-center">
+                                <a href="/polymedic/public/medtech/notifications"
+                                   class="text-primary fw-semibold small text-decoration-none">
+                                    View All Notifications
+                                    <i class="bi bi-arrow-right ms-1"></i>
+                                </a>
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                    <span class="divider-icon">|</span>
+
+                    <!-- USER -->
+                    <div class="header-user">
+
+                        <div class="avatar-small">
+                            <i class="bi bi-person-fill"></i>
+                        </div>
+
+                        <div class="user-details">
+                            <span class="user-name-header"><?= session()->get('full_name') ?? 'Med Tech' ?></span>
+                            <span class="user-role-header">Medical Technologist</span>
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </header>
+
+        <!-- =================================================
+             PAGE CONTENT
+             ================================================= -->
+
+        <div class="admin-content">
+            <?= $this->renderSection('medtechContent') ?>
+        </div>
+
+    </main>
+
+</div>
+
+<!-- =========================================================
+     SIDEBAR + HEADER CSS
+     ========================================================= -->
+
+<style>
+/* =========================================================
+   VARIABLES
+   ========================================================= */
+
+:root {
+    --sidebar-width: 280px;
+    --sidebar-collapsed-width: 78px;
+    --header-height: 64px;
+    --active-blue: #1976d2;
+    --active-blue-dark: #1565c0;
+    --active-blue-light: #e3f2fd;
+    --text-blue: #1e40af;
+    --icon-gray: #9ca3af;
+    --bg-light: #f8fafc;
+
+    /* Single shared timing so every collapse-related property
+       animates in lockstep — this is what makes clicking a menu
+       item while collapsed/expanded look smooth instead of
+       having the label text snap in/out abruptly. */
+    --sidebar-ease: cubic-bezier(0.4, 0, 0.2, 1);
+    --sidebar-speed: 0.32s;
+}
+
+/* =========================================================
+   GLOBAL
+   ========================================================= */
+
+* {
+    box-sizing: border-box;
+}
+
+/* =========================================================
+   SIDEBAR
+   ========================================================= */
+
+.admin-sidebar {
+    width: var(--sidebar-width);
+    min-height: 100vh;
+    background: #ffffff !important;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 1000;
+    overflow-y: auto;
+    overflow-x: hidden;
+    box-shadow: 2px 0 20px rgba(0, 0, 0, 0.06);
+    border-right: 1px solid #e5e7eb !important;
+    transition: width var(--sidebar-speed) var(--sidebar-ease);
+}
+
+.admin-sidebar::-webkit-scrollbar {
+    width: 4px;
+}
+
+.admin-sidebar::-webkit-scrollbar-thumb {
+    background: #e5e7eb;
+    border-radius: 10px;
+}
+
+/* =========================================================
+   SIDEBAR HEADER
+   ========================================================= */
+
+.sidebar-header {
+    height: 82px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.35rem;
+    border-bottom: 1px solid #f3f4f6 !important;
+    transition: padding var(--sidebar-speed) var(--sidebar-ease),
+                justify-content var(--sidebar-speed) var(--sidebar-ease);
+}
+
+.sidebar-logo {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    min-width: 0;
+    transition: gap var(--sidebar-speed) var(--sidebar-ease);
+}
+
+.sidebar-logo img {
+    width: 42px;
+    height: 42px;
+    object-fit: contain;
+    flex-shrink: 0;
+    transition: width var(--sidebar-speed) var(--sidebar-ease),
+                height var(--sidebar-speed) var(--sidebar-ease);
+}
+
+.sidebar-logo span {
+    font-size: 1.08rem;
+    font-weight: 700;
+    color: #111827 !important;
+    letter-spacing: 0.3px;
+    line-height: 1.15;
+    white-space: nowrap;
+    opacity: 1;
+    max-width: 200px;
+    overflow: hidden;
+    display: inline-block;
+    transition: opacity calc(var(--sidebar-speed) * 0.6) var(--sidebar-ease),
+                max-width var(--sidebar-speed) var(--sidebar-ease);
+}
+
+.sidebar-logo span small {
+    display: block;
+    margin-top: 3px;
+    font-size: 0.62rem;
+    font-weight: 400;
+    color: #6b7280 !important;
+}
+
+/* =========================================================
+   SIDEBAR NAV
+   ========================================================= */
+
+.sidebar-nav {
+    padding: 0.9rem 0.75rem 1.5rem;
+}
+
+.sidebar-nav ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.22rem;
+}
+
+/* =========================================================
+   COLLAPSE BUTTON
+   ========================================================= */
+
+.sidebar-toggle-item {
+    margin-bottom: 0.35rem;
+}
+
+.sidebar-toggle-btn {
+    width: 100%;
+    min-height: 43px;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem 0.95rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 9px;
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease,
+                color 0.2s ease,
+                border-color 0.2s ease,
+                transform 0.2s ease,
+                justify-content var(--sidebar-speed) var(--sidebar-ease),
+                gap var(--sidebar-speed) var(--sidebar-ease),
+                padding var(--sidebar-speed) var(--sidebar-ease);
+}
+
+.sidebar-toggle-btn i {
+    width: 24px;
+    min-width: 24px;
+    text-align: center;
+    font-size: 1.05rem;
+    transition: transform var(--sidebar-speed) var(--sidebar-ease);
+}
+
+.sidebar-toggle-btn span {
+    white-space: nowrap;
+    opacity: 1;
+    max-width: 200px;
+    overflow: hidden;
+    display: inline-block;
+    transition: opacity calc(var(--sidebar-speed) * 0.6) var(--sidebar-ease),
+                max-width var(--sidebar-speed) var(--sidebar-ease);
+}
+
+.sidebar-toggle-btn:hover {
+    background: #e3f2fd;
+    border-color: #bfdbfe;
+    color: #1976d2;
+}
+
+.sidebar-toggle-btn:active {
+    transform: scale(0.98);
+}
+
+/* =========================================================
+   NAV SECTION
+   ========================================================= */
+
+.sidebar-nav .nav-section {
+    font-size: 0.64rem;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: #9ca3af !important;
+    padding: 1rem 0.75rem 0.35rem;
+    font-weight: 700;
+    white-space: nowrap;
+    opacity: 1;
+    height: auto;
+    overflow: hidden;
+    transition: opacity calc(var(--sidebar-speed) * 0.6) var(--sidebar-ease),
+                height var(--sidebar-speed) var(--sidebar-ease),
+                padding var(--sidebar-speed) var(--sidebar-ease),
+                margin var(--sidebar-speed) var(--sidebar-ease);
+}
+
+/* =========================================================
+   MENU BUTTON
+   ========================================================= */
+
+.menu-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    min-height: 44px;
+    padding: 0.7rem 0.95rem;
+    border-radius: 9px !important;
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+    background: transparent;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.2s ease,
+                color 0.2s ease,
+                box-shadow 0.2s ease,
+                gap var(--sidebar-speed) var(--sidebar-ease),
+                padding var(--sidebar-speed) var(--sidebar-ease),
+                justify-content var(--sidebar-speed) var(--sidebar-ease);
+}
+
+.menu-icon {
+    font-size: 1.08rem;
+    flex-shrink: 0;
+    width: 24px;
+    text-align: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.menu-icon-svg {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s ease, transform 0.2s ease;
+}
+
+/* Menu label — animates on width/opacity together with the
+   sidebar collapse, instead of the old instant display:none. */
+.menu-btn > span {
+    white-space: nowrap;
+    opacity: 1;
+    max-width: 200px;
+    overflow: hidden;
+    display: inline-block;
+    transition: opacity calc(var(--sidebar-speed) * 0.6) var(--sidebar-ease),
+                max-width var(--sidebar-speed) var(--sidebar-ease);
+}
+
+/* =========================================================
+   NORMAL MENU COLORS
+   ========================================================= */
+
+.admin-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn,
+.admin-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn span {
+    color: var(--text-blue) !important;
+}
+
+.admin-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn .menu-icon,
+.admin-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn .menu-icon-svg {
+    color: var(--icon-gray) !important;
+}
+
+/* =========================================================
+   HOVER
+   ========================================================= */
+
+.menu-btn:hover {
+    background: var(--active-blue-light) !important;
+    color: var(--active-blue) !important;
+}
+
+.menu-btn:hover .menu-icon,
+.menu-btn:hover .menu-icon-svg {
+    color: var(--active-blue) !important;
+    transform: scale(1.05);
+}
+
+/* =========================================================
+   ACTIVE
+   ========================================================= */
+
+.menu-item.active .menu-btn {
+    background: var(--active-blue) !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(25, 118, 210, 0.28) !important;
+}
+
+.menu-item.active .menu-btn span {
+    color: #ffffff !important;
+}
+
+.menu-item.active .menu-icon,
+.menu-item.active .menu-icon-svg {
+    color: #ffffff !important;
+}
+
+.menu-arrow {
+    font-size: 0.85rem;
+    color: #ffffff !important;
+    margin-left: auto;
+    flex-shrink: 0;
+    opacity: 1;
+    transition: opacity calc(var(--sidebar-speed) * 0.6) var(--sidebar-ease);
+}
+
+/* =========================================================
+   REMOVE OLD BORDERS
+   ========================================================= */
+
+.admin-sidebar .sidebar-nav ul li a,
+.admin-sidebar .sidebar-nav ul li.active a {
+    border: none !important;
+    outline: none !important;
+}
+
+/* =========================================================
+   NOTIFICATION BADGE
+   ========================================================= */
+
+.badge-notif {
+    margin-left: auto;
+    background: #ffffff !important;
+    color: var(--text-blue) !important;
+    font-size: 0.62rem;
+    font-weight: 700;
+    padding: 0.15rem 0.45rem;
+    border-radius: 30px;
+    min-width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    flex-shrink: 0;
+    opacity: 1;
+    transition: opacity calc(var(--sidebar-speed) * 0.6) var(--sidebar-ease),
+                transform var(--sidebar-speed) var(--sidebar-ease);
+}
+
+.menu-item.active .badge-notif {
+    display: none !important;
+}
+
+/* =========================================================
+   DIVIDER
+   ========================================================= */
+
+.nav-divider {
+    height: 1px;
+    background: #f3f4f6 !important;
+    margin: 0.55rem 0;
+}
+
+/* =========================================================
+   LOGOUT
+   ========================================================= */
+
+.logout-item {
+    margin-top: 0.2rem;
+}
+
+.logout-item .menu-btn:hover {
+    background: #fee2e2 !important;
+    color: #dc2626 !important;
+}
+
+.logout-item .menu-btn:hover .menu-icon {
+    color: #dc2626 !important;
+}
+
+/* =========================================================
+   COLLAPSED SIDEBAR (DESKTOP ONLY)
+   ========================================================= */
+
+@media (min-width: 993px) {
+
+    .admin-sidebar.collapsed {
+        width: var(--sidebar-collapsed-width);
     }
 
-    /* ===== SIDEBAR ===== */
-    .medtech-sidebar {
-        width: var(--sidebar-width);
-        min-height: 100vh;
-        background: #ffffff !important;
-        position: fixed;
-        top: 0;
-        left: 0;
-        bottom: 0;
-        z-index: 1000;
-        overflow-y: auto;
-        transition: transform 0.3s ease;
-        box-shadow: 2px 0 20px rgba(0,0,0,0.06);
-        border-right: 1px solid #e5e7eb !important;
+    .admin-sidebar.collapsed .sidebar-header {
+        justify-content: center;
+        padding: 1rem 0.5rem;
     }
 
-    .medtech-sidebar::-webkit-scrollbar {
-        width: 4px;
-    }
-
-    .medtech-sidebar::-webkit-scrollbar-thumb {
-        background: #e5e7eb;
-        border-radius: 4px;
-    }
-
-    /* Sidebar Header */
-    .sidebar-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 1.5rem 1.5rem;
-        border-bottom: 1px solid #f3f4f6 !important;
-    }
-
-    .sidebar-logo {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-    }
-
-    .sidebar-logo img {
-        height: 40px;
-        width: auto;
-        object-fit: contain;
-    }
-
-    .sidebar-logo span {
-        font-size: 1.1rem;
-        font-weight: 700;
-        color: #111827 !important;
-        letter-spacing: 0.5px;
-        line-height: 1.2;
-    }
-
-    .sidebar-logo span small {
-        font-weight: 400;
-        font-size: 0.65rem;
-        color: #6b7280 !important;
-        display: block;
-        margin-top: 2px;
-    }
-
-    .sidebar-close {
-        display: none;
-        background: transparent;
-        border: none;
-        color: #6b7280 !important;
-        font-size: 1.2rem;
-        cursor: pointer;
-        padding: 0.25rem;
-    }
-
-    .sidebar-close:hover {
-        color: #111827 !important;
-    }
-
-    /* Sidebar Navigation */
-    .sidebar-nav {
-        padding: 1rem 0.75rem 1.5rem;
-    }
-
-    .sidebar-nav ul {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 0.25rem;
-    }
-
-    .sidebar-nav .nav-section {
-        font-size: 0.65rem;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        color: #9ca3af !important;
-        padding: 1rem 0.75rem 0.25rem;
-        font-weight: 700;
-    }
-
-    /* ===== NON-ACTIVE MENU ITEMS ===== */
-    .medtech-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn,
-    .medtech-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn span {
-        color: var(--text-blue) !important;
-    }
-
-    .medtech-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn .menu-icon,
-    .medtech-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn .menu-icon-svg {
-        color: var(--icon-gray) !important;
-    }
-
-    /* ===== ACTIVE MENU ITEM ===== */
-    .medtech-sidebar .sidebar-nav ul li.menu-item.active a.menu-btn,
-    .medtech-sidebar .sidebar-nav ul li.menu-item.active a.menu-btn span {
-        color: #ffffff !important;
-    }
-
-    .medtech-sidebar .sidebar-nav ul li.menu-item.active a.menu-btn .menu-icon,
-    .medtech-sidebar .sidebar-nav ul li.menu-item.active a.menu-btn .menu-icon-svg {
-        color: #ffffff !important;
-    }
-
-    .medtech-sidebar .sidebar-nav ul li a,
-    .medtech-sidebar .sidebar-nav ul li.active a {
-        border: none !important;
-        border-left: none !important;
-        border-right: none !important;
-        border-top: none !important;
-        border-bottom: none !important;
-        outline: none !important;
-    }
-
-    /* Menu Item Styles */
-    .menu-btn {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
+    .admin-sidebar.collapsed .sidebar-logo {
+        gap: 0;
+        justify-content: center;
         width: 100%;
-        padding: 0.75rem 1rem;
-        border-radius: 8px !important;
-        text-decoration: none;
-        font-size: 0.875rem;
-        font-weight: 600;
-        transition: all 0.2s ease;
-        background: transparent;
-        cursor: pointer;
-        position: relative;
     }
 
-    .menu-btn:hover {
-        background: var(--active-blue-light) !important;
-        color: var(--active-blue) !important;
-        box-shadow: inset 0 1px 3px rgba(25, 118, 210, 0.1) !important;
+    .admin-sidebar.collapsed .sidebar-logo img {
+        width: 40px;
+        height: 40px;
     }
 
-    .menu-btn:hover .menu-icon,
-    .menu-btn:hover .menu-icon-svg {
-        color: var(--active-blue) !important;
+    .admin-sidebar.collapsed .sidebar-logo span {
+        opacity: 0;
+        max-width: 0;
     }
 
-    .menu-item.active .menu-btn {
-        background: var(--active-blue) !important;
-        color: #ffffff !important;
-        box-shadow: 0 4px 12px rgba(25, 118, 210, 0.3) !important;
+    .admin-sidebar.collapsed .sidebar-nav {
+        padding: 0.9rem 0.6rem;
     }
 
-    /* Menu Icon */
-    .menu-icon {
+    /* Toggle button - centered */
+    .admin-sidebar.collapsed .sidebar-toggle-btn {
+        justify-content: center;
+        padding: 0.65rem 0;
+        gap: 0;
+        background: #f1f5f9;
+        border-color: #e2e8f0;
+        display: flex;
+        align-items: center;
+    }
+
+    .admin-sidebar.collapsed .sidebar-toggle-btn span {
+        opacity: 0;
+        max-width: 0;
+        display: none;
+    }
+
+    .admin-sidebar.collapsed .sidebar-toggle-btn i {
+        margin: 0;
+        transform: rotate(180deg);
         font-size: 1.1rem;
-        flex-shrink: 0;
-        width: 24px;
-        text-align: center;
-        transition: color 0.2s ease;
-    }
-
-    .menu-icon-svg {
-        width: 24px;
-        height: 24px;
-        flex-shrink: 0;
-        transition: color 0.2s ease;
-    }
-
-    /* Menu Arrow (Chevron) */
-    .menu-arrow {
-        font-size: 0.9rem;
-        color: #ffffff !important;
-        margin-left: auto;
-        flex-shrink: 0;
-    }
-
-    /* ===== REMOVE BADGE FROM ACTIVE ITEMS ===== */
-    .menu-item.active .badge-notif-med {
-        display: none !important;
-    }
-
-    /* Badge - only shows on non-active items */
-    .badge-notif-med {
-        margin-left: auto;
-        background: #ffffff !important;
-        color: var(--text-blue) !important;
-        font-size: 0.65rem;
-        font-weight: 700;
-        padding: 0.15rem 0.5rem;
-        border-radius: 30px;
-        min-width: 20px;
-        height: 20px;
-        text-align: center;
-        display: inline-flex;
+        display: flex;
         align-items: center;
         justify-content: center;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        width: 24px;
+    }
+
+    .admin-sidebar.collapsed .nav-section {
+        font-size: 0.64rem;
+        height: 13px;
+        padding: 0;
+        margin: 0.55rem 0;
+        opacity: 0;
+    }
+
+    /* Menu buttons - centered icons */
+    .admin-sidebar.collapsed .menu-btn {
+        justify-content: center;
+        width: 100%;
+        min-height: 44px;
+        padding: 0.7rem 0;
+        gap: 0;
+        display: flex;
+        align-items: center;
+    }
+
+    .admin-sidebar.collapsed .menu-btn > span {
+        opacity: 0;
+        max-width: 0;
+        display: none;
+    }
+
+    /* Center the icon properly */
+    .admin-sidebar.collapsed .menu-icon,
+    .admin-sidebar.collapsed .menu-icon-svg {
+        width: 24px;
+        height: 24px;
+        margin: 0;
+        font-size: 1.15rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         flex-shrink: 0;
+        text-align: center;
         line-height: 1;
     }
 
-    /* Logout Item */
-    .logout-item {
-        margin-top: 0.5rem;
-        border-top: 1px solid #f3f4f6 !important;
-        padding-top: 0.5rem;
-    }
-
-    .logout-item .menu-btn:hover {
-        background: #fee2e2 !important;
-        color: #dc2626 !important;
-    }
-
-    .logout-item .menu-btn:hover .menu-icon {
-        color: #dc2626 !important;
-    }
-
-    /* Nav Divider */
-    .nav-divider {
-        height: 1px;
-        background: #f3f4f6 !important;
-        margin: 0.5rem 0;
-    }
-
-    /* ===== SIDEBAR OVERLAY ===== */
-    .sidebar-overlay {
-        position: fixed;
-        inset: 0;
-        background: rgba(0,0,0,0.4);
-        z-index: 999;
-        display: none;
-    }
-
-    .sidebar-overlay.active {
-        display: block;
-    }
-
-    /* ===== MAIN CONTENT ===== */
-    .admin-main {
-        margin-left: var(--sidebar-width);
-        min-height: 100vh;
-        display: flex;
-        flex-direction: column;
-        background: var(--bg-light);
-        width: auto;
-        max-width: none;
-        box-sizing: border-box;
-    }
-
-    /* ===== HEADER - FIXED FOR MOBILE ===== */
-    .medtech-header {
-        background: #ffffff !important;
-        padding: 0.75rem 2rem;
-        border-bottom: 1px solid #e5e7eb !important;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        position: sticky;
-        top: 0;
-        z-index: 100;
-        min-height: var(--header-height);
-        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-        width: 100%;
-        box-sizing: border-box;
-    }
-
-    .header-left {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        min-width: 0;
-    }
-
-    .hamburger-btn {
-        display: none;
-        background: transparent;
-        border: none;
-        font-size: 1.5rem;
-        color: #111827 !important;
-        cursor: pointer;
-        padding: 0.25rem;
-        flex-shrink: 0;
-    }
-
-    .header-title-group {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        min-width: 0;
-    }
-
-    .header-title-icon {
-        width: 24px;
-        height: 24px;
-        object-fit: contain;
-        flex-shrink: 0;
-    }
-
-    .page-title-header {
-        font-size: 1rem;
-        font-weight: 600;
-        color: #111827 !important;
-        margin: 0;
-        white-space: nowrap;
+    .admin-sidebar.collapsed .menu-arrow {
+        opacity: 0;
+        max-width: 0;
         overflow: hidden;
-        text-overflow: ellipsis;
+        display: none;
     }
 
-    .header-right {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        flex-shrink: 0;
-    }
-
-    .header-info-group {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
-    .header-datetime {
-        display: flex;
-        align-items: center;
-        gap: 0.3rem;
-        color: #6b7280 !important;
-        font-size: 0.78rem;
-        font-weight: 500;
-        white-space: nowrap;
-    }
-
-    .header-datetime i {
-        color: var(--active-blue) !important;
-        font-size: 0.8rem;
-    }
-
-    .divider-icon {
-        display: flex;
-        align-items: center;
-        color: #d1d5db !important;
-        font-size: 0.8rem;
-        font-weight: 300;
-        padding: 0 0.1rem;
-    }
-
-    /* Notification Button */
-    .notif-btn {
+    .admin-sidebar.collapsed .menu-item {
         position: relative;
-        background: transparent;
-        border: none;
-        font-size: 1.2rem;
-        color: #6b7280 !important;
-        cursor: pointer;
-        padding: 0.35rem 0.6rem;
-        border-radius: 50%;
-        transition: all 0.2s ease;
     }
 
-    .notif-btn:hover {
-        color: var(--active-blue) !important;
-        background: var(--active-blue-light) !important;
-    }
-
-    .notif-badge {
+    .admin-sidebar.collapsed .badge-notif {
         position: absolute;
         top: 2px;
         right: 2px;
-        background: #dc2626 !important;
-        color: white !important;
-        font-size: 0.65rem;
-        font-weight: 700;
-        min-width: 18px;
-        height: 18px;
-        border-radius: 99px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0 4px;
-        border: 2px solid white;
-        box-shadow: 0 2px 6px rgba(220, 38, 38, 0.4);
-    }
-
-    .notif-badge.has-unread {
-        animation: pulse-badge 1.8s infinite;
-    }
-
-    @keyframes pulse-badge {
-        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
-        70% { transform: scale(1.15); box-shadow: 0 0 0 6px rgba(220, 38, 38, 0); }
-        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
-    }
-
-    /* Notification Dropdown */
-    .notif-dropdown-menu {
-        width: 380px;
-        max-width: 90vw;
-        border-radius: 14px !important;
+        margin: 0;
+        min-width: 17px;
+        width: 17px;
+        height: 17px;
         padding: 0;
-        margin-top: 10px !important;
-        overflow: hidden;
-        border: 1px solid #e5e7eb !important;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.15) !important;
+        font-size: 0.52rem;
+        z-index: 5;
+        opacity: 1;
     }
 
-    .notif-dropdown-header {
-        padding: 0.85rem 1.25rem;
-        background: #f8fafc !important;
-        border-bottom: 1px solid #e5e7eb !important;
-    }
-
-    .notif-dropdown-body {
-        max-height: 380px;
-        overflow-y: auto;
-        padding: 0;
-    }
-
-    .notif-dropdown-body::-webkit-scrollbar {
-        width: 4px;
-    }
-
-    .notif-dropdown-body::-webkit-scrollbar-thumb {
-        background: #d1d5db;
-        border-radius: 4px;
-    }
-
-    .notif-dropdown-footer {
-        padding: 0.75rem 1.25rem;
-        background: #f8fafc !important;
-        border-top: 1px solid #e5e7eb !important;
-    }
-
-    .notif-dropdown-footer .text-primary {
-        color: var(--active-blue) !important;
-        text-decoration: none;
-        font-weight: 600;
-        font-size: 0.85rem;
-    }
-
-    .notif-dropdown-footer .text-primary:hover {
-        color: var(--active-blue-dark) !important;
-        text-decoration: underline;
-    }
-
-    /* Notification Items */
-    .notif-item {
-        display: flex;
-        gap: 0.75rem;
-        padding: 0.85rem 1.25rem;
-        border-bottom: 1px solid #f3f4f6 !important;
-        text-decoration: none !important;
-        color: #374151 !important;
-        transition: background 0.15s ease;
-        position: relative;
-        cursor: pointer;
-    }
-
-    .notif-item:hover {
-        background: #e3f2fd !important;
-    }
-
-    .notif-item:last-child {
-        border-bottom: none !important;
-    }
-
-    .notif-item.unread {
-        background: #f8fafc !important;
-        font-weight: 500;
-    }
-
-    .notif-item.unread::before {
-        content: '';
+    /* Tooltips */
+    .admin-sidebar.collapsed .menu-btn:hover::after {
+        content: attr(data-tooltip);
         position: absolute;
-        left: 8px;
+        left: calc(100% + 12px);
         top: 50%;
         transform: translateY(-50%);
-        width: 6px;
-        height: 6px;
-        background: var(--active-blue) !important;
-        border-radius: 50%;
-    }
-
-    .notif-icon-box {
-        width: 36px;
-        height: 36px;
-        border-radius: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1rem;
-        flex-shrink: 0;
-        margin-top: 2px;
-    }
-
-    .notif-icon-box.lab { background: #e3f2fd !important; color: #1976d2 !important; }
-    .notif-icon-box.appointment { background: #e0edff !important; color: #0148ca !important; }
-    .notif-icon-box.system { background: #fef3c7 !important; color: #d97706 !important; }
-    .notif-icon-box.xray { background: #f3e5f5 !important; color: #7b1fa2 !important; }
-
-    .notif-content {
-        flex: 1;
-        min-width: 0;
-    }
-
-    .notif-title {
-        font-size: 0.82rem;
-        font-weight: 600;
-        color: #111827 !important;
-        margin-bottom: 2px;
+        background: #111827;
+        color: #ffffff;
+        padding: 0.45rem 0.7rem;
+        border-radius: 6px;
+        font-size: 0.72rem;
+        font-weight: 500;
         white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        z-index: 3000;
+        pointer-events: none;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.18);
+        animation: tooltipFade 0.15s ease forwards;
     }
 
-    .notif-msg {
-        font-size: 0.75rem;
-        color: #6b7280 !important;
-        margin-bottom: 4px;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-        line-height: 1.4;
+    .admin-sidebar.collapsed .sidebar-toggle-btn:hover::after {
+        content: attr(title);
+        position: absolute;
+        left: calc(100% + 12px);
+        top: 50%;
+        transform: translateY(-50%);
+        background: #111827;
+        color: #ffffff;
+        padding: 0.45rem 0.7rem;
+        border-radius: 6px;
+        font-size: 0.72rem;
+        font-weight: 500;
+        white-space: nowrap;
+        z-index: 3000;
+        pointer-events: none;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.18);
+        animation: tooltipFade 0.15s ease forwards;
     }
 
-    .notif-time {
-        font-size: 0.68rem;
-        color: #9ca3af !important;
-        display: flex;
-        align-items: center;
-        gap: 0.25rem;
+    @keyframes tooltipFade {
+        from {
+            opacity: 0;
+            transform: translateY(-50%) translateX(-5px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(-50%) translateX(0);
+        }
     }
 
-    .notif-time i {
-        font-size: 0.6rem;
+}
+
+/* =========================================================
+   MOBILE RESPONSIVE - SIDEBAR ALWAYS EXPANDED
+   ========================================================= */
+
+@media (max-width: 992px) {
+
+    .admin-sidebar {
+        width: var(--sidebar-width);
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        z-index: 1000;
     }
 
-    .text-primary {
-        color: var(--active-blue) !important;
+    /* Hide collapse button on mobile */
+    .sidebar-toggle-item {
+        display: none !important;
     }
 
-    .text-primary:hover {
-        color: var(--active-blue-dark) !important;
+    /* Force sidebar expanded on mobile */
+    .admin-sidebar.collapsed {
+        width: var(--sidebar-width) !important;
     }
 
-    /* Header User */
-    .header-user {
-        display: flex;
-        align-items: center;
-        gap: 0.4rem;
-        cursor: pointer;
-        padding: 0.1rem 0.3rem;
-        border-radius: 8px;
-        transition: all 0.3s ease;
+    .admin-sidebar.collapsed .sidebar-header {
+        justify-content: space-between !important;
+        padding: 1rem 1.35rem !important;
     }
 
-    .header-user:hover {
-        background: #f8fafc !important;
+    .admin-sidebar.collapsed .sidebar-logo {
+        gap: 0.7rem !important;
+        justify-content: flex-start !important;
     }
 
-    .medtech-avatar {
-        background: var(--active-blue-light) !important;
-        color: var(--active-blue) !important;
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 0.75rem;
-        flex-shrink: 0;
+    .admin-sidebar.collapsed .sidebar-logo span {
+        opacity: 1 !important;
+        max-width: 200px !important;
+    }
+
+    .admin-sidebar.collapsed .nav-section {
+        font-size: 0.64rem !important;
+        height: auto !important;
+        padding: 1rem 0.75rem 0.35rem !important;
+        margin: 0 !important;
+        opacity: 1 !important;
+    }
+
+    .admin-sidebar.collapsed .menu-btn {
+        justify-content: flex-start !important;
+        padding: 0.7rem 0.95rem !important;
+        gap: 0.75rem !important;
+    }
+
+    .admin-sidebar.collapsed .menu-btn > span {
+        opacity: 1 !important;
+        max-width: 200px !important;
+    }
+
+    .admin-sidebar.collapsed .menu-arrow {
+        opacity: 1 !important;
+        max-width: 20px !important;
+        display: inline-block !important;
+    }
+
+    .admin-sidebar.collapsed .sidebar-toggle-btn {
+        display: none !important;
+    }
+
+    /* Main content takes full width */
+    .admin-main {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+
+    .admin-main.sidebar-collapsed {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+
+    .admin-header {
+        padding: 0.75rem 1rem;
+    }
+
+    .admin-content {
+        padding: 1rem;
+    }
+
+    .header-info-group .divider-icon {
+        display: none;
+    }
+
+}
+
+/* =========================================================
+   MAIN CONTENT
+   ========================================================= */
+
+.admin-main {
+    margin-left: var(--sidebar-width);
+    width: calc(100% - var(--sidebar-width));
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-light);
+    transition: margin-left var(--sidebar-speed) var(--sidebar-ease),
+                width var(--sidebar-speed) var(--sidebar-ease);
+}
+
+.admin-main.sidebar-collapsed {
+    margin-left: var(--sidebar-collapsed-width);
+    width: calc(100% - var(--sidebar-collapsed-width));
+}
+
+/* =========================================================
+   HEADER
+   ========================================================= */
+
+.admin-header {
+    background: #ffffff !important;
+    padding: 0.75rem 2rem;
+    border-bottom: 1px solid #e5e7eb !important;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    min-height: var(--header-height);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    width: 100%;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    min-width: 0;
+}
+
+.header-title-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.header-title-icon {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.page-title-header {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #111827 !important;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* =========================================================
+   HEADER RIGHT
+   ========================================================= */
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-shrink: 0;
+}
+
+.header-info-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.header-datetime {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    color: #6b7280 !important;
+    font-size: 0.78rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.header-datetime i {
+    color: var(--active-blue) !important;
+}
+
+.divider-icon {
+    color: #d1d5db !important;
+    font-size: 0.8rem;
+}
+
+/* =========================================================
+   NOTIFICATION BUTTON
+   ========================================================= */
+
+.notif-btn {
+    position: relative;
+    background: transparent;
+    border: none;
+    font-size: 1.2rem;
+    color: #6b7280 !important;
+    cursor: pointer;
+    padding: 0.35rem 0.6rem;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+}
+
+.notif-btn:hover {
+    color: var(--active-blue) !important;
+    background: var(--active-blue-light) !important;
+}
+
+.notif-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: #dc2626 !important;
+    color: #ffffff !important;
+    font-size: 0.65rem;
+    font-weight: 700;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 99px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    border: 2px solid white;
+}
+
+/* =========================================================
+   NOTIFICATION DROPDOWN
+   ========================================================= */
+
+.notif-dropdown-menu {
+    width: 340px;
+    max-width: 90vw;
+    border-radius: 14px !important;
+    padding: 0;
+    margin-top: 10px !important;
+    overflow: hidden;
+    border: 1px solid #e5e7eb !important;
+}
+
+.notif-dropdown-header {
+    padding: 0.85rem 1rem;
+    background: #f8fafc !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+.notif-dropdown-body {
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.notif-dropdown-footer {
+    padding: 0.75rem 1rem;
+    background: #f8fafc !important;
+    border-top: 1px solid #e5e7eb !important;
+}
+
+.notif-item {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid #f3f4f6 !important;
+    text-decoration: none !important;
+    color: #374151 !important;
+    transition: background 0.15s ease;
+    position: relative;
+}
+
+.notif-item:hover {
+    background: #f8fafc !important;
+}
+
+.notif-item.unread {
+    background: #f8fafc !important;
+}
+
+.notif-item.unread::before {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 6px;
+    height: 6px;
+    background: var(--active-blue) !important;
+    border-radius: 50%;
+}
+
+.notif-icon-box {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.notif-icon-box.appointment {
+    background: #e3f2fd !important;
+    color: #1976d2 !important;
+}
+
+.notif-icon-box.xray {
+    background: #e3f2fd !important;
+    color: #1976d2 !important;
+}
+
+.notif-icon-box.system {
+    background: #fef3c7 !important;
+    color: #d97706 !important;
+}
+
+.notif-icon-box.lab {
+    background: #e8f5e9 !important;
+    color: #28a745 !important;
+}
+
+.notif-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.notif-title {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #111827 !important;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.notif-msg {
+    font-size: 0.75rem;
+    color: #6b7280 !important;
+    margin-bottom: 4px;
+}
+
+.notif-time {
+    font-size: 0.68rem;
+    color: #9ca3af !important;
+}
+
+/* =========================================================
+   USER
+   ========================================================= */
+
+.header-user {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.1rem 0.3rem;
+    border-radius: 8px;
+}
+
+.avatar-small {
+    background: var(--active-blue-light) !important;
+    color: var(--active-blue) !important;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.user-details {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+}
+
+.user-name-header {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #111827 !important;
+}
+
+.user-role-header {
+    font-size: 0.58rem;
+    color: #6b7280 !important;
+}
+
+/* =========================================================
+   CONTENT
+   ========================================================= */
+
+.admin-content {
+    flex: 1;
+    padding: 1.5rem 2rem 2rem;
+    width: 100%;
+    overflow-x: hidden;
+}
+
+/* =========================================================
+   SMALLER SCREENS
+   ========================================================= */
+
+@media (max-width: 768px) {
+
+    .admin-header {
+        padding: 0.5rem 0.75rem;
+        min-height: 52px;
+    }
+
+    .header-title-group .header-title-icon {
+        width: 20px;
+        height: 20px;
+    }
+
+    .page-title-header {
+        font-size: 0.85rem;
+        max-width: 180px;
+    }
+
+    .header-datetime {
+        display: none;
     }
 
     .user-details {
-        display: flex;
-        flex-direction: column;
-        line-height: 1.15;
+        display: none;
     }
 
-    .user-name-header {
-        font-size: 0.78rem;
-        font-weight: 600;
-        color: #111827 !important;
-        white-space: nowrap;
+    .avatar-small {
+        width: 30px;
+        height: 30px;
     }
 
-    .user-role-header {
-        font-size: 0.58rem;
-        color: #6b7280 !important;
-        font-weight: 500;
-        white-space: nowrap;
-    }
-
-    .medtech-role {
-        color: var(--active-blue) !important;
-    }
-
-    /* ===== CONTENT AREA ===== */
     .admin-content {
-        flex: 1 1 auto;
-        min-width: 0;
-        padding: 1.5rem 2rem 2rem;
-        width: 100%;
-        max-width: 100%;
-        box-sizing: border-box;
-        overflow-x: hidden;
+        padding: 0.75rem;
     }
 
-    /* ===== RESPONSIVE GRID FIX FOR MEDTECH PAGES ===== */
-    .stats-row,
-    .stats-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-        width: 100%;
+    .notif-dropdown-menu {
+        width: 300px;
     }
 
-    .stat-card {
-        background: #ffffff;
-        border-radius: 14px;
-        padding: 1.25rem 1.5rem;
-        display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.75rem;
-        box-shadow: 0 2px 12px rgba(10, 43, 78, 0.06);
-        border: 1px solid rgba(1, 72, 202, 0.04);
-        transition: all 0.3s ease;
-        width: 100%;
-        min-width: 0;
-        box-sizing: border-box;
+}
+
+@media (max-width: 576px) {
+
+    .admin-header {
+        padding: 0.4rem 0.6rem;
+        min-height: 48px;
     }
 
-    .stat-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 8px 25px rgba(10, 43, 78, 0.1);
+    .header-title-group {
+        gap: 0.35rem;
     }
 
-    .stat-icon {
-        width: 42px;
-        height: 42px;
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.2rem;
-        flex-shrink: 0;
+    .header-title-group .header-title-icon {
+        width: 18px;
+        height: 18px;
     }
 
-    .stat-info {
-        min-width: 0;
-        width: 100%;
+    .page-title-header {
+        font-size: 0.72rem;
+        max-width: 130px;
     }
 
-    .stat-info h3 {
-        font-size: 1.4rem;
-        font-weight: 700;
-        color: #0a2b4e;
-        margin: 0;
-        line-height: 1.2;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+    .notif-btn {
+        font-size: 1rem;
+        padding: 0.25rem 0.4rem;
     }
 
-    .stat-info p {
-        color: #64748b;
-        font-size: 0.8rem;
-        margin: 0;
-        font-weight: 500;
+    .avatar-small {
+        width: 28px;
+        height: 28px;
     }
 
-    .stat-info small {
-        font-size: 0.7rem;
-        color: #94a3b8;
-        margin-top: 2px;
-        display: block;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+    .notif-dropdown-menu {
+        width: 270px;
     }
 
-    .charts-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-        width: 100%;
+    .admin-content {
+        padding: 0.6rem;
     }
 
-    .chart-card,
-    .reports-card,
-    .summary-card,
-    .queue-card,
-    .tat-card {
-        background: #ffffff;
-        border-radius: 16px;
-        padding: 1.25rem 1.5rem;
-        box-shadow: 0 2px 12px rgba(10, 43, 78, 0.06);
-        border: 1px solid rgba(1, 72, 202, 0.04);
-        min-width: 0;
-        width: 100%;
-        box-sizing: border-box;
+}
+
+@media (max-width: 400px) {
+
+    .page-title-header {
+        font-size: 0.67rem;
+        max-width: 105px;
     }
 
-    /* ============================================
-       RESPONSIVE BREAKPOINTS
-       ============================================ */
-
-    @media (max-width: 1400px) {
-        .stats-row,
-        .stats-grid {
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 0.85rem;
-        }
+    .header-title-group .header-title-icon {
+        width: 17px;
+        height: 17px;
     }
 
-    @media (max-width: 1200px) {
-        .stats-row,
-        .stats-grid {
-            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-            gap: 0.75rem;
-        }
-
-        .charts-row {
-            grid-template-columns: 1fr;
-        }
-
-        .medtech-header {
-            padding: 0.75rem 1.25rem;
-        }
-
-        .admin-content {
-            padding: 1.25rem;
-        }
+    .header-user {
+        display: none;
     }
 
-    @media (max-width: 992px) {
-        .medtech-sidebar {
-            position: fixed;
-            top: 0;
-            left: -280px;
-            width: 280px;
-            height: 100%;
-            background: #ffffff !important;
-            z-index: 1060;
-            transition: left 0.3s ease;
-            box-shadow: none;
+    .notif-dropdown-menu {
+        width: 250px;
+    }
+
+}
+
+</style>
+
+<!-- =========================================================
+     BOOTSTRAP
+     ========================================================= -->
+
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js"></script>
+
+<script>
+(function() {
+    'use strict';
+
+    // =========================================================
+    // SIDEBAR PERSISTENCE
+    // =========================================================
+
+    function getSidebarElements() {
+        var sidebar = document.getElementById('adminSidebar');
+        var adminMain = document.getElementById('adminMain');
+        var collapseBtn = document.getElementById('sidebarCollapseBtn');
+        return { sidebar: sidebar, adminMain: adminMain, collapseBtn: collapseBtn };
+    }
+
+    // Apply saved state instantly (no transition) on first paint,
+    // so the page never "animates" into its initial state on load.
+    function applySidebarState(skipTransition) {
+        var elements = getSidebarElements();
+        var sidebar = elements.sidebar;
+        var adminMain = elements.adminMain;
+
+        if (!sidebar || !adminMain) {
+            setTimeout(function() { applySidebarState(skipTransition); }, 50);
+            return;
         }
 
-        .medtech-sidebar.open {
-            left: 0;
-            box-shadow: 4px 0 30px rgba(0,0,0,0.1) !important;
+        if (skipTransition) {
+            sidebar.classList.add('no-transition');
+            adminMain.classList.add('no-transition');
         }
 
-        .sidebar-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.3);
-            z-index: 1050;
-            display: none;
+        if (window.innerWidth <= 992) {
+            sidebar.classList.remove('collapsed');
+            adminMain.classList.remove('sidebar-collapsed');
+            updateCollapseButton();
+            if (skipTransition) requestAnimationFrame(removeNoTransition);
+            return;
         }
 
-        .sidebar-overlay.active {
-            display: block;
+        var savedState = localStorage.getItem('polymedicSidebarCollapsed');
+
+        if (savedState === null) {
+            localStorage.setItem('polymedicSidebarCollapsed', '0');
+            savedState = '0';
         }
 
-        .sidebar-close {
-            display: flex !important;
+        if (savedState === '1') {
+            sidebar.classList.add('collapsed');
+            adminMain.classList.add('sidebar-collapsed');
+        } else {
+            sidebar.classList.remove('collapsed');
+            adminMain.classList.remove('sidebar-collapsed');
         }
 
-        .admin-main {
-            margin-left: 0;
-            width: auto;
-        }
+        updateCollapseButton();
 
-        .hamburger-btn {
-            display: block;
-        }
+        if (skipTransition) requestAnimationFrame(removeNoTransition);
+    }
 
-        .medtech-header {
-            padding: 0.75rem 1rem;
-        }
+    function removeNoTransition() {
+        var elements = getSidebarElements();
+        if (elements.sidebar) elements.sidebar.classList.remove('no-transition');
+        if (elements.adminMain) elements.adminMain.classList.remove('no-transition');
+    }
 
-        .header-title-group .page-title-header {
-            font-size: 0.9rem !important;
-        }
+    // =========================================================
+    // UPDATE COLLAPSE BUTTON
+    // =========================================================
 
-        .header-info-group .divider-icon {
-            display: none;
-        }
+    function updateCollapseButton() {
+        var elements = getSidebarElements();
+        var sidebar = elements.sidebar;
+        var collapseBtn = elements.collapseBtn;
 
-        .header-datetime span {
-            font-size: 0.7rem;
-        }
+        if (!collapseBtn || !sidebar) return;
 
-        .user-details .user-role-header {
-            font-size: 0.6rem !important;
-        }
+        var icon = collapseBtn.querySelector('i');
+        var text = collapseBtn.querySelector('span');
+        var isCollapsed = sidebar.classList.contains('collapsed');
 
-        .admin-content {
-            padding: 1rem;
-        }
-
-        .notif-dropdown-menu {
-            width: 300px;
+        if (isCollapsed) {
+            if (icon) icon.className = 'bi bi-layout-sidebar-inset-reverse';
+            collapseBtn.title = 'Expand Sidebar';
+            if (text) text.textContent = 'Expand Sidebar';
+        } else {
+            if (icon) icon.className = 'bi bi-layout-sidebar-inset';
+            collapseBtn.title = 'Collapse Sidebar';
+            if (text) text.textContent = 'Collapse Sidebar';
         }
     }
 
-    @media (max-width: 768px) {
-        .medtech-header {
-            padding: 0.5rem 0.75rem;
-            min-height: 50px;
-        }
+    // =========================================================
+    // APPLY ON PAGE LOAD
+    // =========================================================
 
-        .header-title-group .header-title-icon {
-            width: 20px;
-            height: 20px;
-        }
-
-        .header-title-group .page-title-header {
-            font-size: 0.8rem !important;
-            max-width: 150px;
-        }
-
-        .header-datetime {
-            display: none;
-        }
-
-        .header-info-group .divider-icon {
-            display: none;
-        }
-
-        .user-details {
-            display: none;
-        }
-
-        .avatar-small {
-            width: 30px;
-            height: 30px;
-            font-size: 0.75rem;
-        }
-
-        .admin-content {
-            padding: 0.75rem;
-        }
-
-        .notif-dropdown-menu {
-            width: 280px;
-        }
-
-        .hamburger-btn {
-            font-size: 1.2rem;
-            padding: 0.2rem 0.4rem;
-        }
-
-        .notif-btn {
-            font-size: 1rem;
-            padding: 0.2rem 0.4rem;
-        }
-
-        .menu-btn {
-            padding: 0.6rem 0.75rem;
-            font-size: 0.8rem;
-        }
-
-        .menu-icon,
-        .menu-icon-svg {
-            font-size: 0.9rem;
-            width: 20px !important;
-            height: 20px !important;
-        }
-
-        .badge-notif-med {
-            font-size: 0.5rem;
-            padding: 0.1rem 0.4rem;
-            min-width: 16px;
-            height: 16px;
-        }
-
-        .header-user {
-            padding: 0;
-        }
-
-        .header-user .avatar-small {
-            width: 28px;
-            height: 28px;
-            font-size: 0.65rem;
-        }
-
-        .stats-row,
-        .stats-grid {
-            grid-template-columns: repeat(2, 1fr);
-            gap: 0.6rem;
-        }
-
-        .stat-card {
-            padding: 1rem;
-        }
-
-        .stat-icon {
-            width: 36px;
-            height: 36px;
-            font-size: 1rem;
-        }
-
-        .stat-info h3 {
-            font-size: 1.25rem;
-        }
-
-        .chart-card,
-        .reports-card,
-        .summary-card,
-        .queue-card,
-        .tat-card {
-            padding: 1rem;
-        }
-    }
-
-    @media (max-width: 576px) {
-        .medtech-header {
-            padding: 0.4rem 0.5rem;
-            min-height: 44px;
-        }
-
-        .header-title-group .header-title-icon {
-            width: 18px;
-            height: 18px;
-        }
-
-        .header-title-group .page-title-header {
-            font-size: 0.7rem !important;
-            max-width: 120px;
-        }
-
-        .header-datetime {
-            display: none;
-        }
-
-        .header-info-group .divider-icon {
-            display: none;
-        }
-
-        .notif-btn {
-            font-size: 0.9rem;
-            padding: 0.15rem 0.3rem;
-        }
-
-        .notif-badge {
-            width: 14px;
-            height: 14px;
-            font-size: 0.5rem;
-            min-width: 14px;
-            top: -1px;
-            right: -1px;
-        }
-
-        .avatar-small {
-            width: 26px;
-            height: 26px;
-            font-size: 0.65rem;
-        }
-
-        .header-user {
-            display: none;
-        }
-
-        .admin-content {
-            padding: 0.5rem;
-        }
-
-        .notif-dropdown-menu {
-            width: 260px;
-        }
-
-        .notif-item {
-            padding: 0.6rem 0.75rem;
-        }
-
-        .notif-title {
-            font-size: 0.75rem;
-        }
-
-        .notif-msg {
-            font-size: 0.7rem;
-        }
-
-        .menu-btn {
-            padding: 0.5rem 0.6rem;
-            font-size: 0.8rem;
-        }
-
-        .stats-row,
-        .stats-grid {
-            grid-template-columns: 1fr;
-            gap: 0.5rem;
-        }
-
-        .stat-card {
-            flex-direction: row;
-            align-items: center;
-            padding: 0.85rem 1rem;
-            min-height: auto;
-        }
-
-        .stat-icon {
-            width: 40px;
-            height: 40px;
-            font-size: 1.1rem;
-            margin-bottom: 0;
-        }
-
-        .stat-info {
-            flex: 1;
-        }
-
-        .stat-info h3 {
-            font-size: 1.4rem;
-            white-space: normal;
-        }
-
-        .stat-info p {
-            font-size: 0.75rem;
-        }
-
-        .stat-info small {
-            font-size: 0.65rem;
-            white-space: normal;
-        }
-
-        .charts-row {
-            gap: 0.5rem;
-        }
-
-        .chart-card,
-        .reports-card,
-        .summary-card,
-        .queue-card,
-        .tat-card {
-            padding: 0.75rem;
-        }
-
-        .chart-body {
-            height: 200px;
-        }
-    }
-
-    @media (max-width: 400px) {
-        .header-title-group .header-title-icon {
-            width: 16px;
-            height: 16px;
-        }
-
-        .header-title-group .page-title-header {
-            font-size: 0.65rem !important;
-            max-width: 100px;
-        }
-
-        .notif-dropdown-menu {
-            width: 250px;
-        }
-
-        .sidebar-nav {
-            padding: 0.75rem 0.5rem;
-        }
-
-        .menu-btn {
-            padding: 0.5rem 0.6rem;
-            gap: 0.5rem;
-        }
-
-        .notif-btn {
-            font-size: 0.85rem;
-        }
-
-        .notif-badge {
-            width: 12px;
-            height: 12px;
-            font-size: 0.4rem;
-        }
-
-        .chart-body {
-            height: 180px;
-        }
-    }
-
-    /* ============================================================
-       MOBILE SAFETY NET
-       Guarantees that below the 992px breakpoint the sidebar does
-       not push the content off-screen, regardless of any
-       conflicting rule from admin.css or any browser extension.
-       Uses !important because we have observed that other rules
-       on this page can override the mobile media query.
-       ============================================================ */
-    @media (max-width: 992px) {
-        html,
-        body {
-            max-width: 100vw;
-            overflow-x: hidden;
-        }
-
-        .admin-wrapper {
-            max-width: 100vw;
-            overflow-x: hidden;
-            display: block;
-        }
-
-        .admin-main {
-            margin-left: 0 !important;
-            width: 100% !important;
-            max-width: 100vw !important;
-        }
-
-        .admin-content {
-            width: 100% !important;
-            max-width: 100vw !important;
-            padding: 1rem !important;
-        }
-
-        .medtech-sidebar {
-            max-width: 100vw;
-        }
-    }
-    </style>
-
-    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js"></script>
-    <script>
-        function toggleSidebar() {
-            const sidebar = document.getElementById('adminSidebar');
-            const overlay = document.getElementById('sidebarOverlay');
-            sidebar.classList.toggle('open');
-            overlay.classList.toggle('active');
-        }
-
-        window.addEventListener('resize', function() {
-            const sidebar = document.getElementById('adminSidebar');
-            const overlay = document.getElementById('sidebarOverlay');
-            if (window.innerWidth > 992) {
-                sidebar.classList.remove('open');
-                overlay.classList.remove('active');
-            }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            applySidebarState(true);
         });
+    } else {
+        applySidebarState(true);
+    }
 
-        document.querySelectorAll('.sidebar-nav a').forEach(link => {
-            if (link.href === window.location.href) {
-                link.closest('li').classList.add('active');
-            }
-        });
+    window.addEventListener('load', function() {
+        applySidebarState(true);
+    });
 
-        // ============================================================
-        // NOTIFICATION FUNCTIONS
-        // ============================================================
+    window.addEventListener('pageshow', function(e) {
+        if (e.persisted) {
+            setTimeout(function() { applySidebarState(true); }, 50);
+        }
+    });
 
-        function fetchNotifications() {
-            fetch('/polymedic/public/medtech/notifications/fetch', {
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    updateNotificationBadge(data.unread_count);
-                    renderNotificationDropdown(data.notifications);
-                }
-            })
-            .catch(err => console.error('Error fetching notifications:', err));
+    // =========================================================
+    // TOGGLE FUNCTION
+    // =========================================================
+
+    window.toggleSidebarCollapse = function() {
+        var elements = getSidebarElements();
+        var sidebar = elements.sidebar;
+        var adminMain = elements.adminMain;
+
+        if (!sidebar || !adminMain) return;
+        if (window.innerWidth <= 992) return;
+
+        if (sidebar.classList.contains('collapsed')) {
+            sidebar.classList.remove('collapsed');
+            adminMain.classList.remove('sidebar-collapsed');
+            localStorage.setItem('polymedicSidebarCollapsed', '0');
+        } else {
+            sidebar.classList.add('collapsed');
+            adminMain.classList.add('sidebar-collapsed');
+            localStorage.setItem('polymedicSidebarCollapsed', '1');
         }
 
-        function updateNotificationBadge(count) {
-            const badge = document.getElementById('notifBadge');
-            if (count > 0) {
-                badge.textContent = count > 99 ? '99+' : count;
-                badge.style.display = 'flex';
-                badge.classList.add('has-unread');
+        updateCollapseButton();
+    };
+
+    // =========================================================
+    // RESIZE HANDLER
+    // =========================================================
+
+    window.addEventListener('resize', function() {
+        var elements = getSidebarElements();
+        var sidebar = elements.sidebar;
+        var adminMain = elements.adminMain;
+
+        if (!sidebar || !adminMain) return;
+
+        if (window.innerWidth > 992) {
+            var savedState = localStorage.getItem('polymedicSidebarCollapsed');
+            if (savedState === '1') {
+                sidebar.classList.add('collapsed');
+                adminMain.classList.add('sidebar-collapsed');
             } else {
-                badge.style.display = 'none';
-                badge.classList.remove('has-unread');
+                sidebar.classList.remove('collapsed');
+                adminMain.classList.remove('sidebar-collapsed');
             }
+        } else {
+            sidebar.classList.remove('collapsed');
+            adminMain.classList.remove('sidebar-collapsed');
+        }
+        updateCollapseButton();
+    });
+
+    // =========================================================
+    // NOTIFICATIONS
+    // =========================================================
+
+    function fetchNotifications() {
+        fetch('/polymedic/public/medtech/notifications/fetch', {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(function(response) {
+            return response.json();
+        })
+        .then(function(data) {
+            if (data.status === 'success') {
+                updateNotificationBadge(data.unread_count);
+                renderNotificationDropdown(data.notifications);
+            }
+        })
+        .catch(function(error) {
+            console.error('Error fetching notifications:', error);
+        });
+    }
+
+    function updateNotificationBadge(count) {
+        var badge = document.getElementById('notifBadge');
+        if (!badge) return;
+
+        if (count > 0) {
+            badge.textContent = count > 99 ? '99+' : count;
+            badge.style.display = 'flex';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+
+    function renderNotificationDropdown(notifications) {
+        var listContainer = document.getElementById('notifDropdownList');
+        if (!listContainer) return;
+
+        if (!notifications || notifications.length === 0) {
+            listContainer.innerHTML = `
+                <div class="p-3 text-center text-muted small">
+                    <i class="bi bi-bell-slash d-block fs-4 mb-1"></i>
+                    No notifications yet
+                </div>
+            `;
+            return;
         }
 
-        function renderNotificationDropdown(notifications) {
-            const listContainer = document.getElementById('notifDropdownList');
-            if (!notifications || notifications.length === 0) {
-                listContainer.innerHTML = '<div class="p-3 text-center text-muted small"><i class="bi bi-bell-slash d-block fs-4 mb-1"></i>No notifications yet</div>';
-                return;
+        var html = '';
+
+        notifications.forEach(function(item) {
+            var unreadClass = item.is_read == 0 ? 'unread' : '';
+
+            var iconClass = 'bi-bell-fill';
+            var colorClass = 'system';
+
+            if (item.type === 'appointment') {
+                iconClass = 'bi-calendar-check';
+                colorClass = 'appointment';
+            } else if (item.type === 'xray') {
+                iconClass = 'bi-x-ray';
+                colorClass = 'xray';
+            } else if (item.type === 'lab') {
+                iconClass = 'bi-flask';
+                colorClass = 'lab';
             }
 
-            let html = '';
-            notifications.forEach(item => {
-                const unreadClass = item.is_read == 0 ? 'unread' : '';
-                let iconClass = 'bi-bell-fill';
-                let colorClass = 'system';
+            var link = item.link || '#';
 
-                if (item.type === 'appointment') {
-                    iconClass = 'bi-calendar-check';
-                    colorClass = 'appointment';
-                } else if (item.type === 'lab') {
-                    iconClass = 'bi-flask';
-                    colorClass = 'lab';
-                } else if (item.type === 'xray') {
-                    iconClass = 'bi-x-ray';
-                    colorClass = 'xray';
-                }
+            html += `
+                <a href="${link}" class="notif-item ${unreadClass}" onclick="markNotificationRead(${item.id}, event)">
+                    <div class="notif-icon-box ${colorClass}">
+                        <i class="bi ${iconClass}"></i>
+                    </div>
+                    <div class="notif-content">
+                        <div class="notif-title">${escapeHtml(item.title)}</div>
+                        <div class="notif-msg">${escapeHtml(item.message)}</div>
+                        <div class="notif-time"><i class="bi bi-clock me-1"></i>${item.time_ago}</div>
+                    </div>
+                </a>
+            `;
+        });
 
-                const link = item.link || '#';
+        listContainer.innerHTML = html;
+    }
 
-                html += `
-                    <a href="${link}" class="notif-item ${unreadClass}" onclick="markNotificationRead(${item.id}, event)">
-                        <div class="notif-icon-box ${colorClass}">
-                            <i class="bi ${iconClass}"></i>
-                        </div>
-                        <div class="notif-content">
-                            <div class="notif-title">${escapeHtml(item.title)}</div>
-                            <div class="notif-msg">${escapeHtml(item.message)}</div>
-                            <div class="notif-time"><i class="bi bi-clock me-1"></i>${item.time_ago}</div>
-                        </div>
-                    </a>
-                `;
-            });
-            listContainer.innerHTML = html;
+    window.markNotificationRead = function(id, event) {
+        fetch('/polymedic/public/medtech/notifications/mark-read/' + id, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(function(response) {
+            return response.json();
+        })
+        .then(function(data) {
+            if (data.status === 'success') {
+                updateNotificationBadge(data.unread_count);
+            }
+        })
+        .catch(function(error) {
+            console.error('Error marking notification read:', error);
+        });
+    };
+
+    window.markAllNotificationsRead = function(event) {
+        if (event) {
+            event.stopPropagation();
         }
 
-        function markNotificationRead(id, event) {
-            fetch('/polymedic/public/medtech/notifications/mark-read/' + id, {
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    updateNotificationBadge(data.unread_count);
-                }
-            })
-            .catch(err => console.error('Error marking notification read:', err));
-        }
+        fetch('/polymedic/public/medtech/notifications/mark-all-read', {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(function(response) {
+            return response.json();
+        })
+        .then(function(data) {
+            if (data.status === 'success') {
+                updateNotificationBadge(0);
+                fetchNotifications();
+            }
+        })
+        .catch(function(error) {
+            console.error('Error marking notifications read:', error);
+        });
+    };
 
-        function markAllNotificationsRead(event) {
-            if (event) event.stopPropagation();
-            fetch('/polymedic/public/medtech/notifications/mark-all-read', {
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    updateNotificationBadge(0);
-                    fetchNotifications();
-                }
-            })
-            .catch(err => console.error('Error marking notifications read:', err));
-        }
+    function escapeHtml(text) {
+        if (!text) return '';
+        return text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
 
-        function escapeHtml(text) {
-            if (!text) return '';
-            return text
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
-        }
-
+    if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function() {
             fetchNotifications();
             setInterval(fetchNotifications, 15000);
         });
-    </script>
+    } else {
+        fetchNotifications();
+        setInterval(fetchNotifications, 15000);
+    }
+
+})();
+</script>
+
+<style>
+/* Disable transitions only during the initial state application
+   on page load, so restoring a saved collapsed/expanded state
+   never itself animates — only user clicks do. */
+.admin-sidebar.no-transition,
+.admin-sidebar.no-transition *,
+.admin-main.no-transition {
+    transition: none !important;
+}
+</style>
+
 </body>
+
 </html>

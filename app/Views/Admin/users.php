@@ -357,70 +357,158 @@ $userAvatar = 'default-avatar.png';
     </div>
 </div>
 
-<!-- ===== EDIT USER MODAL ===== -->
-<div class="modal fade admin-modal" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+<!-- ===== EDIT USER MODAL (REDESIGNED) ===== -->
+<div class="modal fade admin-modal edit-user-modal" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="editUserModalLabel"><i class="bi bi-pencil me-2" aria-hidden="true"></i>Edit User</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form id="editUserForm" action="" method="POST" data-guard-submit>
-                <?= csrf_field() ?>
-                <div class="modal-body">
-                    <input type="hidden" name="user_id" id="edit_user_id">
 
-                    <div class="mb-3">
-                        <label class="form-label" for="edit_username_display">Username</label>
-                        <input type="text" class="form-control" id="edit_username_display" disabled>
-                        <small class="field-hint">Usernames cannot be changed after creation.</small>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label" for="edit_full_name">Full Name <span class="req">*</span></label>
-                        <input type="text" class="form-control" name="full_name" id="edit_full_name" autocomplete="name" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label" for="edit_email">Email <span class="req">*</span></label>
-                        <input type="email" class="form-control" name="email" id="edit_email" autocomplete="email" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label" for="edit_password">New Password</label>
-                        <div class="password-field">
-                            <input type="password" class="form-control" name="password" id="edit_password" autocomplete="new-password">
-                            <button type="button" class="password-toggle" data-toggle-password="edit_password" aria-label="Show password" title="Show password">
-                                <i class="bi bi-eye" aria-hidden="true"></i>
-                            </button>
-                        </div>
-                        <small class="field-hint">Leave blank to keep the current password.</small>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label" for="edit_role">Role <span class="req">*</span></label>
-                        <select class="form-select" name="role" id="edit_role" required>
-                            <option value="admin">Administrator</option>
-                            <option value="receptionist">Receptionist</option>
-                            <option value="med_tech">Medical Technologist</option>
-                            <option value="radiologist">Radiologist</option>
-                        </select>
-                    </div>
-                    <div class="mb-3" id="edit_prc_wrap" hidden>
-                        <label class="form-label" for="edit_prc_license">
-                            PRC License No. <span class="req">*</span>
-                        </label>
-                        <input type="text" class="form-control" name="prc_license" id="edit_prc_license"
-                               autocomplete="off" maxlength="30" placeholder="e.g. 0123456">
-                        <small class="field-hint">Required for Medical Technologist and Radiologist accounts.</small>
-                    </div>
-                    <div class="mb-0">
-                        <label class="form-label" for="edit_status">Status</label>
-                        <select class="form-select" name="status" id="edit_status">
-                            <option value="active">Active</option>
-                            <option value="inactive">Inactive</option>
-                        </select>
+            <div class="modal-header edit-user-header">
+                <div class="edit-user-heading">
+                    <span class="edit-user-heading-icon" aria-hidden="true">
+                        <i class="bi bi-pencil-square"></i>
+                    </span>
+                    <div class="edit-user-heading-text">
+                        <h5 class="modal-title" id="editUserModalLabel">Edit user</h5>
+                        <p class="edit-user-sub">Update account details, role, and access status.</p>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Update User</button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <form id="editUserForm" action="" method="POST" data-guard-submit>
+                <?= csrf_field() ?>
+                <input type="hidden" name="user_id" id="edit_user_id">
+
+                <div class="modal-body edit-user-body">
+
+                    <!-- ================= IDENTITY ================= -->
+                    <section class="edit-user-section">
+                        <h6 class="edit-user-section-title">Identity</h6>
+
+                        <div class="edit-user-grid">
+                            <div class="edit-user-field">
+                                <label class="form-label" for="edit_username_display">Username</label>
+                                <input type="text"
+                                       class="form-control"
+                                       id="edit_username_display"
+                                       disabled
+                                       autocomplete="off"
+                                       spellcheck="false">
+                                <small class="field-hint">Usernames cannot be changed after creation.</small>
+                            </div>
+
+                            <div class="edit-user-field">
+                                <label class="form-label" for="edit_full_name">
+                                    Full name <span class="req" aria-hidden="true">*</span>
+                                </label>
+                                <input type="text"
+                                       class="form-control"
+                                       name="full_name"
+                                       id="edit_full_name"
+                                       autocomplete="name"
+                                       placeholder="e.g. Juan Dela Cruz"
+                                       required>
+                            </div>
+
+                            <div class="edit-user-field edit-user-field--full">
+                                <label class="form-label" for="edit_email">
+                                    Email <span class="req" aria-hidden="true">*</span>
+                                </label>
+                                <input type="email"
+                                       class="form-control"
+                                       name="email"
+                                       id="edit_email"
+                                       autocomplete="email"
+                                       placeholder="user@polymedic.example"
+                                       required>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- ================= SECURITY ================= -->
+                    <section class="edit-user-section">
+                        <h6 class="edit-user-section-title">Security</h6>
+
+                        <div class="edit-user-grid">
+                            <div class="edit-user-field edit-user-field--full">
+                                <label class="form-label" for="edit_password">New password</label>
+                                <div class="password-field">
+                                    <input type="password"
+                                           class="form-control"
+                                           name="password"
+                                           id="edit_password"
+                                           autocomplete="new-password"
+                                           placeholder="Leave blank to keep current password">
+                                    <button type="button"
+                                            class="password-toggle"
+                                            data-toggle-password="edit_password"
+                                            aria-label="Show password"
+                                            title="Show password">
+                                        <i class="bi bi-eye" aria-hidden="true"></i>
+                                    </button>
+                                </div>
+                                <small class="field-hint">Fill this only if you want to change the user's password.</small>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- ================= ACCESS ================= -->
+                    <section class="edit-user-section">
+                        <h6 class="edit-user-section-title">Access</h6>
+
+                        <div class="edit-user-grid">
+                            <div class="edit-user-field">
+                                <label class="form-label" for="edit_role">
+                                    Role <span class="req" aria-hidden="true">*</span>
+                                </label>
+                                <select class="form-select" name="role" id="edit_role" required>
+                                    <option value="admin">Administrator</option>
+                                    <option value="receptionist">Receptionist</option>
+                                    <option value="med_tech">Medical Technologist</option>
+                                    <option value="radiologist">Radiologist</option>
+                                </select>
+                                <small class="field-hint">Determines what the user can see and do.</small>
+                            </div>
+
+                            <div class="edit-user-field">
+                                <label class="form-label" for="edit_status">Status</label>
+                                <select class="form-select" name="status" id="edit_status">
+                                    <option value="active">Active</option>
+                                    <option value="inactive">Inactive</option>
+                                </select>
+                                <small class="field-hint">Inactive accounts cannot sign in.</small>
+                            </div>
+
+                            <div class="edit-user-field edit-user-field--full" id="edit_prc_wrap" hidden>
+                                <label class="form-label" for="edit_prc_license">
+                                    PRC License No. <span class="req" aria-hidden="true">*</span>
+                                </label>
+                                <input type="text"
+                                       class="form-control"
+                                       name="prc_license"
+                                       id="edit_prc_license"
+                                       autocomplete="off"
+                                       maxlength="30"
+                                       placeholder="e.g. 0123456">
+                                <small class="field-hint">Required for Medical Technologist and Radiologist accounts.</small>
+                            </div>
+                        </div>
+                    </section>
+
+                </div>
+
+                <div class="modal-footer edit-user-footer">
+                    <span class="edit-user-footer-note">
+                        <i class="bi bi-info-circle" aria-hidden="true"></i>
+                        Changes take effect immediately.
+                    </span>
+                    <div class="edit-user-footer-actions">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check2" aria-hidden="true"></i>
+                            Update user
+                        </button>
+                    </div>
                 </div>
             </form>
         </div>
@@ -1033,8 +1121,6 @@ $userAvatar = 'default-avatar.png';
     grid-column: 1 / -1;
 }
 
-/* A subtle reveal when the PRC field appears. The hidden attribute
-   drives it: removing hidden triggers the animation once. */
 .add-user-field--full[hidden] { display: none !important; }
 
 .add-user-field--full:not([hidden]) {
@@ -1077,26 +1163,157 @@ $userAvatar = 'default-avatar.png';
 
 .add-user-footer-actions .btn { margin: 0; }
 
-/* ---- responsive ---- */
+/* ============================================
+   EDIT USER MODAL (mirrors Add User)
+   ============================================ */
 
-@media (max-width: 576px) {
-    .add-user-grid { grid-template-columns: minmax(0, 1fr); }
-
-    .add-user-header { padding: 1rem; }
-    .add-user-body { padding: 0.35rem 1rem 0.85rem; }
-    .add-user-footer { padding: 0.75rem 1rem; }
-
-    .add-user-footer-note { width: 100%; }
-    .add-user-footer-actions { width: 100%; }
-    .add-user-footer-actions .btn { flex: 1; }
+.edit-user-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.15rem 1.35rem;
 }
+
+.edit-user-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    min-width: 0;
+}
+
+.edit-user-heading-icon {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
+    color: var(--um-accent);
+    background: #eef4fd;
+    border: 1px solid #d6e4fa;
+    border-radius: 10px;
+}
+
+.edit-user-heading-text { min-width: 0; }
+
+.edit-user-heading-text .modal-title {
+    font-size: 1.02rem;
+    font-weight: 650;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+    display: block;
+}
+
+.edit-user-sub {
+    margin: 0.15rem 0 0;
+    font-size: 0.8rem;
+    color: var(--um-muted);
+    line-height: 1.4;
+}
+
+.edit-user-body {
+    padding: 0.5rem 1.35rem 1rem;
+}
+
+.edit-user-section {
+    padding: 1rem 0;
+    border-top: 1px solid var(--um-line-soft);
+}
+
+.edit-user-section:first-child {
+    border-top: 0;
+    padding-top: 0.6rem;
+}
+
+.edit-user-section-title {
+    margin: 0 0 0.75rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--um-faint);
+}
+
+.edit-user-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem 1.25rem;
+}
+
+.edit-user-field {
+    min-width: 0;
+}
+
+.edit-user-field--full {
+    grid-column: 1 / -1;
+}
+
+.edit-user-field--full[hidden] { display: none !important; }
+
+.edit-user-field--full:not([hidden]) {
+    animation: editUserFieldIn 0.22s ease;
+}
+
+@keyframes editUserFieldIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.edit-user-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.85rem;
+    flex-wrap: wrap;
+    padding: 0.85rem 1.35rem;
+    background: var(--um-canvas);
+}
+
+.edit-user-footer-note {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.74rem;
+    color: var(--um-muted);
+}
+
+.edit-user-footer-note i { font-size: 0.82rem; color: var(--um-faint); }
+
+.edit-user-footer-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: auto;
+}
+
+.edit-user-footer-actions .btn { margin: 0; }
 
 /* ===== HIDDEN HELPER ===== */
 [hidden] { display: none !important; }
 
 /* ============================================
-   RESPONSIVE (table)
+   RESPONSIVE
    ============================================ */
+
+@media (max-width: 576px) {
+    .add-user-grid,
+    .edit-user-grid { grid-template-columns: minmax(0, 1fr); }
+
+    .add-user-header,
+    .edit-user-header { padding: 1rem; }
+    .add-user-body,
+    .edit-user-body { padding: 0.35rem 1rem 0.85rem; }
+    .add-user-footer,
+    .edit-user-footer { padding: 0.75rem 1rem; }
+
+    .add-user-footer-note,
+    .edit-user-footer-note { width: 100%; }
+    .add-user-footer-actions,
+    .edit-user-footer-actions { width: 100%; }
+    .add-user-footer-actions .btn,
+    .edit-user-footer-actions .btn { flex: 1; }
+}
 
 @media (max-width: 991px) {
     .search-wrapper { max-width: 100%; }
@@ -1417,7 +1634,7 @@ $userAvatar = 'default-avatar.png';
                 submitBtn.disabled = false;
                 submitBtn.textContent = modalEl.id === 'addUserModal'
                     ? 'Create user'
-                    : 'Update User';
+                    : 'Update user';
             }
         });
     });
@@ -1426,6 +1643,14 @@ $userAvatar = 'default-avatar.png';
     if (addModal) {
         addModal.addEventListener('shown.bs.modal', function () {
             var first = document.getElementById('add_full_name');
+            if (first) { first.focus(); }
+        });
+    }
+
+    var editModal = document.getElementById('editUserModal');
+    if (editModal) {
+        editModal.addEventListener('shown.bs.modal', function () {
+            var first = document.getElementById('edit_full_name');
             if (first) { first.focus(); }
         });
     }

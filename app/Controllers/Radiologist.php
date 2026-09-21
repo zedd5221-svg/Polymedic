@@ -6,6 +6,7 @@ use App\Models\AppointmentModel;
 use App\Models\DiagnosticRequestModel;
 use App\Models\NotificationModel;
 use App\Models\PaymentModel;
+use App\Models\ServiceModel;
 use App\Models\UserModel;
 
 class Radiologist extends BaseController
@@ -46,6 +47,85 @@ class Radiologist extends BaseController
             DiagnosticRequestModel::STATUS_IN_PROGRESS,
             DiagnosticRequestModel::STATUS_COMPLETED,
             DiagnosticRequestModel::STATUS_RELEASED,
+        ];
+    }
+
+    /**
+     * Active X-ray services for the dashboard catalogue card and the
+     * services donut.
+     *
+     * Returns every active row from the services table whose category
+     * is 'xray', plus a breakdown by clinical region. The region for
+     * each service is derived from its name, matched against the
+     * keyword lists below.
+     *
+     * Every X-ray service in the database appears at least once, so
+     * nothing falls into "Other" unless it genuinely does not match
+     * any clinical region.
+     */
+    private function getAvailableXrayServices()
+    {
+        $serviceModel = new ServiceModel();
+
+        $services = $serviceModel->getXrayServices();
+
+        $categoryMap = [
+            'Chest'             => [
+                'chest', 'thoracic bony', 'thoracic bony cage',
+            ],
+            'Skull & Face'      => [
+                'skull', 'towner', 'orbit', 'nasap',
+                'paranasal', 'pns', 'neck', 'cervical',
+            ],
+            'Spine & Pelvis'    => [
+                'thoracic vert', 'thoracolumbar', 'lumbosacral',
+                'lumbar', 'whole spine', 'pelvis', 'frog leg',
+            ],
+            'Upper Extremities' => [
+                'shoulder', 'humerus', 'arm', 'elbow',
+                'forearm', 'radius', 'wrist',
+                'hand', 'finger', 'metacarpal',
+            ],
+            'Lower Extremities' => [
+                'leg', 'knee', 'foot', 'ankle',
+            ],
+            'Abdomen'           => [
+                'abdomen',
+            ],
+        ];
+
+        $categoryCounts = [];
+        foreach ($categoryMap as $cat => $_) {
+            $categoryCounts[$cat] = 0;
+        }
+        $categoryCounts['Other'] = 0;
+
+        foreach ($services as $service) {
+            $name    = strtolower((string) ($service['service_name'] ?? ''));
+            $matched = false;
+
+            foreach ($categoryMap as $cat => $keywords) {
+                foreach ($keywords as $kw) {
+                    if (strpos($name, $kw) !== false) {
+                        $categoryCounts[$cat]++;
+                        $matched = true;
+                        break 2;
+                    }
+                }
+            }
+
+            if (!$matched) {
+                $categoryCounts['Other']++;
+            }
+        }
+
+        // Drop empty categories so the donut only shows real groups.
+        $categoryCounts = array_filter($categoryCounts);
+
+        return [
+            'services'       => $services,
+            'count'          => count($services),
+            'categoryCounts' => $categoryCounts,
         ];
     }
 
@@ -107,6 +187,8 @@ class Radiologist extends BaseController
 
         $data['today_revenue']   = $paymentModel->getXrayRevenueToday();
         $data['monthly_revenue'] = $paymentModel->getXrayRevenueThisMonth();
+
+        $data['servicesCatalog'] = $this->getAvailableXrayServices();
 
         return view('Radiologist/dashboard', $data);
     }

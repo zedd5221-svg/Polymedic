@@ -504,7 +504,7 @@
                 <?php endif; ?>
 
                 <div class="btn-group-success">
-                    <a href="<?= base_url('/') ?>" class="btn-outline-custom">
+                    <a href="<?= base_url('polymedic/public') ?>" class="btn-outline-custom">
                         <i class="bi bi-house" aria-hidden="true"></i>
                         Back home
                     </a>

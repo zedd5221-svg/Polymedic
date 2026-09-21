@@ -6,7 +6,21 @@
 
 <?php
 /* ------------------------------------------------------------------
-   View-local helpers only. No controller or query logic is changed.
+   Radiologist Dashboard
+
+   Layout:
+     1. Seven KPI stat cards
+     2. Weekly Study Volume chart (left) + Available X-ray Services
+        scrollable catalogue (right)
+     3. Two donut cards side by side — Status Breakdown (left) and
+        Services by Region (right). Each donut has its legend on the
+        right side of the canvas.
+     4. Reading Worklist table
+
+   All values come from the existing controller:
+     $pending, $processing, $completed, $released, $total,
+     $today_revenue, $monthly_revenue, $pending_examinations,
+     $weekly_data, $servicesCatalog
    ------------------------------------------------------------------ */
 
 $pending    = (int) ($pending ?? 0);
@@ -21,25 +35,28 @@ $monthlyRevenue = (float) ($monthly_revenue ?? 0);
 $recentExaminations  = (isset($recent_examinations)  && is_array($recent_examinations))  ? $recent_examinations  : [];
 $pendingExaminations = (isset($pending_examinations) && is_array($pending_examinations)) ? $pending_examinations : [];
 
-/*
- * Weekly volume comes from XrayExaminationModel::getWeeklyVolumeData()
- * and is shaped as ['labels' => [...], 'datasets' => [...]]. When the
- * controller has not been wired to pass it, the chart renders an empty
- * placeholder rather than inventing numbers.
- */
 $weeklyData     = (isset($weekly_data) && is_array($weekly_data)) ? $weekly_data : [];
 $weeklyLabels   = (isset($weeklyData['labels'])   && is_array($weeklyData['labels']))   ? $weeklyData['labels']   : [];
 $weeklyDatasets = (isset($weeklyData['datasets']) && is_array($weeklyData['datasets'])) ? $weeklyData['datasets'] : [];
 
 $hasWeeklyChart = !empty($weeklyLabels) && !empty($weeklyDatasets);
 
-/* Reduce a value to a safe CSS class fragment. */
+/* X-ray services catalogue — supplied by Radiologist::getAvailableXrayServices(). */
+$servicesCatalog = (isset($servicesCatalog) && is_array($servicesCatalog)) ? $servicesCatalog : [
+    'services'       => [],
+    'count'          => 0,
+    'categoryCounts' => [],
+];
+
+$xrayServices   = $servicesCatalog['services'];
+$xrayCount      = (int) $servicesCatalog['count'];
+$categoryCounts = $servicesCatalog['categoryCounts'];
+
 $slug = static function ($value, $fallback = 'unknown') {
     $value = preg_replace('/[^a-z0-9_-]/', '', strtolower(trim((string) $value)));
     return $value !== '' ? $value : $fallback;
 };
 
-/* Initials for the avatar, taken from the real stored name. */
 $initialsOf = static function ($name) {
     $parts = preg_split('/\s+/', trim((string) $name));
     $first = mb_substr($parts[0] ?? '', 0, 1);
@@ -47,7 +64,7 @@ $initialsOf = static function ($name) {
     return mb_strtoupper($first . $last);
 };
 
-;$peso = static function ($amount) {
+$peso = static function ($amount) {
     $amount = (float) $amount;
     $decimals = (floor($amount) == $amount) ? 0 : 2;
     return '₱' . number_format($amount, $decimals);
@@ -61,26 +78,12 @@ $statusMeta = [
     'released'    => ['label' => 'Released',   'tone' => 'released'],
 ];
 
-/* Real status breakdown of the pending worklist. */
 $statusCounts = [];
 foreach ($pendingExaminations as $exam) {
     $st = $slug($exam['status'] ?? '', 'unknown');
     $statusCounts[$st] = ($statusCounts[$st] ?? 0) + 1;
 }
 
-/*
- * STAT CARDS
- *
- * Same shell as the receptionist dashboard. Each card carries an
- * 'icon' key naming a PNG inside public/assets/images/. The 'tone'
- * key is retained for future styling; every tone renders transparent
- * so the PNG sits directly on the card with no coloured tile behind
- * it.
- *
- * Revenue cards are formatted through the $peso helper so the figure
- * is unambiguous, and receive the same 'stat-card--revenue' modifier
- * the receptionist page uses for its money KPI.
- */
 $statCards = [
     [
         'key'   => 'pending',
@@ -164,7 +167,6 @@ $statCards = [
             <<?= $tag ?> class="stat-card<?= $isMoney ? ' stat-card--revenue' : '' ?>"<?= $href ?>>
 
                 <div class="stat-top">
-
                     <div class="stat-icon <?= esc($card['tone'], 'attr') ?>">
                         <?php if ($icon !== ''): ?>
                             <img src="<?= esc(base_url('assets/images/' . $icon), 'attr') ?>"
@@ -182,11 +184,10 @@ $statCards = [
                             <polyline points="9 18 15 12 9 6"></polyline>
                         </svg>
                     <?php endif; ?>
-
                 </div>
 
                 <div class="stat-value<?= $isMoney ? ' stat-value-money' : '' ?>">
-                   <?= esc($card['value']) ?>
+                    <?= esc($card['value']) ?>
                 </div>
 
                 <div class="stat-label"><?= esc($card['label']) ?></div>
@@ -198,12 +199,10 @@ $statCards = [
     </div>
 
 
-    <!-- ===== CHARTS ROW ===== -->
-    <div class="charts-row">
+    <!-- ===== TOP ROW: Weekly Volume + Available X-ray Services ===== -->
+    <div class="charts-row charts-row--top">
 
-        <!-- Weekly study volume (stacked bar) -->
         <div class="chart-card">
-
             <div class="chart-header">
                 <div class="chart-heading">
                     <h5>Weekly Study Volume</h5>
@@ -228,12 +227,39 @@ $statCards = [
                     <small>Once examinations are scheduled, their counts appear here.</small>
                 </div>
             <?php endif; ?>
-
         </div>
 
-        <!-- Status breakdown (donut) -->
-        <div class="chart-card">
+        <div class="chart-card chart-card--services">
+            <div class="chart-header">
+                <div class="chart-heading">
+                    <h5>Available X-ray Services</h5>
+                    <small>Active catalogue (<?= number_format($xrayCount) ?>)</small>
+                </div>
+            </div>
 
+            <?php if (!empty($xrayServices)): ?>
+                <ul class="service-list" aria-label="Active X-ray services">
+                    <?php foreach ($xrayServices as $service): ?>
+                        <li class="service-list-item">
+                            <span class="service-list-name"><?= esc($service['service_name'] ?? '') ?></span>
+                            <span class="service-list-price">
+                                <?= esc($peso((float) ($service['charge'] ?? 0))) ?>
+                            </span>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php else: ?>
+                <p class="service-list-empty">No X-ray services are currently active.</p>
+            <?php endif; ?>
+        </div>
+    </div>
+
+
+    <!-- ===== MIDDLE ROW: Two donuts side by side ===== -->
+    <div class="charts-row charts-row--donuts">
+
+        <!-- Status breakdown -->
+        <div class="chart-card">
             <div class="chart-header">
                 <div class="chart-heading">
                     <h5>Status Breakdown</h5>
@@ -242,7 +268,6 @@ $statCards = [
             </div>
 
             <?php if ($total > 0): ?>
-
                 <?php
                 $donutRaw = [
                     'Pending'    => $pending,
@@ -253,14 +278,11 @@ $statCards = [
                 $donutData = array_filter($donutRaw, static fn ($n) => $n > 0);
                 arsort($donutData);
                 $donutTotal = array_sum($donutData);
-
                 $donutPalette = ['#2450d8', '#f0b429', '#0f9d76', '#0e7490', '#d9534f', '#7b8794'];
                 ?>
 
                 <?php if ($donutTotal > 0): ?>
-
                     <div class="donut-wrap">
-
                         <div class="donut-canvas">
                             <canvas id="statusChart"></canvas>
                             <div class="donut-center">
@@ -285,9 +307,7 @@ $statCards = [
                                 </li>
                             <?php endforeach; ?>
                         </ul>
-
                     </div>
-
                 <?php else: ?>
                     <div class="chart-body chart-empty">
                         <i class="bi bi-pie-chart" aria-hidden="true"></i>
@@ -295,7 +315,6 @@ $statCards = [
                         <small>The breakdown appears once examinations exist.</small>
                     </div>
                 <?php endif; ?>
-
             <?php else: ?>
                 <div class="chart-body chart-empty">
                     <i class="bi bi-pie-chart" aria-hidden="true"></i>
@@ -303,7 +322,57 @@ $statCards = [
                     <small>Examination counts appear here once the pipeline has entries.</small>
                 </div>
             <?php endif; ?>
+        </div>
 
+        <!-- Services breakdown by clinical region -->
+        <div class="chart-card">
+            <div class="chart-header">
+                <div class="chart-heading">
+                    <h5>Services by Region</h5>
+                    <small>Catalogue split across clinical areas</small>
+                </div>
+            </div>
+
+            <?php if (!empty($categoryCounts)): ?>
+                <?php
+                $svcData = $categoryCounts;
+                arsort($svcData);
+                $svcTotal = array_sum($svcData);
+                $svcPalette = ['#2450d8', '#0f9d76', '#f0b429', '#0e7490', '#d9534f', '#7b8794', '#6d28d9'];
+                ?>
+                <div class="donut-wrap">
+                    <div class="donut-canvas">
+                        <canvas id="servicesChart"></canvas>
+                        <div class="donut-center">
+                            <span class="donut-value"><?= number_format($svcTotal) ?></span>
+                            <span class="donut-label">Services</span>
+                        </div>
+                    </div>
+
+                    <ul class="donut-legend">
+                        <?php $si = 0; ?>
+                        <?php foreach ($svcData as $cat => $count): ?>
+                            <?php
+                                $pct = $svcTotal > 0 ? ($count / $svcTotal) * 100 : 0;
+                                $color = $svcPalette[$si % count($svcPalette)];
+                                $si++;
+                            ?>
+                            <li class="legend-item">
+                                <span class="legend-dot" style="background: <?= esc($color, 'attr') ?>;"></span>
+                                <span class="legend-name"><?= esc($cat) ?></span>
+                                <span class="legend-pct"><?= number_format($pct, $pct < 10 ? 1 : 0) ?>%</span>
+                                <span class="legend-count"><?= number_format($count) ?></span>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+            <?php else: ?>
+                <div class="chart-body chart-empty">
+                    <i class="bi bi-pie-chart" aria-hidden="true"></i>
+                    <p>No services on file</p>
+                    <small>Add X-ray services to see their distribution here.</small>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -312,7 +381,6 @@ $statCards = [
     <div class="appointments-card">
 
         <div class="card-header-custom">
-
             <div class="chart-heading">
                 <h5><i class="bi bi-list-check" aria-hidden="true"></i> Reading Worklist</h5>
                 <small>
@@ -334,7 +402,6 @@ $statCards = [
                     View All <i class="bi bi-arrow-right" aria-hidden="true"></i>
                 </a>
             </div>
-
         </div>
 
         <div class="table-responsive">
@@ -474,10 +541,6 @@ $statCards = [
 <style>
 /* =========================================================
    DESIGN TOKENS
-   Same shell as the receptionist dashboard. Every selector
-   is scoped to .dashboard-container so it beats the bare
-   .stat-card / .stats-row rules in RadiologistLayout.php
-   without using !important.
    ========================================================= */
 
 .dashboard-container {
@@ -526,9 +589,6 @@ $statCards = [
 
 /* =========================================================
    STATS ROW
-   Same shell as the receptionist dashboard — seven-track
-   grid, gap, padding and radius unchanged. The radiologist
-   page also renders seven cards, so no adjustment is needed.
    ========================================================= */
 
 .dashboard-container .stats-row {
@@ -627,7 +687,6 @@ $statCards = [
     overflow-wrap: anywhere;
 }
 
-/* ----- revenue KPI cards ----- */
 .dashboard-container .stat-card--revenue {
     border-color: #d7e3fb;
     background: linear-gradient(180deg, #fbfdff 0%, #ffffff 100%);
@@ -648,14 +707,21 @@ $statCards = [
 }
 
 /* =========================================================
-   CHARTS ROW
+   CHART ROWS
    ========================================================= */
 
 .dashboard-container .charts-row {
     display: grid;
-    grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
     gap: 0.9rem;
     margin-bottom: 1.1rem;
+}
+
+.dashboard-container .charts-row--top {
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+}
+
+.dashboard-container .charts-row--donuts {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
 .dashboard-container .chart-card {
@@ -742,18 +808,101 @@ $statCards = [
 .dashboard-container .chart-empty small { font-size: 0.74rem; color: var(--db-ink-faint); }
 
 /* =========================================================
-   DONUT + LEGEND
+   AVAILABLE X-RAY SERVICES — scrollable catalogue
    ========================================================= */
 
-.dashboard-container .donut-wrap {
+.dashboard-container .chart-card--services {
     display: flex;
     flex-direction: column;
+}
+
+.dashboard-container .service-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 280px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+}
+
+.dashboard-container .service-list::-webkit-scrollbar { width: 6px; }
+.dashboard-container .service-list::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+.dashboard-container .service-list::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+.dashboard-container .service-list::-webkit-scrollbar-track { background: transparent; }
+
+.dashboard-container .service-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.5rem 0.65rem;
+    border-radius: var(--db-r-sm);
+    background: var(--db-rail);
+    min-height: 34px;
+    transition: background-color 0.15s ease;
+}
+
+.dashboard-container .service-list-item:hover { background: #eef2f7; }
+
+.dashboard-container .service-list-name {
+    font-size: 0.8125rem;
+    color: var(--db-ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.dashboard-container .service-list-price {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--db-ink-soft);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.dashboard-container .service-list-empty {
+    margin: 0;
+    padding: 1rem 0.25rem;
+    font-size: 0.8125rem;
+    color: var(--db-ink-mute);
+    text-align: center;
+}
+
+/* =========================================================
+   DONUT + LEGEND
+   Donut on the left, legend on the right. The grid gives the
+   donut a fixed slot so it stays perfectly square, and the
+   legend takes the remaining width.
+   ========================================================= */
+
+.dashboard-container .charts-row--donuts .chart-card {
+    padding: 0.9rem 1rem 1rem;
+}
+
+.dashboard-container .charts-row--donuts .chart-header {
+    margin-bottom: 0.6rem;
+}
+
+.dashboard-container .donut-wrap {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr);
+    align-items: center;
     gap: 1.1rem;
 }
 
 .dashboard-container .donut-canvas {
     position: relative;
-    height: 190px;
+    height: 140px;
     flex-shrink: 0;
 }
 
@@ -769,7 +918,7 @@ $statCards = [
 }
 
 .dashboard-container .donut-value {
-    font-size: 1.9rem;
+    font-size: 1.35rem;
     font-weight: 800;
     letter-spacing: -0.04em;
     line-height: 1;
@@ -778,10 +927,10 @@ $statCards = [
 }
 
 .dashboard-container .donut-label {
-    font-size: 0.7rem;
+    font-size: 0.62rem;
     font-weight: 500;
     color: var(--db-ink-mute);
-    margin-top: 0.2rem;
+    margin-top: 0.1rem;
 }
 
 .dashboard-container .donut-legend {
@@ -790,24 +939,24 @@ $statCards = [
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.1rem;
+    gap: 0;
 }
 
 .dashboard-container .legend-item {
     display: flex;
     align-items: center;
-    gap: 0.55rem;
-    padding: 0.4rem 0.5rem;
+    gap: 0.45rem;
+    padding: 0.2rem 0.35rem;
     border-radius: var(--db-r-sm);
-    font-size: 0.8rem;
+    font-size: 0.72rem;
     transition: background-color 0.16s ease;
 }
 
 .dashboard-container .legend-item:hover { background: var(--db-rail); }
 
 .dashboard-container .legend-dot {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
     flex-shrink: 0;
 }
@@ -826,13 +975,14 @@ $statCards = [
     font-weight: 700;
     color: var(--db-ink);
     font-variant-numeric: tabular-nums;
+    font-size: 0.72rem;
 }
 
 .dashboard-container .legend-count {
-    font-size: 0.735rem;
+    font-size: 0.68rem;
     color: var(--db-ink-faint);
     font-variant-numeric: tabular-nums;
-    min-width: 1.5rem;
+    min-width: 1.25rem;
     text-align: right;
 }
 
@@ -903,10 +1053,6 @@ $statCards = [
 
 .dashboard-container .btn-view-all i { font-size: 0.75rem; }
 
-/* =========================================================
-   TABLE
-   ========================================================= */
-
 .dashboard-container .receptionist-table {
     margin: 0;
     border-collapse: separate;
@@ -949,7 +1095,6 @@ $statCards = [
 
 .dashboard-container .col-action { text-align: right; }
 
-/* ----- patient cell ----- */
 .dashboard-container .patient-cell {
     display: flex;
     align-items: center;
@@ -989,7 +1134,6 @@ $statCards = [
     color: var(--db-ink-faint);
 }
 
-/* ----- service + status ----- */
 .dashboard-container .service-tag {
     display: inline-block;
     font-size: 0.735rem;
@@ -1029,7 +1173,6 @@ $statCards = [
 .dashboard-container .status-badge.released  { background: #f0fdfa; color: var(--db-teal); border-color: #cdeae4; }
 .dashboard-container .status-badge.stat      { background: #fdeef0; color: var(--db-red); border-color: #f4d2d5; }
 
-/* ----- actions ----- */
 .dashboard-container .action-cell {
     display: flex;
     align-items: center;
@@ -1055,10 +1198,6 @@ $statCards = [
 .dashboard-container .action-icon-btn:hover          { background: var(--db-line-soft); color: var(--db-ink); }
 .dashboard-container .action-icon-btn.view:hover     { background: var(--db-accent-soft); color: var(--db-accent); border-color: #d3e0fb; }
 .dashboard-container .action-icon-btn.complete:hover { background: #eefaf4; color: var(--db-green); border-color: #c6ebda; }
-
-/* =========================================================
-   FILTER FOOTER
-   ========================================================= */
 
 .dashboard-container .table-filter-footer {
     display: flex;
@@ -1123,10 +1262,6 @@ $statCards = [
     color: var(--db-ink);
 }
 
-/* =========================================================
-   EMPTY STATE
-   ========================================================= */
-
 .dashboard-container .empty-state {
     text-align: center;
     padding: 3rem 1rem;
@@ -1169,8 +1304,26 @@ $statCards = [
 }
 
 @media (max-width: 1100px) {
-    .dashboard-container .charts-row { grid-template-columns: minmax(0, 1fr); }
-    .dashboard-container .donut-canvas { height: 220px; }
+    .dashboard-container .charts-row--top,
+    .dashboard-container .charts-row--donuts {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    /* Legend drops below the donut on narrow screens so the
+       side-by-side grid does not get squeezed. */
+    .dashboard-container .donut-wrap {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0.65rem;
+        justify-items: center;
+    }
+
+    .dashboard-container .donut-canvas { height: 160px; }
+
+    .dashboard-container .donut-legend {
+        width: 100%;
+    }
+
+    .dashboard-container .service-list { max-height: 240px; }
 }
 
 @media (max-width: 992px) {
@@ -1232,6 +1385,8 @@ $statCards = [
 
     .dashboard-container .table-filter-footer { flex-direction: column; align-items: stretch; }
     .dashboard-container .filter-group { justify-content: space-between; }
+
+    .dashboard-container .service-list { max-height: 220px; }
 }
 
 @media (max-width: 576px) {
@@ -1239,6 +1394,8 @@ $statCards = [
     .dashboard-container .stats-row { grid-template-columns: minmax(0, 1fr); gap: 12px; }
     .dashboard-container .card-header-custom { flex-direction: column; align-items: stretch; }
     .dashboard-container .header-right-group { justify-content: space-between; }
+
+    .dashboard-container .service-list { max-height: 200px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1273,6 +1430,9 @@ $statCards = [
     var statusValues = <?= json_encode(array_map('intval', array_values($donutData ?? [])), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     var donutPalette = <?= json_encode($donutPalette ?? [],             JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 
+    var servicesLabels = <?= json_encode(array_keys($categoryCounts ?? []),              JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    var servicesValues = <?= json_encode(array_map('intval', array_values($categoryCounts ?? [])), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+
     var TOOLTIP = {
         backgroundColor: '#ffffff',
         titleColor: '#0b1220',
@@ -1291,14 +1451,10 @@ $statCards = [
 
         // ----- Weekly volume (stacked bar) -----
         var weeklyCanvas = document.getElementById('weeklyVolumeChart');
-
         if (weeklyCanvas && Array.isArray(weeklyDatasets) && weeklyDatasets.length) {
             new Chart(weeklyCanvas.getContext('2d'), {
                 type: 'bar',
-                data: {
-                    labels: weeklyLabels,
-                    datasets: weeklyDatasets
-                },
+                data: { labels: weeklyLabels, datasets: weeklyDatasets },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
@@ -1325,9 +1481,8 @@ $statCards = [
             });
         }
 
-        // ----- Status breakdown (donut) -----
+        // ----- Status donut -----
         var statusCanvas = document.getElementById('statusChart');
-
         if (statusCanvas && statusValues.length) {
             new Chart(statusCanvas.getContext('2d'), {
                 type: 'doughnut',
@@ -1364,6 +1519,47 @@ $statCards = [
                 }
             });
         }
+
+        // ----- Services donut -----
+        var servicesCanvas = document.getElementById('servicesChart');
+        if (servicesCanvas && servicesValues.length) {
+            var svcPalette = ['#2450d8', '#0f9d76', '#f0b429', '#0e7490', '#d9534f', '#7b8794', '#6d28d9'];
+
+            new Chart(servicesCanvas.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: servicesLabels,
+                    datasets: [{
+                        data: servicesValues,
+                        backgroundColor: servicesLabels.map(function (_, i) {
+                            return svcPalette[i % svcPalette.length];
+                        }),
+                        borderWidth: 3,
+                        borderColor: '#ffffff',
+                        borderRadius: 6,
+                        spacing: 2,
+                        hoverOffset: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '72%',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: Object.assign({}, TOOLTIP, {
+                            callbacks: {
+                                label: function (ctx) {
+                                    var total = servicesValues.reduce(function (a, b) { return a + b; }, 0);
+                                    var pct = total ? Math.round((ctx.parsed / total) * 100) : 0;
+                                    return ctx.parsed + ' services (' + pct + '%)';
+                                }
+                            }
+                        })
+                    }
+                }
+            });
+        }
     }
 
     function ensureCharts() {
@@ -1382,8 +1578,6 @@ $statCards = [
 
 /* =====================================================
    WORKLIST FILTER
-   Tabs filter the table rows by status. The STAT tab reads
-   the data-stat attribute instead of data-status.
    ===================================================== */
 
 (function () {

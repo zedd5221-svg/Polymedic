@@ -217,6 +217,11 @@ foreach ($appointmentList as $appt) {
                         $patient, $reference, $email, $phone, $kindLabel,
                         implode(' ', $allServices),
                     ])));
+
+                    /* Show the LATE tag only when the status pill isn't
+                       already saying "Late" — otherwise the card shows
+                       "LATE" and "Late" side-by-side. */
+                    $showLateTag = $isLate && $status !== 'late';
                 ?>
                     <article class="dx-card<?= $isLate ? ' is-stat' : '' ?>"
                              data-key="<?= esc($id, 'attr') ?>"
@@ -234,7 +239,7 @@ foreach ($appointmentList as $appt) {
                             </button>
 
                             <div class="dx-card-flags">
-                                <?php if ($isLate): ?>
+                                <?php if ($showLateTag): ?>
                                     <span class="dx-tag-stat" title="Late">LATE</span>
                                 <?php endif; ?>
                                 <span class="dx-status dx-status--<?= esc($meta['tone'], 'attr') ?>">

@@ -6,6 +6,7 @@ use App\Models\AppointmentModel;
 use App\Models\DiagnosticRequestModel;
 use App\Models\LabResultModel;
 use App\Models\NotificationModel;
+use App\Models\ServiceModel;
 use App\Models\UserModel;
 
 class MedTech extends BaseController
@@ -115,9 +116,11 @@ class MedTech extends BaseController
             ->where('status', DiagnosticRequestModel::STATUS_COMPLETED)
             ->countAllResults();
 
-        $data['intakeData']     = $this->getHourlyIntake($labRequestModel);
-        $data['sectionData']    = $this->getSectionBreakdown($labRequestModel);
-        $data['turnaroundData'] = $this->getTurnaroundTimes($labRequestModel, $labResultModel);
+        $data['intakeData']      = $this->getHourlyIntake($labRequestModel);
+        $data['intakeMonthData'] = $this->getDailyIntakeMonth($labRequestModel);
+        $data['sectionData']     = $this->getSectionBreakdown($labRequestModel);
+        $data['turnaroundData']  = $this->getTurnaroundTimes($labRequestModel, $labResultModel);
+        $data['serviceCatalog']  = $this->getAvailableServices();
 
         return view('MedTech/dashboard', $data);
     }
@@ -153,6 +156,76 @@ class MedTech extends BaseController
         ];
     }
 
+    /**
+     * Daily specimen intake for the current calendar month.
+     *
+     * Returns one entry per day of the month: the day-of-month as a
+     * label and the request count for that day as the value. Days
+     * with no requests return 0, so the bar chart always shows the
+     * full month rather than just the days with activity.
+     */
+    private function getDailyIntakeMonth($labRequestModel)
+    {
+        $type  = DiagnosticRequestModel::TYPE_LAB;
+        $year  = (int) date('Y');
+        $month = (int) date('n');
+        $days  = (int) date('t');
+
+        $labels = [];
+        $counts = [];
+
+        for ($day = 1; $day <= $days; $day++) {
+            $date = sprintf('%04d-%02d-%02d', $year, $month, $day);
+            $labels[] = (string) $day;
+
+            $labRequestModel->resetQuery();
+            $counts[] = $labRequestModel
+                ->where('type', $type)
+                ->where('DATE(created_at)', $date)
+                ->countAllResults();
+        }
+
+        return [
+            'labels' => $labels,
+            'data'   => $counts,
+        ];
+    }
+
+    /**
+     * Count of active services in the catalogue.
+     *
+     * Used by the dashboard's "Available services" card so the page
+     * reflects what the lab actually offers, not a hard-coded number.
+     */
+    private function getAvailableServices()
+{
+    $serviceModel = new ServiceModel();
+
+    $labServices  = $serviceModel->getLaboratoryServices();
+    $xrayServices = $serviceModel->getXrayServices();
+    $counts       = $serviceModel->getCountByCategory();
+
+    return [
+        'lab'        => $labServices,
+        'xray'       => $xrayServices,
+        'labCount'   => $counts['laboratory'],
+        'xrayCount'  => $counts['xray'],
+        'otherCount' => $counts['other'],
+        'total'      => $counts['total'],
+    ];
+}
+
+    /**
+     * Today's volume broken down by laboratory section.
+     *
+     * Keywords are matched against the request's lab_services string,
+     * in the order the sections appear here. Longer / more specific
+     * keywords must come before shorter ones inside each section, and
+     * sections are ordered so a service lands in its true home.
+     *
+     * Every service in the `services` table appears below, so nothing
+     * falls into "Other" unless it is genuinely unrecognised.
+     */
     private function getSectionBreakdown($labRequestModel)
     {
         $today = date('Y-m-d');
@@ -166,41 +239,68 @@ class MedTech extends BaseController
 
         $sectionMap = [
             'Hematology' => [
-                'cbc', 'hemoglobin', 'hematocrit', 'rbc', 'wbc', 'platelet',
-                'complete blood', 'blood count', 'blood typing', 'complete blood count',
-                'hb', 'hct', 'mcv', 'mch', 'mchc', 'rdw', 'neutrophils', 'lymphocytes',
-                'monocytes', 'eosinophils', 'basophils', 'blood typing'
+                'complete blood count', 'cbc',
+                'platelet count', 'platelet',
+                'esr',
+                'hemoglobin', 'hgb',
+                'hematocrit', 'hct',
+                'blood typing',
+                'rbc', 'wbc',
+                'mcv', 'mch', 'mchc', 'rdw',
+                'neutrophils', 'lymphocytes', 'monocytes',
+                'eosinophils', 'basophils',
             ],
             'Chemistry' => [
-                'glucose', 'creatinine', 'bun', 'sodium', 'potassium', 'chloride',
-                'calcium', 'chemistry', 'blood chemistry', 'blood uric acid', 'uric acid',
-                'hba1c', 'triglycerides', 'cholesterol', 'lipid', 'lipid profile',
-                'total cholesterol', 'hdl', 'ldl', 'vldl', 'albumin', 'bilirubin',
-                'alkaline phosphatase', 'alt', 'ast', 'sgpt', 'sgot', 'protein',
-                'electrolytes', 'bicarbonate', 'magnesium', 'phosphorus', 'blood urea nitrogen'
+                'glucose', 'rbs', 'fbs',
+                'hba1c',
+                'cholesterol', 'triglycerides',
+                'hdl', 'ldl', 'vldl',
+                'creatinine', 'blood uric acid', 'uric acid',
+                'blood urea nitrogen', 'bun',
+                'sgpt', 'alt', 'sgot', 'ast',
+                'sodium', 'potassium', 'chloride', 'calcium',
+                'electrolytes', 'albumin', 'bilirubin',
+                'alkaline phosphatase', 'protein',
+                'bicarbonate', 'magnesium', 'phosphorus',
+                'lipid profile', 'lipid',
             ],
             'Urinalysis' => [
-                'urinalysis', 'urine', 'ua', 'specific gravity', 'ph',
-                'protein urine', 'glucose urine', 'ketones', 'urobilinogen',
-                'bilirubin urine', 'nitrite', 'leukocyte esterase'
+                'urinalysis', 'urine',
+                'specific gravity', 'ketones', 'urobilinogen',
+                'nitrite', 'leukocyte esterase',
             ],
-            'Microbiology' => [
-                'culture', 'sensitivity', 'gram stain', 'microbiology',
-                'blood culture', 'urine culture', 'sputum culture', 'stool culture',
-                'afb', 'gram', 'fungal culture', 'bacterial culture'
+            'Microscopy' => [
+                'fecalysis', 'fecal',
+                'semenanalysis', 'semen',
             ],
             'Serology' => [
-                'serology', 'antibody', 'antigen', 'hiv', 'hepatitis', 'syphilis',
-                't. pallidum', 'vdrl', 'rpr', 'anti-hcv', 'hbsag', 'anti-hbs',
-                'anti-hiv', 'dengue', 'igg', 'igm', 'rheumatoid factor', 'aso'
-            ],
-            'Coagulation' => [
-                'coagulation', 'pt', 'aptt', 'inr', 'bleeding time',
-                'clotting time', 'prothrombin time', 'partial thromboplastin time'
+                'hbsag', 'hepatitis', 'anti-hbs',
+                'anti-hcv', 'hcv',
+                'hiv', 'anti-hiv',
+                'salmonella', 'typhi',
+                'syphilis', 't. pallidum',
+                'vdrl', 'rpr',
+                'dengue', 'igg', 'igm',
+                'rheumatoid factor', 'aso',
+                'antibody', 'antigen',
             ],
             'Thyroid' => [
-                'thyroid', 't3', 't4', 'ft3', 'ft4', 'tsh',
-                'thyroid panel', 'thyroid function', 't3 uptake', 'free t4'
+                'thyroid', 'thyroid panel', 'thyroid function',
+                't3 uptake', 'free t3', 'ft3',
+                'free t4', 'ft4',
+                'tsh', 't3', 't4',
+            ],
+            'Microbiology' => [
+                'culture', 'sensitivity', 'gram stain',
+                'blood culture', 'urine culture',
+                'sputum culture', 'stool culture',
+                'afb', 'fungal culture', 'bacterial culture',
+            ],
+            'Coagulation' => [
+                'coagulation',
+                'prothrombin time', 'pt',
+                'partial thromboplastin time', 'aptt',
+                'inr', 'bleeding time', 'clotting time',
             ],
         ];
 

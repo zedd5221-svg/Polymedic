@@ -40,15 +40,6 @@ $jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
 
 /* ------------------------------------------------------------------
    STAT CARDS
-
-   Values and labels are unchanged from the previous version — only
-   the card appearance changed to match the receptionist dashboard:
-   a PNG icon inside a transparent 40x40 wrapper, the label and
-   subtitle stack, and a chevron on the right for cards that link.
-
-   Each card carries an 'icon' key naming a PNG in
-   public/assets/images/. If the file is missing the card still
-   renders — the image just shows a broken-image placeholder.
    ------------------------------------------------------------------ */
 $statCards = [
     [
@@ -117,6 +108,43 @@ $statCards = [
         'link'  => base_url('admin/reports/revenue'),
     ],
 ];
+
+/* ------------------------------------------------------------------
+   SPARKLINES
+   ------------------------------------------------------------------ */
+$kpiTrends = $kpiTrends ?? [];
+$sparkMeta = [
+    'patients'      => ['color' => '#0891B2', 'goodUp' => true,  'cumulative' => true,  'unit' => 'patients'],
+    'today'         => ['color' => '#0D9488', 'goodUp' => true,  'cumulative' => false, 'unit' => 'appointments'],
+    'pending'       => ['color' => '#EA580C', 'goodUp' => false, 'cumulative' => false, 'unit' => 'requests received'],
+    'completed'     => ['color' => '#16A34A', 'goodUp' => true,  'cumulative' => false, 'unit' => 'completed'],
+    'released'      => ['color' => '#2563EB', 'goodUp' => true,  'cumulative' => false, 'unit' => 'released'],
+    'revenue_today' => ['color' => '#CA8A04', 'goodUp' => true,  'cumulative' => false, 'unit' => 'revenue', 'money' => true],
+    'revenue_month' => ['color' => '#DB2777', 'goodUp' => true,  'cumulative' => true,  'unit' => 'revenue', 'money' => true],
+];
+
+/* Returns [svgPath, lastX%, lastY%] for a value series. */
+$sparkGeometry = static function (array $vals): array {
+    $n = count($vals);
+    if ($n < 2) { return ['', 100, 50]; }
+    $min = min($vals);
+    $max = max($vals);
+    $rng = $max - $min;
+    $w = 100; $h = 32; $pad = 3;
+    $pts = [];
+    foreach (array_values($vals) as $i => $v) {
+        $x = $i / ($n - 1) * $w;
+        $y = $rng > 0 ? $h - $pad - (($v - $min) / $rng) * ($h - 2 * $pad) : $h / 2;
+        $pts[] = [round($x, 2), round($y, 2)];
+    }
+    $line = 'M' . $pts[0][0] . ',' . $pts[0][1];
+    for ($i = 1; $i < $n; $i++) {
+        $cx = round(($pts[$i - 1][0] + $pts[$i][0]) / 2, 2);
+        $line .= ' C' . $cx . ',' . $pts[$i - 1][1] . ' ' . $cx . ',' . $pts[$i][1] . ' ' . $pts[$i][0] . ',' . $pts[$i][1];
+    }
+    $last = end($pts);
+    return [$line, $last[0], round($last[1] / $h * 100, 2)];
+};
 ?>
 
 <div class="dashboard-wrapper">
@@ -128,8 +156,22 @@ $statCards = [
                 $tag  = !empty($card['link']) ? 'a' : 'div';
                 $href = !empty($card['link']) ? ' href="' . esc($card['link'], 'attr') . '"' : '';
                 $icon = (string) ($card['icon'] ?? '');
+
+                $meta   = $sparkMeta[$card['key']] ?? null;
+                $vals   = $meta ? array_map('floatval', $kpiTrends[$card['key']] ?? []) : [];
+                $hasSpk = $meta && count($vals) >= 2;
+                if ($hasSpk) {
+                    [$spkLine, $spkX, $spkY] = $sparkGeometry($vals);
+                    $dates = $kpiTrends['dates'] ?? [];
+                    $fmt   = !empty($meta['money'])
+                        ? static fn($v) => '₱' . number_format($v, 2)
+                        : static fn($v) => number_format($v);
+                    $spkTitle = $meta['unit'] . ': ' . $fmt(end($vals))
+                        . ' on ' . (isset($dates[count($vals) - 1]) ? date('M j', strtotime($dates[count($vals) - 1])) : 'today')
+                        . ' · 14-day peak ' . $fmt(max($vals));
+                }
             ?>
-            <<?= $tag ?> class="stat-card"<?= $href ?>>
+            <<?= $tag ?> class="stat-card"<?= $href ?><?= $hasSpk ? ' style="--spark:' . esc($meta['color'], 'attr') . '"' : '' ?>>
 
                 <div class="stat-top">
 
@@ -153,13 +195,24 @@ $statCards = [
 
                 </div>
 
-                <div class="stat-value<?= !empty($card['raw']) ? ' stat-value-money' : '' ?>">
-                    <?= !empty($card['raw']) ? $card['value'] : esc($card['value']) ?>
+                <div class="stat-value-row">
+                    <div class="stat-value<?= !empty($card['raw']) ? ' stat-value-money' : '' ?>">
+                        <?= !empty($card['raw']) ? $card['value'] : esc($card['value']) ?>
+                    </div>
+                    <?php if ($hasSpk): ?>
+                        <div class="spark spark-inline" role="img" aria-label="<?= esc($spkTitle, 'attr') ?>" title="<?= esc($spkTitle, 'attr') ?>">
+                            <svg viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true">
+                                <path d="<?= $spkLine ?>" class="spark-line" fill="none" vector-effect="non-scaling-stroke"/>
+                            </svg>
+                        </div>
+                    <?php endif; ?>
                 </div>
 
                 <div class="stat-label"><?= esc($card['label']) ?></div>
 
-                <div class="stat-sub"><?= esc($card['note']) ?></div>
+                <div class="stat-foot">
+                    <div class="stat-sub"><?= esc($card['note']) ?></div>
+                </div>
 
             </<?= $tag ?>>
         <?php endforeach; ?>
@@ -474,8 +527,7 @@ $statCards = [
     border-radius: var(--db-radius-xs);
 }
 
-/* ===== STATS ROW =====
-   Fixed seven-track grid, matching the receptionist dashboard. */
+/* ===== STATS ROW ===== */
 
 .stats-row {
     display: grid;
@@ -511,8 +563,6 @@ $statCards = [
     color: var(--db-text-soft);
 }
 
-/* Grid, not flex, so the icon stays pinned to the left edge and the
-   chevron to the right edge regardless of the card's width. */
 .stat-top {
     display: grid;
     grid-template-columns: 40px 1fr 16px;
@@ -536,10 +586,9 @@ $statCards = [
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    background: transparent;
 }
 
-/* PNG icon sits directly on the card. The wrapper is 40x40 but
-   transparent, so no colored tile is drawn behind the image. */
 .stat-img {
     width: 25px;
     height: 25px;
@@ -554,8 +603,6 @@ $statCards = [
     justify-self: end;
 }
 
-/* Tone hooks retained on the icon wrapper for future use, but with
-   transparent backgrounds so no colored tile is drawn. */
 .icon-cyan,
 .icon-teal,
 .icon-orange,
@@ -566,19 +613,53 @@ $statCards = [
     background: transparent;
 }
 
-.stat-value {
-    font-size: 1.65rem;
-    font-weight: 700;
-    color: var(--db-text);
-    line-height: 1.15;
+.stat-value-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 10px;
     margin-bottom: 6px;
+    min-width: 0;
+}
+
+/* Smaller KPI number to match the reference design. */
+.stat-value {
+    font-size: 1.35rem;
+    font-weight: 680;
+    color: var(--db-text);
+    line-height: 1.1;
     letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums;
+    min-width: 0;
 }
 
 .stat-value-money {
-    font-size: 1.35rem;
+    font-size: 1.0rem;
     overflow-wrap: anywhere;
+}
+
+/* Small inline sparkline, sits to the right of the value. */
+.spark-inline {
+    flex-shrink: 0;
+    width: 56px;
+    height: 20px;
+    position: relative;
+}
+
+.spark-inline svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    overflow: visible;
+}
+
+.spark-line {
+    stroke: var(--spark);
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 .stat-label {
@@ -591,6 +672,22 @@ $statCards = [
 .stat-sub {
     font-size: 0.775rem;
     color: var(--db-text-muted);
+}
+
+.stat-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 4px;
+    min-width: 0;
+}
+
+.stat-foot .stat-sub {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* ===== LAYOUT ROWS ===== */
@@ -616,10 +713,6 @@ $statCards = [
     box-shadow: var(--db-shadow);
     border: 1px solid var(--db-border);
     min-width: 0;
-}
-
-.full-width {
-    margin-bottom: var(--db-gap);
 }
 
 .card-header {
@@ -992,57 +1085,6 @@ $statCards = [
     .pending-actions { width: 100%; justify-content: flex-end; }
 }
 
-/* ===== ACTIVITY ===== */
-.activity-list {
-    display: flex;
-    flex-direction: column;
-}
-
-.activity-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    padding: 12px 8px;
-    margin: 0 -8px;
-    border-bottom: 1px solid var(--db-subtle);
-    border-radius: var(--db-radius-xs);
-    transition: background-color 0.18s ease;
-}
-
-.activity-item:hover {
-    background: var(--db-canvas);
-}
-
-.activity-item:last-child {
-    border-bottom: none;
-}
-
-.activity-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    margin-top: 6px;
-    flex-shrink: 0;
-}
-
-.activity-content {
-    flex: 1;
-    min-width: 0;
-}
-
-.activity-content p {
-    margin: 0 0 3px;
-    font-size: 0.84rem;
-    color: var(--db-text);
-    line-height: 1.5;
-}
-
-.activity-content small {
-    font-size: 0.735rem;
-    color: var(--db-text-muted);
-    font-variant-numeric: tabular-nums;
-}
-
 /* ===== EMPTY STATE ===== */
 .empty-state {
     text-align: center;
@@ -1135,7 +1177,6 @@ $statCards = [
 
 /* ============================================
    RESPONSIVE
-   Same cascade as the receptionist dashboard.
    ============================================ */
 
 @media (max-width: 1500px) {
@@ -1157,8 +1198,9 @@ $statCards = [
 @media (max-width: 768px) {
     .stat-card         { padding: 16px; }
     .chart-card        { padding: 16px; }
-    .stat-value        { font-size: 1.45rem; }
-    .stat-value-money  { font-size: 1.2rem; }
+    .stat-value        { font-size: 1.2rem; }
+    .stat-value-money  { font-size: 1.05rem; }
+    .spark-inline      { width: 44px; height: 16px; }
     .chart-container,
     .empty-state-chart { height: 240px; }
 }
@@ -1181,6 +1223,123 @@ $statCards = [
         max-width: none;
     }
     .toast { min-width: 0; }
+}
+
+/* ============================================
+   MODERN SKIN
+   ============================================ */
+
+.dashboard-wrapper,
+#toastContainer {
+    --db-radius:       16px;
+    --db-radius-sm:    10px;
+    --db-shadow:       0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 14px -6px rgba(15, 23, 42, 0.06);
+    --db-shadow-hover: 0 2px 4px rgba(15, 23, 42, 0.04), 0 14px 28px -10px rgba(15, 23, 42, 0.16);
+}
+
+.dashboard-wrapper {
+    background:
+        radial-gradient(900px 320px at 8% -80px, rgba(13, 148, 136, 0.08), transparent 70%),
+        radial-gradient(700px 300px at 100% -60px, rgba(37, 99, 235, 0.05), transparent 70%),
+        var(--db-canvas);
+}
+
+.dash-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 22px;
+}
+
+.dash-title {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: var(--db-text);
+}
+
+.dash-sub {
+    margin: 2px 0 0;
+    font-size: 0.83rem;
+    color: var(--db-text-muted);
+}
+
+.stat-card {
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(180deg, #FFFFFF 0%, #FCFDFE 100%);
+    border: 1px solid rgba(226, 232, 240, 0.9);
+    padding: 16px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.stat-card:hover,
+.stat-card:focus-visible {
+    transform: translateY(-3px);
+    border-color: color-mix(in srgb, var(--spark, #CBD5E1) 35%, #E2E8F0);
+    box-shadow: var(--db-shadow-hover);
+}
+
+/* NOTE: the colored top line (::before) has been removed. */
+
+.stat-top { margin-bottom: 12px; }
+
+/* Icon wrapper stays transparent — no tile behind the PNG. */
+.stat-icon { background: transparent; border-radius: 0; }
+
+/* Keep the reduced KPI size stable across the modern skin. */
+.stat-value { font-size: 1.35rem; margin-bottom: 0; }
+.stat-label { margin-bottom: 0; }
+
+.chart-card {
+    border-color: rgba(226, 232, 240, 0.9);
+    padding: 22px;
+    transition: box-shadow 0.2s ease;
+}
+
+.chart-card:hover { box-shadow: var(--db-shadow-hover); }
+
+.card-header { border-bottom: 0; padding-bottom: 0; margin-bottom: 18px; }
+
+.card-title svg {
+    box-sizing: content-box;
+    padding: 6px;
+    border-radius: 9px;
+    background: var(--db-accent-soft);
+}
+
+.badge-time {
+    border-radius: 999px;
+    background: #FFFFFF;
+    padding: 4px 11px;
+}
+
+.badge-pending { background: #FEF3C7; }
+
+.avg-box {
+    padding: 6px 12px;
+    border-radius: 10px;
+    background: var(--db-accent-soft);
+}
+.avg-value { color: #0F766E; }
+
+.test-progress { height: 8px; border-radius: 999px; }
+.test-fill { border-radius: 999px; }
+
+.pending-item { border-radius: 12px; }
+
+.btn-refresh {
+    border-radius: 10px;
+    box-shadow: var(--db-shadow);
+}
+
+@media (max-width: 576px) {
+    .dash-head { align-items: flex-start; }
+    .card-header { flex-direction: row; }
 }
 
 /* ===== MOTION PREFERENCES ===== */
@@ -1248,15 +1407,50 @@ function dbCompactPeso(value) {
 }
 
 const dbBaseTooltip = {
-    backgroundColor: DB_COLORS.surface,
-    titleColor: DB_COLORS.text,
-    bodyColor: DB_COLORS.text,
-    borderColor: DB_COLORS.border,
+    backgroundColor: 'rgba(15, 23, 42, 0.94)',
+    titleColor: '#F8FAFC',
+    bodyColor: '#E2E8F0',
+    footerColor: '#F8FAFC',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
-    padding: 10,
-    cornerRadius: 6,
+    padding: 12,
+    cornerRadius: 10,
+    boxPadding: 4,
+    caretSize: 6,
     titleFont: { size: 12, weight: '600' },
     bodyFont: { size: 12 }
+};
+
+function dbGradient(color, topAlpha, bottomAlpha) {
+    return function (context) {
+        const chart = context.chart;
+        const area = chart.chartArea;
+        if (!area) { return color; }
+        const g = chart.ctx.createLinearGradient(0, area.top, 0, area.bottom);
+        g.addColorStop(0, color.replace('__A__', topAlpha));
+        g.addColorStop(1, color.replace('__A__', bottomAlpha));
+        return g;
+    };
+}
+
+const dbCrosshair = {
+    id: 'dbCrosshair',
+    afterDatasetsDraw: function (chart) {
+        const active = chart.tooltip && chart.tooltip.getActiveElements();
+        if (!active || !active.length) { return; }
+        const x = active[0].element.x;
+        const area = chart.chartArea;
+        const ctx = chart.ctx;
+        ctx.save();
+        ctx.beginPath();
+        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = 'rgba(13, 148, 136, 0.35)';
+        ctx.lineWidth = 1;
+        ctx.moveTo(x, area.top);
+        ctx.lineTo(x, area.bottom);
+        ctx.stroke();
+        ctx.restore();
+    }
 };
 
 const dbBaseLegend = {
@@ -1278,7 +1472,7 @@ function dbScales(yTickCallback) {
         y: {
             beginAtZero: true,
             border: { display: false },
-            grid: { color: DB_COLORS.grid, drawBorder: false, drawTicks: false },
+            grid: { color: DB_COLORS.grid, drawBorder: false, drawTicks: false, tickBorderDash: [3, 3] },
             ticks: {
                 color: DB_COLORS.tick,
                 font: { size: 11 },
@@ -1295,8 +1489,6 @@ function dbScales(yTickCallback) {
     };
 }
 
-// Guards against a missing canvas or a Chart.js file that failed to load,
-// so one absent element can never stop the rest of the page scripts.
 function dbInitChart(canvasId, config) {
     if (typeof Chart === 'undefined') { return null; }
     const canvas = document.getElementById(canvasId);
@@ -1307,25 +1499,17 @@ function dbInitChart(canvasId, config) {
 // ============================================
 // ANIMATION
 // ============================================
-// One place to tune motion for every chart. Honours the operating
-// system's reduced-motion setting, so the dashboard stays still for
-// anyone who has asked for that.
 
 const DB_REDUCED_MOTION =
     window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-// Bars grow up from the baseline, staggered left to right.
 function dbBarAnimation(stagger) {
     if (DB_REDUCED_MOTION) { return { duration: 0 }; }
-
     const step = typeof stagger === 'number' ? stagger : 40;
-
     return {
         duration: 700,
         easing: 'easeOutQuart',
         delay: function (context) {
-            // Delay each point once, on its first draw only, so hovering
-            // and tooltips never replay the stagger.
             if (context.type === 'data' && context.mode === 'default' && !context.dropped) {
                 context.dropped = true;
                 return context.dataIndex * step + context.datasetIndex * 90;
@@ -1335,10 +1519,8 @@ function dbBarAnimation(stagger) {
     };
 }
 
-// The revenue line draws itself left to right, rising from the baseline.
 function dbLineAnimation() {
     if (DB_REDUCED_MOTION) { return { duration: 0 }; }
-
     return {
         duration: 900,
         easing: 'easeOutQuart',
@@ -1369,14 +1551,10 @@ function dbLineAnimation() {
     };
 }
 
-// Replays a chart's entry animation the first time it scrolls into view,
-// so charts below the fold are not already finished when reached.
 function dbAnimateOnView(chart, canvasId) {
     if (!chart || DB_REDUCED_MOTION || !('IntersectionObserver' in window)) { return; }
-
     const canvas = document.getElementById(canvasId);
     if (!canvas) { return; }
-
     const observer = new IntersectionObserver(function (entries) {
         entries.forEach(function (entry) {
             if (entry.isIntersecting) {
@@ -1386,7 +1564,6 @@ function dbAnimateOnView(chart, canvasId) {
             }
         });
     }, { threshold: 0.25 });
-
     observer.observe(canvas);
 }
 
@@ -1403,17 +1580,20 @@ dbInitChart('revenueChart', {
             label: 'Revenue',
             data: revenueData.values,
             borderColor: DB_COLORS.accent,
-            backgroundColor: 'rgba(13, 148, 136, 0.06)',
+            backgroundColor: dbGradient('rgba(13, 148, 136, __A__)', 0.28, 0),
             fill: true,
-            tension: 0.35,
+            tension: 0.4,
             pointBackgroundColor: DB_COLORS.accent,
             pointBorderColor: '#FFFFFF',
             pointBorderWidth: 2,
-            pointRadius: 3,
             pointHoverRadius: 6,
-            borderWidth: 2
+            pointRadius: function (ctx) {
+                return ctx.dataIndex === ctx.dataset.data.length - 1 ? 5 : 0;
+            },
+            borderWidth: 2.5
         }]
     },
+    plugins: [dbCrosshair],
     options: {
         responsive: true,
         maintainAspectRatio: false,
@@ -1437,9 +1617,6 @@ dbInitChart('revenueChart', {
 // ============================================
 // 2. DEPARTMENT PATIENT VOLUME CHART
 // ============================================
-// Laboratory vs X-Ray patient counts per day, supplied by
-// Admin::getDepartmentData(). The bars are stacked, so each column's
-// height reads as the total patients handled that day.
 
 const deptLab  = Array.isArray(visitsData.lab)  ? visitsData.lab  : [];
 const deptXray = Array.isArray(visitsData.xray) ? visitsData.xray : [];
@@ -1454,7 +1631,7 @@ const deptChart = dbInitChart('visitsChart', {
                 data: deptLab,
                 backgroundColor: DB_COLORS.accent,
                 hoverBackgroundColor: '#0F766E',
-                borderRadius: { topLeft: 0, topRight: 0, bottomLeft: 4, bottomRight: 4 },
+                borderRadius: { topLeft: 0, topRight: 0, bottomLeft: 6, bottomRight: 6 },
                 borderSkipped: false,
                 barPercentage: 0.7,
                 categoryPercentage: 0.8,
@@ -1466,7 +1643,7 @@ const deptChart = dbInitChart('visitsChart', {
                 data: deptXray,
                 backgroundColor: '#7C3AED',
                 hoverBackgroundColor: '#6D28D9',
-                borderRadius: { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 },
+                borderRadius: { topLeft: 6, topRight: 6, bottomLeft: 0, bottomRight: 0 },
                 borderSkipped: false,
                 barPercentage: 0.7,
                 categoryPercentage: 0.8,
@@ -1491,7 +1668,6 @@ const deptChart = dbInitChart('visitsChart', {
                         const n = Number(context.parsed.y) || 0;
                         return context.dataset.label + ': ' + n + (n === 1 ? ' patient' : ' patients');
                     },
-                    // Combined total for the day, shown under the two rows.
                     footer: function (items) {
                         let total = 0;
                         items.forEach(function (item) { total += Number(item.parsed.y) || 0; });
@@ -1505,7 +1681,7 @@ const deptChart = dbInitChart('visitsChart', {
                 beginAtZero: true,
                 stacked: true,
                 border: { display: false },
-                grid: { color: DB_COLORS.grid, drawBorder: false, drawTicks: false },
+                grid: { color: DB_COLORS.grid, drawBorder: false, drawTicks: false, tickBorderDash: [3, 3] },
                 ticks: {
                     color: DB_COLORS.tick,
                     font: { size: 11 },
@@ -1539,7 +1715,7 @@ const requestsChart = dbInitChart('requestsChart', {
                 label: 'Requested',
                 data: requestsData.requested,
                 backgroundColor: DB_COLORS.accent,
-                borderRadius: 4,
+                borderRadius: 6,
                 borderSkipped: false,
                 barPercentage: 0.7,
                 categoryPercentage: 0.8,
@@ -1549,7 +1725,7 @@ const requestsChart = dbInitChart('requestsChart', {
                 label: 'Completed',
                 data: requestsData.completed,
                 backgroundColor: DB_COLORS.success,
-                borderRadius: 4,
+                borderRadius: 6,
                 borderSkipped: false,
                 barPercentage: 0.7,
                 categoryPercentage: 0.8,
@@ -1619,8 +1795,6 @@ function showToast(message, type = 'info') {
 // ============================================
 // PENDING APPOINTMENTS PANEL
 // ============================================
-// Four rows per page. Every row is already in the DOM, so paging is
-// instant and costs no extra request.
 
 (function () {
     const list = document.getElementById('pendingList');
@@ -1643,7 +1817,6 @@ function showToast(message, type = 'info') {
             item.hidden = !onPage;
 
             if (onPage) {
-                // Restart the entry animation so each page fades in.
                 item.style.animation = 'none';
                 void item.offsetWidth;
                 item.style.animation = '';
@@ -1668,9 +1841,6 @@ function showToast(message, type = 'info') {
         });
     }
 
-    // Confirm approval by patient name. Bound here rather than with an
-    // inline onclick, so the name never has to be escaped into an
-    // attribute string.
     list.addEventListener('click', function (event) {
         const link = event.target.closest('[data-confirm-approve]');
         if (!link) { return; }

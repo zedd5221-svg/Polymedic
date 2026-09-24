@@ -81,14 +81,6 @@ class Receptionist extends BaseController
         return view('Receptionist/dashboard', $data);
     }
 
-    /**
-     * Aggregate all patients from every source and dedupe them.
-     *
-     * This is the single source of truth for the patient list and the
-     * patient count. Both dashboard() and patients() call it, so the
-     * number shown on the dashboard card is always the same as the
-     * number shown on the Patients page.
-     */
     private function getAllPatients(): array
     {
         $patientModel     = new PatientModel();
@@ -98,7 +90,6 @@ class Receptionist extends BaseController
         $allPatients = [];
         $seenKeys    = [];
 
-        // ========== 1. FROM PATIENTS TABLE (PRIMARY SOURCE) ==========
         try {
             $patientsTable = $patientModel
                 ->orderBy('created_at', 'DESC')
@@ -125,7 +116,6 @@ class Receptionist extends BaseController
             log_message('error', 'Patients - Patients table error: ' . $e->getMessage());
         }
 
-        // ========== 2. FROM APPOINTMENTS (APPROVED / COMPLETED ONLY) ==========
         try {
             $appointmentPatients = $appointmentModel
                 ->select('full_name, email, phone, age, gender, MAX(appointment_date) as last_visit')
@@ -155,7 +145,6 @@ class Receptionist extends BaseController
             log_message('error', 'Patients - Appointments error: ' . $e->getMessage());
         }
 
-        // ========== 3. FROM LAB REQUESTS (NON-CANCELLED) ==========
         try {
             $labPatients = $diagnosticModel
                 ->select('patient_name as full_name, age, gender, MAX(request_date) as last_visit')
@@ -186,7 +175,6 @@ class Receptionist extends BaseController
             log_message('error', 'Patients - Lab Requests error: ' . $e->getMessage());
         }
 
-        // ========== 4. FROM X-RAY EXAMINATIONS (NON-CANCELLED) ==========
         try {
             $xrayPatients = $diagnosticModel
                 ->select('patient_name as full_name, age, gender, MAX(request_date) as last_visit')
@@ -217,7 +205,6 @@ class Receptionist extends BaseController
             log_message('error', 'Patients - X-Ray error: ' . $e->getMessage());
         }
 
-        // Sort by last_visit (newest first)
         usort($allPatients, function ($a, $b) {
             return strtotime($b['last_visit'] ?? '0') - strtotime($a['last_visit'] ?? '0');
         });
@@ -282,9 +269,6 @@ class Receptionist extends BaseController
         return view('Receptionist/appointment_view', $data);
     }
 
-    // =============================================
-    // APPROVE APPOINTMENT - CREATE DIAGNOSTIC REQUESTS
-    // =============================================
     public function approveAppointment($id)
     {
         $redirect = $this->checkAuth();
@@ -303,24 +287,20 @@ class Receptionist extends BaseController
                             ->with('error', 'This appointment cannot be approved');
         }
 
-        // Update appointment status to approved
         $model->update($id, [
             'status'       => 'approved',
             'arrival_time' => date('Y-m-d H:i:s')
         ]);
 
-        // ===== CREATE/UPDATE PATIENT RECORD =====
         $patientModel = new PatientModel();
         $patient = $patientModel->findOrCreateFromAppointment($appointment);
 
-        // ===== DECODE SERVICES FROM APPOINTMENT =====
         $labServices = json_decode($appointment['lab_services'], true) ?? [];
         $xrayServices = json_decode($appointment['xray_services'], true) ?? [];
         $successMessages = [];
 
         $diagnosticModel = new DiagnosticRequestModel();
 
-        // ===== CREATE LAB REQUEST IF LAB SERVICES EXIST =====
         if (!empty($labServices)) {
             $existing = $diagnosticModel
                 ->where('appointment_id', $id)
@@ -367,7 +347,6 @@ class Receptionist extends BaseController
             }
         }
 
-        // ===== CREATE X-RAY REQUEST IF X-RAY SERVICES EXIST =====
         if (!empty($xrayServices)) {
             $existing = $diagnosticModel
                 ->where('appointment_id', $id)
@@ -414,7 +393,6 @@ class Receptionist extends BaseController
             }
         }
 
-        // Build success message
         $message = 'Appointment approved successfully!';
         if (!empty($successMessages)) {
             $message .= ' ' . implode(' ', $successMessages);
@@ -479,9 +457,6 @@ class Receptionist extends BaseController
                         ->with('success', 'Appointment marked as completed!');
     }
 
-    // =============================================
-    // PATIENTS - SHOW ALL PATIENTS (Online + Walk-in)
-    // =============================================
     public function patients()
     {
         $redirect = $this->checkAuth();
@@ -582,9 +557,6 @@ class Receptionist extends BaseController
         return view('Receptionist/reports');
     }
 
-    // =============================================
-    // MANUAL SYNC - Create lab requests for existing approved appointments
-    // =============================================
     public function syncLabRequests()
     {
         $redirect = $this->checkAuth();
@@ -647,7 +619,6 @@ class Receptionist extends BaseController
             }
         }
 
-        // Also sync X-Ray for approved appointments
         $xrayAppointments = $appointmentModel
             ->where('status', 'approved')
             ->where('xray_services IS NOT NULL')
@@ -699,9 +670,6 @@ class Receptionist extends BaseController
                         ->with('success', "Synced $created lab requests, $xrayCreated X-Ray requests, and $patientsCreated patients. Skipped $skipped lab and $xraySkipped X-Ray (already exist).");
     }
 
-    // =============================================
-    // DIAGNOSTIC REQUESTS - WALK-IN PATIENTS
-    // =============================================
     public function diagnosticRequests()
     {
         $redirect = $this->checkAuth();
@@ -727,14 +695,6 @@ class Receptionist extends BaseController
         return view('Receptionist/diagnostic_requests', $data);
     }
 
-    /**
-     * Get combined lab and x-ray requests from the merged table.
-     *
-     * The model's row decoration means each row already carries both
-     * the new column names (services, request_date) and the legacy
-     * aliases (lab_services, exam_type, exam_date), so this method
-     * reads whichever name is convenient without needing two queries.
-     */
     private function getCombinedRequests($diagnosticModel)
     {
         $rows = $diagnosticModel
@@ -793,9 +753,6 @@ class Receptionist extends BaseController
         return $combined;
     }
 
-    /**
-     * Count requests by status
-     */
     private function countRequestsByStatus($requests, $status)
     {
         $count = 0;
@@ -807,9 +764,6 @@ class Receptionist extends BaseController
         return $count;
     }
 
-    // =============================================
-    // CREATE WALK-IN DIAGNOSTIC REQUEST
-    // =============================================
     public function createDiagnosticRequest()
     {
         $redirect = $this->checkAuth();
@@ -978,7 +932,7 @@ class Receptionist extends BaseController
             $model->insert([
                 'reference_number' => $prefix . '-' . date('y') . '-' . strtoupper(bin2hex(random_bytes(3))),
                 'type'             => $requestType,
-                'appointment_id'   => 0,
+                'appointment_id'   => null,   // FIXED: was 0, FK fk_dr_appointment requires NULL for walk-ins
                 'patient_name'     => $patientName,
                 'patient_code'     => $patientCode !== 'N/A' ? $patientCode : null,
                 'age'              => $age,
@@ -1013,9 +967,6 @@ class Receptionist extends BaseController
         return redirect()->back()->with('error', 'Invalid request type');
     }
 
-    // =============================================
-    // UPDATE DIAGNOSTIC REQUEST STATUS - WITH PAYMENT
-    // =============================================
     public function updateDiagnosticStatus($id, $type, $status)
     {
         $redirect = $this->checkAuth();
@@ -1042,7 +993,6 @@ class Receptionist extends BaseController
 
             $servicesString = $request['services'] ?? '';
 
-            // ===== SPECIAL: When status changes to "in_progress" (Start Processing) =====
             if ($status === 'in_progress') {
 
                 $existingPayment = $paymentModel->getByRequest($id, $type);
@@ -1128,7 +1078,6 @@ class Receptionist extends BaseController
                 ]);
             }
 
-            // ===== Handle other status updates =====
             $update = ['status' => $status];
             if ($status === 'released') {
                 $update['released_at'] = date('Y-m-d H:i:s');
@@ -1150,9 +1099,6 @@ class Receptionist extends BaseController
         }
     }
 
-    // =============================================
-    // DELETE DIAGNOSTIC REQUEST
-    // =============================================
     public function deleteDiagnosticRequest($id, $type)
     {
         $redirect = $this->checkAuth();
@@ -1184,9 +1130,6 @@ class Receptionist extends BaseController
         }
     }
 
-    // =============================================
-    // GET REQUEST DETAILS FOR VIEW
-    // =============================================
     public function getRequestDetails($id, $type)
     {
         $redirect = $this->checkAuth();
@@ -1258,9 +1201,6 @@ class Receptionist extends BaseController
         }
     }
 
-    // =============================================
-    // PRINT REQUEST
-    // =============================================
     public function printRequest($id, $type)
     {
         $redirect = $this->checkAuth();
@@ -1288,9 +1228,6 @@ class Receptionist extends BaseController
         return view('Receptionist/print_request', ['request' => $row, 'type' => $type]);
     }
 
-    // =============================================
-    // SYNC WALK-IN PATIENTS TO PATIENTS TABLE
-    // =============================================
     public function syncWalkInPatients()
     {
         $redirect = $this->checkAuth();
@@ -1303,9 +1240,6 @@ class Receptionist extends BaseController
                         ->with('success', "Synced {$count} walk-in patients to the patients table.");
     }
 
-    // =============================================
-    // DASHBOARD DATA - WEEKLY APPOINTMENTS
-    // =============================================
     private function getWeeklyAppointmentData()
     {
         $appointmentModel = new AppointmentModel();
@@ -1320,9 +1254,6 @@ class Receptionist extends BaseController
         return $weeklyData;
     }
 
-    // =============================================
-    // DASHBOARD DATA - SERVICE DISTRIBUTION
-    // =============================================
     private function getServiceDistributionData()
     {
         $appointmentModel = new AppointmentModel();
@@ -1368,9 +1299,6 @@ class Receptionist extends BaseController
         ];
     }
 
-    // =============================================
-    // API: GET DASHBOARD DATA (AJAX)
-    // =============================================
     public function getDashboardData()
     {
         $redirect = $this->checkAuth();
@@ -1396,9 +1324,6 @@ class Receptionist extends BaseController
         }
     }
 
-    // =============================================
-    // GET PAYMENT DETAILS
-    // =============================================
     public function getPaymentDetails($id)
     {
         $redirect = $this->checkAuth();
@@ -1423,9 +1348,6 @@ class Receptionist extends BaseController
         }
     }
 
-    // =============================================
-    // PRINT RECEIPT
-    // =============================================
     public function printReceipt($id)
     {
         $redirect = $this->checkAuth();
@@ -1454,9 +1376,6 @@ class Receptionist extends BaseController
         }
     }
 
-    // =============================================
-    // REFUND PAYMENT
-    // =============================================
     public function refundPayment($id)
     {
         $redirect = $this->checkAuth();

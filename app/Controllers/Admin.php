@@ -114,8 +114,12 @@ class Admin extends BaseController
         // ===== RECENT ACTIVITY =====
         $recentActivity = $this->getRecentActivity();
 
+        // ===== KPI SPARKLINES (last 14 days, real daily figures) =====
+        $kpiTrends = $this->getKpiTrends(14, (int) $totalPatients);
+
         // ===== BUILD DATA ARRAY =====
         $data = [
+            'kpiTrends' => $kpiTrends,
             'totalPatients' => $totalPatients,
             'todayPatients' => $todayPatients,
             'pendingRequests' => $pendingRequests,
@@ -135,6 +139,100 @@ class Admin extends BaseController
     }
 
     // ===== CHART HELPERS =====
+
+    /**
+     * Daily series for the KPI sparklines, oldest day first, ending today.
+     * Every value is a real count or sum from the database; days with no
+     * activity are zero. Keys match the card keys in the dashboard view.
+     *
+     *  patients       cumulative registered patients (ends at the total)
+     *  today          appointments scheduled per day
+     *  pending        diagnostic requests received per day
+     *  completed      requests marked completed per day (by updated_at)
+     *  released       requests released per day (by released_at)
+     *  revenue_today  paid revenue per day
+     *  revenue_month  paid revenue, cumulative within the current month
+     */
+    private function getKpiTrends(int $days, int $totalPatients): array
+    {
+        $db    = db_connect();
+        $start = date('Y-m-d', strtotime('-' . ($days - 1) . ' days'));
+        $end   = date('Y-m-d');
+
+        $dates = [];
+        for ($i = 0; $i < $days; $i++) {
+            $dates[] = date('Y-m-d', strtotime($start . ' +' . $i . ' days'));
+        }
+
+        // Runs a "date, value" grouped query and returns a full day-indexed series.
+        $series = function (string $table, string $dateExpr, string $valueExpr, array $where = [], array $whereIn = []) use ($db, $dates, $start, $end) {
+            $b = $db->table($table)
+                ->select("$dateExpr AS d, $valueExpr AS v", false)
+                ->where("$dateExpr >=", $start)
+                ->where("$dateExpr <=", $end);
+            foreach ($where as $col => $val) {
+                $b->where($col, $val);
+            }
+            foreach ($whereIn as $col => $vals) {
+                $b->whereIn($col, $vals);
+            }
+            $rows = $b->groupBy('d')->get()->getResultArray();
+
+            $map = [];
+            foreach ($rows as $r) {
+                $map[$r['d']] = (float) $r['v'];
+            }
+            return array_map(fn($d) => $map[$d] ?? 0, $dates);
+        };
+
+        // Patients: walk back from today's total using new registrations per day.
+        $newPatients = $series('patients', 'DATE(created_at)', 'COUNT(*)');
+        $patients    = [];
+        $running     = $totalPatients - array_sum($newPatients);
+        foreach ($newPatients as $n) {
+            $running   += $n;
+            $patients[] = $running;
+        }
+
+        $revenue = $series('payments', 'DATE(payment_date)', 'SUM(total_amount)', ['payment_status' => 'paid']);
+
+        // Month-to-date cumulative revenue, from the 1st of this month.
+        $monthStart = date('Y-m-01');
+        $mtdRows = $db->table('payments')
+            ->select('DATE(payment_date) AS d, SUM(total_amount) AS v', false)
+            ->where('payment_status', 'paid')
+            ->where("DATE(payment_date) >=", $monthStart)
+            ->where("DATE(payment_date) <=", $end)
+            ->groupBy('d')->get()->getResultArray();
+        $mtdMap = [];
+        foreach ($mtdRows as $r) {
+            $mtdMap[$r['d']] = (float) $r['v'];
+        }
+        $mtd     = [];
+        $sum     = 0;
+        $cursor  = $monthStart;
+        $mtdFull = [];
+        while ($cursor <= $end) {
+            $sum += $mtdMap[$cursor] ?? 0;
+            $mtdFull[$cursor] = $sum;
+            $cursor = date('Y-m-d', strtotime($cursor . ' +1 day'));
+        }
+        foreach ($dates as $d) {
+            // Before the 1st of the month the running total restarts at zero.
+            $mtd[] = $mtdFull[$d] ?? 0;
+        }
+
+        return [
+            'dates'         => $dates,
+            'patients'      => $patients,
+            'today'         => $series('appointments', 'appointment_date', 'COUNT(*)'),
+            'pending'       => $series('diagnostic_requests', 'DATE(request_date)', 'COUNT(*)'),
+            'completed'     => $series('diagnostic_requests', 'DATE(updated_at)', 'COUNT(*)', ["status" => "completed"]),
+            'released'      => $series('diagnostic_requests', 'DATE(released_at)', 'COUNT(*)', ['status' => 'released']),
+            'revenue_today' => $revenue,
+            'revenue_month' => $mtd,
+        ];
+    }
 
     private function getRevenueData()
     {
@@ -344,16 +442,6 @@ class Admin extends BaseController
 
     // =============================================
     // PATIENTS - COMPLETE FIX (ALL SOURCES)
-    //
-    // A patient only exists once they've been registered. That means:
-    //   - a row in the patients table, OR
-    //   - an appointment that has been approved (pending bookings
-    //     are not patients yet), OR
-    //   - a real lab or x-ray request (not cancelled).
-    //
-    // Pending online bookings are deliberately excluded here. They
-    // show on the Appointments page until the front desk approves
-    // them, which is what creates the patients-table row.
     // =============================================
     public function patients()
     {
@@ -367,7 +455,6 @@ class Admin extends BaseController
         $allPatients = [];
         $seenKeys = [];
 
-        // ========== 1. FROM PATIENTS TABLE ==========
         try {
             $patientsTable = $patientModel
                 ->orderBy('created_at', 'DESC')
@@ -397,10 +484,6 @@ class Admin extends BaseController
             log_message('error', 'Patients - Patients table error: ' . $e->getMessage());
         }
 
-        // ========== 2. FROM APPOINTMENTS (APPROVED / COMPLETED ONLY) ==========
-        // A pending online booking is not a patient yet. The front
-        // desk must approve it first. Filtering on status here stops
-        // unapproved bookings from appearing on the Patients page.
         try {
             $appointmentPatients = $appointmentModel
                 ->select('id, full_name, email, phone, age, gender, MAX(appointment_date) as last_visit, MIN(created_at) as created_at')
@@ -433,7 +516,6 @@ class Admin extends BaseController
             log_message('error', 'Patients - Appointments error: ' . $e->getMessage());
         }
 
-        // ========== 3. FROM LAB REQUESTS (NON-CANCELLED) ==========
         try {
             $labPatients = $diagnosticModel
                 ->select('id, patient_name as full_name, age, gender, MAX(request_date) as last_visit, MIN(created_at) as created_at')
@@ -467,7 +549,6 @@ class Admin extends BaseController
             log_message('error', 'Patients - Lab Requests error: ' . $e->getMessage());
         }
 
-        // ========== 4. FROM X-RAY EXAMINATIONS (NON-CANCELLED) ==========
         try {
             $xrayPatients = $diagnosticModel
                 ->select('id, patient_name as full_name, age, gender, MAX(request_date) as last_visit, MIN(created_at) as created_at')
@@ -603,11 +684,6 @@ class Admin extends BaseController
                             ->with('error', 'Username already exists');
         }
 
-        /*
-         * PRC license is required only for med_tech and radiologist.
-         * For other roles we force the value to NULL so nothing stale
-         * can be persisted by a crafted POST.
-         */
         $prcInput = trim((string) $this->request->getPost('prc_license'));
 
         if ($userModel->requiresPrcLicense($role)) {
@@ -669,7 +745,6 @@ class Admin extends BaseController
             }
             $prcValue = $prcInput;
         } else {
-            /* Moving a user off a clinical role clears the PRC number. */
             $prcValue = null;
         }
 
@@ -880,8 +955,6 @@ class Admin extends BaseController
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
 
-        // The dashboard's approval panel links carry ?from=dashboard,
-        // so the user is returned to wherever they approved from.
         $returnTo = $this->request->getGet('from') === 'dashboard'
             ? base_url('admin/dashboard')
             : base_url('admin/appointments');
@@ -904,13 +977,11 @@ class Admin extends BaseController
             'arrival_time' => date('Y-m-d H:i:s')
         ]);
 
-        // ===== CREATE PATIENT RECORD =====
         $patientModel = new PatientModel();
         $patient = $patientModel->findOrCreateFromAppointment($appointment);
 
         $diagnosticModel = new DiagnosticRequestModel();
 
-        // ===== LAB REQUEST =====
         $labServices = json_decode($appointment['lab_services'], true) ?? [];
         if (!empty($labServices)) {
             $existing = $diagnosticModel
@@ -946,7 +1017,6 @@ class Admin extends BaseController
             }
         }
 
-        // ===== X-RAY REQUEST =====
         $xrayServices = json_decode($appointment['xray_services'], true) ?? [];
         if (!empty($xrayServices)) {
             $existing = $diagnosticModel
@@ -1182,12 +1252,6 @@ class Admin extends BaseController
     if ($page < 1) $page = 1;
     $offset = ($page - 1) * $perPage;
 
-    /*
-     * Category filter. Accepts 'laboratory', 'xray', or 'other'.
-     * Anything else — including 'all' and empty string — is treated
-     * as "no filter". This is what makes the tabs on the services
-     * page actually narrow the list.
-     */
     $categoryFilter = strtolower(trim((string) $this->request->getGet('category')));
     $allowed        = ['laboratory', 'xray', 'other'];
 
@@ -1213,11 +1277,6 @@ class Admin extends BaseController
         ->limit($perPage, $offset)
         ->findAll();
 
-    /*
-     * The category counts must always reflect the entire table,
-     * not the current filter. A fresh model instance is used so
-     * the where('category', ...) above does not carry over.
-     */
     $counts = (new ServiceModel())->getCountByCategory();
 
     $data = [
@@ -1359,11 +1418,6 @@ class Admin extends BaseController
         $diagnosticModel = new DiagnosticRequestModel();
         $serviceModel    = new ServiceModel();
 
-        /*
-         * All diagnostic rows live in one table now. A single query
-         * returns every request, and each row carries its own type.
-         * The view and the client script read the same shape as before.
-         */
         $rows = $diagnosticModel
             ->orderBy('created_at', 'DESC')
             ->findAll();
@@ -1403,19 +1457,6 @@ class Admin extends BaseController
         return view('Admin/diagnostic_requests', $data);
     }
 
-    /**
-     * Reduce one diagnostic_requests row to the shape the view expects.
-     *
-     * Source is derived from the appointment_id foreign key, the same
-     * way the receptionist controller does it. A populated appointment_id
-     * means the request came from an approved online booking; zero or
-     * NULL means it was created by hand at the front desk.
-     *
-     * The DiagnosticRequestModel decorates each row with both the new
-     * (services) and the legacy (lab_services / exam_type) column
-     * names, so this method doesn't need to know which side the row
-     * originally came from.
-     */
     private function buildDiagnosticRow(array $row, string $type): array
     {
         if ($type === 'xray') {
@@ -1519,22 +1560,16 @@ class Admin extends BaseController
     $email       = trim((string) ($post['email'] ?? ''));
     $today       = date('Y-m-d');
 
-    // ===== CREATE OR REUSE PATIENT RECORD =====
-    // This is the step the admin path was missing. It matches the
-    // receptionist's logic so both create the same patient row with
-    // a generated patient_code.
     $patientModel = new PatientModel();
     $patientCode  = null;
 
     try {
         $existingPatient = null;
 
-        // 1. Match by email (most reliable)
         if (!empty($email)) {
             $existingPatient = $patientModel->where('email', $email)->first();
         }
 
-        // 2. Match by name + age + gender
         if (!$existingPatient) {
             $existingPatient = $patientModel->where('full_name', $patientName)
                                             ->where('age', $age)
@@ -1542,7 +1577,6 @@ class Admin extends BaseController
                                             ->first();
         }
 
-        // 3. Match by phone, but only if name/age/gender also line up
         if (!$existingPatient && !empty($phone)) {
             $byPhone = $patientModel->where('phone', $phone)->first();
 
@@ -1555,7 +1589,6 @@ class Admin extends BaseController
         }
 
         if ($existingPatient) {
-            // Fill in any blank fields on the existing record.
             $updates = [];
             if (empty($existingPatient['email']) && !empty($email)) {
                 $updates['email'] = $email;
@@ -1573,7 +1606,6 @@ class Admin extends BaseController
             $patient     = $patientModel->find($existingPatient['id']);
             $patientCode = $patient['patient_code'] ?? null;
         } else {
-            // New patient — generate a code and insert.
             $newCode = $patientModel->generatePatientCode();
 
             $patientModel->insert([
@@ -1590,10 +1622,8 @@ class Admin extends BaseController
         }
     } catch (\Exception $e) {
         log_message('error', 'Admin walk-in patient creation failed: ' . $e->getMessage());
-        // Continue without a patient code rather than failing the request.
     }
 
-    // ===== CREATE THE DIAGNOSTIC REQUEST =====
     try {
         $model = new DiagnosticRequestModel();
 
@@ -1602,9 +1632,9 @@ class Admin extends BaseController
         $model->insert([
             'reference_number' => $prefix . '-' . date('y') . '-' . strtoupper(bin2hex(random_bytes(3))),
             'type'             => $requestType,
-            'appointment_id'   => 0,
+            'appointment_id'   => null,   // FIXED: was 0, FK fk_dr_appointment requires NULL for walk-ins
             'patient_name'     => $patientName,
-            'patient_code'     => $patientCode,   // <- now populated
+            'patient_code'     => $patientCode,
             'age'              => $age,
             'gender'           => $gender,
             'email'            => $email !== '' ? $email : null,
@@ -1783,11 +1813,6 @@ class Admin extends BaseController
                              ->with('error', 'Request not found.');
         }
 
-        /*
-         * The print view already handles both types. It reads a `type`
-         * key from the row, so add it here rather than duplicating the
-         * print template.
-         */
         $row['type'] = $type;
 
         return view('Receptionist/print_request', ['request' => $row, 'type' => $type]);

@@ -85,7 +85,7 @@
                     </div>
                 <?php endif ?>
                 
-                <form action="/polymedic/public/appointment/submit" method="POST" id="bookingForm">
+                <form action="/polymedic/public/appointment/submit" method="POST" id="bookingForm" novalidate>
                     <?= csrf_field() ?>
                     
                     <!-- ===== STEP 1: Date & Time ===== -->
@@ -98,13 +98,13 @@
                         
                         <div class="row g-4">
                             <div class="col-md-7">
-                                <label class="form-label-custom">
+                                <label class="form-label-custom" for="appointment_date">
                                     <i class="bi bi-calendar-event me-1"></i> Appointment Date
                                 </label>
                                 <input type="date" class="form-control form-control-custom" name="appointment_date" id="appointment_date" min="<?= date('Y-m-d') ?>" required>
                             </div>
                             <div class="col-md-5">
-                                <label class="form-label-custom">
+                                <label class="form-label-custom" for="appointment_time">
                                     <i class="bi bi-clock me-1"></i> Preferred Time
                                 </label>
                                 <select class="form-select form-select-custom" name="appointment_time" id="appointment_time" required>
@@ -141,19 +141,28 @@
                         
                         <div class="row g-4">
                             <div class="col-md-6">
-                                <label class="form-label-custom">
+                                <label class="form-label-custom" for="full_name">
                                     <i class="bi bi-person me-1"></i> Full Name
                                 </label>
-                                <input type="text" class="form-control form-control-custom" name="full_name" id="full_name" placeholder="Dr. Juan Dela Cruz" required>
+                                <input type="text" class="form-control form-control-custom" name="full_name" id="full_name" 
+                                       placeholder="Dr. Juan Dela Cruz" 
+                                       pattern="^[A-Za-zÀ-ÿ.'\-\s]{2,100}$"
+                                       title="Letters, spaces, periods, hyphens and apostrophes only (2–100 characters)"
+                                       maxlength="100" 
+                                       required>
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label-custom">
+                                <label class="form-label-custom" for="age">
                                     <i class="bi bi-cake2 me-1"></i> Age
                                 </label>
-                                <input type="number" class="form-control form-control-custom" name="age" id="age" placeholder="25" min="0" required>
+                                <input type="number" class="form-control form-control-custom" name="age" id="age" 
+                                       placeholder="25" 
+                                       min="0" max="150" 
+                                       step="1"
+                                       required>
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label-custom">
+                                <label class="form-label-custom" for="gender">
                                     <i class="bi bi-gender-ambiguous me-1"></i> Gender
                                 </label>
                                 <select class="form-select form-select-custom" name="gender" id="gender" required>
@@ -164,16 +173,26 @@
                                 </select>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label-custom">
+                                <label class="form-label-custom" for="email">
                                     <i class="bi bi-envelope me-1"></i> Email Address
                                 </label>
-                                <input type="email" class="form-control form-control-custom" name="email" id="email" placeholder="your@email.com" required>
+                                <input type="email" class="form-control form-control-custom" name="email" id="email" 
+                                       placeholder="your@email.com" 
+                                       maxlength="150"
+                                       pattern="^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$"
+                                       title="Enter a valid email address (e.g. your@email.com)"
+                                       required>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label-custom">
+                                <label class="form-label-custom" for="phone">
                                     <i class="bi bi-phone me-1"></i> Phone Number
                                 </label>
-                                <input type="tel" class="form-control form-control-custom" name="phone" id="phone" placeholder="0912 345 6789" required>
+                                <input type="tel" class="form-control form-control-custom" name="phone" id="phone" 
+                                       placeholder="0912 345 6789" 
+                                       pattern="^0\d{3}\s?\d{3}\s?\d{4}$"
+                                       title="Philippine mobile number, e.g. 0912 345 6789"
+                                       maxlength="13"
+                                       required>
                             </div>
                         </div>
                         
@@ -259,7 +278,7 @@
                         <!-- X-Ray Services (Dynamic from Database) -->
                         <div id="xrayServicesContainer" style="display: none;">
                             <div class="service-category-title">
-                                <i class="bi bi-x-ray" style="color: #0a2b4e;"></i> X-Ray Services
+                                <i class="bi bi-radioactive" style="color: #0a2b4e;"></i> X-Ray Services
                             </div>
                             <div class="service-grid">
                                 <?php if (!empty($xrayServices)): ?>
@@ -285,10 +304,13 @@
                         
                         <!-- Other Requests -->
                         <div class="mt-4">
-                            <label class="form-label-custom">
+                            <label class="form-label-custom" for="other_requests">
                                 <i class="bi bi-clipboard2-pulse me-1"></i> Other Requests
                             </label>
-                            <textarea class="form-control form-control-custom" name="other_requests" id="other_requests" rows="3" placeholder="Any additional requests or special instructions..."></textarea>
+                            <textarea class="form-control form-control-custom" name="other_requests" id="other_requests" 
+                                      rows="3" 
+                                      maxlength="500"
+                                      placeholder="Any additional requests or special instructions..."></textarea>
                         </div>
                         
                         <div class="btn-group-custom">
@@ -453,6 +475,17 @@
     border-top: 2px solid #0148ca;
 }
 
+/* ===== FORM VALIDATION STYLES ===== */
+.form-control-custom:invalid:not(:placeholder-shown),
+.form-select-custom:invalid:not(:placeholder-shown) {
+    border-color: #dc3545;
+    background-image: none;
+}
+
+.form-control-custom:valid:not(:placeholder-shown) {
+    border-color: #198754;
+}
+
 /* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
     .service-check {
@@ -495,7 +528,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // ===== LOAD SERVICE PRICES =====
     function loadServicePrices() {
-        // Get prices from data attributes on checkboxes
         document.querySelectorAll('.service-checkbox').forEach(cb => {
             const name = cb.value;
             const price = parseFloat(cb.dataset.price) || 0;
@@ -547,11 +579,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const consultationFee = 500.00;
         const total = consultationFee + totalServiceFee;
         
-        // Update display
         document.getElementById('serviceFeeDisplay').textContent = '₱ ' + totalServiceFee.toFixed(2);
         document.getElementById('totalAmountDisplay').textContent = '₱ ' + total.toFixed(2);
         
-        // Store for review
         selectedServices = selectedNames;
         formData.serviceFee = totalServiceFee;
         formData.totalAmount = total;
@@ -574,15 +604,18 @@ document.addEventListener('DOMContentLoaded', function() {
             if (type === 'laboratory') {
                 labContainer.style.display = 'block';
                 xrayContainer.style.display = 'none';
+                // Uncheck hidden xray services
+                document.querySelectorAll('#xrayServicesContainer .service-checkbox').forEach(cb => cb.checked = false);
             } else if (type === 'xray') {
                 labContainer.style.display = 'none';
                 xrayContainer.style.display = 'block';
+                // Uncheck hidden lab services
+                document.querySelectorAll('#labServicesContainer .service-checkbox').forEach(cb => cb.checked = false);
             } else if (type === 'both') {
                 labContainer.style.display = 'block';
                 xrayContainer.style.display = 'block';
             }
             
-            // Recalculate total
             calculateTotal();
         });
     });
@@ -594,43 +627,86 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // ===== STEP NAVIGATION BUTTONS =====
-    document.getElementById('step1Next').addEventListener('click', function() {
-        const date = document.getElementById('appointment_date').value;
-        const time = document.getElementById('appointment_time').value;
-        
-        if (!date || !time) {
-            alert('⚠️ Please select both a date and time to continue.');
-            return;
+    // ===== STRICT VALIDATION HELPER =====
+    function validateInput(input) {
+        if (!input.checkValidity()) {
+            input.classList.add('is-invalid');
+            input.reportValidity();
+            return false;
         }
+        input.classList.remove('is-invalid');
+        return true;
+    }
+    
+    // ===== STEP 1 NEXT =====
+    document.getElementById('step1Next').addEventListener('click', function() {
+        const dateInput = document.getElementById('appointment_date');
+        const timeInput = document.getElementById('appointment_time');
         
-        formData.date = date;
-        formData.time = time;
+        if (!validateInput(dateInput)) return;
+        if (!validateInput(timeInput)) return;
+        
+        formData.date = dateInput.value;
+        formData.time = timeInput.value;
         updateStep(2);
     });
     
+    // ===== STEP 2 NEXT (STRICT) =====
     document.getElementById('step2Next').addEventListener('click', function() {
-        const email = document.getElementById('email').value;
-        const phone = document.getElementById('phone').value;
-        const name = document.getElementById('full_name').value;
-        const age = document.getElementById('age').value;
-        const gender = document.getElementById('gender').value;
+        const nameInput = document.getElementById('full_name');
+        const ageInput = document.getElementById('age');
+        const genderInput = document.getElementById('gender');
+        const emailInput = document.getElementById('email');
+        const phoneInput = document.getElementById('phone');
         
-        if (!email || !phone || !name || !age || !gender) {
-            alert('⚠️ Please fill in all required fields.');
+        // Validate all required fields strictly
+        if (!validateInput(nameInput)) return;
+        if (!validateInput(ageInput)) return;
+        if (!validateInput(genderInput)) return;
+        if (!validateInput(emailInput)) return;
+        if (!validateInput(phoneInput)) return;
+        
+        // Additional strict checks
+        const nameVal = nameInput.value.trim();
+        if (nameVal.length < 2) {
+            nameInput.setCustomValidity('Name must be at least 2 characters.');
+            nameInput.reportValidity();
             return;
         }
+        nameInput.setCustomValidity('');
         
-        formData.email = email;
-        formData.phone = phone;
-        formData.name = name;
-        formData.age = age;
-        formData.gender = gender;
+        const ageVal = parseInt(ageInput.value, 10);
+        if (isNaN(ageVal) || ageVal < 0 || ageVal > 150) {
+            ageInput.setCustomValidity('Please enter a valid age (0–150).');
+            ageInput.reportValidity();
+            return;
+        }
+        ageInput.setCustomValidity('');
+        
+        // Normalize phone: strip spaces for storage, keep display format
+        const phoneVal = phoneInput.value.trim();
+        const normalizedPhone = phoneVal.replace(/\s/g, '');
+        if (!/^0\d{9}$/.test(normalizedPhone)) {
+            phoneInput.setCustomValidity('Phone must be a valid PH mobile number (e.g. 0912 345 6789).');
+            phoneInput.reportValidity();
+            return;
+        }
+        phoneInput.setCustomValidity('');
+        
+        formData.email = emailInput.value.trim();
+        formData.phone = normalizedPhone;
+        formData.phoneDisplay = phoneVal;
+        formData.name = nameVal;
+        formData.age = ageVal;
+        formData.gender = genderInput.value;
+        
         updateStep(3);
     });
     
+    // ===== STEP 3 NEXT =====
     document.getElementById('step3Next').addEventListener('click', function() {
-        const others = document.getElementById('other_requests').value || 'None';
+        const othersInput = document.getElementById('other_requests');
+        const others = othersInput.value.trim() || 'None';
         formData.others = others;
         
         const activeCard = document.querySelector('.service-type-card.active');
@@ -638,8 +714,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const serviceTypeLabel = activeCard ? activeCard.querySelector('.title').textContent : 'None';
         formData.serviceType = serviceTypeLabel;
         
-        const labChecked = document.querySelectorAll('#labServicesContainer .service-checkbox:checked');
-        const xrayChecked = document.querySelectorAll('#xrayServicesContainer .service-checkbox:checked');
+        // Only count services from visible containers
+        const labChecked = labContainer.style.display !== 'none' 
+            ? document.querySelectorAll('#labServicesContainer .service-checkbox:checked') 
+            : [];
+        const xrayChecked = xrayContainer.style.display !== 'none' 
+            ? document.querySelectorAll('#xrayServicesContainer .service-checkbox:checked') 
+            : [];
         
         let labServices = [];
         let xrayServices = [];
@@ -660,7 +741,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Calculate total
         const total = calculateTotal();
         
         formData.labServices = labServices;
@@ -670,7 +750,7 @@ document.addEventListener('DOMContentLoaded', function() {
         formData.totalAmount = total;
         
         document.getElementById('reviewDateTime').textContent = formData.date + ' at ' + formData.time;
-        document.getElementById('reviewContact').textContent = formData.email + ' | ' + formData.phone;
+        document.getElementById('reviewContact').textContent = formData.email + ' | ' + formData.phoneDisplay;
         document.getElementById('reviewPatient').textContent = formData.name + ' (' + formData.age + ' yrs, ' + formData.gender + ')';
         document.getElementById('reviewServiceType').textContent = formData.serviceType;
         document.getElementById('reviewServices').textContent = formData.services;
@@ -692,9 +772,49 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('confirmBooking').disabled = !this.checked;
     });
     
-    // ===== CONFIRM PAYMENT =====
+    // ===== CONFIRM BOOKING (FINAL STRICT CHECK) =====
     document.getElementById('confirmBooking').addEventListener('click', function() {
+        // Final validation of all required fields before submit
+        const requiredIds = ['appointment_date', 'appointment_time', 'full_name', 'age', 'gender', 'email', 'phone'];
+        let allValid = true;
+        
+        requiredIds.forEach(id => {
+            const el = document.getElementById(id);
+            if (!el.checkValidity()) {
+                el.classList.add('is-invalid');
+                allValid = false;
+            }
+        });
+        
+        if (!allValid) {
+            alert('⚠️ Some required fields are invalid. Please review your information.');
+            updateStep(2);
+            return;
+        }
+        
+        // Ensure at least one service is selected
+        const anyChecked = document.querySelector('.service-checkbox:checked');
+        if (!anyChecked) {
+            alert('⚠️ Please select at least one service.');
+            updateStep(3);
+            return;
+        }
+        
         document.getElementById('bookingForm').submit();
+    });
+    
+    // ===== REAL-TIME VALIDATION (remove is-invalid on input) =====
+    document.querySelectorAll('input, select, textarea').forEach(el => {
+        el.addEventListener('input', function() {
+            if (this.checkValidity()) {
+                this.classList.remove('is-invalid');
+            }
+        });
+        el.addEventListener('change', function() {
+            if (this.checkValidity()) {
+                this.classList.remove('is-invalid');
+            }
+        });
     });
 });
 </script>

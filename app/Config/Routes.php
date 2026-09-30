@@ -96,7 +96,6 @@ $routes->group('receptionist', ['filter' => 'auth:receptionist'], function ($rou
     $routes->delete('delete-diagnostic-request/(:num)/(:any)', 'Receptionist::deleteDiagnosticRequest/$1/$2');
     $routes->get('get-request-details/(:num)/(:any)', 'Receptionist::getRequestDetails/$1/$2');
     $routes->get('print-request/(:num)/(:any)', 'Receptionist::printRequest/$1/$2');
-    $routes->get('print-request/(:any)/(:any)', 'Receptionist::printRequest/$1/$2');
 
     // Patient sync / debug
     $routes->get('sync-walk-in-patients', 'Receptionist::syncWalkInPatients');

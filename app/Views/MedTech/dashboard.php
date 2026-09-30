@@ -8,15 +8,11 @@
 /* ------------------------------------------------------------------
    MedTech Dashboard
 
-   KPI cards match the Admin KPI row.
+   KPI cards match the Admin KPI row, including 14-day sparklines.
    Two compact specimen intake charts (Today / This month).
    Volume by Section chart, plus a scrollable "Available services"
    card listing every active laboratory service.
    Turnaround Time panel with bars calibrated to the worst performer.
-
-   Values come from the controller:
-     $counts, $allRequests, $totalRequests, $intakeData,
-     $intakeMonthData, $sectionData, $turnaroundData, $serviceCatalog
    ------------------------------------------------------------------ */
 
 $statCards = [
@@ -86,12 +82,44 @@ $statCards = [
 ];
 
 /* ------------------------------------------------------------------
-   Turnaround Time — calibrated bar widths.
-
-   Bar length is scaled to the worst-performing test rather than the
-   target, so a single slow test doesn't push every bar to full.
-   Rows with no data collapse to a quiet single line.
+   SPARKLINES — same look and math as the Admin dashboard.
    ------------------------------------------------------------------ */
+$kpiTrends = $kpiTrends ?? [];
+
+$sparkMeta = [
+    'total'       => ['color' => '#0891B2', 'goodUp' => true,  'cumulative' => true,  'unit' => 'requests'],
+    'pending'     => ['color' => '#0D9488', 'goodUp' => false, 'cumulative' => false, 'unit' => 'pending'],
+    'in_progress' => ['color' => '#EA580C', 'goodUp' => false, 'cumulative' => false, 'unit' => 'in progress'],
+    'draft'       => ['color' => '#CA8A04', 'goodUp' => true,  'cumulative' => false, 'unit' => 'drafts'],
+    'completed'   => ['color' => '#16A34A', 'goodUp' => true,  'cumulative' => false, 'unit' => 'completed'],
+    'released'    => ['color' => '#2563EB', 'goodUp' => true,  'cumulative' => false, 'unit' => 'released'],
+    'in_queue'    => ['color' => '#DB2777', 'goodUp' => false, 'cumulative' => false, 'unit' => 'in queue'],
+];
+
+/* Returns [svgPath, lastX%, lastY%] for a value series. */
+$sparkGeometry = static function (array $vals): array {
+    $n = count($vals);
+    if ($n < 2) { return ['', 100, 50]; }
+    $min = min($vals);
+    $max = max($vals);
+    $rng = $max - $min;
+    $w = 100; $h = 32; $pad = 3;
+    $pts = [];
+    foreach (array_values($vals) as $i => $v) {
+        $x = $i / ($n - 1) * $w;
+        $y = $rng > 0 ? $h - $pad - (($v - $min) / $rng) * ($h - 2 * $pad) : $h / 2;
+        $pts[] = [round($x, 2), round($y, 2)];
+    }
+    $line = 'M' . $pts[0][0] . ',' . $pts[0][1];
+    for ($i = 1; $i < $n; $i++) {
+        $cx = round(($pts[$i - 1][0] + $pts[$i][0]) / 2, 2);
+        $line .= ' C' . $cx . ',' . $pts[$i - 1][1] . ' ' . $cx . ',' . $pts[$i][1] . ' ' . $pts[$i][0] . ',' . $pts[$i][1];
+    }
+    $last = end($pts);
+    return [$line, $last[0], round($last[1] / $h * 100, 2)];
+};
+
+/* Turnaround Time — calibrated bars. */
 $tatRows = $turnaroundData ?? [];
 
 $tatWithData = array_values(array_filter($tatRows, static function ($t) {
@@ -114,7 +142,6 @@ $tatToneOf = static function (array $t): string {
     return 'green';
 };
 
-/* Service catalogue — full list of active lab services. */
 $catalog = $serviceCatalog ?? [
     'lab'        => [],
     'xray'       => [],
@@ -134,8 +161,21 @@ $catalog = $serviceCatalog ?? [
                 $tag  = !empty($card['link']) ? 'a' : 'div';
                 $href = !empty($card['link']) ? ' href="' . esc($card['link'], 'attr') . '"' : '';
                 $icon = (string) ($card['icon'] ?? '');
+
+                $meta   = $sparkMeta[$card['key']] ?? null;
+                $vals   = $meta ? array_map('floatval', $kpiTrends[$card['key']] ?? []) : [];
+                $hasSpk = $meta && count($vals) >= 2;
+
+                if ($hasSpk) {
+                    [$spkLine, $spkX, $spkY] = $sparkGeometry($vals);
+                    $dates = $kpiTrends['dates'] ?? [];
+                    $fmt   = static fn($v) => number_format($v);
+                    $spkTitle = $meta['unit'] . ': ' . $fmt(end($vals))
+                        . ' on ' . (isset($dates[count($vals) - 1]) ? date('M j', strtotime($dates[count($vals) - 1])) : 'today')
+                        . ' · 14-day peak ' . $fmt(max($vals));
+                }
             ?>
-            <<?= $tag ?> class="stat-card"<?= $href ?>>
+            <<?= $tag ?> class="stat-card"<?= $href ?><?= $hasSpk ? ' style="--spark:' . esc($meta['color'], 'attr') . '"' : '' ?>>
 
                 <div class="stat-top">
                     <div class="stat-icon <?= esc($card['tone'], 'attr') ?>">
@@ -157,7 +197,18 @@ $catalog = $serviceCatalog ?? [
                     <?php endif; ?>
                 </div>
 
-                <div class="stat-value"><?= esc($card['value']) ?></div>
+                <div class="stat-value-row">
+                    <div class="stat-value"><?= esc($card['value']) ?></div>
+                    <?php if ($hasSpk): ?>
+                        <div class="spark spark-inline" role="img"
+                             aria-label="<?= esc($spkTitle, 'attr') ?>"
+                             title="<?= esc($spkTitle, 'attr') ?>">
+                            <svg viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true">
+                                <path d="<?= $spkLine ?>" class="spark-line" fill="none" vector-effect="non-scaling-stroke"/>
+                            </svg>
+                        </div>
+                    <?php endif; ?>
+                </div>
 
                 <div class="stat-label"><?= esc($card['label']) ?></div>
 
@@ -413,15 +464,18 @@ $catalog = $serviceCatalog ?? [
     --db-text:          #0F172A;
     --db-text-soft:     #475569;
     --db-text-muted:    #94A3B8;
-    --db-radius:        12px;
-    --db-radius-sm:     8px;
+    --db-radius:        16px;
+    --db-radius-sm:     10px;
     --db-radius-xs:     6px;
-    --db-shadow:        0 1px 2px rgba(15, 23, 42, 0.04);
-    --db-shadow-hover:  0 6px 16px rgba(15, 23, 42, 0.07);
+    --db-shadow:        0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 14px -6px rgba(15, 23, 42, 0.06);
+    --db-shadow-hover:  0 2px 4px rgba(15, 23, 42, 0.04), 0 14px 28px -10px rgba(15, 23, 42, 0.16);
     --db-gap:           20px;
 
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: var(--db-canvas);
+    background:
+        radial-gradient(900px 320px at 8% -80px, rgba(13, 148, 136, 0.08), transparent 70%),
+        radial-gradient(700px 300px at 100% -60px, rgba(37, 99, 235, 0.05), transparent 70%),
+        var(--db-canvas);
     padding: 24px;
     min-height: 100vh;
     -webkit-font-smoothing: antialiased;
@@ -445,15 +499,18 @@ $catalog = $serviceCatalog ?? [
 }
 
 .stat-card {
-    display: block;
-    background: var(--db-surface);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(180deg, #FFFFFF 0%, #FCFDFE 100%);
+    border: 1px solid rgba(226, 232, 240, 0.9);
     border-radius: var(--db-radius);
-    padding: 18px;
+    padding: 16px;
     box-shadow: var(--db-shadow);
-    border: 1px solid var(--db-border);
     text-decoration: none;
     color: inherit;
-    transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
     min-width: 0;
     width: 100%;
     box-sizing: border-box;
@@ -461,7 +518,8 @@ $catalog = $serviceCatalog ?? [
 
 .stat-card:hover,
 .stat-card:focus-visible {
-    border-color: var(--db-border-strong);
+    transform: translateY(-3px);
+    border-color: color-mix(in srgb, var(--spark, #CBD5E1) 35%, #E2E8F0);
     box-shadow: var(--db-shadow-hover);
     text-decoration: none;
     color: inherit;
@@ -473,7 +531,7 @@ $catalog = $serviceCatalog ?? [
     display: grid;
     grid-template-columns: 40px 1fr 16px;
     align-items: center;
-    margin-bottom: 14px;
+    margin-bottom: 12px;
     width: 100%;
 }
 
@@ -515,17 +573,51 @@ $catalog = $serviceCatalog ?? [
 .icon-yellow,
 .icon-pink { background: transparent; }
 
-.stat-value {
-    font-size: 1.65rem;
-    font-weight: 700;
-    color: var(--db-text);
-    line-height: 1.15;
+/* ===== VALUE ROW + INLINE SPARKLINE ===== */
+
+.stat-value-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 10px;
     margin-bottom: 6px;
-    letter-spacing: -0.02em;
-    font-variant-numeric: tabular-nums;
+    min-width: 0;
 }
 
-.stat-value-money { font-size: 1.35rem; overflow-wrap: anywhere; }
+.stat-value {
+    font-size: 1.35rem;
+    font-weight: 680;
+    color: var(--db-text);
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    min-width: 0;
+}
+
+.stat-value-money { font-size: 1.0rem; overflow-wrap: anywhere; }
+
+.spark-inline {
+    flex-shrink: 0;
+    width: 56px;
+    height: 20px;
+    position: relative;
+}
+
+.spark-inline svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    overflow: visible;
+}
+
+.spark-line {
+    stroke: var(--spark);
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
 
 .stat-label {
     font-size: 0.875rem;
@@ -605,9 +697,7 @@ $catalog = $serviceCatalog ?? [
 }
 
 /* ============================================
-   AVAILABLE SERVICES — scrollable catalogue
-   The card is the same visual size as the chart next to it. The
-   list scrolls internally when there are more services than fit.
+   AVAILABLE SERVICES
    ============================================ */
 
 .service-list {
@@ -619,29 +709,14 @@ $catalog = $serviceCatalog ?? [
     display: flex;
     flex-direction: column;
     gap: 0.2rem;
-
-    /* Firefox scrollbar */
     scrollbar-width: thin;
     scrollbar-color: #cbd5e1 transparent;
 }
 
-/* WebKit scrollbar — thin, muted, matches the dashboard tone. */
-.service-list::-webkit-scrollbar {
-    width: 6px;
-}
-
-.service-list::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 3px;
-}
-
-.service-list::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
-}
-
-.service-list::-webkit-scrollbar-track {
-    background: transparent;
-}
+.service-list::-webkit-scrollbar { width: 6px; }
+.service-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+.service-list::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+.service-list::-webkit-scrollbar-track { background: transparent; }
 
 .service-list-item {
     display: flex;
@@ -655,9 +730,7 @@ $catalog = $serviceCatalog ?? [
     transition: background-color 0.15s ease;
 }
 
-.service-list-item:hover {
-    background: #eef2f7;
-}
+.service-list-item:hover { background: #eef2f7; }
 
 .service-list-name {
     font-size: 0.8125rem;
@@ -1037,8 +1110,9 @@ $catalog = $serviceCatalog ?? [
     .chart-card,
     .queue-card,
     .tat-card          { padding: 16px; }
-    .stat-value        { font-size: 1.45rem; }
-    .stat-value-money  { font-size: 1.2rem; }
+    .stat-value        { font-size: 1.2rem; }
+    .stat-value-money  { font-size: 1.05rem; }
+    .spark-inline      { width: 44px; height: 16px; }
 
     .queue-header {
         flex-direction: column;

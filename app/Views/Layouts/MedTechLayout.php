@@ -131,6 +131,31 @@
                     </a>
                 </li>
 
+                <!-- =========================================
+                     NOTIFICATIONS
+                     ========================================= -->
+
+                <li class="nav-section">Account</li>
+
+                <!-- NOTIFICATIONS -->
+                <li class="menu-item <?= strpos(current_url(), 'medtech/notifications') !== false ? 'active' : '' ?>">
+                    <a href="/polymedic/public/medtech/notifications" class="menu-btn" data-tooltip="Notifications">
+                        <i class="bi bi-bell-fill menu-icon"></i>
+                        <span>Notifications</span>
+
+                        <?php
+                        $unreadCount = (new \App\Models\NotificationModel())->getUnreadCount();
+                        if ($unreadCount > 0):
+                        ?>
+                            <span class="badge-notif"><?= $unreadCount ?></span>
+                        <?php endif; ?>
+
+                        <?php if (strpos(current_url(), 'medtech/notifications') !== false): ?>
+                            <i class="bi bi-chevron-right menu-arrow"></i>
+                        <?php endif; ?>
+                    </a>
+                </li>
+
                 <!-- DIVIDER -->
                 <li class="nav-divider"></li>
 
@@ -175,7 +200,8 @@
                         'View Lab Request' => 'lab-icon.png',
                         'Laboratory Findings' => 'lab-icon.png',
                         'Reports' => 'lab-icon.png',
-                        'MedTech Dashboard' => 'statisctics.png'
+                        'MedTech Dashboard' => 'statisctics.png',
+                        'Notifications' => 'appointment1.png'
                     ];
 
                     $iconFile = $iconMap[$pageTitle] ?? 'lab-icon.png';
@@ -313,21 +339,11 @@
     --icon-gray: #9ca3af;
     --bg-light: #f8fafc;
 
-    /* Single shared timing so every collapse-related property
-       animates in lockstep — this is what makes clicking a menu
-       item while collapsed/expanded look smooth instead of
-       having the label text snap in/out abruptly. */
     --sidebar-ease: cubic-bezier(0.4, 0, 0.2, 1);
     --sidebar-speed: 0.32s;
 }
 
-/* =========================================================
-   GLOBAL
-   ========================================================= */
-
-* {
-    box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
 /* =========================================================
    SIDEBAR
@@ -349,14 +365,8 @@
     transition: width var(--sidebar-speed) var(--sidebar-ease);
 }
 
-.admin-sidebar::-webkit-scrollbar {
-    width: 4px;
-}
-
-.admin-sidebar::-webkit-scrollbar-thumb {
-    background: #e5e7eb;
-    border-radius: 10px;
-}
+.admin-sidebar::-webkit-scrollbar { width: 4px; }
+.admin-sidebar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
 
 /* =========================================================
    SIDEBAR HEADER
@@ -417,9 +427,7 @@
    SIDEBAR NAV
    ========================================================= */
 
-.sidebar-nav {
-    padding: 0.9rem 0.75rem 1.5rem;
-}
+.sidebar-nav { padding: 0.9rem 0.75rem 1.5rem; }
 
 .sidebar-nav ul {
     list-style: none;
@@ -434,9 +442,7 @@
    COLLAPSE BUTTON
    ========================================================= */
 
-.sidebar-toggle-item {
-    margin-bottom: 0.35rem;
-}
+.sidebar-toggle-item { margin-bottom: 0.35rem; }
 
 .sidebar-toggle-btn {
     width: 100%;
@@ -485,9 +491,7 @@
     color: #1976d2;
 }
 
-.sidebar-toggle-btn:active {
-    transform: scale(0.98);
-}
+.sidebar-toggle-btn:active { transform: scale(0.98); }
 
 /* =========================================================
    NAV SECTION
@@ -557,8 +561,6 @@
     transition: color 0.2s ease, transform 0.2s ease;
 }
 
-/* Menu label — animates on width/opacity together with the
-   sidebar collapse, instead of the old instant display:none. */
 .menu-btn > span {
     white-space: nowrap;
     opacity: 1;
@@ -608,14 +610,10 @@
     box-shadow: 0 4px 12px rgba(25, 118, 210, 0.28) !important;
 }
 
-.menu-item.active .menu-btn span {
-    color: #ffffff !important;
-}
+.menu-item.active .menu-btn span { color: #ffffff !important; }
 
 .menu-item.active .menu-icon,
-.menu-item.active .menu-icon-svg {
-    color: #ffffff !important;
-}
+.menu-item.active .menu-icon-svg { color: #ffffff !important; }
 
 .menu-arrow {
     font-size: 0.85rem;
@@ -660,9 +658,7 @@
                 transform var(--sidebar-speed) var(--sidebar-ease);
 }
 
-.menu-item.active .badge-notif {
-    display: none !important;
-}
+.menu-item.active .badge-notif { display: none !important; }
 
 /* =========================================================
    DIVIDER
@@ -678,18 +674,14 @@
    LOGOUT
    ========================================================= */
 
-.logout-item {
-    margin-top: 0.2rem;
-}
+.logout-item { margin-top: 0.2rem; }
 
 .logout-item .menu-btn:hover {
     background: #fee2e2 !important;
     color: #dc2626 !important;
 }
 
-.logout-item .menu-btn:hover .menu-icon {
-    color: #dc2626 !important;
-}
+.logout-item .menu-btn:hover .menu-icon { color: #dc2626 !important; }
 
 /* =========================================================
    COLLAPSED SIDEBAR (DESKTOP ONLY)
@@ -697,9 +689,7 @@
 
 @media (min-width: 993px) {
 
-    .admin-sidebar.collapsed {
-        width: var(--sidebar-collapsed-width);
-    }
+    .admin-sidebar.collapsed { width: var(--sidebar-collapsed-width); }
 
     .admin-sidebar.collapsed .sidebar-header {
         justify-content: center;
@@ -712,21 +702,15 @@
         width: 100%;
     }
 
-    .admin-sidebar.collapsed .sidebar-logo img {
-        width: 40px;
-        height: 40px;
-    }
+    .admin-sidebar.collapsed .sidebar-logo img { width: 40px; height: 40px; }
 
     .admin-sidebar.collapsed .sidebar-logo span {
         opacity: 0;
         max-width: 0;
     }
 
-    .admin-sidebar.collapsed .sidebar-nav {
-        padding: 0.9rem 0.6rem;
-    }
+    .admin-sidebar.collapsed .sidebar-nav { padding: 0.9rem 0.6rem; }
 
-    /* Toggle button - centered */
     .admin-sidebar.collapsed .sidebar-toggle-btn {
         justify-content: center;
         padding: 0.65rem 0;
@@ -761,7 +745,6 @@
         opacity: 0;
     }
 
-    /* Menu buttons - centered icons */
     .admin-sidebar.collapsed .menu-btn {
         justify-content: center;
         width: 100%;
@@ -778,7 +761,6 @@
         display: none;
     }
 
-    /* Center the icon properly */
     .admin-sidebar.collapsed .menu-icon,
     .admin-sidebar.collapsed .menu-icon-svg {
         width: 24px;
@@ -800,9 +782,7 @@
         display: none;
     }
 
-    .admin-sidebar.collapsed .menu-item {
-        position: relative;
-    }
+    .admin-sidebar.collapsed .menu-item { position: relative; }
 
     .admin-sidebar.collapsed .badge-notif {
         position: absolute;
@@ -818,7 +798,6 @@
         opacity: 1;
     }
 
-    /* Tooltips */
     .admin-sidebar.collapsed .menu-btn:hover::after {
         content: attr(data-tooltip);
         position: absolute;
@@ -858,20 +837,13 @@
     }
 
     @keyframes tooltipFade {
-        from {
-            opacity: 0;
-            transform: translateY(-50%) translateX(-5px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(-50%) translateX(0);
-        }
+        from { opacity: 0; transform: translateY(-50%) translateX(-5px); }
+        to   { opacity: 1; transform: translateY(-50%) translateX(0); }
     }
-
 }
 
 /* =========================================================
-   MOBILE RESPONSIVE - SIDEBAR ALWAYS EXPANDED
+   MOBILE RESPONSIVE
    ========================================================= */
 
 @media (max-width: 992px) {
@@ -885,15 +857,9 @@
         z-index: 1000;
     }
 
-    /* Hide collapse button on mobile */
-    .sidebar-toggle-item {
-        display: none !important;
-    }
+    .sidebar-toggle-item { display: none !important; }
 
-    /* Force sidebar expanded on mobile */
-    .admin-sidebar.collapsed {
-        width: var(--sidebar-width) !important;
-    }
+    .admin-sidebar.collapsed { width: var(--sidebar-width) !important; }
 
     .admin-sidebar.collapsed .sidebar-header {
         justify-content: space-between !important;
@@ -935,33 +901,15 @@
         display: inline-block !important;
     }
 
-    .admin-sidebar.collapsed .sidebar-toggle-btn {
-        display: none !important;
-    }
+    .admin-sidebar.collapsed .sidebar-toggle-btn { display: none !important; }
 
-    /* Main content takes full width */
-    .admin-main {
-        margin-left: 0 !important;
-        width: 100% !important;
-    }
+    .admin-main { margin-left: 0 !important; width: 100% !important; }
+    .admin-main.sidebar-collapsed { margin-left: 0 !important; width: 100% !important; }
 
-    .admin-main.sidebar-collapsed {
-        margin-left: 0 !important;
-        width: 100% !important;
-    }
+    .admin-header { padding: 0.75rem 1rem; }
+    .admin-content { padding: 1rem; }
 
-    .admin-header {
-        padding: 0.75rem 1rem;
-    }
-
-    .admin-content {
-        padding: 1rem;
-    }
-
-    .header-info-group .divider-icon {
-        display: none;
-    }
-
+    .header-info-group .divider-icon { display: none; }
 }
 
 /* =========================================================
@@ -1061,9 +1009,7 @@
     white-space: nowrap;
 }
 
-.header-datetime i {
-    color: var(--active-blue) !important;
-}
+.header-datetime i { color: var(--active-blue) !important; }
 
 .divider-icon {
     color: #d1d5db !important;
@@ -1151,13 +1097,9 @@
     position: relative;
 }
 
-.notif-item:hover {
-    background: #f8fafc !important;
-}
+.notif-item:hover { background: #f8fafc !important; }
 
-.notif-item.unread {
-    background: #f8fafc !important;
-}
+.notif-item.unread { background: #f8fafc !important; }
 
 .notif-item.unread::before {
     content: '';
@@ -1181,30 +1123,12 @@
     flex-shrink: 0;
 }
 
-.notif-icon-box.appointment {
-    background: #e3f2fd !important;
-    color: #1976d2 !important;
-}
+.notif-icon-box.appointment { background: #e3f2fd !important; color: #1976d2 !important; }
+.notif-icon-box.xray        { background: #e3f2fd !important; color: #1976d2 !important; }
+.notif-icon-box.system      { background: #fef3c7 !important; color: #d97706 !important; }
+.notif-icon-box.lab         { background: #e8f5e9 !important; color: #28a745 !important; }
 
-.notif-icon-box.xray {
-    background: #e3f2fd !important;
-    color: #1976d2 !important;
-}
-
-.notif-icon-box.system {
-    background: #fef3c7 !important;
-    color: #d97706 !important;
-}
-
-.notif-icon-box.lab {
-    background: #e8f5e9 !important;
-    color: #28a745 !important;
-}
-
-.notif-content {
-    flex: 1;
-    min-width: 0;
-}
+.notif-content { flex: 1; min-width: 0; }
 
 .notif-title {
     font-size: 0.82rem;
@@ -1283,108 +1207,33 @@
    ========================================================= */
 
 @media (max-width: 768px) {
-
-    .admin-header {
-        padding: 0.5rem 0.75rem;
-        min-height: 52px;
-    }
-
-    .header-title-group .header-title-icon {
-        width: 20px;
-        height: 20px;
-    }
-
-    .page-title-header {
-        font-size: 0.85rem;
-        max-width: 180px;
-    }
-
-    .header-datetime {
-        display: none;
-    }
-
-    .user-details {
-        display: none;
-    }
-
-    .avatar-small {
-        width: 30px;
-        height: 30px;
-    }
-
-    .admin-content {
-        padding: 0.75rem;
-    }
-
-    .notif-dropdown-menu {
-        width: 300px;
-    }
-
+    .admin-header { padding: 0.5rem 0.75rem; min-height: 52px; }
+    .header-title-group .header-title-icon { width: 20px; height: 20px; }
+    .page-title-header { font-size: 0.85rem; max-width: 180px; }
+    .header-datetime { display: none; }
+    .user-details { display: none; }
+    .avatar-small { width: 30px; height: 30px; }
+    .admin-content { padding: 0.75rem; }
+    .notif-dropdown-menu { width: 300px; }
 }
 
 @media (max-width: 576px) {
-
-    .admin-header {
-        padding: 0.4rem 0.6rem;
-        min-height: 48px;
-    }
-
-    .header-title-group {
-        gap: 0.35rem;
-    }
-
-    .header-title-group .header-title-icon {
-        width: 18px;
-        height: 18px;
-    }
-
-    .page-title-header {
-        font-size: 0.72rem;
-        max-width: 130px;
-    }
-
-    .notif-btn {
-        font-size: 1rem;
-        padding: 0.25rem 0.4rem;
-    }
-
-    .avatar-small {
-        width: 28px;
-        height: 28px;
-    }
-
-    .notif-dropdown-menu {
-        width: 270px;
-    }
-
-    .admin-content {
-        padding: 0.6rem;
-    }
-
+    .admin-header { padding: 0.4rem 0.6rem; min-height: 48px; }
+    .header-title-group { gap: 0.35rem; }
+    .header-title-group .header-title-icon { width: 18px; height: 18px; }
+    .page-title-header { font-size: 0.72rem; max-width: 130px; }
+    .notif-btn { font-size: 1rem; padding: 0.25rem 0.4rem; }
+    .avatar-small { width: 28px; height: 28px; }
+    .notif-dropdown-menu { width: 270px; }
+    .admin-content { padding: 0.6rem; }
 }
 
 @media (max-width: 400px) {
-
-    .page-title-header {
-        font-size: 0.67rem;
-        max-width: 105px;
-    }
-
-    .header-title-group .header-title-icon {
-        width: 17px;
-        height: 17px;
-    }
-
-    .header-user {
-        display: none;
-    }
-
-    .notif-dropdown-menu {
-        width: 250px;
-    }
-
+    .page-title-header { font-size: 0.67rem; max-width: 105px; }
+    .header-title-group .header-title-icon { width: 17px; height: 17px; }
+    .header-user { display: none; }
+    .notif-dropdown-menu { width: 250px; }
 }
-
 </style>
 
 <!-- =========================================================
@@ -1409,8 +1258,6 @@
         return { sidebar: sidebar, adminMain: adminMain, collapseBtn: collapseBtn };
     }
 
-    // Apply saved state instantly (no transition) on first paint,
-    // so the page never "animates" into its initial state on load.
     function applySidebarState(skipTransition) {
         var elements = getSidebarElements();
         var sidebar = elements.sidebar;
@@ -1460,10 +1307,6 @@
         if (elements.adminMain) elements.adminMain.classList.remove('no-transition');
     }
 
-    // =========================================================
-    // UPDATE COLLAPSE BUTTON
-    // =========================================================
-
     function updateCollapseButton() {
         var elements = getSidebarElements();
         var sidebar = elements.sidebar;
@@ -1486,10 +1329,6 @@
         }
     }
 
-    // =========================================================
-    // APPLY ON PAGE LOAD
-    // =========================================================
-
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function() {
             applySidebarState(true);
@@ -1507,10 +1346,6 @@
             setTimeout(function() { applySidebarState(true); }, 50);
         }
     });
-
-    // =========================================================
-    // TOGGLE FUNCTION
-    // =========================================================
 
     window.toggleSidebarCollapse = function() {
         var elements = getSidebarElements();
@@ -1532,10 +1367,6 @@
 
         updateCollapseButton();
     };
-
-    // =========================================================
-    // RESIZE HANDLER
-    // =========================================================
 
     window.addEventListener('resize', function() {
         var elements = getSidebarElements();
@@ -1566,13 +1397,9 @@
 
     function fetchNotifications() {
         fetch('/polymedic/public/medtech/notifications/fetch', {
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
-            }
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
         })
-        .then(function(response) {
-            return response.json();
-        })
+        .then(function(response) { return response.json(); })
         .then(function(data) {
             if (data.status === 'success') {
                 updateNotificationBadge(data.unread_count);
@@ -1650,13 +1477,9 @@
 
     window.markNotificationRead = function(id, event) {
         fetch('/polymedic/public/medtech/notifications/mark-read/' + id, {
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
-            }
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
         })
-        .then(function(response) {
-            return response.json();
-        })
+        .then(function(response) { return response.json(); })
         .then(function(data) {
             if (data.status === 'success') {
                 updateNotificationBadge(data.unread_count);
@@ -1668,18 +1491,12 @@
     };
 
     window.markAllNotificationsRead = function(event) {
-        if (event) {
-            event.stopPropagation();
-        }
+        if (event) { event.stopPropagation(); }
 
         fetch('/polymedic/public/medtech/notifications/mark-all-read', {
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
-            }
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
         })
-        .then(function(response) {
-            return response.json();
-        })
+        .then(function(response) { return response.json(); })
         .then(function(data) {
             if (data.status === 'success') {
                 updateNotificationBadge(0);
@@ -1715,9 +1532,6 @@
 </script>
 
 <style>
-/* Disable transitions only during the initial state application
-   on page load, so restoring a saved collapsed/expanded state
-   never itself animates — only user clicks do. */
 .admin-sidebar.no-transition,
 .admin-sidebar.no-transition *,
 .admin-main.no-transition {

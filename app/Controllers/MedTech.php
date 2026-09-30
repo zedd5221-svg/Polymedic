@@ -31,14 +31,6 @@ class MedTech extends BaseController
         return null;
     }
 
-    /**
-     * Statuses the MedTech is allowed to see in their worklist.
-     *
-     * 'pending' is deliberately excluded. A walk-in request created
-     * by the receptionist stays in the front-desk queue until they
-     * press Start, which flips the status to 'in_progress'. Only at
-     * that point does the request appear in the lab.
-     */
     private function departmentStatuses(): array
     {
         return [
@@ -87,9 +79,6 @@ class MedTech extends BaseController
         $data['perPage']     = $perPage;
         $data['totalPages']  = ceil($data['totalRequests'] / $perPage);
 
-        // "Pending" on the MedTech side means sent to the lab but not
-        // started here yet. That is in_progress and draft, not the raw
-        // pending state.
         $labRequestModel->resetQuery();
         $data['pendingRequests'] = $labRequestModel
             ->where('type', $type)
@@ -122,7 +111,79 @@ class MedTech extends BaseController
         $data['turnaroundData']  = $this->getTurnaroundTimes($labRequestModel, $labResultModel);
         $data['serviceCatalog']  = $this->getAvailableServices();
 
+        // KPI sparklines — same look as the admin dashboard.
+        $data['kpiTrends'] = $this->getKpiTrends(14, (int) ($data['counts']['total'] ?? 0));
+
         return view('MedTech/dashboard', $data);
+    }
+
+    // =============================================
+    // KPI SPARKLINE TRENDS (last N days, ending today)
+    // =============================================
+    private function getKpiTrends(int $days, int $totalRequests): array
+    {
+        $db    = db_connect();
+        $start = date('Y-m-d', strtotime('-' . ($days - 1) . ' days'));
+        $end   = date('Y-m-d');
+        $type  = DiagnosticRequestModel::TYPE_LAB;
+
+        $dates = [];
+        for ($i = 0; $i < $days; $i++) {
+            $dates[] = date('Y-m-d', strtotime($start . ' +' . $i . ' days'));
+        }
+
+        $series = function (string $dateExpr, string $valueExpr, array $where = [], array $whereIn = []) use ($db, $dates, $start, $end, $type) {
+            $b = $db->table('diagnostic_requests')
+                ->select("$dateExpr AS d, $valueExpr AS v", false)
+                ->where('type', $type)
+                ->where("$dateExpr >=", $start)
+                ->where("$dateExpr <=", $end);
+            foreach ($where as $col => $val) {
+                $b->where($col, $val);
+            }
+            foreach ($whereIn as $col => $vals) {
+                $b->whereIn($col, $vals);
+            }
+            $rows = $b->groupBy('d')->get()->getResultArray();
+
+            $map = [];
+            foreach ($rows as $r) {
+                $map[$r['d']] = (float) $r['v'];
+            }
+            return array_map(fn($d) => $map[$d] ?? 0, $dates);
+        };
+
+        // Total requests: cumulative walk-back from today's total.
+        $newTotal = $series('DATE(created_at)', 'COUNT(*)');
+        $total    = [];
+        $running  = $totalRequests - array_sum($newTotal);
+        foreach ($newTotal as $n) {
+            $running += $n;
+            $total[]  = $running;
+        }
+
+        $pending     = $series('DATE(created_at)', 'COUNT(*)', ['status' => 'pending']);
+        $inProgress  = $series('DATE(created_at)', 'COUNT(*)', ['status' => 'in_progress']);
+        $draft       = $series('DATE(created_at)', 'COUNT(*)', ['status' => 'draft']);
+        $completed   = $series('DATE(updated_at)', 'COUNT(*)', ['status' => 'completed']);
+        $released    = $series('DATE(released_at)', 'COUNT(*)', ['status' => 'released']);
+
+        // In queue = pending + in_progress + draft, summed per day.
+        $inQueue = [];
+        for ($i = 0; $i < $days; $i++) {
+            $inQueue[] = ($pending[$i] ?? 0) + ($inProgress[$i] ?? 0) + ($draft[$i] ?? 0);
+        }
+
+        return [
+            'dates'       => $dates,
+            'total'       => $total,
+            'pending'     => $pending,
+            'in_progress' => $inProgress,
+            'draft'       => $draft,
+            'completed'   => $completed,
+            'released'    => $released,
+            'in_queue'    => $inQueue,
+        ];
     }
 
     private function getHourlyIntake($labRequestModel)
@@ -156,14 +217,6 @@ class MedTech extends BaseController
         ];
     }
 
-    /**
-     * Daily specimen intake for the current calendar month.
-     *
-     * Returns one entry per day of the month: the day-of-month as a
-     * label and the request count for that day as the value. Days
-     * with no requests return 0, so the bar chart always shows the
-     * full month rather than just the days with activity.
-     */
     private function getDailyIntakeMonth($labRequestModel)
     {
         $type  = DiagnosticRequestModel::TYPE_LAB;
@@ -191,41 +244,24 @@ class MedTech extends BaseController
         ];
     }
 
-    /**
-     * Count of active services in the catalogue.
-     *
-     * Used by the dashboard's "Available services" card so the page
-     * reflects what the lab actually offers, not a hard-coded number.
-     */
     private function getAvailableServices()
-{
-    $serviceModel = new ServiceModel();
+    {
+        $serviceModel = new ServiceModel();
 
-    $labServices  = $serviceModel->getLaboratoryServices();
-    $xrayServices = $serviceModel->getXrayServices();
-    $counts       = $serviceModel->getCountByCategory();
+        $labServices  = $serviceModel->getLaboratoryServices();
+        $xrayServices = $serviceModel->getXrayServices();
+        $counts       = $serviceModel->getCountByCategory();
 
-    return [
-        'lab'        => $labServices,
-        'xray'       => $xrayServices,
-        'labCount'   => $counts['laboratory'],
-        'xrayCount'  => $counts['xray'],
-        'otherCount' => $counts['other'],
-        'total'      => $counts['total'],
-    ];
-}
+        return [
+            'lab'        => $labServices,
+            'xray'       => $xrayServices,
+            'labCount'   => $counts['laboratory'],
+            'xrayCount'  => $counts['xray'],
+            'otherCount' => $counts['other'],
+            'total'      => $counts['total'],
+        ];
+    }
 
-    /**
-     * Today's volume broken down by laboratory section.
-     *
-     * Keywords are matched against the request's lab_services string,
-     * in the order the sections appear here. Longer / more specific
-     * keywords must come before shorter ones inside each section, and
-     * sections are ordered so a service lands in its true home.
-     *
-     * Every service in the `services` table appears below, so nothing
-     * falls into "Other" unless it is genuinely unrecognised.
-     */
     private function getSectionBreakdown($labRequestModel)
     {
         $today = date('Y-m-d');
@@ -447,9 +483,6 @@ class MedTech extends BaseController
 
         $departmentStatuses = $this->departmentStatuses();
 
-        // If the user selected a department-facing status, honour it.
-        // Otherwise list everything the lab has been sent, which is
-        // all statuses except 'pending' and 'cancelled'.
         if ($status !== null && $status !== '' && in_array($status, $departmentStatuses, true)) {
             $labRequestModel->resetQuery();
             $data['requests'] = $labRequestModel
@@ -846,8 +879,6 @@ class MedTech extends BaseController
                         + $data['counts']['released'];
             $data['totalCount'] = $totalCount > 0 ? $totalCount : 1;
 
-            // Same rule as the requests page — reports cover only rows
-            // that have actually reached the department.
             $labRequestModel->resetQuery();
             $data['requests'] = $labRequestModel
                 ->where('type', $type)

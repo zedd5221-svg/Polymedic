@@ -28,9 +28,6 @@ $initialsOf = static function ($name) {
 
 /* ------------------------------------------------------------------
    SERVICE DISTRIBUTION
-   Prefers figures supplied by the controller. Otherwise it is derived
-   from the real appointments already rendered below, so the donut
-   never shows invented numbers.
    ------------------------------------------------------------------ */
 $serviceCounts = [];
 
@@ -52,15 +49,10 @@ arsort($serviceCounts);
 
 $serviceTotal = array_sum($serviceCounts);
 
-/* Palette for the donut segments and the legend dots */
 $donutPalette = ['#2450d8', '#f0b429', '#0f9d76', '#7b8794', '#d9534f', '#0e7490'];
 
 /* ------------------------------------------------------------------
    APPOINTMENT TRENDS
-   Rendered only when the controller supplies a real series. To turn
-   the line chart on, pass:
-       $data['weekly_appointments'] = [4, 9, 7, 12, 8, 3, 5];
-       $data['weekly_labels']       = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
    ------------------------------------------------------------------ */
 $trendValues = (isset($weekly_appointments) && is_array($weekly_appointments)) ? array_values($weekly_appointments) : [];
 $trendLabels = (isset($weekly_labels) && is_array($weekly_labels) && count($weekly_labels) === count($trendValues))
@@ -69,7 +61,6 @@ $trendLabels = (isset($weekly_labels) && is_array($weekly_labels) && count($week
 
 $hasTrend = count($trendValues) >= 2;
 
-/* Real status breakdown of today's schedule */
 $statusCounts = [];
 foreach ($appointments as $appt) {
     $st = $slug($appt['status'] ?? '', 'unknown');
@@ -78,20 +69,10 @@ foreach ($appointments as $appt) {
 
 /* ------------------------------------------------------------------
    STAT CARDS
-
-   Each card has an 'icon' key. That value is the PNG filename inside
-   public/assets/images/. Change any filename below to change which
-   image appears on that card. If a file is missing, the card still
-   renders — the image just shows a broken-image placeholder.
-
-   The 'tone' key is kept so future changes can still target a card
-   by a stable name, but every tone now renders transparent so the
-   PNG sits directly on the card with no colored tile behind it.
    ------------------------------------------------------------------ */
 $statCards = [
     [
         'key'   => 'patients',
-        // TODO: replace with your PNG for "All Patients"
         'icon'  => 'people-blue.png',
         'tone'  => 'icon-cyan',
         'label' => 'All Patients',
@@ -101,7 +82,6 @@ $statCards = [
     ],
     [
         'key'   => 'today',
-        // TODO: replace with your PNG for "Today's Appointments"
         'icon'  => 'document.png',
         'tone'  => 'icon-teal',
         'label' => "Today's Appointments",
@@ -111,7 +91,6 @@ $statCards = [
     ],
     [
         'key'   => 'pending',
-        // TODO: replace with your PNG for "Pending Appointments"
         'icon'  => 'file (1).png',
         'tone'  => 'icon-orange',
         'label' => 'Pending Appointments',
@@ -121,7 +100,6 @@ $statCards = [
     ],
     [
         'key'   => 'completed',
-        // TODO: replace with your PNG for "Completed Today"
         'icon'  => 'people-check-blue.png',
         'tone'  => 'icon-green',
         'label' => 'Completed Today',
@@ -131,7 +109,6 @@ $statCards = [
     ],
     [
         'key'   => 'diagnostics',
-        // TODO: replace with your PNG for "Pending Diagnostics"
         'icon'  => 'clock (4).png',
         'tone'  => 'icon-blue',
         'label' => 'Pending Diagnostics',
@@ -141,7 +118,6 @@ $statCards = [
     ],
     [
         'key'   => 'unpaid',
-        // TODO: replace with your PNG for "Unpaid Bills"
         'icon'  => 'no-money-red.png',
         'tone'  => 'icon-pink',
         'label' => 'Unpaid Bills',
@@ -151,7 +127,6 @@ $statCards = [
     ],
     [
         'key'   => 'collections',
-        // TODO: replace with your PNG for "Today's Collections"
         'icon'  => 'money-yellow.png',
         'tone'  => 'icon-yellow',
         'label' => "Today's Collections",
@@ -161,6 +136,44 @@ $statCards = [
         'link'  => null,
     ],
 ];
+
+/* ------------------------------------------------------------------
+   SPARKLINES — same look and math as the Admin dashboard.
+   ------------------------------------------------------------------ */
+$kpiTrends = $kpiTrends ?? [];
+
+$sparkMeta = [
+    'patients'    => ['color' => '#0891B2', 'goodUp' => true,  'cumulative' => true,  'unit' => 'patients'],
+    'today'       => ['color' => '#0D9488', 'goodUp' => true,  'cumulative' => false, 'unit' => 'appointments'],
+    'pending'     => ['color' => '#EA580C', 'goodUp' => false, 'cumulative' => false, 'unit' => 'pending'],
+    'completed'   => ['color' => '#16A34A', 'goodUp' => true,  'cumulative' => false, 'unit' => 'completed'],
+    'diagnostics' => ['color' => '#2563EB', 'goodUp' => false, 'cumulative' => false, 'unit' => 'diagnostics'],
+    'unpaid'      => ['color' => '#DB2777', 'goodUp' => false, 'cumulative' => false, 'unit' => 'unpaid'],
+    'collections' => ['color' => '#CA8A04', 'goodUp' => true,  'cumulative' => false, 'unit' => 'collections', 'money' => true],
+];
+
+/* Returns [svgPath, lastX%, lastY%] for a value series. */
+$sparkGeometry = static function (array $vals): array {
+    $n = count($vals);
+    if ($n < 2) { return ['', 100, 50]; }
+    $min = min($vals);
+    $max = max($vals);
+    $rng = $max - $min;
+    $w = 100; $h = 32; $pad = 3;
+    $pts = [];
+    foreach (array_values($vals) as $i => $v) {
+        $x = $i / ($n - 1) * $w;
+        $y = $rng > 0 ? $h - $pad - (($v - $min) / $rng) * ($h - 2 * $pad) : $h / 2;
+        $pts[] = [round($x, 2), round($y, 2)];
+    }
+    $line = 'M' . $pts[0][0] . ',' . $pts[0][1];
+    for ($i = 1; $i < $n; $i++) {
+        $cx = round(($pts[$i - 1][0] + $pts[$i][0]) / 2, 2);
+        $line .= ' C' . $cx . ',' . $pts[$i - 1][1] . ' ' . $cx . ',' . $pts[$i][1] . ' ' . $pts[$i][0] . ',' . $pts[$i][1];
+    }
+    $last = end($pts);
+    return [$line, $last[0], round($last[1] / $h * 100, 2)];
+};
 ?>
 
 <div class="dashboard-container">
@@ -172,8 +185,24 @@ $statCards = [
                 $tag  = !empty($card['link']) ? 'a' : 'div';
                 $href = !empty($card['link']) ? ' href="' . esc($card['link'], 'attr') . '"' : '';
                 $icon = (string) ($card['icon'] ?? '');
+                $isMoney = !empty($card['raw']);
+
+                $meta   = $sparkMeta[$card['key']] ?? null;
+                $vals   = $meta ? array_map('floatval', $kpiTrends[$card['key']] ?? []) : [];
+                $hasSpk = $meta && count($vals) >= 2;
+
+                if ($hasSpk) {
+                    [$spkLine, $spkX, $spkY] = $sparkGeometry($vals);
+                    $dates = $kpiTrends['dates'] ?? [];
+                    $fmt   = !empty($meta['money'])
+                        ? static fn($v) => '₱' . number_format($v, 2)
+                        : static fn($v) => number_format($v);
+                    $spkTitle = $meta['unit'] . ': ' . $fmt(end($vals))
+                        . ' on ' . (isset($dates[count($vals) - 1]) ? date('M j', strtotime($dates[count($vals) - 1])) : 'today')
+                        . ' · 14-day peak ' . $fmt(max($vals));
+                }
             ?>
-            <<?= $tag ?> class="stat-card"<?= $href ?>>
+            <<?= $tag ?> class="stat-card"<?= $href ?><?= $hasSpk ? ' style="--spark:' . esc($meta['color'], 'attr') . '"' : '' ?>>
 
                 <div class="stat-top">
 
@@ -197,8 +226,19 @@ $statCards = [
 
                 </div>
 
-                <div class="stat-value<?= !empty($card['raw']) ? ' stat-value-money' : '' ?>">
-                    <?= !empty($card['raw']) ? $card['value'] : esc($card['value']) ?>
+                <div class="stat-value-row">
+                    <div class="stat-value<?= $isMoney ? ' stat-value-money' : '' ?>">
+                        <?= $isMoney ? $card['value'] : esc($card['value']) ?>
+                    </div>
+                    <?php if ($hasSpk): ?>
+                        <div class="spark spark-inline" role="img"
+                             aria-label="<?= esc($spkTitle, 'attr') ?>"
+                             title="<?= esc($spkTitle, 'attr') ?>">
+                            <svg viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true">
+                                <path d="<?= $spkLine ?>" class="spark-line" fill="none" vector-effect="non-scaling-stroke"/>
+                            </svg>
+                        </div>
+                    <?php endif; ?>
                 </div>
 
                 <div class="stat-label"><?= esc($card['label']) ?></div>
@@ -346,12 +386,6 @@ $statCards = [
                                 $fullName  = $appointment['full_name'] ?? '';
                                 $apptTime  = trim((string) ($appointment['appointment_time'] ?? ''));
 
-                                /* Derive the service label from the actual service
-                                   columns, not from service_type. The booking form
-                                   writes 'laboratory' into service_type regardless
-                                   of what the patient selected, so it cannot be
-                                   trusted. lab_services and xray_services are the
-                                   real source of truth. */
                                 $labList  = json_decode($appointment['lab_services']  ?? '[]', true);
                                 $xrayList = json_decode($appointment['xray_services'] ?? '[]', true);
 
@@ -458,11 +492,6 @@ $statCards = [
 <style>
 /* =========================================================
    DESIGN TOKENS
-   All selectors below are scoped to .dashboard-container so
-   they beat the bare .stat-card / .stats-row rules that live
-   in ReceptionistLayout.php, without using !important and
-   without changing those layout rules (other pages still use
-   them).
    ========================================================= */
 
 .dashboard-container {
@@ -509,9 +538,6 @@ $statCards = [
 
 /* =========================================================
    STATS ROW
-   Scoped so the layout's `.stats-row` rule (repeat auto-fit,
-   minmax 200px) does not override. Fixed 7-track grid matches
-   the admin dashboard card width.
    ========================================================= */
 
 .dashboard-container .stats-row {
@@ -546,9 +572,6 @@ $statCards = [
 
 .dashboard-container .stat-card:hover .stat-arrow { color: #475569; }
 
-/* Grid, not flex, so the icon stays pinned to the left edge and the
-   chevron to the right edge regardless of any parent that might
-   constrain the card's width. */
 .dashboard-container .stat-top {
     display: grid;
     grid-template-columns: 40px 1fr 16px;
@@ -574,9 +597,6 @@ $statCards = [
     flex-shrink: 0;
 }
 
-/* The PNG icon. Sized to sit comfortably inside the 40x40 tile.
-   The tile itself is now transparent — see the .icon-* rules
-   below — so the PNG sits directly on the card. */
 .dashboard-container .stat-img {
     width: 25px;
     height: 25px;
@@ -591,9 +611,6 @@ $statCards = [
     justify-self: end;
 }
 
-/* Tone hooks retained on the icon wrapper for future use, but with
-   transparent backgrounds so no colored tile is drawn. The wrapper
-   stays 40x40 so all seven cards keep the same row alignment. */
 .dashboard-container .icon-cyan,
 .dashboard-container .icon-teal,
 .dashboard-container .icon-orange,
@@ -604,19 +621,54 @@ $statCards = [
     background: transparent;
 }
 
-.dashboard-container .stat-value {
-    font-size: 1.65rem;
-    font-weight: 700;
-    color: #0F172A;
-    line-height: 1.15;
+/* ===== VALUE ROW + INLINE SPARKLINE ===== */
+
+.dashboard-container .stat-value-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 10px;
     margin-bottom: 6px;
+    min-width: 0;
+}
+
+.dashboard-container .stat-value {
+    font-size: 1.35rem;
+    font-weight: 680;
+    color: #0F172A;
+    line-height: 1.1;
     letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums;
+    min-width: 0;
+    margin-bottom: 0;
 }
 
 .dashboard-container .stat-value-money {
-    font-size: 1.35rem;
+    font-size: 1.0rem;
     overflow-wrap: anywhere;
+}
+
+.dashboard-container .spark-inline {
+    flex-shrink: 0;
+    width: 56px;
+    height: 20px;
+    position: relative;
+}
+
+.dashboard-container .spark-inline svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    overflow: visible;
+}
+
+.dashboard-container .spark-line {
+    stroke: var(--spark);
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 .dashboard-container .stat-label {
@@ -933,7 +985,6 @@ $statCards = [
 
 .dashboard-container .col-action { text-align: right; }
 
-/* ----- patient cell ----- */
 .dashboard-container .patient-cell {
     display: flex;
     align-items: center;
@@ -973,7 +1024,6 @@ $statCards = [
     color: var(--db-ink-faint);
 }
 
-/* ----- service + status ----- */
 .dashboard-container .service-tag {
     display: inline-block;
     font-size: 0.735rem;
@@ -1014,7 +1064,6 @@ $statCards = [
 .dashboard-container .status-badge.late      { background: #fdf1ec; color: #c2410c; border-color: #f6d9c9; }
 .dashboard-container .status-badge.unknown   { background: var(--db-rail); color: var(--db-ink-mute); border-color: var(--db-line); }
 
-/* ----- actions ----- */
 .dashboard-container .action-cell {
     display: flex;
     align-items: center;
@@ -1101,8 +1150,9 @@ $statCards = [
     .dashboard-container { padding: 0.9rem; }
 
     .dashboard-container .stat-card { padding: 16px; }
-    .dashboard-container .stat-value { font-size: 1.45rem; }
-    .dashboard-container .stat-value-money { font-size: 1.2rem; }
+    .dashboard-container .stat-value { font-size: 1.2rem; }
+    .dashboard-container .stat-value-money { font-size: 1.05rem; }
+    .dashboard-container .spark-inline { width: 44px; height: 16px; }
 
     .dashboard-container .chart-card { padding: 1rem; }
     .dashboard-container .chart-body { height: 240px; }
@@ -1153,6 +1203,8 @@ $statCards = [
 @media (max-width: 576px) {
     .dashboard-container { padding: 0.75rem; }
     .dashboard-container .stats-row { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+    .dashboard-container .stat-value { font-size: 1.15rem; }
+    .dashboard-container .stat-value-money { font-size: 1.0rem; }
     .dashboard-container .card-header-custom { flex-direction: column; align-items: stretch; }
     .dashboard-container .header-right-group { justify-content: space-between; }
 }
@@ -1180,9 +1232,6 @@ $statCards = [
 
     // ============================================
     // CHART DATA
-    // Service distribution comes from the real appointments
-    // rendered above. The trend series is only present when the
-    // controller supplied one, so nothing here is invented.
     // ============================================
     var trendLabels   = <?= json_encode($trendLabels, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     var trendValues   = <?= json_encode($trendValues, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;

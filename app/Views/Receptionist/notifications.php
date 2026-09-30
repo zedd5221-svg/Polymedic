@@ -4,6 +4,289 @@
 
 <?= $this->section('receptionistContent') ?>
 
+<style>
+/* =========================================================
+   Lab and X-Ray PNG icons
+   ========================================================= */
+
+.nc .nc-tile--png {
+    background: transparent;
+    border-color: transparent;
+    padding: 0;
+}
+
+.nc .nc-tile-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+/* =========================================================
+   Selection mode
+   Cards are unchanged until the user clicks Delete multiple.
+   Selection mode adds the checkbox rail and reveals a top
+   toolbar with the count and the destructive action.
+   ========================================================= */
+
+.nc-check {
+    position: absolute;
+    top: 14px;
+    left: 8px;
+    z-index: 2;
+    display: none;
+}
+
+.nc-list.is-selecting .nc-card { position: relative; }
+.nc-list.is-selecting .nc-card { padding-left: 26px; }
+.nc-list.is-selecting .nc-check { display: block; }
+
+.nc-check input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: #0d9488;
+    cursor: pointer;
+    display: block;
+}
+
+.nc-list.is-selecting .nc-card.is-selected {
+    border-color: #99f6e4;
+    box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.15);
+}
+
+.nc-list.is-selecting .nc-card { cursor: pointer; }
+
+/* =========================================================
+   Selection toolbar — replaces the head action while selecting
+   ========================================================= */
+
+.nc-selectbar {
+    display: none;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.nc.is-selecting .nc-head-actions .nc-selectbar { display: inline-flex; }
+.nc.is-selecting .nc-head-actions .nc-head-default { display: none; }
+
+.nc-selectbar-count {
+    font-size: 0.8125rem;
+    color: #115e59;
+    font-weight: 600;
+    margin-right: 0.25rem;
+}
+
+.nc-btn--danger,
+.nc-btn--danger:hover { color: #ffffff; }
+.nc-btn--danger { background: #dc2626; border-color: #dc2626; }
+.nc-btn--danger:hover { background: #b91c1c; border-color: #b91c1c; }
+.nc-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* =========================================================
+   Bulk delete review modal
+   ========================================================= */
+
+.bulk-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.42);
+    z-index: 1080;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem;
+}
+
+.bulk-backdrop.is-open { display: flex; }
+
+.bulk-modal {
+    width: 100%;
+    max-width: 520px;
+    max-height: min(85vh, 720px);
+    display: flex;
+    flex-direction: column;
+    background: #ffffff;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 24px 48px -12px rgba(15, 23, 42, 0.32);
+    overflow: hidden;
+    animation: bulkIn 0.18s ease;
+}
+
+@keyframes bulkIn {
+    from { opacity: 0; transform: translateY(6px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0)   scale(1);    }
+}
+
+.bulk-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.05rem 1.25rem;
+    border-bottom: 1px solid #eef2f7;
+}
+
+.bulk-head-text { min-width: 0; }
+
+.bulk-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 650;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.bulk-title i { color: #dc2626; }
+
+.bulk-sub {
+    margin: 0.15rem 0 0;
+    font-size: 0.8rem;
+    color: #64748b;
+}
+
+.bulk-close {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    font-size: 0.8rem;
+    color: #64748b;
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.bulk-close:hover { background: #eef2f7; color: #0f172a; }
+
+.bulk-body {
+    padding: 0.75rem 1rem 1rem;
+    overflow-y: auto;
+}
+
+.bulk-body-note {
+    margin: 0 0 0.75rem;
+    font-size: 0.78rem;
+    color: #64748b;
+}
+
+.bulk-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border: 1px solid #eef2f7;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.bulk-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    padding: 0.65rem 0.85rem;
+    border-bottom: 1px solid #f1f5f9;
+    background: #ffffff;
+    cursor: pointer;
+}
+
+.bulk-item:last-child { border-bottom: 0; }
+.bulk-item:hover { background: #f8fafc; }
+
+.bulk-item input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    margin-top: 0.15rem;
+    accent-color: #0d9488;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.bulk-item-body { min-width: 0; }
+
+.bulk-item-title {
+    margin: 0;
+    font-size: 0.83rem;
+    font-weight: 600;
+    color: #0f172a;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.bulk-item-msg {
+    margin: 0.15rem 0 0;
+    font-size: 0.78rem;
+    color: #64748b;
+    line-height: 1.45;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.bulk-item-meta {
+    display: block;
+    margin-top: 0.2rem;
+    font-size: 0.72rem;
+    color: #94a3b8;
+}
+
+.bulk-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding: 0.85rem 1.25rem;
+    background: #f8fafc;
+    border-top: 1px solid #eef2f7;
+}
+
+.bulk-foot-note {
+    font-size: 0.78rem;
+    color: #64748b;
+}
+
+.bulk-foot-note strong { color: #0f172a; }
+
+.bulk-foot-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: auto;
+}
+
+.bulk-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    height: 36px;
+    padding: 0 0.9rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1;
+    border-radius: 7px;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    color: #334155;
+    cursor: pointer;
+    white-space: nowrap;
+    text-decoration: none;
+}
+
+.bulk-btn:hover { background: #f8fafc; border-color: #cbd5e1; color: #0f172a; }
+
+.bulk-btn--danger,
+.bulk-btn--danger:hover { color: #ffffff; }
+.bulk-btn--danger { background: #dc2626; border-color: #dc2626; }
+.bulk-btn--danger:hover { background: #b91c1c; border-color: #b91c1c; }
+.bulk-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+</style>
+
 <?php
 $notifBase = $notif_base ?? 'receptionist/notifications';
 
@@ -11,15 +294,19 @@ $notifBase = $notif_base ?? 'receptionist/notifications';
  * Avatar PNGs are expected at:
  *   public/assets/images/man-avatar.png
  *   public/assets/images/woman-avatar.png
+ *
+ * Category PNGs for lab and x-ray live at:
+ *   public/assets/images/microscope-icon.png
+ *   public/assets/images/bones.png
+ *
+ * Same files the admin notifications page uses, so updating the
+ * asset updates every role's page.
  */
 $maleAvatar   = 'man-avatar.png';
 $femaleAvatar = 'woman-avatar.png';
+$labIconPng   = 'microscope-icon.png';
+$xrayIconPng  = 'bones.png';
 
-/*
- * Initials fallback. Used when the notification is about a patient
- * whose gender we do not know, so the card still reads as a person
- * rather than showing a generic bell.
- */
 $initialsOf = static function ($name) {
     $parts = preg_split('/\s+/', trim((string) $name));
     $first = mb_substr($parts[0] ?? '', 0, 1);
@@ -28,10 +315,6 @@ $initialsOf = static function ($name) {
     return $out !== '' ? $out : '?';
 };
 
-/*
- * Pull a clean patient name out of the notification title.
- * Strips prefixes like "New Appointment Request: " and "New Lab Request: ".
- */
 $patientNameFrom = static function ($title) {
     $name = preg_replace(
         '/^(Pending Appointment|New Appointment Request|New Appointment|Appointment|New Lab Request|New X-Ray Request|X-Ray Examination|Laboratory Request):\s*/i',
@@ -41,49 +324,25 @@ $patientNameFrom = static function ($title) {
     return trim($name);
 };
 
-/*
- * Bucket a timestamp into a section heading. The list arrives sorted
- * newest first, so walking it in order produces the headings in order.
- */
 $bucketOf = static function ($ts) {
-    if (!$ts) {
-        return 'Earlier';
-    }
-    if ($ts >= strtotime('today')) {
-        return 'Today';
-    }
-    if ($ts >= strtotime('yesterday')) {
-        return 'Yesterday';
-    }
-    if ($ts >= strtotime('-7 days')) {
-        return 'Earlier this week';
-    }
-    if ($ts >= strtotime('-30 days')) {
-        return 'Earlier this month';
-    }
+    if (!$ts) return 'Earlier';
+    if ($ts >= strtotime('today'))     return 'Today';
+    if ($ts >= strtotime('yesterday')) return 'Yesterday';
+    if ($ts >= strtotime('-7 days'))   return 'Earlier this week';
+    if ($ts >= strtotime('-30 days'))  return 'Earlier this month';
     return 'Older';
 };
 
-/*
- * Short relative time for the card. The exact timestamp stays
- * available in the title attribute and the datetime attribute.
- */
 $relativeTime = static function ($ts) {
-    if (!$ts) {
-        return '';
-    }
-
+    if (!$ts) return '';
     $diff = time() - $ts;
-
-    if ($diff < 60)    return 'Just now';
-    if ($diff < 3600)  { $n = (int) floor($diff / 60);    return $n . ($n === 1 ? ' min ago'  : ' mins ago'); }
-    if ($diff < 86400) { $n = (int) floor($diff / 3600);  return $n . ($n === 1 ? ' hour ago' : ' hours ago'); }
-    if ($diff < 604800){ $n = (int) floor($diff / 86400); return $n . ($n === 1 ? ' day ago'  : ' days ago'); }
-
+    if ($diff < 60)     return 'Just now';
+    if ($diff < 3600)   { $n = (int) floor($diff / 60);    return $n . ($n === 1 ? ' min ago'  : ' mins ago'); }
+    if ($diff < 86400)  { $n = (int) floor($diff / 3600);  return $n . ($n === 1 ? ' hour ago' : ' hours ago'); }
+    if ($diff < 604800) { $n = (int) floor($diff / 86400); return $n . ($n === 1 ? ' day ago'  : ' days ago'); }
     return date('M j', $ts);
 };
 
-/* Labels for the type filter chips. */
 $typeLabels = [
     'appointment' => 'Appointments',
     'xray'        => 'X-Ray',
@@ -93,7 +352,6 @@ $typeLabels = [
     'system'      => 'System',
 ];
 
-/* Count the types actually present, so we only show chips that matter. */
 $typeCounts = [];
 foreach (($notifications ?? []) as $n) {
     $t = (string) ($n['type'] ?? 'system');
@@ -102,7 +360,7 @@ foreach (($notifications ?? []) as $n) {
 arsort($typeCounts);
 ?>
 
-<div class="nc">
+<div class="nc" id="ncRoot">
 
     <!-- PAGE HEADER -->
     <header class="nc-head">
@@ -118,14 +376,36 @@ arsort($typeCounts);
             </p>
         </div>
 
-        <?php if ($unread_count > 0): ?>
-            <div class="nc-head-actions">
-                <a href="<?= base_url($notifBase . '/mark-all-read') ?>" class="nc-btn">
-                    <i class="bi bi-check2-all" aria-hidden="true"></i>
-                    <span>Mark all as read</span>
-                </a>
+        <div class="nc-head-actions">
+
+            <!-- Default actions - hidden when selection mode is on -->
+            <div class="nc-head-default" style="display: inline-flex; gap: 0.5rem;">
+                <?php if ($unread_count > 0): ?>
+                    <a href="<?= base_url($notifBase . '/mark-all-read') ?>" class="nc-btn">
+                        <i class="bi bi-check2-all" aria-hidden="true"></i>
+                        <span>Mark all as read</span>
+                    </a>
+                <?php endif; ?>
+
+                <?php if (!empty($notifications)): ?>
+                    <button type="button" class="nc-btn" id="ncStartSelect">
+                        <i class="bi bi-check2-square" aria-hidden="true"></i>
+                        <span>Delete multiple</span>
+                    </button>
+                <?php endif; ?>
             </div>
-        <?php endif; ?>
+
+            <!-- Selection actions - shown only while selecting -->
+            <div class="nc-selectbar" id="ncSelectBar">
+                <span class="nc-selectbar-count" id="ncSelectCount">0 selected</span>
+                <button type="button" class="nc-btn" id="ncCancelSelect">Cancel</button>
+                <button type="button" class="nc-btn nc-btn--danger" id="ncDeleteSelected" disabled>
+                    <i class="bi bi-trash3" aria-hidden="true"></i>
+                    <span>Delete selected</span>
+                </button>
+            </div>
+
+        </div>
     </header>
 
     <?php if (session()->getFlashdata('success')): ?>
@@ -229,11 +509,6 @@ arsort($typeCounts);
                             <div class="nc-group-body">
                     <?php endif;
 
-                    /*
-                     * Gender is stored at write time on the notification row.
-                     * Only 'male' or 'female' are ever persisted, so this is
-                     * a direct read rather than a guess from the message.
-                     */
                     $gender = strtolower((string) ($notif['reference_gender'] ?? ''));
                     if (!in_array($gender, ['male', 'female'], true)) {
                         $gender = null;
@@ -246,15 +521,11 @@ arsort($typeCounts);
                     $message       = (string) ($notif['message'] ?? '');
                     $nameForAvatar = $patientNameFrom($displayTitle);
 
-                    /*
-                     * An avatar is shown when the notification is about a
-                     * patient and we know the patient's gender. Otherwise
-                     * the coloured type icon is shown instead.
-                     */
                     $showAvatar = ($gender !== null && $type === 'appointment');
 
-                    /* Lowercased haystack for the client-side search. */
                     $haystack = mb_strtolower($displayTitle . ' ' . $message);
+
+                    $notifId = (int) ($notif['id'] ?? 0);
 
                     $cardIndex++;
                 ?>
@@ -262,9 +533,21 @@ arsort($typeCounts);
                              data-read-status="<?= $isUnread ? 'unread' : 'read' ?>"
                              data-type="<?= esc($type, 'attr') ?>"
                              data-search="<?= esc($haystack, 'attr') ?>"
+                             data-id="<?= esc((string) $notifId, 'attr') ?>"
+                             data-title="<?= esc($displayTitle, 'attr') ?>"
+                             data-message="<?= esc($message, 'attr') ?>"
+                             data-time="<?= esc(date('M j, Y · g:i A', $createdTs ?: time()), 'attr') ?>"
                              style="--nc-i: <?= (int) min($cardIndex, 12) ?>">
 
-                        <!-- Leading visual: patient avatar or type icon -->
+                        <!-- Selection checkbox rail (only visible in select mode) -->
+                        <label class="nc-check" title="Select this notification">
+                            <input type="checkbox"
+                                   class="nc-check-input"
+                                   value="<?= esc((string) $notifId, 'attr') ?>"
+                                   aria-label="Select notification: <?= esc($displayTitle, 'attr') ?>">
+                        </label>
+
+                        <!-- Leading visual: patient avatar, PNG icon, or type tile -->
                         <div class="nc-lead">
                             <?php if ($showAvatar): ?>
                                 <span class="nc-avatar nc-avatar--<?= esc($gender, 'attr') ?>">
@@ -274,10 +557,30 @@ arsort($typeCounts);
                                          loading="lazy"
                                          decoding="async">
                                 </span>
+
                             <?php elseif ($type === 'appointment'): ?>
                                 <span class="nc-avatar nc-avatar--initials" aria-hidden="true">
                                     <?= esc($initialsOf($nameForAvatar)) ?>
                                 </span>
+
+                            <?php elseif ($type === 'lab'): ?>
+                                <span class="nc-tile nc-tile--png" aria-hidden="true">
+                                    <img src="<?= esc(base_url('assets/images/' . $labIconPng), 'attr') ?>"
+                                         alt=""
+                                         class="nc-tile-img"
+                                         loading="lazy"
+                                         decoding="async">
+                                </span>
+
+                            <?php elseif ($type === 'xray'): ?>
+                                <span class="nc-tile nc-tile--png" aria-hidden="true">
+                                    <img src="<?= esc(base_url('assets/images/' . $xrayIconPng), 'attr') ?>"
+                                         alt=""
+                                         class="nc-tile-img"
+                                         loading="lazy"
+                                         decoding="async">
+                                </span>
+
                             <?php else: ?>
                                 <span class="nc-tile nc-tile--<?= esc($color, 'attr') ?>" aria-hidden="true">
                                     <i class="bi <?= esc($icon) ?>"></i>
@@ -334,7 +637,6 @@ arsort($typeCounts);
 
                         </div>
 
-                      
                     </article>
                 <?php endforeach; ?>
 
@@ -367,6 +669,58 @@ arsort($typeCounts);
     </section>
 
 </div>
+
+
+<!-- =========================================================
+     BULK DELETE REVIEW MODAL
+     ========================================================= -->
+<div class="bulk-backdrop" id="bulkBackdrop" hidden>
+    <div class="bulk-modal" role="dialog" aria-modal="true" aria-labelledby="bulkTitle">
+
+        <header class="bulk-head">
+            <div class="bulk-head-text">
+                <h3 class="bulk-title" id="bulkTitle">
+                    <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+                    Review before deleting
+                </h3>
+                <p class="bulk-sub" id="bulkSub">Uncheck anything you want to keep.</p>
+            </div>
+            <button type="button" class="bulk-close" id="bulkClose" aria-label="Close">
+                <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+        </header>
+
+        <div class="bulk-body">
+            <p class="bulk-body-note">
+                The following notifications will be permanently removed. Uncheck any you want to keep.
+            </p>
+            <ul class="bulk-list" id="bulkList"></ul>
+        </div>
+
+        <footer class="bulk-foot">
+            <span class="bulk-foot-note">
+                <strong id="bulkRemaining">0</strong> of <span id="bulkTotal">0</span> will be deleted.
+            </span>
+            <div class="bulk-foot-actions">
+                <button type="button" class="bulk-btn" id="bulkCancel">Cancel</button>
+                <button type="button" class="bulk-btn bulk-btn--danger" id="bulkConfirm" disabled>
+                    <i class="bi bi-trash3" aria-hidden="true"></i>
+                    Delete
+                </button>
+            </div>
+        </footer>
+
+    </div>
+</div>
+
+<!-- The batch delete form. Submitted by the modal's Confirm button. -->
+<form id="bulkForm"
+      action="<?= base_url($notifBase . '/delete-batch') ?>"
+      method="POST"
+      hidden>
+    <?= csrf_field() ?>
+    <div id="bulkFormInputs"></div>
+</form>
 
 
 <style>
@@ -875,8 +1229,6 @@ arsort($typeCounts);
     box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.05);
 }
 
-/* Ringed highlight on the patient avatar so the photo reads
-   clearly against a white card. */
 .nc-avatar--male {
     background: var(--nc-male-soft);
     color: var(--nc-male-ink);
@@ -902,8 +1254,7 @@ arsort($typeCounts);
     display: block;
 }
 
-/* Rounded square tile for non-patient notification types
-   (x-ray, lab, billing, payment, system). */
+/* Rounded square tile for non-patient notification types */
 .nc-tile {
     width: 44px;
     height: 44px;
@@ -912,6 +1263,7 @@ arsort($typeCounts);
     justify-content: center;
     border-radius: var(--nc-radius-md);
     font-size: 1.1rem;
+    overflow: hidden;
 }
 
 .nc-tile--appointment { background: #ccfbf1; color: #0d9488; }
@@ -1085,6 +1437,10 @@ arsort($typeCounts);
 (function () {
     'use strict';
 
+    /* =========================================================
+       FILTER + SEARCH (unchanged from the original)
+       ========================================================= */
+
     var tabs   = Array.prototype.slice.call(document.querySelectorAll('.nc-tab'));
     var chips  = Array.prototype.slice.call(document.querySelectorAll('.nc-chip'));
     var groups = Array.prototype.slice.call(document.querySelectorAll('.nc-group'));
@@ -1096,7 +1452,6 @@ arsort($typeCounts);
 
     var state = { read: 'all', type: 'all', term: '' };
 
-    /* Cache each message node's original text so highlighting can be undone. */
     cards.forEach(function (card) {
         var msg = card.querySelector('.nc-card-message');
         if (msg) { msg.dataset.plain = msg.textContent; }
@@ -1117,8 +1472,6 @@ arsort($typeCounts);
             return;
         }
 
-        /* Build the highlighted output as text nodes + <mark>, never
-           by assigning innerHTML, so message content cannot inject markup. */
         msg.textContent = '';
         var re = new RegExp(escapeRe(term), 'ig');
         var last = 0;
@@ -1140,7 +1493,7 @@ arsort($typeCounts);
         }
     }
 
-    function apply() {
+    function applyFilters() {
         var visible = 0;
         var counts  = { all: 0, unread: 0, read: 0 };
 
@@ -1153,8 +1506,6 @@ arsort($typeCounts);
             var show = okRead && okType && okTerm;
             card.classList.toggle('is-hidden', !show);
 
-            /* Tab counts reflect the type + search filters, so the numbers
-               stay honest while a chip or search is active. */
             if (okType && okTerm) {
                 counts.all++;
                 counts[card.dataset.readStatus]++;
@@ -1168,7 +1519,6 @@ arsort($typeCounts);
             }
         });
 
-        /* Hide a date heading when nothing under it survived the filter. */
         groups.forEach(function (group) {
             var any = group.querySelector('.nc-card:not(.is-hidden)');
             group.classList.toggle('is-hidden', !any);
@@ -1191,7 +1541,7 @@ arsort($typeCounts);
                 t.setAttribute('aria-pressed', on ? 'true' : 'false');
             });
             state.read = tab.dataset.filter || 'all';
-            apply();
+            applyFilters();
         });
     });
 
@@ -1203,7 +1553,7 @@ arsort($typeCounts);
                 c.setAttribute('aria-pressed', on ? 'true' : 'false');
             });
             state.type = chip.dataset.type || 'all';
-            apply();
+            applyFilters();
         });
     });
 
@@ -1213,17 +1563,16 @@ arsort($typeCounts);
             clearTimeout(timer);
             timer = setTimeout(function () {
                 state.term = search.value.trim().toLowerCase();
-                apply();
+                applyFilters();
             }, 120);
         });
 
-        /* Escape clears the box. */
         search.addEventListener('keydown', function (e) {
             if (e.key === 'Escape' && search.value !== '') {
                 e.preventDefault();
                 search.value = '';
                 state.term = '';
-                apply();
+                applyFilters();
             }
         });
     }
@@ -1233,7 +1582,7 @@ arsort($typeCounts);
             search.value = '';
             state.term = '';
             search.focus();
-            apply();
+            applyFilters();
         });
     }
 
@@ -1253,11 +1602,10 @@ arsort($typeCounts);
                 c.setAttribute('aria-pressed', on ? 'true' : 'false');
             });
 
-            apply();
+            applyFilters();
         });
     }
 
-    /* "/" focuses the search box, the way most list UIs behave. */
     document.addEventListener('keydown', function (e) {
         if (e.key !== '/' || !search) { return; }
         var tag = (e.target.tagName || '').toLowerCase();
@@ -1266,7 +1614,201 @@ arsort($typeCounts);
         search.focus();
     });
 
-    apply();
+    applyFilters();
+
+    /* =========================================================
+       SELECTION MODE (new — matches admin)
+       ========================================================= */
+
+    var root = document.getElementById('ncRoot');
+    var list = document.getElementById('ncList');
+
+    if (!root || !list) { return; }
+
+    var startBtn   = document.getElementById('ncStartSelect');
+    var cancelBtn  = document.getElementById('ncCancelSelect');
+    var deleteBtn  = document.getElementById('ncDeleteSelected');
+    var countLabel = document.getElementById('ncSelectCount');
+
+    function isSelecting() {
+        return root.classList.contains('is-selecting');
+    }
+
+    function enterSelectMode() {
+        root.classList.add('is-selecting');
+        list.classList.add('is-selecting');
+        refreshCount();
+    }
+
+    function exitSelectMode() {
+        root.classList.remove('is-selecting');
+        list.classList.remove('is-selecting');
+        cards.forEach(function (card) {
+            card.classList.remove('is-selected');
+            var input = card.querySelector('.nc-check-input');
+            if (input) { input.checked = false; }
+        });
+        refreshCount();
+    }
+
+    function selectedCards() {
+        return cards.filter(function (c) { return c.classList.contains('is-selected'); });
+    }
+
+    function refreshCount() {
+        var n = selectedCards().length;
+        countLabel.textContent = n + ' selected';
+        deleteBtn.disabled = n === 0;
+    }
+
+    if (startBtn)  { startBtn.addEventListener('click', enterSelectMode); }
+    if (cancelBtn) { cancelBtn.addEventListener('click', exitSelectMode); }
+
+    list.addEventListener('click', function (e) {
+        if (!isSelecting()) { return; }
+        if (e.target.closest('a, button, input, .nc-body-foot')) { return; }
+
+        var card = e.target.closest('.nc-card');
+        if (!card) { return; }
+
+        var input = card.querySelector('.nc-check-input');
+        if (!input) { return; }
+
+        input.checked = !input.checked;
+        card.classList.toggle('is-selected', input.checked);
+        refreshCount();
+    });
+
+    list.addEventListener('change', function (e) {
+        var input = e.target.closest('.nc-check-input');
+        if (!input) { return; }
+        var card = input.closest('.nc-card');
+        if (!card) { return; }
+        card.classList.toggle('is-selected', input.checked);
+        refreshCount();
+    });
+
+    /* =========================================================
+       BULK DELETE MODAL (new — matches admin)
+       ========================================================= */
+
+    var backdrop    = document.getElementById('bulkBackdrop');
+    var bulkListEl  = document.getElementById('bulkList');
+    var bulkConfirm = document.getElementById('bulkConfirm');
+    var bulkRemain  = document.getElementById('bulkRemaining');
+    var bulkTotal   = document.getElementById('bulkTotal');
+    var bulkForm    = document.getElementById('bulkForm');
+    var bulkInputs  = document.getElementById('bulkFormInputs');
+
+    function openBulk(ids) {
+        bulkListEl.innerHTML = '';
+
+        ids.forEach(function (id) {
+            var card = cards.find(function (c) { return c.dataset.id === String(id); });
+            if (!card) { return; }
+
+            var li = document.createElement('li');
+            li.className = 'bulk-item';
+            li.innerHTML =
+                '<input type="checkbox" class="bulk-item-check" value="' + card.dataset.id + '" checked>' +
+                '<div class="bulk-item-body">' +
+                    '<p class="bulk-item-title"></p>' +
+                    '<p class="bulk-item-msg"></p>' +
+                    '<span class="bulk-item-meta"></span>' +
+                '</div>';
+
+            li.querySelector('.bulk-item-title').textContent = card.dataset.title || '';
+            li.querySelector('.bulk-item-msg').textContent   = card.dataset.message || '';
+            li.querySelector('.bulk-item-meta').textContent  = card.dataset.time || '';
+
+            bulkListEl.appendChild(li);
+        });
+
+        bulkTotal.textContent = String(ids.length);
+        refreshBulkFooter();
+
+        backdrop.hidden = false;
+        backdrop.classList.add('is-open');
+        document.body.style.overflow = 'hidden';
+
+        setTimeout(function () { bulkConfirm.focus(); }, 40);
+    }
+
+    function closeBulk() {
+        backdrop.classList.remove('is-open');
+        backdrop.hidden = true;
+        document.body.style.overflow = '';
+        bulkListEl.innerHTML = '';
+    }
+
+    function currentCheckedIds() {
+        return Array.prototype.slice
+            .call(bulkListEl.querySelectorAll('.bulk-item-check:checked'))
+            .map(function (c) { return c.value; });
+    }
+
+    function refreshBulkFooter() {
+        var n = currentCheckedIds().length;
+        bulkRemain.textContent = String(n);
+        bulkConfirm.disabled = n === 0;
+        bulkConfirm.innerHTML = n === 0
+            ? '<i class="bi bi-trash3" aria-hidden="true"></i> Delete'
+            : '<i class="bi bi-trash3" aria-hidden="true"></i> Delete ' + n;
+    }
+
+    bulkListEl.addEventListener('change', function (e) {
+        if (!e.target.closest('.bulk-item-check')) { return; }
+        refreshBulkFooter();
+    });
+
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', function () {
+            var ids = selectedCards().map(function (c) { return c.dataset.id; });
+            if (ids.length === 0) { return; }
+            openBulk(ids);
+        });
+    }
+
+    var closeEl  = document.getElementById('bulkClose');
+    var cancelEl = document.getElementById('bulkCancel');
+
+    if (closeEl)  { closeEl.addEventListener('click', closeBulk); }
+    if (cancelEl) { cancelEl.addEventListener('click', closeBulk); }
+
+    if (backdrop) {
+        backdrop.addEventListener('click', function (e) {
+            if (e.target === backdrop) { closeBulk(); }
+        });
+    }
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && backdrop && backdrop.classList.contains('is-open')) {
+            closeBulk();
+        }
+    });
+
+    if (bulkConfirm) {
+        bulkConfirm.addEventListener('click', function () {
+            var ids = currentCheckedIds();
+            if (ids.length === 0) { return; }
+
+            bulkInputs.innerHTML = '';
+            ids.forEach(function (id) {
+                var hidden = document.createElement('input');
+                hidden.type  = 'hidden';
+                hidden.name  = 'ids[]';
+                hidden.value = id;
+                bulkInputs.appendChild(hidden);
+            });
+
+            bulkConfirm.disabled = true;
+            bulkConfirm.innerHTML = '<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span> Deleting…';
+
+            bulkForm.submit();
+        });
+    }
+
+    refreshCount();
 })();
 </script>
 

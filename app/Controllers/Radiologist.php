@@ -33,14 +33,6 @@ class Radiologist extends BaseController
         return null;
     }
 
-    /**
-     * Statuses the Radiologist is allowed to see in their worklist.
-     *
-     * 'pending' is deliberately excluded. A walk-in request created
-     * by the receptionist stays in the front-desk queue until they
-     * press Start, which flips the status to 'in_progress'. Only at
-     * that point does the study appear in radiology.
-     */
     private function departmentStatuses(): array
     {
         return [
@@ -50,19 +42,6 @@ class Radiologist extends BaseController
         ];
     }
 
-    /**
-     * Active X-ray services for the dashboard catalogue card and the
-     * services donut.
-     *
-     * Returns every active row from the services table whose category
-     * is 'xray', plus a breakdown by clinical region. The region for
-     * each service is derived from its name, matched against the
-     * keyword lists below.
-     *
-     * Every X-ray service in the database appears at least once, so
-     * nothing falls into "Other" unless it genuinely does not match
-     * any clinical region.
-     */
     private function getAvailableXrayServices()
     {
         $serviceModel = new ServiceModel();
@@ -119,7 +98,6 @@ class Radiologist extends BaseController
             }
         }
 
-        // Drop empty categories so the donut only shows real groups.
         $categoryCounts = array_filter($categoryCounts);
 
         return [
@@ -140,9 +118,6 @@ class Radiologist extends BaseController
 
         $departmentStatuses = $this->departmentStatuses();
 
-        // "Pending" on the Radiologist side is really in_progress —
-        // sent to the department but not yet started here. The raw
-        // pending state is a front-desk concept and not shown.
         $data['pending']    = $model
             ->where('type', $type)
             ->where('status', DiagnosticRequestModel::STATUS_IN_PROGRESS)
@@ -190,7 +165,114 @@ class Radiologist extends BaseController
 
         $data['servicesCatalog'] = $this->getAvailableXrayServices();
 
+        // KPI sparklines — same look as the Admin dashboard.
+        $data['kpiTrends'] = $this->getKpiTrends(14, (int) $data['total']);
+
         return view('Radiologist/dashboard', $data);
+    }
+
+    /**
+     * Daily series for the KPI sparklines on the Radiologist dashboard.
+     * Oldest day first, ending today.
+     */
+    private function getKpiTrends(int $days, int $totalStudies): array
+    {
+        $db    = db_connect();
+        $start = date('Y-m-d', strtotime('-' . ($days - 1) . ' days'));
+        $end   = date('Y-m-d');
+        $type  = DiagnosticRequestModel::TYPE_XRAY;
+
+        $dates = [];
+        for ($i = 0; $i < $days; $i++) {
+            $dates[] = date('Y-m-d', strtotime($start . ' +' . $i . ' days'));
+        }
+
+        $series = function (string $dateExpr, string $valueExpr, array $where = []) use ($db, $dates, $start, $end, $type) {
+            $b = $db->table('diagnostic_requests')
+                ->select("$dateExpr AS d, $valueExpr AS v", false)
+                ->where('type', $type)
+                ->where("$dateExpr >=", $start)
+                ->where("$dateExpr <=", $end);
+            foreach ($where as $col => $val) {
+                $b->where($col, $val);
+            }
+            $rows = $b->groupBy('d')->get()->getResultArray();
+
+            $map = [];
+            foreach ($rows as $r) {
+                $map[$r['d']] = (float) $r['v'];
+            }
+            return array_map(fn($d) => $map[$d] ?? 0, $dates);
+        };
+
+        // Total studies: cumulative walk-back from today's total.
+        $newTotal = $series('DATE(created_at)', 'COUNT(*)');
+        $total    = [];
+        $running  = $totalStudies - array_sum($newTotal);
+        foreach ($newTotal as $n) {
+            $running += $n;
+            $total[]  = $running;
+        }
+
+        return [
+            'dates'       => $dates,
+            'pending'     => $series('DATE(created_at)', 'COUNT(*)', ['status' => 'in_progress']),
+            'processing'  => $series('DATE(created_at)', 'COUNT(*)', ['status' => 'in_progress']),
+            'completed'   => $series('DATE(updated_at)', 'COUNT(*)', ['status' => 'completed']),
+            'released'    => $series('DATE(released_at)', 'COUNT(*)', ['status' => 'released']),
+            'total'       => $total,
+
+            // Revenue sparklines — read from the payments table.
+            'revenue_today' => $this->getXrayRevenueSeries($dates, false),
+            'revenue_month' => $this->getXrayRevenueSeries($dates, true),
+        ];
+    }
+
+    /**
+     * Daily paid revenue, or a running month-to-date cumulative total
+     * when $cumulative is true.
+     */
+    private function getXrayRevenueSeries(array $dates, bool $cumulative): array
+    {
+        if (empty($dates)) { return []; }
+
+        $db    = db_connect();
+        $start = $dates[0];
+        $end   = end($dates);
+
+        $rows = $db->table('payments')
+            ->select('DATE(payment_date) AS d, SUM(total_amount) AS v', false)
+            ->where('payment_status', 'paid')
+            ->where('DATE(payment_date) >=', $start)
+            ->where('DATE(payment_date) <=', $end)
+            ->groupBy('d')
+            ->get()
+            ->getResultArray();
+
+        $map = [];
+        foreach ($rows as $r) {
+            $map[$r['d']] = (float) $r['v'];
+        }
+
+        $series = array_map(fn($d) => $map[$d] ?? 0, $dates);
+
+        if (!$cumulative) {
+            return $series;
+        }
+
+        // Month-to-date cumulative — resets on the first of the month.
+        $monthStart = date('Y-m-01');
+        $running    = 0;
+        $out        = [];
+        foreach ($dates as $i => $d) {
+            if ($d < $monthStart) {
+                $out[] = 0;
+                continue;
+            }
+            $running += $series[$i];
+            $out[]    = $running;
+        }
+        return $out;
     }
 
     public function examinations()
@@ -203,9 +285,6 @@ class Radiologist extends BaseController
 
         $departmentStatuses = $this->departmentStatuses();
 
-        // X-ray worklist: only studies the receptionist has sent.
-        // Pending rows live in the receptionist's queue until they
-        // press Start.
         $data['examinations'] = $model
             ->where('type', $type)
             ->whereIn('status', $departmentStatuses)

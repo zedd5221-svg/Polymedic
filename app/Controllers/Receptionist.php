@@ -78,7 +78,96 @@ class Receptionist extends BaseController
         $data['service_labels'] = $serviceData['labels'];
         $data['service_counts'] = $serviceData['counts'];
 
+        // KPI sparklines — same look as the Admin dashboard.
+        $data['kpiTrends'] = $this->getKpiTrends(14, (int) $data['total_patients']);
+
         return view('Receptionist/dashboard', $data);
+    }
+
+    /**
+     * Daily series for the KPI sparklines on the Receptionist dashboard.
+     * Oldest day first, ending today. Every value is a real per-day
+     * count from the same tables the KPI cards themselves read.
+     *
+     * Keys match the card keys in the Receptionist dashboard view.
+     */
+    private function getKpiTrends(int $days, int $totalPatients): array
+    {
+        $db    = db_connect();
+        $start = date('Y-m-d', strtotime('-' . ($days - 1) . ' days'));
+        $end   = date('Y-m-d');
+
+        $dates = [];
+        for ($i = 0; $i < $days; $i++) {
+            $dates[] = date('Y-m-d', strtotime($start . ' +' . $i . ' days'));
+        }
+
+        // Generic "date, value" grouped query → day-indexed series.
+        $series = function (string $table, string $dateExpr, string $valueExpr, array $where = []) use ($db, $dates, $start, $end) {
+            $b = $db->table($table)
+                ->select("$dateExpr AS d, $valueExpr AS v", false)
+                ->where("$dateExpr >=", $start)
+                ->where("$dateExpr <=", $end);
+            foreach ($where as $col => $val) {
+                $b->where($col, $val);
+            }
+            $rows = $b->groupBy('d')->get()->getResultArray();
+
+            $map = [];
+            foreach ($rows as $r) {
+                $map[$r['d']] = (float) $r['v'];
+            }
+            return array_map(fn($d) => $map[$d] ?? 0, $dates);
+        };
+
+        // All patients: cumulative walk-back from today's total using
+        // the patients table's per-day new registrations.
+        $newPatients = $series('patients', 'DATE(created_at)', 'COUNT(*)');
+        $patients    = [];
+        $running     = $totalPatients - array_sum($newPatients);
+        foreach ($newPatients as $n) {
+            $running    += $n;
+            $patients[]  = $running;
+        }
+
+        return [
+            'dates'       => $dates,
+            'patients'    => $patients,
+            'today'       => $series('appointments', 'appointment_date', 'COUNT(*)'),
+            'pending'     => $series('appointments', 'DATE(created_at)', 'COUNT(*)', ['status' => 'pending']),
+            'completed'   => $series('appointments', 'DATE(updated_at)', 'COUNT(*)', ['status' => 'completed']),
+            'diagnostics' => $series('diagnostic_requests', 'DATE(created_at)', 'COUNT(*)', ['status' => 'pending']),
+            'unpaid'      => $series('diagnostic_requests', 'DATE(created_at)', 'COUNT(*)', ['status' => 'in_progress']),
+            'collections' => $this->getCollectionsSeries($dates),
+        ];
+    }
+
+    /**
+     * Daily paid revenue — real per-day sums from the payments table.
+     */
+    private function getCollectionsSeries(array $dates): array
+    {
+        if (empty($dates)) { return []; }
+
+        $db    = db_connect();
+        $start = $dates[0];
+        $end   = end($dates);
+
+        $rows = $db->table('payments')
+            ->select('DATE(payment_date) AS d, SUM(total_amount) AS v', false)
+            ->where('payment_status', 'paid')
+            ->where('DATE(payment_date) >=', $start)
+            ->where('DATE(payment_date) <=', $end)
+            ->groupBy('d')
+            ->get()
+            ->getResultArray();
+
+        $map = [];
+        foreach ($rows as $r) {
+            $map[$r['d']] = (float) $r['v'];
+        }
+
+        return array_map(fn($d) => $map[$d] ?? 0, $dates);
     }
 
     private function getAllPatients(): array
@@ -932,7 +1021,7 @@ class Receptionist extends BaseController
             $model->insert([
                 'reference_number' => $prefix . '-' . date('y') . '-' . strtoupper(bin2hex(random_bytes(3))),
                 'type'             => $requestType,
-                'appointment_id'   => null,   // FIXED: was 0, FK fk_dr_appointment requires NULL for walk-ins
+                'appointment_id'   => null,
                 'patient_name'     => $patientName,
                 'patient_code'     => $patientCode !== 'N/A' ? $patientCode : null,
                 'age'              => $age,

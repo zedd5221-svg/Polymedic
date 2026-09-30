@@ -7,20 +7,6 @@
 <?php
 /* ------------------------------------------------------------------
    Radiologist Dashboard
-
-   Layout:
-     1. Seven KPI stat cards
-     2. Weekly Study Volume chart (left) + Available X-ray Services
-        scrollable catalogue (right)
-     3. Two donut cards side by side — Status Breakdown (left) and
-        Services by Region (right). Each donut has its legend on the
-        right side of the canvas.
-     4. Reading Worklist table
-
-   All values come from the existing controller:
-     $pending, $processing, $completed, $released, $total,
-     $today_revenue, $monthly_revenue, $pending_examinations,
-     $weekly_data, $servicesCatalog
    ------------------------------------------------------------------ */
 
 $pending    = (int) ($pending ?? 0);
@@ -41,7 +27,6 @@ $weeklyDatasets = (isset($weeklyData['datasets']) && is_array($weeklyData['datas
 
 $hasWeeklyChart = !empty($weeklyLabels) && !empty($weeklyDatasets);
 
-/* X-ray services catalogue — supplied by Radiologist::getAvailableXrayServices(). */
 $servicesCatalog = (isset($servicesCatalog) && is_array($servicesCatalog)) ? $servicesCatalog : [
     'services'       => [],
     'count'          => 0,
@@ -151,6 +136,44 @@ $statCards = [
         'link'  => null,
     ],
 ];
+
+/* ------------------------------------------------------------------
+   SPARKLINES — same look and math as the Admin dashboard.
+   ------------------------------------------------------------------ */
+$kpiTrends = $kpiTrends ?? [];
+
+$sparkMeta = [
+    'pending'       => ['color' => '#EA580C', 'goodUp' => false, 'cumulative' => false, 'unit' => 'pending'],
+    'processing'    => ['color' => '#2563EB', 'goodUp' => false, 'cumulative' => false, 'unit' => 'in reading'],
+    'completed'     => ['color' => '#16A34A', 'goodUp' => true,  'cumulative' => false, 'unit' => 'completed'],
+    'released'      => ['color' => '#0D9488', 'goodUp' => true,  'cumulative' => false, 'unit' => 'released'],
+    'total'         => ['color' => '#0891B2', 'goodUp' => true,  'cumulative' => true,  'unit' => 'studies'],
+    'revenue_today' => ['color' => '#CA8A04', 'goodUp' => true,  'cumulative' => false, 'unit' => 'revenue', 'money' => true],
+    'revenue_month' => ['color' => '#DB2777', 'goodUp' => true,  'cumulative' => true,  'unit' => 'revenue', 'money' => true],
+];
+
+/* Returns [svgPath, lastX%, lastY%] for a value series. */
+$sparkGeometry = static function (array $vals): array {
+    $n = count($vals);
+    if ($n < 2) { return ['', 100, 50]; }
+    $min = min($vals);
+    $max = max($vals);
+    $rng = $max - $min;
+    $w = 100; $h = 32; $pad = 3;
+    $pts = [];
+    foreach (array_values($vals) as $i => $v) {
+        $x = $i / ($n - 1) * $w;
+        $y = $rng > 0 ? $h - $pad - (($v - $min) / $rng) * ($h - 2 * $pad) : $h / 2;
+        $pts[] = [round($x, 2), round($y, 2)];
+    }
+    $line = 'M' . $pts[0][0] . ',' . $pts[0][1];
+    for ($i = 1; $i < $n; $i++) {
+        $cx = round(($pts[$i - 1][0] + $pts[$i][0]) / 2, 2);
+        $line .= ' C' . $cx . ',' . $pts[$i - 1][1] . ' ' . $cx . ',' . $pts[$i][1] . ' ' . $pts[$i][0] . ',' . $pts[$i][1];
+    }
+    $last = end($pts);
+    return [$line, $last[0], round($last[1] / $h * 100, 2)];
+};
 ?>
 
 <div class="dashboard-container">
@@ -163,8 +186,23 @@ $statCards = [
                 $href = !empty($card['link']) ? ' href="' . esc($card['link'], 'attr') . '"' : '';
                 $icon = (string) ($card['icon'] ?? '');
                 $isMoney = !empty($card['raw']);
+
+                $meta   = $sparkMeta[$card['key']] ?? null;
+                $vals   = $meta ? array_map('floatval', $kpiTrends[$card['key']] ?? []) : [];
+                $hasSpk = $meta && count($vals) >= 2;
+
+                if ($hasSpk) {
+                    [$spkLine, $spkX, $spkY] = $sparkGeometry($vals);
+                    $dates = $kpiTrends['dates'] ?? [];
+                    $fmt   = !empty($meta['money'])
+                        ? static fn($v) => $peso($v)
+                        : static fn($v) => number_format($v);
+                    $spkTitle = $meta['unit'] . ': ' . $fmt(end($vals))
+                        . ' on ' . (isset($dates[count($vals) - 1]) ? date('M j', strtotime($dates[count($vals) - 1])) : 'today')
+                        . ' · 14-day peak ' . $fmt(max($vals));
+                }
             ?>
-            <<?= $tag ?> class="stat-card<?= $isMoney ? ' stat-card--revenue' : '' ?>"<?= $href ?>>
+            <<?= $tag ?> class="stat-card<?= $isMoney ? ' stat-card--revenue' : '' ?>"<?= $href ?><?= $hasSpk ? ' style="--spark:' . esc($meta['color'], 'attr') . '"' : '' ?>>
 
                 <div class="stat-top">
                     <div class="stat-icon <?= esc($card['tone'], 'attr') ?>">
@@ -186,8 +224,19 @@ $statCards = [
                     <?php endif; ?>
                 </div>
 
-                <div class="stat-value<?= $isMoney ? ' stat-value-money' : '' ?>">
-                    <?= esc($card['value']) ?>
+                <div class="stat-value-row">
+                    <div class="stat-value<?= $isMoney ? ' stat-value-money' : '' ?>">
+                        <?= esc($card['value']) ?>
+                    </div>
+                    <?php if ($hasSpk): ?>
+                        <div class="spark spark-inline" role="img"
+                             aria-label="<?= esc($spkTitle, 'attr') ?>"
+                             title="<?= esc($spkTitle, 'attr') ?>">
+                            <svg viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true">
+                                <path d="<?= $spkLine ?>" class="spark-line" fill="none" vector-effect="non-scaling-stroke"/>
+                            </svg>
+                        </div>
+                    <?php endif; ?>
                 </div>
 
                 <div class="stat-label"><?= esc($card['label']) ?></div>
@@ -672,19 +721,54 @@ $statCards = [
     background: transparent;
 }
 
-.dashboard-container .stat-value {
-    font-size: 1.65rem;
-    font-weight: 700;
-    color: #0F172A;
-    line-height: 1.15;
+/* ===== VALUE ROW + INLINE SPARKLINE ===== */
+
+.dashboard-container .stat-value-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 10px;
     margin-bottom: 6px;
+    min-width: 0;
+}
+
+.dashboard-container .stat-value {
+    font-size: 1.35rem;
+    font-weight: 680;
+    color: #0F172A;
+    line-height: 1.1;
     letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums;
+    min-width: 0;
+    margin-bottom: 0;
 }
 
 .dashboard-container .stat-value-money {
-    font-size: 1.35rem;
+    font-size: 1.0rem;
     overflow-wrap: anywhere;
+}
+
+.dashboard-container .spark-inline {
+    flex-shrink: 0;
+    width: 56px;
+    height: 20px;
+    position: relative;
+}
+
+.dashboard-container .spark-inline svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    overflow: visible;
+}
+
+.dashboard-container .spark-line {
+    stroke: var(--spark);
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 .dashboard-container .stat-card--revenue {
@@ -880,9 +964,6 @@ $statCards = [
 
 /* =========================================================
    DONUT + LEGEND
-   Donut on the left, legend on the right. The grid gives the
-   donut a fixed slot so it stays perfectly square, and the
-   legend takes the remaining width.
    ========================================================= */
 
 .dashboard-container .charts-row--donuts .chart-card {
@@ -1309,8 +1390,6 @@ $statCards = [
         grid-template-columns: minmax(0, 1fr);
     }
 
-    /* Legend drops below the donut on narrow screens so the
-       side-by-side grid does not get squeezed. */
     .dashboard-container .donut-wrap {
         grid-template-columns: minmax(0, 1fr);
         gap: 0.65rem;
@@ -1335,8 +1414,9 @@ $statCards = [
     .dashboard-container { padding: 0.9rem; }
 
     .dashboard-container .stat-card { padding: 16px; }
-    .dashboard-container .stat-value { font-size: 1.45rem; }
-    .dashboard-container .stat-value-money { font-size: 1.2rem; }
+    .dashboard-container .stat-value { font-size: 1.2rem; }
+    .dashboard-container .stat-value-money { font-size: 1.05rem; }
+    .dashboard-container .spark-inline { width: 44px; height: 16px; }
 
     .dashboard-container .chart-card { padding: 1rem; }
     .dashboard-container .chart-body { height: 240px; }
@@ -1392,6 +1472,8 @@ $statCards = [
 @media (max-width: 576px) {
     .dashboard-container { padding: 0.75rem; }
     .dashboard-container .stats-row { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+    .dashboard-container .stat-value { font-size: 1.15rem; }
+    .dashboard-container .stat-value-money { font-size: 1.0rem; }
     .dashboard-container .card-header-custom { flex-direction: column; align-items: stretch; }
     .dashboard-container .header-right-group { justify-content: space-between; }
 

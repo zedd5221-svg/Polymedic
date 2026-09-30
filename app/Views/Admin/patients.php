@@ -40,9 +40,9 @@
 
     /* PNG stat-card icon filenames. */
     $statIcons = [
-        'total'  => 'multiple-users-silhouette.png',
+        'total'  => 'g2.png',
         'online' => 'worldwide.png',
-        'walkin' => 'walk.png',
+        'walkin' => 'man.png',
     ];
 ?>
 
@@ -52,13 +52,6 @@
     <header class="pt-head">
         <div>
             <h2 class="pt-title">Patient management</h2>
-            <p class="pt-lede">
-                <strong><?= number_format($total ?? count($patients)) ?></strong> registered
-                <span aria-hidden="true">·</span>
-                <strong><?= number_format($activeCount) ?></strong> active
-                <span aria-hidden="true">·</span>
-                <strong><?= number_format($inactiveCount) ?></strong> inactive
-            </p>
         </div>
 
         <div class="pt-head-actions">
@@ -548,8 +541,8 @@
 .pt-stat-icon--amber { background: transparent; }
 
 .pt-stat-img {
-    width: 24px;
-    height: 24px;
+    width: 30px;
+    height: 26px;
     object-fit: contain;
     display: block;
 }

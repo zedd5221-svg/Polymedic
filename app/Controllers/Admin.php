@@ -144,14 +144,6 @@ class Admin extends BaseController
      * Daily series for the KPI sparklines, oldest day first, ending today.
      * Every value is a real count or sum from the database; days with no
      * activity are zero. Keys match the card keys in the dashboard view.
-     *
-     *  patients       cumulative registered patients (ends at the total)
-     *  today          appointments scheduled per day
-     *  pending        diagnostic requests received per day
-     *  completed      requests marked completed per day (by updated_at)
-     *  released       requests released per day (by released_at)
-     *  revenue_today  paid revenue per day
-     *  revenue_month  paid revenue, cumulative within the current month
      */
     private function getKpiTrends(int $days, int $totalPatients): array
     {
@@ -283,11 +275,6 @@ class Admin extends BaseController
 
     /**
      * Patients handled by each department, per day of the current week.
-     *
-     * Both department counts come from the merged table now, split by
-     * the type column. A patient with both lab and xray requests is
-     * counted once under each department, which is what the stacked
-     * chart is meant to show.
      */
     private function getDepartmentData()
     {
@@ -314,9 +301,6 @@ class Admin extends BaseController
                 ->countAllResults();
         }
 
-        // No placeholder numbers here on purpose. A dashboard showing
-        // invented patient counts is worse than one showing an empty
-        // week, and the view already handles the empty case.
         return [
             'labels' => $days,
             'lab'    => $lab,
@@ -326,7 +310,6 @@ class Admin extends BaseController
 
     /**
      * Appointments waiting for approval, soonest first.
-     * The dashboard panel pages through these four at a time.
      */
     private function getPendingAppointments(int $limit = 20)
     {
@@ -498,7 +481,7 @@ class Admin extends BaseController
                 if (!empty($name) && !isset($seenKeys[$key])) {
                     $seenKeys[$key] = true;
                     $allPatients[] = [
-                        'id' => $patient['id'] ?? 0,
+                        'id' => $this->resolvePatientId(null, $patient['full_name'] ?? '', $patient['age'] ?? null) ?? 0,
                         'patient_code' => 'N/A',
                         'full_name' => $patient['full_name'] ?? 'Unknown',
                         'email' => $patient['email'] ?? '',
@@ -531,7 +514,7 @@ class Admin extends BaseController
                 if (!empty($name) && !isset($seenKeys[$key])) {
                     $seenKeys[$key] = true;
                     $allPatients[] = [
-                        'id' => $patient['id'] ?? 0,
+                        'id' => $this->resolvePatientId(null, $patient['full_name'] ?? '', $patient['age'] ?? null) ?? 0,
                         'patient_code' => 'N/A',
                         'full_name' => $patient['full_name'] ?? 'Unknown',
                         'email' => '',
@@ -564,7 +547,7 @@ class Admin extends BaseController
                 if (!empty($name) && !isset($seenKeys[$key])) {
                     $seenKeys[$key] = true;
                     $allPatients[] = [
-                        'id' => $patient['id'] ?? 0,
+                        'id' => $this->resolvePatientId(null, $patient['full_name'] ?? '', $patient['age'] ?? null) ?? 0,
                         'patient_code' => 'N/A',
                         'full_name' => $patient['full_name'] ?? 'Unknown',
                         'email' => '',
@@ -590,6 +573,120 @@ class Admin extends BaseController
         $data['total'] = count($allPatients);
 
         return view('Admin/patients', $data);
+    }
+
+    /**
+     * View a single patient using the shared appointment/patient view.
+     * Reached from the eye icon on the admin patients list.
+     */
+    public function viewPatient($id = null)
+    {
+        $redirect = $this->checkAuth();
+        if ($redirect) return $redirect;
+
+        $id = (int) $id;
+        if ($id <= 0) {
+            return redirect()->to(base_url('admin/patients'))
+                             ->with('error', 'Invalid patient.');
+        }
+
+        $patientModel = new PatientModel();
+        $patient      = $patientModel->find($id);
+
+        if (! $patient) {
+            return redirect()->to(base_url('admin/patients'))
+                             ->with('error', 'Patient not found.');
+        }
+
+        // Normalize "source" into a human-readable service type.
+        $source      = strtolower((string) ($patient['source'] ?? ''));
+        $serviceType = (strpos($source, 'walk-in') !== false) ? 'Walk-in' : 'Online';
+
+        // Shape the data the way appointment_view.php expects.
+        $appointment = [
+            'id'               => $patient['id']           ?? null,
+            'reference_number' => $patient['patient_code'] ?? '—',
+            'full_name'        => $patient['full_name']    ?? '',
+            'gender'           => $patient['gender']       ?? '',
+            'age'              => $patient['age']          ?? '',
+            'email'            => $patient['email']        ?? '',
+            'phone'            => $patient['phone']        ?? '',
+            'appointment_date' => $patient['created_at']   ?? null,
+            'appointment_time' => null,
+            'arrival_time'     => null,
+            'created_at'       => $patient['created_at']   ?? null,
+            'updated_at'       => $patient['updated_at']   ?? null,
+            'status'           => 'approved',
+            'service_type'     => $serviceType,
+            'other_requests'   => '',
+        ];
+
+        // Pull this patient's diagnostic history (optional — fails silently).
+        $lab_services  = [];
+        $xray_services = [];
+
+        try {
+            $diagnosticModel = new DiagnosticRequestModel();
+
+            $rows = $diagnosticModel
+                ->where('patient_name', $appointment['full_name'])
+                ->orderBy('created_at', 'DESC')
+                ->limit(20)
+                ->findAll();
+
+            foreach ($rows as $row) {
+                $services = array_filter(array_map('trim', explode(',', (string) ($row['services'] ?? ''))));
+                if (($row['type'] ?? '') === 'xray') {
+                    $xray_services = array_merge($xray_services, $services);
+                } else {
+                    $lab_services = array_merge($lab_services, $services);
+                }
+            }
+
+            $lab_services  = array_values(array_unique($lab_services));
+            $xray_services = array_values(array_unique($xray_services));
+        } catch (\Exception $e) {
+            log_message('error', 'Admin viewPatient history error: ' . $e->getMessage());
+        }
+
+        return view('Admin/appointment_view', [
+            'appointment'   => $appointment,
+            'lab_services'  => $lab_services,
+            'xray_services' => $xray_services,
+            'viewMode'      => 'patient',
+        ]);
+    }
+
+    /**
+     * Resolve a patient row's id by name (and optionally age) if it
+     * wasn't already provided. Used so the eye icon always has a valid
+     * patient id, even for rows that came from appointments or
+     * diagnostic requests rather than the patients table.
+     */
+    private function resolvePatientId(?int $id, string $fullName, $age = null): ?int
+    {
+        if (!empty($id)) {
+            return (int) $id;
+        }
+
+        $fullName = trim($fullName);
+        if ($fullName === '') {
+            return null;
+        }
+
+        try {
+            $patientModel = new PatientModel();
+            $query = $patientModel->where('full_name', $fullName);
+            if (!empty($age)) {
+                $query->where('age', $age);
+            }
+            $row = $query->first();
+
+            return isset($row['id']) ? (int) $row['id'] : null;
+        } catch (\Exception $e) {
+            log_message('error', 'Admin resolvePatientId error: ' . $e->getMessage());
+            return null;
+        }
     }
 
     public function approvePatient($id)
@@ -894,6 +991,8 @@ class Admin extends BaseController
             'cancelled' => 'danger',
             'late'      => 'dark'
         ];
+
+        $data['viewMode'] = 'appointment';
 
         return view('Admin/appointment_view', $data);
     }
@@ -1405,9 +1504,6 @@ class Admin extends BaseController
 
     // =============================================
     // DIAGNOSTIC REQUESTS
-    // Same queue the receptionist handles at the front desk, exposed
-    // here so an administrator can create, adjust, and print requests
-    // without leaving the admin area.
     // =============================================
 
     public function diagnosticRequests()
@@ -1632,7 +1728,7 @@ class Admin extends BaseController
         $model->insert([
             'reference_number' => $prefix . '-' . date('y') . '-' . strtoupper(bin2hex(random_bytes(3))),
             'type'             => $requestType,
-            'appointment_id'   => null,   // FIXED: was 0, FK fk_dr_appointment requires NULL for walk-ins
+            'appointment_id'   => null,
             'patient_name'     => $patientName,
             'patient_code'     => $patientCode,
             'age'              => $age,

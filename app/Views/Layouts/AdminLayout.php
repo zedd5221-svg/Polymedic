@@ -20,6 +20,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <!-- AOS -->
+    <link rel="stylesheet" href="https://unpkg.com/aos@2.3.4/dist/aos.css">
     <script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script>
 
 </head>
@@ -39,17 +40,65 @@
          SIDEBAR
          ===================================================== -->
 
-    <aside class="admin-sidebar" id="adminSidebar">
+    <?php
+    /* ---------------------------------------------------------
+       Sidebar data. Keeping the menu in one array means the link,
+       the icon and the active-state check can never drift apart.
+       --------------------------------------------------------- */
+
+    $currentUrl = current_url();
+
+    $isActive = static function (string $segment) use ($currentUrl): bool {
+        return strpos(rtrim($currentUrl, '/'), $segment) !== false;
+    };
+
+    // Guarded so a missing/failing model can never blank the whole layout.
+    $unreadCount = 0;
+    if (class_exists('\App\Models\NotificationModel')) {
+        try {
+            $unreadCount = (int) (new \App\Models\NotificationModel())->getUnreadCount();
+        } catch (\Throwable $e) {
+            $unreadCount = 0;
+        }
+    }
+
+    $navGroups = [
+        'Main' => [
+            ['seg' => 'admin/dashboard',           'icon' => 'bi-grid-1x2-fill',        'label' => 'Dashboard'],
+            ['seg' => 'admin/appointments',        'icon' => 'bi-calendar-check',       'label' => 'Appointments'],
+            ['seg' => 'admin/diagnostic-requests', 'icon' => 'bi-file-earmark-medical', 'label' => 'Diagnostic Requests'],
+            ['seg' => 'admin/patients',            'icon' => 'bi-people-fill',          'label' => 'Patients'],
+            ['seg' => 'admin/services',            'icon' => 'bi-grid-3x3-gap-fill',    'label' => 'Services'],
+        ],
+        'Admin' => [
+            ['seg' => 'admin/users',         'icon' => 'bi-person-gear', 'label' => 'User Management'],
+            ['seg' => 'admin/notifications', 'icon' => 'bi-bell-fill',   'label' => 'Notifications', 'badge' => $unreadCount],
+        ],
+    ];
+
+    $navIndex = 0;
+    ?>
+
+    <aside class="admin-sidebar" id="adminSidebar" aria-label="Main navigation">
 
         <!-- SIDEBAR HEADER -->
         <div class="sidebar-header">
-            <div class="sidebar-logo">
-                <img src="/polymedic/public/assets/images/logo4.png" alt="PolyMedic">
-                <span>
+
+            <a class="sidebar-logo" href="<?= base_url('admin/dashboard') ?>">
+                <span class="logo-badge">
+                    <img src="/polymedic/public/assets/images/logo4.png" alt="">
+                </span>
+                <span class="logo-text">
                     PolyMedic
                     <small>Diagnostic System</small>
                 </span>
-            </div>
+            </a>
+
+            <!-- Mobile only: closes the drawer -->
+            <button type="button" class="sidebar-close" id="sidebarCloseBtn" aria-label="Close menu">
+                <i class="bi bi-x-lg"></i>
+            </button>
+
         </div>
 
         <!-- =================================================
@@ -59,133 +108,63 @@
         <nav class="sidebar-nav">
             <ul>
 
-                <!-- =========================================
-                     SIDEBAR COLLAPSE BUTTON
-                     ========================================= -->
-
+                <!-- COLLAPSE BUTTON (desktop only) -->
                 <li class="sidebar-toggle-item">
                     <button type="button"
                             class="sidebar-toggle-btn"
                             id="sidebarCollapseBtn"
-                            onclick="toggleSidebarCollapse()"
-                            title="Collapse Sidebar">
-                        <i class="bi bi-layout-sidebar-inset"></i>
+                            data-tooltip="Expand Sidebar"
+                            aria-controls="adminSidebar"
+                            aria-expanded="true"
+                            aria-label="Collapse sidebar">
+                        <i class="bi bi-chevron-double-left" aria-hidden="true"></i>
                         <span>Collapse Sidebar</span>
                     </button>
                 </li>
 
-                <!-- =========================================
-                     MAIN
-                     ========================================= -->
+                <?php foreach ($navGroups as $groupLabel => $items): ?>
 
-                <li class="nav-section">Main</li>
+                    <li class="nav-section"><span><?= esc($groupLabel) ?></span></li>
 
-                <!-- DASHBOARD -->
-                <li class="menu-item <?= current_url() == base_url('admin/dashboard') ? 'active' : '' ?>">
-                    <a href="/polymedic/public/admin/dashboard" class="menu-btn" data-tooltip="Dashboard">
-                        <i class="bi bi-grid-1x2-fill menu-icon"></i>
-                        <span>Dashboard</span>
-                        <?php if (current_url() == base_url('admin/dashboard')): ?>
-                            <i class="bi bi-chevron-right menu-arrow"></i>
-                        <?php endif; ?>
-                    </a>
-                </li>
+                    <?php foreach ($items as $item): $active = $isActive($item['seg']); ?>
+                        <li class="menu-item<?= $active ? ' active' : '' ?>" style="--i: <?= $navIndex++ ?>">
+                            <a href="<?= base_url($item['seg']) ?>"
+                               class="menu-btn"
+                               data-tooltip="<?= esc($item['label']) ?>"
+                               <?= $active ? 'aria-current="page"' : '' ?>>
+                                <i class="bi <?= $item['icon'] ?> menu-icon" aria-hidden="true"></i>
+                                <span><?= esc($item['label']) ?></span>
+                                <?php if (! empty($item['badge'])): ?>
+                                    <span class="badge-notif"><?= $item['badge'] > 99 ? '99+' : $item['badge'] ?></span>
+                                <?php endif; ?>
+                            </a>
+                        </li>
+                    <?php endforeach; ?>
 
-                <!-- APPOINTMENTS -->
-                <li class="menu-item <?= current_url() == base_url('admin/appointments') ? 'active' : '' ?>">
-                    <a href="/polymedic/public/admin/appointments" class="menu-btn" data-tooltip="Appointments">
-                        <i class="bi bi-calendar-check menu-icon"></i>
-                        <span>Appointments</span>
-                        <?php if (current_url() == base_url('admin/appointments')): ?>
-                            <i class="bi bi-chevron-right menu-arrow"></i>
-                        <?php endif; ?>
-                    </a>
-                </li>
-                   
-                  <!-- Diagnostic Request -->
-                <li class="menu-item <?= strpos(current_url(), 'admin/diagnostic-requests') !== false ? 'active' : '' ?>">
-                    <a href="<?= base_url('admin/diagnostic-requests') ?>" class="menu-btn" data-tooltip="Diagnostic Requests">
-                         <i class="bi bi-file-earmark-medical menu-icon"></i>
-                         <span>Diagnostic Requests</span>
-                         <?php if (strpos(current_url(), 'admin/diagnostic-requests') !== false): ?>
-                              <i class="bi bi-chevron-right menu-arrow"></i>
-                         <?php endif; ?>
-                    </a>
-                </li>
-
-                <!-- PATIENTS -->
-                <li class="menu-item <?= current_url() == base_url('admin/patients') ? 'active' : '' ?>">
-                    <a href="/polymedic/public/admin/patients" class="menu-btn" data-tooltip="Patients">
-                        <i class="bi bi-people-fill menu-icon"></i>
-                        <span>Patients</span>
-                        <?php if (current_url() == base_url('admin/patients')): ?>
-                            <i class="bi bi-chevron-right menu-arrow"></i>
-                        <?php endif; ?>
-                    </a>
-                </li>
-
-                <!-- SERVICES -->
-                <li class="menu-item <?= current_url() == base_url('admin/services') ? 'active' : '' ?>">
-                    <a href="/polymedic/public/admin/services" class="menu-btn" data-tooltip="Services">
-                        <i class="bi bi-grid-3x3-gap-fill menu-icon"></i>
-                        <span>Services</span>
-                        <?php if (current_url() == base_url('admin/services')): ?>
-                            <i class="bi bi-chevron-right menu-arrow"></i>
-                        <?php endif; ?>
-                    </a>
-                </li>
-
-                <!-- =========================================
-                     ADMIN
-                     ========================================= -->
-
-                <li class="nav-section">Admin</li>
-
-                <!-- USER MANAGEMENT -->
-                <li class="menu-item <?= current_url() == base_url('admin/users') ? 'active' : '' ?>">
-                    <a href="/polymedic/public/admin/users" class="menu-btn" data-tooltip="User Management">
-                        <i class="bi bi-person-gear menu-icon"></i>
-                        <span>User Management</span>
-                        <?php if (current_url() == base_url('admin/users')): ?>
-                            <i class="bi bi-chevron-right menu-arrow"></i>
-                        <?php endif; ?>
-                    </a>
-                </li>
-
-                <!-- NOTIFICATIONS -->
-                <li class="menu-item <?= current_url() == base_url('admin/notifications') ? 'active' : '' ?>">
-                    <a href="/polymedic/public/admin/notifications" class="menu-btn" data-tooltip="Notifications">
-                        <i class="bi bi-bell-fill menu-icon"></i>
-                        <span>Notifications</span>
-
-                        <?php
-                        $unreadCount = (new \App\Models\NotificationModel())->getUnreadCount();
-                        if ($unreadCount > 0):
-                        ?>
-                            <span class="badge-notif"><?= $unreadCount ?></span>
-                        <?php endif; ?>
-
-                        <?php if (current_url() == base_url('admin/notifications')): ?>
-                            <i class="bi bi-chevron-right menu-arrow"></i>
-                        <?php endif; ?>
-                    </a>
-                </li>
-
-                <!-- DIVIDER -->
-                <li class="nav-divider"></li>
-
-                <!-- LOGOUT -->
-                <li class="menu-item logout-item">
-                    <a href="/polymedic/public/logout" class="menu-btn" data-tooltip="Logout">
-                        <i class="bi bi-box-arrow-right menu-icon"></i>
-                        <span>Logout</span>
-                    </a>
-                </li>
+                <?php endforeach; ?>
 
             </ul>
         </nav>
 
+        <!-- =================================================
+             FOOTER (pinned to the bottom)
+             ================================================= -->
+
+        <div class="sidebar-footer">
+            <ul>
+                <li class="menu-item logout-item">
+                    <a href="/polymedic/public/logout" class="menu-btn" data-tooltip="Logout">
+                        <i class="bi bi-box-arrow-right menu-icon" aria-hidden="true"></i>
+                        <span>Logout</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+
     </aside>
+
+    <!-- Mobile drawer backdrop -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop" hidden></div>
 
     <!-- =====================================================
          MAIN
@@ -202,6 +181,16 @@
             <!-- HEADER LEFT -->
             <div class="header-left">
 
+                <!-- MOBILE MENU (opens the sidebar drawer) -->
+                <button type="button"
+                        class="mobile-menu-btn"
+                        id="mobileMenuBtn"
+                        aria-controls="adminSidebar"
+                        aria-expanded="false"
+                        aria-label="Open menu">
+                    <i class="bi bi-list"></i>
+                </button>
+
                 <!-- PAGE TITLE -->
                 <div class="header-title-group">
 
@@ -210,15 +199,12 @@
 
                     $iconMap = [
                         'Dashboard' => 'statisctics.png',
-                        'Appointments' => 'appointment1.png',
-                        'Patients' => 'sick-patient.png',
+                        'Appointments' => 'calendar.png',
+                        'Patient Management' => 'group (1).png',
                         'Diagnostic Requests' => 'stethoscope.png',
-                        'Laboratory Findings' => 'lab-icon.png',
                         'User Management' => 'profile.png',
-                        'Notifications' => 'appointment1.png',
-                        'Radiologist Dashboard' => 'xray-icon.png',
-                        'X-Ray Examinations' => 'xray-icon.png',
-                        'View X-Ray Examination' => 'xray-icon.png'
+                        'Notifications' => 'notification.png',
+                        'Service Management' => 'view-list.png',                       
                     ];
 
                     if (strpos($pageTitle, 'Radiologist') !== false) {
@@ -228,7 +214,9 @@
                     } else {
                         $iconFile = $iconMap[$pageTitle] ?? 'statisctics.png';
                     }
+                    
                     ?>
+
 
                     <img src="/polymedic/public/assets/images/<?= $iconFile ?>"
                          alt="<?= esc($pageTitle) ?>"
@@ -352,21 +340,40 @@
    ========================================================= */
 
 :root {
-    --sidebar-width: 280px;
-    --sidebar-collapsed-width: 78px;
+    --sidebar-width: 282px;
+    --sidebar-collapsed-width: 84px;
     --header-height: 64px;
+
     --active-blue: #1976d2;
     --active-blue-dark: #1565c0;
     --active-blue-light: #e3f2fd;
     --text-blue: #1e40af;
     --icon-gray: #9ca3af;
-    --bg-light: #f8fafc;
+    --bg-light: #f4f7fb;
 
-    /* Single shared timing so every collapse-related property
-       animates in lockstep — this is what makes clicking a menu
-       item while collapsed/expanded look smooth instead of
-       having the label text snap in/out abruptly. */
+    /* ---- SIDEBAR PALETTE (deep navy) -------------------------
+       Want the old white sidebar back? Replace just these eight
+       values with:
+         --sb-bg-top: #ffffff;  --sb-bg-bottom: #ffffff;
+         --sb-text: #1e40af;    --sb-text-dim: #9ca3af;
+         --sb-heading: #9ca3af; --sb-hover-bg: #e3f2fd;
+         --sb-hover-text: #1976d2; --sb-border: #e5e7eb;
+       ---------------------------------------------------------- */
+    --sb-bg-top: #123566;
+    --sb-bg-bottom: #0a1f3d;
+    --sb-text: #cddcef;
+    --sb-text-dim: #8aa4c4;
+    --sb-heading: #6e8bb0;
+    --sb-hover-bg: rgba(255, 255, 255, 0.08);
+    --sb-hover-text: #ffffff;
+    --sb-border: rgba(255, 255, 255, 0.10);
+
+    --sb-active-from: #1976d2;
+    --sb-active-to: #43a3f5;
+    --sb-active-glow: rgba(25, 118, 210, 0.45);
+
     --sidebar-ease: cubic-bezier(0.4, 0, 0.2, 1);
+    --sidebar-spring: cubic-bezier(0.22, 1, 0.36, 1);
     --sidebar-speed: 0.32s;
 }
 
@@ -379,32 +386,39 @@
 }
 
 /* =========================================================
-   SIDEBAR
+   SIDEBAR SHELL
+   Flex column: header on top, scrolling nav in the middle,
+   logout pinned to the bottom.
    ========================================================= */
 
 .admin-sidebar {
     width: var(--sidebar-width);
-    min-height: 100vh;
-    background: #ffffff !important;
     position: fixed;
     top: 0;
     left: 0;
     bottom: 0;
-    z-index: 1000;
-    overflow-y: auto;
-    overflow-x: hidden;
-    box-shadow: 2px 0 20px rgba(0, 0, 0, 0.06);
-    border-right: 1px solid #e5e7eb !important;
-    transition: width var(--sidebar-speed) var(--sidebar-ease);
+    z-index: 1040;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(170deg, var(--sb-bg-top) 0%, var(--sb-bg-bottom) 100%) !important;
+    border-right: 1px solid var(--sb-border) !important;
+    box-shadow: 4px 0 24px rgba(8, 20, 40, 0.16);
+    overflow: visible;
+    transition: width var(--sidebar-speed) var(--sidebar-ease),
+                transform var(--sidebar-speed) var(--sidebar-ease);
 }
 
-.admin-sidebar::-webkit-scrollbar {
-    width: 4px;
-}
-
-.admin-sidebar::-webkit-scrollbar-thumb {
-    background: #e5e7eb;
-    border-radius: 10px;
+/* Soft glow behind the top of the sidebar */
+.admin-sidebar::before {
+    content: '';
+    position: absolute;
+    top: -90px;
+    left: -60px;
+    width: 240px;
+    height: 240px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(67, 163, 245, 0.22), transparent 70%);
+    pointer-events: none;
 }
 
 /* =========================================================
@@ -412,14 +426,15 @@
    ========================================================= */
 
 .sidebar-header {
+    position: relative;
     height: 82px;
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 1rem 1.35rem;
-    border-bottom: 1px solid #f3f4f6 !important;
-    transition: padding var(--sidebar-speed) var(--sidebar-ease),
-                justify-content var(--sidebar-speed) var(--sidebar-ease);
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--sb-border) !important;
+    transition: padding var(--sidebar-speed) var(--sidebar-ease);
 }
 
 .sidebar-logo {
@@ -427,56 +442,127 @@
     align-items: center;
     gap: 0.7rem;
     min-width: 0;
+    text-decoration: none;
     transition: gap var(--sidebar-speed) var(--sidebar-ease);
 }
 
-.sidebar-logo img {
-    width: 42px;
-    height: 42px;
-    object-fit: contain;
+.logo-badge {
+    width: 44px;
+    height: 44px;
     flex-shrink: 0;
-    transition: width var(--sidebar-speed) var(--sidebar-ease),
-                height var(--sidebar-speed) var(--sidebar-ease);
+    border-radius: 13px;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 16px rgba(4, 16, 35, 0.35);
+    transition: transform 0.35s var(--sidebar-spring),
+                box-shadow 0.3s ease;
 }
 
-.sidebar-logo span {
-    font-size: 1.08rem;
+.sidebar-logo:hover .logo-badge {
+    transform: translateY(-2px) rotate(-4deg);
+    box-shadow: 0 10px 22px rgba(4, 16, 35, 0.45);
+}
+
+.logo-badge img {
+    width: 30px;
+    height: 30px;
+    object-fit: contain;
+}
+
+.logo-text {
+    font-size: 1.05rem;
     font-weight: 700;
-    color: #111827 !important;
+    color: #ffffff !important;
     letter-spacing: 0.3px;
     line-height: 1.15;
     white-space: nowrap;
     opacity: 1;
-    max-width: 200px;
+    max-width: 190px;
     overflow: hidden;
     display: inline-block;
-    transition: opacity calc(var(--sidebar-speed) * 0.6) var(--sidebar-ease),
+    transition: opacity calc(var(--sidebar-speed) * 0.55) var(--sidebar-ease),
                 max-width var(--sidebar-speed) var(--sidebar-ease);
 }
 
-.sidebar-logo span small {
+.logo-text small {
     display: block;
     margin-top: 3px;
     font-size: 0.62rem;
-    font-weight: 400;
-    color: #6b7280 !important;
+    font-weight: 500;
+    letter-spacing: 0.4px;
+    color: var(--sb-text-dim) !important;
+}
+
+/* Mobile-only close button */
+.sidebar-close {
+    display: none;
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.10);
+    color: #ffffff;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.sidebar-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: rotate(90deg);
 }
 
 /* =========================================================
-   SIDEBAR NAV
+   NAV AREA (scrolls on its own)
    ========================================================= */
 
 .sidebar-nav {
-    padding: 0.9rem 0.75rem 1.5rem;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0.85rem 0.75rem 1rem;
+    transition: padding var(--sidebar-speed) var(--sidebar-ease);
 }
 
-.sidebar-nav ul {
+.sidebar-nav ul,
+.sidebar-footer ul {
     list-style: none;
     padding: 0;
     margin: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.22rem;
+    gap: 0.25rem;
+}
+
+.sidebar-nav::-webkit-scrollbar {
+    width: 5px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.16);
+    border-radius: 10px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.28);
+}
+
+.sidebar-nav {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.sidebar-footer {
+    flex-shrink: 0;
+    padding: 0.7rem 0.75rem 1.1rem;
+    border-top: 1px solid var(--sb-border);
+    transition: padding var(--sidebar-speed) var(--sidebar-ease);
 }
 
 /* =========================================================
@@ -484,28 +570,28 @@
    ========================================================= */
 
 .sidebar-toggle-item {
-    margin-bottom: 0.35rem;
+    margin-bottom: 0.4rem;
 }
 
 .sidebar-toggle-btn {
     width: 100%;
-    min-height: 43px;
+    min-height: 42px;
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.65rem 0.95rem;
-    border: 1px solid #e5e7eb;
-    border-radius: 9px;
-    background: #f8fafc;
-    color: #64748b;
-    font-size: 0.8rem;
+    gap: 0.7rem;
+    padding: 0.6rem 0.8rem;
+    border: 1px dashed rgba(255, 255, 255, 0.18);
+    border-radius: 11px;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--sb-text-dim);
+    font-size: 0.78rem;
     font-weight: 600;
+    letter-spacing: 0.2px;
     cursor: pointer;
-    transition: background 0.2s ease,
-                color 0.2s ease,
-                border-color 0.2s ease,
-                transform 0.2s ease,
-                justify-content var(--sidebar-speed) var(--sidebar-ease),
+    transition: background 0.22s ease,
+                color 0.22s ease,
+                border-color 0.22s ease,
+                transform 0.15s ease,
                 gap var(--sidebar-speed) var(--sidebar-ease),
                 padding var(--sidebar-speed) var(--sidebar-ease);
 }
@@ -513,126 +599,167 @@
 .sidebar-toggle-btn i {
     width: 24px;
     min-width: 24px;
-    text-align: center;
-    font-size: 1.05rem;
-    transition: transform var(--sidebar-speed) var(--sidebar-ease);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+    transition: transform 0.35s var(--sidebar-spring);
 }
 
 .sidebar-toggle-btn span {
     white-space: nowrap;
     opacity: 1;
-    max-width: 200px;
+    max-width: 180px;
     overflow: hidden;
     display: inline-block;
-    transition: opacity calc(var(--sidebar-speed) * 0.6) var(--sidebar-ease),
+    transition: opacity calc(var(--sidebar-speed) * 0.55) var(--sidebar-ease),
                 max-width var(--sidebar-speed) var(--sidebar-ease);
 }
 
 .sidebar-toggle-btn:hover {
-    background: #e3f2fd;
-    border-color: #bfdbfe;
-    color: #1976d2;
+    background: rgba(255, 255, 255, 0.10);
+    border-color: rgba(255, 255, 255, 0.32);
+    color: #ffffff;
+}
+
+.sidebar-toggle-btn:hover i {
+    transform: translateX(-3px);
 }
 
 .sidebar-toggle-btn:active {
-    transform: scale(0.98);
+    transform: scale(0.97);
+}
+
+.sidebar-toggle-btn:focus-visible,
+.menu-btn:focus-visible,
+.sidebar-close:focus-visible,
+.mobile-menu-btn:focus-visible {
+    outline: 2px solid var(--sb-active-to);
+    outline-offset: 2px;
 }
 
 /* =========================================================
-   NAV SECTION
+   SECTION HEADINGS
    ========================================================= */
 
 .sidebar-nav .nav-section {
-    font-size: 0.64rem;
+    font-size: 0.63rem;
     text-transform: uppercase;
-    letter-spacing: 1.2px;
-    color: #9ca3af !important;
-    padding: 1rem 0.75rem 0.35rem;
+    letter-spacing: 1.4px;
+    color: var(--sb-heading) !important;
+    padding: 0.95rem 0.8rem 0.3rem;
     font-weight: 700;
     white-space: nowrap;
+    position: relative;
+    transition: padding var(--sidebar-speed) var(--sidebar-ease);
+}
+
+.sidebar-nav .nav-section span {
     opacity: 1;
-    height: auto;
-    overflow: hidden;
-    transition: opacity calc(var(--sidebar-speed) * 0.6) var(--sidebar-ease),
-                height var(--sidebar-speed) var(--sidebar-ease),
-                padding var(--sidebar-speed) var(--sidebar-ease),
-                margin var(--sidebar-speed) var(--sidebar-ease);
+    display: inline-block;
+    transition: opacity calc(var(--sidebar-speed) * 0.5) var(--sidebar-ease);
 }
 
 /* =========================================================
-   MENU BUTTON
+   MENU ITEMS
    ========================================================= */
 
+.menu-item {
+    position: relative;
+    animation: navFadeIn 0.45s var(--sidebar-spring) both;
+    animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+@keyframes navFadeIn {
+    from { opacity: 0; transform: translateX(-14px); }
+    to   { opacity: 1; transform: none; }
+}
+
 .menu-btn {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.8rem;
     width: 100%;
-    min-height: 44px;
-    padding: 0.7rem 0.95rem;
-    border-radius: 9px !important;
+    min-height: 46px;
+    padding: 0.68rem 0.85rem;
+    border-radius: 12px !important;
     text-decoration: none;
-    font-size: 0.85rem;
+    font-size: 0.845rem;
     font-weight: 600;
+    letter-spacing: 0.1px;
     background: transparent;
+    color: var(--sb-text) !important;
     cursor: pointer;
-    position: relative;
-    transition: background 0.2s ease,
-                color 0.2s ease,
-                box-shadow 0.2s ease,
+    overflow: hidden;
+    transition: background 0.24s var(--sidebar-ease),
+                color 0.24s var(--sidebar-ease),
+                transform 0.24s var(--sidebar-spring),
+                box-shadow 0.28s var(--sidebar-ease),
                 gap var(--sidebar-speed) var(--sidebar-ease),
-                padding var(--sidebar-speed) var(--sidebar-ease),
-                justify-content var(--sidebar-speed) var(--sidebar-ease);
+                padding var(--sidebar-speed) var(--sidebar-ease);
+}
+
+/* The little bar that slides in on the left edge */
+.menu-btn::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 3px;
+    height: 0;
+    border-radius: 0 4px 4px 0;
+    background: var(--sb-active-to);
+    transform: translateY(-50%);
+    transition: height 0.28s var(--sidebar-spring);
 }
 
 .menu-icon {
-    font-size: 1.08rem;
+    font-size: 1.05rem;
     flex-shrink: 0;
     width: 24px;
+    height: 24px;
     text-align: center;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    transition: color 0.2s ease, transform 0.2s ease;
+    color: var(--sb-text-dim) !important;
+    transition: color 0.24s ease,
+                transform 0.3s var(--sidebar-spring);
 }
 
-/* Menu label — animates on width/opacity together with the
-   sidebar collapse, instead of the old instant display:none. */
 .menu-btn > span {
     white-space: nowrap;
     opacity: 1;
-    max-width: 200px;
+    max-width: 180px;
     overflow: hidden;
     display: inline-block;
-    transition: opacity calc(var(--sidebar-speed) * 0.6) var(--sidebar-ease),
+    color: inherit !important;
+    transition: opacity calc(var(--sidebar-speed) * 0.55) var(--sidebar-ease),
                 max-width var(--sidebar-speed) var(--sidebar-ease);
-}
-
-/* =========================================================
-   NORMAL MENU COLORS
-   ========================================================= */
-
-.admin-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn,
-.admin-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn span {
-    color: var(--text-blue) !important;
-}
-
-.admin-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn .menu-icon {
-    color: var(--icon-gray) !important;
 }
 
 /* =========================================================
    HOVER
    ========================================================= */
 
-.menu-btn:hover {
-    background: var(--active-blue-light) !important;
-    color: var(--active-blue) !important;
+.menu-item:not(.active) .menu-btn:hover {
+    background: var(--sb-hover-bg) !important;
+    color: var(--sb-hover-text) !important;
+    transform: translateX(4px);
 }
 
-.menu-btn:hover .menu-icon {
-    color: var(--active-blue) !important;
-    transform: scale(1.05);
+.menu-item:not(.active) .menu-btn:hover::before {
+    height: 22px;
+}
+
+.menu-item:not(.active) .menu-btn:hover .menu-icon {
+    color: var(--sb-active-to) !important;
+    transform: scale(1.14) translateY(-1px);
+}
+
+.menu-btn:active {
+    transform: translateX(4px) scale(0.985);
 }
 
 /* =========================================================
@@ -640,100 +767,138 @@
    ========================================================= */
 
 .menu-item.active .menu-btn {
-    background: var(--active-blue) !important;
+    background: linear-gradient(100deg, var(--sb-active-from), var(--sb-active-to)) !important;
     color: #ffffff !important;
-    box-shadow: 0 4px 12px rgba(25, 118, 210, 0.28) !important;
+    box-shadow: 0 8px 20px var(--sb-active-glow) !important;
 }
 
+.menu-item.active .menu-btn::before {
+    height: 60%;
+    background: #ffffff;
+    opacity: 0.9;
+}
+
+.menu-item.active .menu-icon,
 .menu-item.active .menu-btn span {
     color: #ffffff !important;
 }
 
-.menu-item.active .menu-icon {
-    color: #ffffff !important;
+/* Slow shine sweeping across the active item */
+.menu-item.active .menu-btn::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -60%;
+    width: 45%;
+    height: 100%;
+    background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+    transform: skewX(-18deg);
+    animation: activeShine 4.5s ease-in-out 1.2s infinite;
 }
 
-.menu-arrow {
-    font-size: 0.85rem;
-    color: #ffffff !important;
-    margin-left: auto;
-    flex-shrink: 0;
-    opacity: 1;
-    transition: opacity calc(var(--sidebar-speed) * 0.6) var(--sidebar-ease);
-}
-
-/* =========================================================
-   REMOVE OLD BORDERS
-   ========================================================= */
-
-.admin-sidebar .sidebar-nav ul li a,
-.admin-sidebar .sidebar-nav ul li.active a {
-    border: none !important;
-    outline: none !important;
+@keyframes activeShine {
+    0%   { left: -60%; }
+    45%  { left: 130%; }
+    100% { left: 130%; }
 }
 
 /* =========================================================
-   NOTIFICATION BADGE
+   BADGE
    ========================================================= */
 
 .badge-notif {
     margin-left: auto;
-    background: #ffffff !important;
-    color: var(--text-blue) !important;
+    background: #ef4444 !important;
+    color: #ffffff !important;
     font-size: 0.62rem;
     font-weight: 700;
-    padding: 0.15rem 0.45rem;
+    padding: 0.1rem 0.4rem;
     border-radius: 30px;
     min-width: 20px;
     height: 20px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.5);
     flex-shrink: 0;
-    opacity: 1;
-    transition: opacity calc(var(--sidebar-speed) * 0.6) var(--sidebar-ease),
-                transform var(--sidebar-speed) var(--sidebar-ease);
+    animation: badgePulse 2.4s ease-in-out infinite;
+    transition: opacity calc(var(--sidebar-speed) * 0.55) var(--sidebar-ease);
+}
+
+@keyframes badgePulse {
+    0%, 100% { box-shadow: 0 2px 8px rgba(239, 68, 68, 0.5); }
+    50%      { box-shadow: 0 2px 14px rgba(239, 68, 68, 0.85); }
 }
 
 .menu-item.active .badge-notif {
-    display: none !important;
-}
-
-/* =========================================================
-   DIVIDER
-   ========================================================= */
-
-.nav-divider {
-    height: 1px;
-    background: #f3f4f6 !important;
-    margin: 0.55rem 0;
+    background: #ef4444 !important;
+    color: #ffffff !important; 
+    box-shadow: none;
+    animation: none;
 }
 
 /* =========================================================
    LOGOUT
    ========================================================= */
 
-.logout-item {
-    margin-top: 0.2rem;
+.logout-item .menu-btn:hover {
+    background: rgba(239, 68, 68, 0.16) !important;
+    color: #fecaca !important;
 }
 
-.logout-item .menu-btn:hover {
-    background: #fee2e2 !important;
-    color: #dc2626 !important;
+.logout-item .menu-btn:hover::before {
+    background: #f87171;
 }
 
 .logout-item .menu-btn:hover .menu-icon {
-    color: #dc2626 !important;
+    color: #f87171 !important;
+    transform: translateX(2px) scale(1.1);
+}
+
+/* =========================================================
+   TOOLTIP (collapsed sidebar)
+   Rendered into <body> by JS, so the sidebar's own scrolling
+   can never clip it — that was the old bug.
+   ========================================================= */
+
+.sb-tooltip {
+    position: fixed;
+    z-index: 4000;
+    pointer-events: none;
+    background: #102a4c;
+    color: #ffffff;
+    padding: 0.45rem 0.72rem;
+    border-radius: 8px;
+    font-size: 0.74rem;
+    font-weight: 600;
+    white-space: nowrap;
+    box-shadow: 0 10px 24px rgba(4, 16, 35, 0.35);
+    opacity: 0;
+    transform: translateX(-6px);
+    transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.sb-tooltip::before {
+    content: '';
+    position: absolute;
+    left: -4px;
+    top: 50%;
+    width: 8px;
+    height: 8px;
+    background: inherit;
+    transform: translateY(-50%) rotate(45deg);
+    border-radius: 1px;
+}
+
+.sb-tooltip.show {
+    opacity: 1;
+    transform: translateX(0);
 }
 
 /* =========================================================
    COLLAPSED SIDEBAR (DESKTOP ONLY)
-   All the label/element hiding below uses the SAME
-   --sidebar-speed/--sidebar-ease as the base rules above,
-   and animates opacity + max-width instead of snapping with
-   width:0/display:none, so clicking any menu item mid-collapse
-   or mid-expand doesn't cause a jump — it finishes the tween.
+   Labels fade + shrink to zero width. No display:none, so the
+   transition actually runs both ways.
    ========================================================= */
 
 @media (min-width: 993px) {
@@ -753,238 +918,166 @@
         width: 100%;
     }
 
-    .admin-sidebar.collapsed .sidebar-logo img {
-        width: 40px;
-        height: 40px;
-    }
-
-    .admin-sidebar.collapsed .sidebar-logo span {
+    .admin-sidebar.collapsed .logo-text {
         opacity: 0;
         max-width: 0;
     }
 
-    .admin-sidebar.collapsed .sidebar-nav {
-        padding: 0.9rem 0.6rem;
+    .admin-sidebar.collapsed .sidebar-nav,
+    .admin-sidebar.collapsed .sidebar-footer {
+        padding-left: 0.6rem;
+        padding-right: 0.6rem;
     }
 
-    /* Toggle button - centered */
     .admin-sidebar.collapsed .sidebar-toggle-btn {
         justify-content: center;
-        padding: 0.65rem 0;
         gap: 0;
-        background: #f1f5f9;
-        border-color: #e2e8f0;
-        display: flex;
-        align-items: center;
+        padding: 0.6rem 0;
     }
 
     .admin-sidebar.collapsed .sidebar-toggle-btn span {
         opacity: 0;
         max-width: 0;
-        display: none;
     }
 
-    .admin-sidebar.collapsed .sidebar-toggle-btn i {
-        margin: 0;
-        transform: rotate(180deg);
-        font-size: 1.1rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 24px;
+    .admin-sidebar.collapsed .sidebar-toggle-btn:hover i {
+        transform: translateX(3px);
     }
 
     .admin-sidebar.collapsed .nav-section {
-        font-size: 0.64rem;
-        height: 13px;
-        padding: 0;
-        margin: 0.55rem 0;
+        padding: 0.7rem 0 0.3rem;
+        text-align: center;
+    }
+
+    .admin-sidebar.collapsed .nav-section span {
         opacity: 0;
     }
 
-    /* Menu buttons - centered icons */
+    /* A short rule stands in for the hidden section label */
+    .admin-sidebar.collapsed .nav-section::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        bottom: 6px;
+        width: 22px;
+        height: 1px;
+        background: var(--sb-border);
+        transform: translateX(-50%);
+    }
+
     .admin-sidebar.collapsed .menu-btn {
         justify-content: center;
-        width: 100%;
-        min-height: 44px;
-        padding: 0.7rem 0;
         gap: 0;
-        display: flex;
-        align-items: center;
+        padding: 0.68rem 0;
     }
 
     .admin-sidebar.collapsed .menu-btn > span {
         opacity: 0;
         max-width: 0;
-        display: none;
     }
 
-    /* Center the icon properly */
-    .admin-sidebar.collapsed .menu-icon {
-        width: 24px;
-        height: 24px;
-        margin: 0;
-        font-size: 1.15rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-        text-align: center;
-        line-height: 1;
-    }
-
-    .admin-sidebar.collapsed .menu-arrow {
-        opacity: 0;
-        max-width: 0;
-        overflow: hidden;
-        display: none;
-    }
-
-    .admin-sidebar.collapsed .menu-item {
-        position: relative;
+    .admin-sidebar.collapsed .menu-item:not(.active) .menu-btn:hover {
+        transform: translateX(0) scale(1.06);
     }
 
     .admin-sidebar.collapsed .badge-notif {
         position: absolute;
-        top: 2px;
-        right: 2px;
+        top: 3px;
+        right: 8px;
         margin: 0;
         min-width: 17px;
-        width: 17px;
         height: 17px;
-        padding: 0;
-        font-size: 0.52rem;
-        z-index: 5;
-        opacity: 1;
-    }
-
-    /* Tooltips */
-    .admin-sidebar.collapsed .menu-btn:hover::after {
-        content: attr(data-tooltip);
-        position: absolute;
-        left: calc(100% + 12px);
-        top: 50%;
-        transform: translateY(-50%);
-        background: #111827;
-        color: #ffffff;
-        padding: 0.45rem 0.7rem;
-        border-radius: 6px;
-        font-size: 0.72rem;
-        font-weight: 500;
-        white-space: nowrap;
-        z-index: 3000;
-        pointer-events: none;
-        box-shadow: 0 5px 15px rgba(0,0,0,0.18);
-        animation: tooltipFade 0.15s ease forwards;
-    }
-
-    .admin-sidebar.collapsed .sidebar-toggle-btn:hover::after {
-        content: attr(title);
-        position: absolute;
-        left: calc(100% + 12px);
-        top: 50%;
-        transform: translateY(-50%);
-        background: #111827;
-        color: #ffffff;
-        padding: 0.45rem 0.7rem;
-        border-radius: 6px;
-        font-size: 0.72rem;
-        font-weight: 500;
-        white-space: nowrap;
-        z-index: 3000;
-        pointer-events: none;
-        box-shadow: 0 5px 15px rgba(0,0,0,0.18);
-        animation: tooltipFade 0.15s ease forwards;
-    }
-
-    @keyframes tooltipFade {
-        from {
-            opacity: 0;
-            transform: translateY(-50%) translateX(-5px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(-50%) translateX(0);
-        }
+        padding: 0 3px;
+        font-size: 0.55rem;
     }
 
 }
 
 /* =========================================================
-   MOBILE RESPONSIVE - SIDEBAR ALWAYS EXPANDED
+   MOBILE — SIDEBAR BECOMES A SLIDE-IN DRAWER
    ========================================================= */
+
+.sidebar-backdrop {
+    display: none;
+}
+
+.mobile-menu-btn {
+    display: none;
+    width: 38px;
+    height: 38px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #ffffff;
+    color: #1f2937;
+    font-size: 1.15rem;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
+}
+
+.mobile-menu-btn:hover {
+    background: var(--active-blue-light);
+    color: var(--active-blue);
+}
+
+.mobile-menu-btn:active {
+    transform: scale(0.94);
+}
 
 @media (max-width: 992px) {
 
     .admin-sidebar {
-        width: var(--sidebar-width);
-        position: fixed;
-        left: 0;
-        top: 0;
-        bottom: 0;
-        z-index: 1000;
+        width: min(86vw, var(--sidebar-width));
+        transform: translateX(-102%);
+        box-shadow: none;
     }
 
-    /* Hide collapse button on mobile */
+    body.sidebar-open .admin-sidebar {
+        transform: translateX(0);
+        box-shadow: 18px 0 40px rgba(8, 20, 40, 0.28);
+    }
+
+    /* Collapsed state never applies on mobile */
+    .admin-sidebar.collapsed {
+        width: min(86vw, var(--sidebar-width));
+    }
+
     .sidebar-toggle-item {
         display: none !important;
     }
 
-    /* Force sidebar expanded on mobile */
-    .admin-sidebar.collapsed {
-        width: var(--sidebar-width) !important;
+    .sidebar-close {
+        display: flex;
     }
 
-    .admin-sidebar.collapsed .sidebar-header {
-        justify-content: space-between !important;
-        padding: 1rem 1.35rem !important;
+    .mobile-menu-btn {
+        display: inline-flex;
     }
 
-    .admin-sidebar.collapsed .sidebar-logo {
-        gap: 0.7rem !important;
-        justify-content: flex-start !important;
+    .sidebar-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 1030;
+        background: rgba(8, 20, 40, 0.5);
+        backdrop-filter: blur(2px);
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.3s ease, visibility 0s linear 0.3s;
     }
 
-    .admin-sidebar.collapsed .sidebar-logo span {
-        opacity: 1 !important;
-        max-width: 200px !important;
+    body.sidebar-open .sidebar-backdrop {
+        opacity: 1;
+        visibility: visible;
+        transition: opacity 0.3s ease, visibility 0s;
     }
 
-    .admin-sidebar.collapsed .nav-section {
-        font-size: 0.64rem !important;
-        height: auto !important;
-        padding: 1rem 0.75rem 0.35rem !important;
-        margin: 0 !important;
-        opacity: 1 !important;
+    body.sidebar-open {
+        overflow: hidden;
     }
 
-    .admin-sidebar.collapsed .menu-btn {
-        justify-content: flex-start !important;
-        padding: 0.7rem 0.95rem !important;
-        gap: 0.75rem !important;
-    }
-
-    .admin-sidebar.collapsed .menu-btn > span {
-        opacity: 1 !important;
-        max-width: 200px !important;
-    }
-
-    .admin-sidebar.collapsed .menu-arrow {
-        opacity: 1 !important;
-        max-width: 20px !important;
-        display: inline-block !important;
-    }
-
-    .admin-sidebar.collapsed .sidebar-toggle-btn {
-        display: none !important;
-    }
-
-    /* Main content takes full width */
-    .admin-main {
-        margin-left: 0 !important;
-        width: 100% !important;
-    }
-
+    .admin-main,
     .admin-main.sidebar-collapsed {
         margin-left: 0 !important;
         width: 100% !important;
@@ -1000,6 +1093,25 @@
 
     .header-info-group .divider-icon {
         display: none;
+    }
+
+}
+
+/* =========================================================
+   REDUCED MOTION
+   ========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+
+    .menu-item,
+    .menu-item.active .menu-btn::after,
+    .badge-notif {
+        animation: none !important;
+    }
+
+    .menu-btn:hover,
+    .menu-item:not(.active) .menu-btn:hover {
+        transform: none !important;
     }
 
 }
@@ -1449,166 +1561,211 @@
     'use strict';
 
     // =========================================================
-    // SIDEBAR PERSISTENCE
+    // SIDEBAR: COLLAPSE (desktop) + DRAWER (mobile)
     // =========================================================
 
-    function getSidebarElements() {
-        var sidebar = document.getElementById('adminSidebar');
-        var adminMain = document.getElementById('adminMain');
-        var collapseBtn = document.getElementById('sidebarCollapseBtn');
-        return { sidebar: sidebar, adminMain: adminMain, collapseBtn: collapseBtn };
+    var STORAGE_KEY = 'polymedicSidebarCollapsed';
+    var DESKTOP_MIN = 993;
+
+    var sidebar     = document.getElementById('adminSidebar');
+    var adminMain   = document.getElementById('adminMain');
+    var collapseBtn = document.getElementById('sidebarCollapseBtn');
+    var menuBtn     = document.getElementById('mobileMenuBtn');
+    var closeBtn    = document.getElementById('sidebarCloseBtn');
+    var backdrop    = document.getElementById('sidebarBackdrop');
+
+    function isDesktop() {
+        return window.innerWidth >= DESKTOP_MIN;
     }
 
-    // Apply saved state instantly (no transition) on first paint,
-    // so the page never "animates" into its initial state on load.
-    function applySidebarState(skipTransition) {
-        var elements = getSidebarElements();
-        var sidebar = elements.sidebar;
-        var adminMain = elements.adminMain;
-
-        if (!sidebar || !adminMain) {
-            setTimeout(function() { applySidebarState(skipTransition); }, 50);
-            return;
+    // localStorage can throw in private mode / sandboxed iframes.
+    function readCollapsed() {
+        try {
+            return localStorage.getItem(STORAGE_KEY) === '1';
+        } catch (e) {
+            return false;
         }
+    }
+
+    function writeCollapsed(value) {
+        try {
+            localStorage.setItem(STORAGE_KEY, value ? '1' : '0');
+        } catch (e) { /* ignore */ }
+    }
+
+    function setCollapsed(collapsed, skipTransition) {
+        if (!sidebar || !adminMain) return;
 
         if (skipTransition) {
             sidebar.classList.add('no-transition');
             adminMain.classList.add('no-transition');
         }
 
-        if (window.innerWidth <= 992) {
-            sidebar.classList.remove('collapsed');
-            adminMain.classList.remove('sidebar-collapsed');
-            updateCollapseButton();
-            if (skipTransition) requestAnimationFrame(removeNoTransition);
-            return;
+        sidebar.classList.toggle('collapsed', collapsed);
+        adminMain.classList.toggle('sidebar-collapsed', collapsed);
+        updateCollapseButton(collapsed);
+
+        if (skipTransition) {
+            // Two frames: one to paint the new state, one to re-enable easing.
+            requestAnimationFrame(function() {
+                requestAnimationFrame(function() {
+                    sidebar.classList.remove('no-transition');
+                    adminMain.classList.remove('no-transition');
+                });
+            });
         }
-
-        var savedState = localStorage.getItem('polymedicSidebarCollapsed');
-
-        if (savedState === null) {
-            localStorage.setItem('polymedicSidebarCollapsed', '0');
-            savedState = '0';
-        }
-
-        if (savedState === '1') {
-            sidebar.classList.add('collapsed');
-            adminMain.classList.add('sidebar-collapsed');
-        } else {
-            sidebar.classList.remove('collapsed');
-            adminMain.classList.remove('sidebar-collapsed');
-        }
-
-        updateCollapseButton();
-
-        if (skipTransition) requestAnimationFrame(removeNoTransition);
     }
 
-    function removeNoTransition() {
-        var elements = getSidebarElements();
-        if (elements.sidebar) elements.sidebar.classList.remove('no-transition');
-        if (elements.adminMain) elements.adminMain.classList.remove('no-transition');
-    }
-
-    // =========================================================
-    // UPDATE COLLAPSE BUTTON
-    // =========================================================
-
-    function updateCollapseButton() {
-        var elements = getSidebarElements();
-        var sidebar = elements.sidebar;
-        var collapseBtn = elements.collapseBtn;
-
-        if (!collapseBtn || !sidebar) return;
+    function updateCollapseButton(collapsed) {
+        if (!collapseBtn) return;
 
         var icon = collapseBtn.querySelector('i');
         var text = collapseBtn.querySelector('span');
-        var isCollapsed = sidebar.classList.contains('collapsed');
+        var label = collapsed ? 'Expand Sidebar' : 'Collapse Sidebar';
 
-        if (isCollapsed) {
-            if (icon) icon.className = 'bi bi-layout-sidebar-inset-reverse';
-            collapseBtn.title = 'Expand Sidebar';
-            if (text) text.textContent = 'Expand Sidebar';
-        } else {
-            if (icon) icon.className = 'bi bi-layout-sidebar-inset';
-            collapseBtn.title = 'Collapse Sidebar';
-            if (text) text.textContent = 'Collapse Sidebar';
+        // One icon, no CSS rotation, so it can't get flipped twice.
+        if (icon) {
+            icon.className = collapsed
+                ? 'bi bi-chevron-double-right'
+                : 'bi bi-chevron-double-left';
         }
+        if (text) text.textContent = label;
+
+        collapseBtn.setAttribute('aria-label', label);
+        collapseBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        collapseBtn.setAttribute('data-tooltip', label);
+        collapseBtn.removeAttribute('title'); // avoids a duplicate native tooltip
     }
 
-    // =========================================================
-    // APPLY ON PAGE LOAD
-    // =========================================================
+    // ---- mobile drawer -------------------------------------
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() {
-            applySidebarState(true);
+    function openDrawer() {
+        document.body.classList.add('sidebar-open');
+        if (menuBtn) menuBtn.setAttribute('aria-expanded', 'true');
+        if (backdrop) backdrop.removeAttribute('hidden');
+        if (closeBtn) closeBtn.focus();
+    }
+
+    function closeDrawer() {
+        document.body.classList.remove('sidebar-open');
+        if (menuBtn) menuBtn.setAttribute('aria-expanded', 'false');
+    }
+
+    if (menuBtn)  menuBtn.addEventListener('click', openDrawer);
+    if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
+    if (backdrop) backdrop.addEventListener('click', closeDrawer);
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeDrawer();
+    });
+
+    // Tapping a link closes the drawer so the new page isn't covered.
+    if (sidebar) {
+        sidebar.addEventListener('click', function(e) {
+            if (!isDesktop() && e.target.closest('.menu-btn')) closeDrawer();
         });
-    } else {
-        applySidebarState(true);
     }
 
-    window.addEventListener('load', function() {
-        applySidebarState(true);
-    });
-
-    window.addEventListener('pageshow', function(e) {
-        if (e.persisted) {
-            setTimeout(function() { applySidebarState(true); }, 50);
-        }
-    });
-
-    // =========================================================
-    // TOGGLE FUNCTION
-    // =========================================================
+    // ---- collapse toggle -----------------------------------
 
     window.toggleSidebarCollapse = function() {
-        var elements = getSidebarElements();
-        var sidebar = elements.sidebar;
-        var adminMain = elements.adminMain;
-
-        if (!sidebar || !adminMain) return;
-        if (window.innerWidth <= 992) return;
-
-        if (sidebar.classList.contains('collapsed')) {
-            sidebar.classList.remove('collapsed');
-            adminMain.classList.remove('sidebar-collapsed');
-            localStorage.setItem('polymedicSidebarCollapsed', '0');
-        } else {
-            sidebar.classList.add('collapsed');
-            adminMain.classList.add('sidebar-collapsed');
-            localStorage.setItem('polymedicSidebarCollapsed', '1');
-        }
-
-        updateCollapseButton();
+        if (!isDesktop()) return;
+        var next = !sidebar.classList.contains('collapsed');
+        setCollapsed(next, false);
+        writeCollapsed(next);
+        hideTooltip();
     };
 
-    // =========================================================
-    // RESIZE HANDLER
-    // =========================================================
+    if (collapseBtn) {
+        collapseBtn.addEventListener('click', window.toggleSidebarCollapse);
+    }
+
+    // ---- initial state -------------------------------------
+
+    function applySidebarState() {
+        if (!sidebar || !adminMain) return;
+        setCollapsed(isDesktop() && readCollapsed(), true);
+        if (!isDesktop()) closeDrawer();
+    }
+
+    applySidebarState();
+
+    window.addEventListener('pageshow', function(e) {
+        if (e.persisted) applySidebarState();
+    });
+
+    // ---- resize (debounced) --------------------------------
+
+    var resizeTimer = null;
+    var wasDesktop = isDesktop();
 
     window.addEventListener('resize', function() {
-        var elements = getSidebarElements();
-        var sidebar = elements.sidebar;
-        var adminMain = elements.adminMain;
-
-        if (!sidebar || !adminMain) return;
-
-        if (window.innerWidth > 992) {
-            var savedState = localStorage.getItem('polymedicSidebarCollapsed');
-            if (savedState === '1') {
-                sidebar.classList.add('collapsed');
-                adminMain.classList.add('sidebar-collapsed');
-            } else {
-                sidebar.classList.remove('collapsed');
-                adminMain.classList.remove('sidebar-collapsed');
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function() {
+            var nowDesktop = isDesktop();
+            if (nowDesktop !== wasDesktop) {
+                wasDesktop = nowDesktop;
+                applySidebarState();
             }
-        } else {
-            sidebar.classList.remove('collapsed');
-            adminMain.classList.remove('sidebar-collapsed');
-        }
-        updateCollapseButton();
+            if (nowDesktop) closeDrawer();
+            hideTooltip();
+        }, 120);
     });
+
+    // =========================================================
+    // COLLAPSED TOOLTIPS
+    // Appended to <body>, positioned with fixed coords, so the
+    // sidebar's scroll container can never clip them.
+    // =========================================================
+
+    var tooltipEl = null;
+
+    function getTooltipEl() {
+        if (!tooltipEl) {
+            tooltipEl = document.createElement('div');
+            tooltipEl.className = 'sb-tooltip';
+            tooltipEl.setAttribute('role', 'tooltip');
+            document.body.appendChild(tooltipEl);
+        }
+        return tooltipEl;
+    }
+
+    function showTooltip(target) {
+        if (!isDesktop() || !sidebar.classList.contains('collapsed')) return;
+
+        var label = target.getAttribute('data-tooltip');
+        if (!label) return;
+
+        var tip = getTooltipEl();
+        tip.textContent = label;
+        tip.style.visibility = 'hidden';
+        tip.classList.add('show');
+
+        var rect = target.getBoundingClientRect();
+        var top = rect.top + (rect.height / 2) - (tip.offsetHeight / 2);
+
+        // Keep it on screen near the very top/bottom of the list.
+        top = Math.max(8, Math.min(top, window.innerHeight - tip.offsetHeight - 8));
+
+        tip.style.left = (rect.right + 12) + 'px';
+        tip.style.top = top + 'px';
+        tip.style.visibility = 'visible';
+    }
+
+    function hideTooltip() {
+        if (tooltipEl) tooltipEl.classList.remove('show');
+    }
+
+    if (sidebar) {
+        sidebar.querySelectorAll('[data-tooltip]').forEach(function(el) {
+            el.addEventListener('mouseenter', function() { showTooltip(el); });
+            el.addEventListener('focus', function() { showTooltip(el); });
+            el.addEventListener('mouseleave', hideTooltip);
+            el.addEventListener('blur', hideTooltip);
+        });
+
+        sidebar.addEventListener('scroll', hideTooltip, { passive: true });
+    }
 
     // =========================================================
     // NOTIFICATIONS
@@ -1775,9 +1932,15 @@
    on page load, so restoring a saved collapsed/expanded state
    never itself animates — only user clicks do. */
 .admin-sidebar.no-transition,
-.admin-sidebar.no-transition * ,
+.admin-sidebar.no-transition *,
 .admin-main.no-transition {
     transition: none !important;
+}
+
+/* Skip the staggered intro when a saved collapsed state is
+   restored, otherwise items animate in on every page load. */
+.admin-sidebar.no-transition .menu-item {
+    animation: none !important;
 }
 </style>
 

@@ -190,14 +190,15 @@ class Receptionist extends BaseController
                 if (!empty($name) && !isset($seenKeys[$key])) {
                     $seenKeys[$key] = true;
                     $allPatients[] = [
+                        'id'           => $patient['id'] ?? null,
                         'patient_code' => $patient['patient_code'] ?? 'N/A',
-                        'full_name' => $patient['full_name'] ?? 'Unknown',
-                        'email' => $patient['email'] ?? '',
-                        'phone' => $patient['phone'] ?? '',
-                        'age' => $patient['age'] ?? '',
-                        'gender' => $patient['gender'] ?? '',
-                        'source' => ucfirst($patient['source'] ?? 'Unknown'),
-                        'last_visit' => $patient['created_at'] ?? null,
+                        'full_name'    => $patient['full_name'] ?? 'Unknown',
+                        'email'        => $patient['email'] ?? '',
+                        'phone'        => $patient['phone'] ?? '',
+                        'age'          => $patient['age'] ?? '',
+                        'gender'       => $patient['gender'] ?? '',
+                        'source'       => ucfirst($patient['source'] ?? 'Unknown'),
+                        'last_visit'   => $patient['created_at'] ?? null,
                     ];
                 }
             }
@@ -219,14 +220,15 @@ class Receptionist extends BaseController
                 if (!empty($name) && !isset($seenKeys[$key])) {
                     $seenKeys[$key] = true;
                     $allPatients[] = [
+                        'id'           => $this->resolvePatientId(null, $patient['full_name'] ?? '', $patient['age'] ?? null),
                         'patient_code' => 'N/A',
-                        'full_name' => $patient['full_name'] ?? 'Unknown',
-                        'email' => $patient['email'] ?? '',
-                        'phone' => $patient['phone'] ?? '',
-                        'age' => $patient['age'] ?? '',
-                        'gender' => $patient['gender'] ?? '',
-                        'source' => 'Online',
-                        'last_visit' => $patient['last_visit'] ?? null,
+                        'full_name'    => $patient['full_name'] ?? 'Unknown',
+                        'email'        => $patient['email'] ?? '',
+                        'phone'        => $patient['phone'] ?? '',
+                        'age'          => $patient['age'] ?? '',
+                        'gender'       => $patient['gender'] ?? '',
+                        'source'       => 'Online',
+                        'last_visit'   => $patient['last_visit'] ?? null,
                     ];
                 }
             }
@@ -249,14 +251,15 @@ class Receptionist extends BaseController
                 if (!empty($name) && !isset($seenKeys[$key])) {
                     $seenKeys[$key] = true;
                     $allPatients[] = [
+                        'id'           => $this->resolvePatientId(null, $patient['full_name'] ?? '', $patient['age'] ?? null),
                         'patient_code' => 'N/A',
-                        'full_name' => $patient['full_name'] ?? 'Unknown',
-                        'email' => '',
-                        'phone' => '',
-                        'age' => $patient['age'] ?? '',
-                        'gender' => $patient['gender'] ?? '',
-                        'source' => 'Walk-in (Lab)',
-                        'last_visit' => $patient['last_visit'] ?? null,
+                        'full_name'    => $patient['full_name'] ?? 'Unknown',
+                        'email'        => '',
+                        'phone'        => '',
+                        'age'          => $patient['age'] ?? '',
+                        'gender'       => $patient['gender'] ?? '',
+                        'source'       => 'Walk-in (Lab)',
+                        'last_visit'   => $patient['last_visit'] ?? null,
                     ];
                 }
             }
@@ -279,14 +282,15 @@ class Receptionist extends BaseController
                 if (!empty($name) && !isset($seenKeys[$key])) {
                     $seenKeys[$key] = true;
                     $allPatients[] = [
+                        'id'           => $this->resolvePatientId(null, $patient['full_name'] ?? '', $patient['age'] ?? null),
                         'patient_code' => 'N/A',
-                        'full_name' => $patient['full_name'] ?? 'Unknown',
-                        'email' => '',
-                        'phone' => '',
-                        'age' => $patient['age'] ?? '',
-                        'gender' => $patient['gender'] ?? '',
-                        'source' => 'Walk-in (X-Ray)',
-                        'last_visit' => $patient['last_visit'] ?? null,
+                        'full_name'    => $patient['full_name'] ?? 'Unknown',
+                        'email'        => '',
+                        'phone'        => '',
+                        'age'          => $patient['age'] ?? '',
+                        'gender'       => $patient['gender'] ?? '',
+                        'source'       => 'Walk-in (X-Ray)',
+                        'last_visit'   => $patient['last_visit'] ?? null,
                     ];
                 }
             }
@@ -299,6 +303,38 @@ class Receptionist extends BaseController
         });
 
         return $allPatients;
+    }
+
+    /**
+     * Resolve a patient row's id by name (and optionally age) if it
+     * wasn't already provided. Used so the eye icon always has a valid
+     * patient id, even for rows that came from appointments or
+     * diagnostic requests rather than the patients table.
+     */
+    private function resolvePatientId(?int $id, string $fullName, $age = null): ?int
+    {
+        if (!empty($id)) {
+            return (int) $id;
+        }
+
+        $fullName = trim($fullName);
+        if ($fullName === '') {
+            return null;
+        }
+
+        try {
+            $patientModel = new PatientModel();
+            $query = $patientModel->where('full_name', $fullName);
+            if (!empty($age)) {
+                $query->where('age', $age);
+            }
+            $row = $query->first();
+
+            return isset($row['id']) ? (int) $row['id'] : null;
+        } catch (\Exception $e) {
+            log_message('error', 'resolvePatientId error: ' . $e->getMessage());
+            return null;
+        }
     }
 
     public function appointments()
@@ -355,7 +391,91 @@ class Receptionist extends BaseController
             'late'      => 'dark'
         ];
 
+        $data['viewMode'] = 'appointment';
+
         return view('Receptionist/appointment_view', $data);
+    }
+
+    /**
+     * View a single patient using the shared appointment/patient view.
+     * Reached from the eye icon on the patients list.
+     */
+    public function viewPatient($id = null)
+    {
+        $redirect = $this->checkAuth();
+        if ($redirect) return $redirect;
+
+        $id = (int) $id;
+        if ($id <= 0) {
+            return redirect()->to(base_url('receptionist/patients'))
+                             ->with('error', 'Invalid patient.');
+        }
+
+        $patientModel = new PatientModel();
+        $patient      = $patientModel->find($id);
+
+        if (! $patient) {
+            return redirect()->to(base_url('receptionist/patients'))
+                             ->with('error', 'Patient not found.');
+        }
+
+        // Normalize "source" into a human-readable service type.
+        $source      = strtolower((string) ($patient['source'] ?? ''));
+        $serviceType = (strpos($source, 'walk-in') !== false) ? 'Walk-in' : 'Online';
+
+        // Shape the data the way appointment_view.php expects.
+        $appointment = [
+            'id'               => $patient['id']           ?? null,
+            'reference_number' => $patient['patient_code'] ?? '—',
+            'full_name'        => $patient['full_name']    ?? '',
+            'gender'           => $patient['gender']       ?? '',
+            'age'              => $patient['age']          ?? '',
+            'email'            => $patient['email']        ?? '',
+            'phone'            => $patient['phone']        ?? '',
+            'appointment_date' => $patient['created_at']   ?? null,
+            'appointment_time' => null,
+            'arrival_time'     => null,
+            'created_at'       => $patient['created_at']   ?? null,
+            'updated_at'       => $patient['updated_at']   ?? null,
+            'status'           => 'approved',
+            'service_type'     => $serviceType,
+            'other_requests'   => '',
+        ];
+
+        // Pull this patient's diagnostic history (optional — fails silently).
+        $lab_services  = [];
+        $xray_services = [];
+
+        try {
+            $diagnosticModel = new DiagnosticRequestModel();
+
+            $rows = $diagnosticModel
+                ->where('patient_name', $appointment['full_name'])
+                ->orderBy('created_at', 'DESC')
+                ->limit(20)
+                ->findAll();
+
+            foreach ($rows as $row) {
+                $services = array_filter(array_map('trim', explode(',', (string) ($row['services'] ?? ''))));
+                if (($row['type'] ?? '') === 'xray') {
+                    $xray_services = array_merge($xray_services, $services);
+                } else {
+                    $lab_services = array_merge($lab_services, $services);
+                }
+            }
+
+            $lab_services  = array_values(array_unique($lab_services));
+            $xray_services = array_values(array_unique($xray_services));
+        } catch (\Exception $e) {
+            log_message('error', 'viewPatient history error: ' . $e->getMessage());
+        }
+
+        return view('Receptionist/appointment_view', [
+            'appointment'   => $appointment,
+            'lab_services'  => $lab_services,
+            'xray_services' => $xray_services,
+            'viewMode'      => 'patient',
+        ]);
     }
 
     public function approveAppointment($id)

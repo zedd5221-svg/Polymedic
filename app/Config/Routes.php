@@ -19,6 +19,10 @@ $routes->get('logout', 'Auth::logout');
 $routes->group('admin', ['filter' => 'auth:admin'], function ($routes) {
     $routes->get('dashboard', 'Admin::dashboard');
     $routes->get('patients', 'Admin::patients');
+
+    // ✅ Patient detail view (used by the eye icon on the patients list)
+    $routes->get('patient/view/(:num)', 'Admin::viewPatient/$1');
+
     $routes->get('requests', 'Admin::requests');
     $routes->get('users', 'Admin::users');
     $routes->get('sync-xray', 'Admin::syncXrayExaminations');
@@ -69,6 +73,9 @@ $routes->group('admin', ['filter' => 'auth:admin'], function ($routes) {
 $routes->group('receptionist', ['filter' => 'auth:receptionist'], function ($routes) {
     $routes->get('dashboard', 'Receptionist::dashboard');
     $routes->get('patients', 'Receptionist::patients');
+
+    // ✅ Patient detail view (used by the eye icon on the patients list)
+    $routes->get('patient/view/(:num)', 'Receptionist::viewPatient/$1');
 
     // Appointments
     $routes->get('appointments', 'Receptionist::appointments');

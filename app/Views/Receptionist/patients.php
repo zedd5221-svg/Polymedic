@@ -161,6 +161,7 @@
                             $age      = (string) ($patient['age'] ?? 'N/A');
                             $email    = (string) ($patient['email'] ?? '');
                             $phone    = (string) ($patient['phone'] ?? '');
+                            $pid      = isset($patient['id']) ? (int) $patient['id'] : 0;
 
                             // Avatar kind: male, female, or neutral fallback to initials
                             $genderRaw  = strtolower(trim($gender));
@@ -228,9 +229,21 @@
 
                                 <td data-label="Actions" class="pt-c-actions">
                                     <div class="pt-actions">
-                                        <button type="button" class="pt-icon-btn" title="View patient" aria-label="View <?= esc($name, 'attr') ?>">
-                                            <i class="bi bi-eye" aria-hidden="true"></i>
-                                        </button>
+                                        <?php if ($pid > 0): ?>
+                                            <a href="<?= base_url('receptionist/patient/view/' . $pid) ?>"
+                                               class="pt-icon-btn"
+                                               title="View patient"
+                                               aria-label="View <?= esc($name, 'attr') ?>">
+                                                <i class="bi bi-eye" aria-hidden="true"></i>
+                                            </a>
+                                        <?php else: ?>
+                                            <span class="pt-icon-btn"
+                                                  aria-disabled="true"
+                                                  title="No linked patient record"
+                                                  style="opacity:.35;cursor:not-allowed;">
+                                                <i class="bi bi-eye-slash" aria-hidden="true"></i>
+                                            </span>
+                                        <?php endif; ?>
                                     </div>
                                 </td>
                             </tr>

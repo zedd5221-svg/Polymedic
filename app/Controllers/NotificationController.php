@@ -15,533 +15,325 @@ class NotificationController extends BaseController
 
     /**
      * ============================================================
-     * HELPER - Clean Link (Removes ALL base URL variations)
+     * GUARD
      * ============================================================
+     * Exact role match. No admin bypass - an admin hitting the
+     * radiologist endpoints is sent back to the admin dashboard.
      */
-    private function cleanLink($link)
+    private function guard(string $requiredRole)
     {
-        if (empty($link)) {
-            return '';
-        }
-        
-        // Remove ALL possible base URL variations
-        $link = str_replace('http://localhost/polymedic/public/', '', $link);
-        $link = str_replace('https://localhost/polymedic/public/', '', $link);
-        $link = str_replace('http://localhost/polymedic/', '', $link);
-        $link = str_replace('https://localhost/polymedic/', '', $link);
-        $link = str_replace('/polymedic/public/', '', $link);
-        $link = str_replace('polymedic/public/', '', $link);
-        $link = str_replace('/public/', '', $link);
-        $link = str_replace('/index.php/', '', $link);
-        $link = str_replace(base_url(), '', $link);
-        $link = ltrim($link, '/');
-        
-        return $link;
-    }
+        $isAjax = $this->request->isAJAX();
 
-    private function getFullLink($link)
-    {
-        $cleaned = $this->cleanLink($link);
-        if (empty($cleaned)) {
-            return base_url('admin/dashboard');
+        if (!session()->get('is_logged_in')) {
+            return $isAjax
+                ? $this->response->setStatusCode(401)->setJSON(['status' => 'error', 'message' => 'Unauthorized'])
+                : redirect()->to(base_url('login'));
         }
-        return base_url($cleaned);
+
+        if (session()->get('role') !== $requiredRole) {
+            return $isAjax
+                ? $this->response->setStatusCode(403)->setJSON(['status' => 'error', 'message' => 'Forbidden'])
+                : redirect()->to($this->notificationModel->dashboardFor(session()->get('role')))
+                            ->with('error', 'You do not have access to that page.');
+        }
+
+        return null;
     }
 
     /**
      * ============================================================
-     * ADMIN NOTIFICATION METHODS
+     * SHARED IMPLEMENTATIONS
      * ============================================================
      */
 
+    private function listFor(string $role, string $view)
+    {
+        $notifications = $this->notificationModel->getAllForRole($role);
+
+        return view($view, [
+            'notifications' => $notifications,
+            'unread_count'  => $this->notificationModel->getUnreadCount($role),
+            'unreadCount'   => $this->notificationModel->getUnreadCount($role), // legacy view var
+            'total_count'   => count($notifications),
+            'notif_base'    => NotificationModel::NOTIFICATION_PAGES[$role] ?? '',
+        ]);
+    }
+
+    private function fetchFor(string $role)
+    {
+        return $this->response->setJSON([
+            'status'        => 'success',
+            'unread_count'  => $this->notificationModel->getUnreadCount($role),
+            'notifications' => $this->notificationModel->getNotificationsForJson(6, $role),
+        ]);
+    }
+
+    /**
+     * Mark read, then redirect. Rows belonging to another role are
+     * treated as not found. Notify-only rows are marked read but
+     * never redirect anywhere.
+     */
+    private function markReadFor(string $role, $id)
+    {
+        $notification = $this->notificationModel->findForRole($id, $role);
+        $ownPage      = $this->notificationModel->notificationsPageFor($role);
+
+        if (!$notification) {
+            return $this->request->isAJAX()
+                ? $this->response->setStatusCode(404)->setJSON(['status' => 'error', 'message' => 'Notification not found'])
+                : redirect()->to($ownPage)->with('error', 'Notification not found.');
+        }
+
+        $this->notificationModel->markAsRead($id, $role);
+        $target = $this->notificationModel->resolveLink($notification, $role);
+
+        if ($this->request->isAJAX()) {
+            return $this->response->setJSON([
+                'status'       => 'success',
+                'unread_count' => $this->notificationModel->getUnreadCount($role),
+                'can_open'     => $target !== null,
+                'target_link'  => $target,
+            ]);
+        }
+
+        if ($target === null) {
+            return redirect()->to($ownPage)->with('success', 'Marked as read.');
+        }
+
+        return redirect()->to($target);
+    }
+
+    private function markAllReadFor(string $role)
+    {
+        $this->notificationModel->markAllAsRead($role);
+
+        if ($this->request->isAJAX()) {
+            return $this->response->setJSON([
+                'status'       => 'success',
+                'unread_count' => 0,
+                'message'      => 'All notifications marked as read',
+            ]);
+        }
+
+        return redirect()->to($this->notificationModel->notificationsPageFor($role))
+                         ->with('success', 'All notifications marked as read');
+    }
+
+    private function deleteFor(string $role, $id)
+    {
+        $ok = $this->notificationModel->deleteForRole($id, $role);
+
+        if ($this->request->isAJAX()) {
+            return $this->response->setJSON([
+                'status'  => $ok ? 'success' : 'error',
+                'message' => $ok ? 'Notification deleted' : 'Notification not found',
+            ]);
+        }
+
+        return redirect()->to($this->notificationModel->notificationsPageFor($role))
+                         ->with($ok ? 'success' : 'error', $ok ? 'Notification deleted successfully' : 'Notification not found.');
+    }
+
+    /**
+     * ============================================================
+     * ADMIN
+     * ============================================================
+     */
     public function index()
     {
-        if (!session()->get('is_logged_in')) {
-            return redirect()->to(base_url('login'));
-        }
-
-        $notifications = $this->notificationModel->orderBy('created_at', 'DESC')->findAll();
-        
-        foreach ($notifications as &$notif) {
-            $notif['full_link'] = $this->getFullLink($notif['link'] ?? '');
-        }
-
-        $data['notifications'] = $notifications;
-        $data['unread_count']  = $this->notificationModel->getUnreadCount();
-        $data['total_count']   = count($notifications);
-
-        return view('Admin/notifications', $data);
+        if ($r = $this->guard('admin')) return $r;
+        return $this->listFor('admin', 'Admin/notifications');
     }
 
     public function fetch()
     {
-        if (!session()->get('is_logged_in')) {
-            return $this->response->setJSON(['status' => 'error', 'message' => 'Unauthorized']);
-        }
-
-        $unreadCount = $this->notificationModel->getUnreadCount();
-        $recent      = $this->notificationModel->getRecentNotifications(6);
-
-        $formatted = array_map(function ($item) {
-            return [
-                'id'           => $item['id'],
-                'type'         => $item['type'],
-                'title'        => $item['title'],
-                'message'      => $item['message'],
-                'link'         => $this->getFullLink($item['link'] ?? ''),
-                'is_read'      => (int)$item['is_read'],
-                'time_ago'     => $this->timeAgo($item['created_at']),
-                'created_at'   => $item['created_at']
-            ];
-        }, $recent);
-
-        return $this->response->setJSON([
-            'status'        => 'success',
-            'unread_count'  => $unreadCount,
-            'notifications' => $formatted
-        ]);
+        if ($r = $this->guard('admin')) return $r;
+        return $this->fetchFor('admin');
     }
 
     public function markRead($id)
     {
-        if (!session()->get('is_logged_in')) {
-            if ($this->request->isAJAX()) {
-                return $this->response->setJSON(['status' => 'error', 'message' => 'Unauthorized']);
-            }
-            return redirect()->to(base_url('login'));
-        }
-
-        $notification = $this->notificationModel->find($id);
-
-        if ($notification) {
-            $this->notificationModel->markAsRead($id);
-            
-            // Clean the link and add base_url
-            $link = $this->cleanLink($notification['link'] ?? '');
-            
-            if (empty($link)) {
-                $targetLink = base_url('admin/dashboard');
-            } else {
-                $targetLink = base_url($link);
-            }
-        } else {
-            $targetLink = base_url('admin/dashboard');
-        }
-
-        if ($this->request->isAJAX()) {
-            return $this->response->setJSON([
-                'status'       => 'success',
-                'unread_count' => $this->notificationModel->getUnreadCount(),
-                'target_link'  => $targetLink
-            ]);
-        }
-
-        return redirect()->to($targetLink);
+        if ($r = $this->guard('admin')) return $r;
+        return $this->markReadFor('admin', $id);
     }
 
     public function markAllRead()
     {
-        if (!session()->get('is_logged_in')) {
-            if ($this->request->isAJAX()) {
-                return $this->response->setJSON(['status' => 'error', 'message' => 'Unauthorized']);
-            }
-            return redirect()->to(base_url('login'));
-        }
-
-        $this->notificationModel->markAllAsRead();
-
-        if ($this->request->isAJAX()) {
-            return $this->response->setJSON([
-                'status'       => 'success',
-                'unread_count' => 0,
-                'message'      => 'All notifications marked as read'
-            ]);
-        }
-
-        return redirect()->back()->with('success', 'All notifications marked as read');
+        if ($r = $this->guard('admin')) return $r;
+        return $this->markAllReadFor('admin');
     }
 
     public function delete($id)
     {
-        if (!session()->get('is_logged_in')) {
+        if ($r = $this->guard('admin')) return $r;
+        return $this->deleteFor('admin', $id);
+    }
+
+    /**
+     * Bulk delete. Row IDs arrive as ids[] in the POST body.
+     *
+     * Only rows belonging to the caller's role are removed, so a
+     * crafted POST cannot reach across roles. The role filter is
+     * what makes this safe to expose from every notification page
+     * (admin, receptionist, radiologist, medtech) through the same
+     * route, because each caller only ever sees their own rows.
+     */
+    public function deleteBatch()
+    {
+        $role = (string) session()->get('role');
+
+        $pages = [
+            'admin'        => 'admin/notifications',
+            'receptionist' => 'receptionist/notifications',
+            'radiologist'  => 'radiologist/notifications',
+            'med_tech'     => 'medtech/notifications',
+        ];
+
+        if ($role === '' || !isset($pages[$role])) {
             return redirect()->to(base_url('login'));
         }
 
-        $this->notificationModel->delete($id);
+        $ids = $this->request->getPost('ids');
 
-        if ($this->request->isAJAX()) {
-            return $this->response->setJSON([
-                'status'  => 'success',
-                'message' => 'Notification deleted successfully'
-            ]);
+        if (!is_array($ids) || empty($ids)) {
+            return redirect()->to(base_url($pages[$role]))
+                             ->with('error', 'No notifications were selected.');
         }
 
-        return redirect()->back()->with('success', 'Notification deleted successfully');
+        $clean = [];
+        foreach ($ids as $id) {
+            $n = (int) $id;
+            if ($n > 0) { $clean[$n] = $n; }
+        }
+
+        if (empty($clean)) {
+            return redirect()->to(base_url($pages[$role]))
+                             ->with('error', 'No valid notifications were selected.');
+        }
+
+        $clean = array_values($clean);
+
+        try {
+            $this->notificationModel
+                 ->whereIn('id', $clean)
+                 ->where('user_role', $role)
+                 ->delete();
+        } catch (\Exception $e) {
+            log_message('error', 'Bulk notification delete failed: ' . $e->getMessage());
+            return redirect()->to(base_url($pages[$role]))
+                             ->with('error', 'Could not delete the selected notifications.');
+        }
+
+        $count = count($clean);
+        $msg = $count === 1
+            ? '1 notification deleted.'
+            : $count . ' notifications deleted.';
+
+        return redirect()->to(base_url($pages[$role]))->with('success', $msg);
     }
 
     /**
      * ============================================================
-     * RECEPTIONIST NOTIFICATION METHODS
+     * RECEPTIONIST
      * ============================================================
      */
-
     public function receptionistIndex()
     {
-        if (!session()->get('is_logged_in')) {
-            return redirect()->to(base_url('login'));
-        }
-
-        $role = session()->get('role');
-        if ($role !== 'receptionist') {
-            return redirect()->to(base_url('admin/dashboard'));
-        }
-
-        $notifications = $this->notificationModel->orderBy('created_at', 'DESC')->findAll();
-        
-        foreach ($notifications as &$notif) {
-            $notif['full_link'] = $this->getFullLink($notif['link'] ?? '');
-        }
-
-        $data['notifications'] = $notifications;
-        $data['unread_count']  = $this->notificationModel->getUnreadCount();
-        $data['total_count']   = count($notifications);
-
-        return view('Receptionist/notifications', $data);
+        if ($r = $this->guard('receptionist')) return $r;
+        return $this->listFor('receptionist', 'Receptionist/notifications');
     }
 
     public function receptionistFetch()
     {
-        if (!session()->get('is_logged_in')) {
-            return $this->response->setJSON(['status' => 'error', 'message' => 'Unauthorized']);
-        }
-
-        $role = session()->get('role');
-        if ($role !== 'receptionist') {
-            return $this->response->setJSON(['status' => 'error', 'message' => 'Unauthorized']);
-        }
-
-        $unreadCount = $this->notificationModel->getUnreadCount();
-        $recent      = $this->notificationModel->getRecentNotifications(6);
-
-        $formatted = array_map(function ($item) {
-            $link = $this->cleanLink($item['link'] ?? '');
-            
-            if (!empty($link) && strpos($link, 'admin') !== false) {
-                $link = str_replace('admin', 'receptionist', $link);
-            }
-            
-            return [
-                'id'           => $item['id'],
-                'type'         => $item['type'],
-                'title'        => $item['title'],
-                'message'      => $item['message'],
-                'link'         => base_url($link),
-                'is_read'      => (int)$item['is_read'],
-                'time_ago'     => $this->timeAgo($item['created_at']),
-                'created_at'   => $item['created_at']
-            ];
-        }, $recent);
-
-        return $this->response->setJSON([
-            'status'        => 'success',
-            'unread_count'  => $unreadCount,
-            'notifications' => $formatted
-        ]);
+        if ($r = $this->guard('receptionist')) return $r;
+        return $this->fetchFor('receptionist');
     }
 
     public function receptionistMarkRead($id)
     {
-        if (!session()->get('is_logged_in')) {
-            if ($this->request->isAJAX()) {
-                return $this->response->setJSON(['status' => 'error', 'message' => 'Unauthorized']);
-            }
-            return redirect()->to(base_url('login'));
-        }
-
-        $role = session()->get('role');
-        if ($role !== 'receptionist') {
-            return redirect()->to(base_url('admin/dashboard'));
-        }
-
-        $notification = $this->notificationModel->find($id);
-
-        if ($notification) {
-            $this->notificationModel->markAsRead($id);
-            $link = $this->cleanLink($notification['link'] ?? '');
-            
-            if (!empty($link) && strpos($link, 'admin') !== false) {
-                $link = str_replace('admin', 'receptionist', $link);
-            }
-            
-            if (empty($link)) {
-                $targetLink = base_url('receptionist/dashboard');
-            } else {
-                $targetLink = base_url($link);
-            }
-        } else {
-            $targetLink = base_url('receptionist/dashboard');
-        }
-
-        if ($this->request->isAJAX()) {
-            return $this->response->setJSON([
-                'status'       => 'success',
-                'unread_count' => $this->notificationModel->getUnreadCount(),
-                'target_link'  => $targetLink
-            ]);
-        }
-
-        return redirect()->to($targetLink);
+        if ($r = $this->guard('receptionist')) return $r;
+        return $this->markReadFor('receptionist', $id);
     }
 
     public function receptionistMarkAllRead()
     {
-        if (!session()->get('is_logged_in')) {
-            if ($this->request->isAJAX()) {
-                return $this->response->setJSON(['status' => 'error', 'message' => 'Unauthorized']);
-            }
-            return redirect()->to(base_url('login'));
-        }
-
-        $role = session()->get('role');
-        if ($role !== 'receptionist') {
-            return redirect()->to(base_url('admin/dashboard'));
-        }
-
-        $this->notificationModel->markAllAsRead();
-
-        if ($this->request->isAJAX()) {
-            return $this->response->setJSON([
-                'status'       => 'success',
-                'unread_count' => 0,
-                'message'      => 'All notifications marked as read'
-            ]);
-        }
-
-        return redirect()->back()->with('success', 'All notifications marked as read');
+        if ($r = $this->guard('receptionist')) return $r;
+        return $this->markAllReadFor('receptionist');
     }
 
     public function receptionistDelete($id)
     {
-        if (!session()->get('is_logged_in')) {
-            return redirect()->to(base_url('login'));
-        }
-
-        $role = session()->get('role');
-        if ($role !== 'receptionist') {
-            return redirect()->to(base_url('admin/dashboard'));
-        }
-
-        $this->notificationModel->delete($id);
-
-        if ($this->request->isAJAX()) {
-            return $this->response->setJSON([
-                'status'  => 'success',
-                'message' => 'Notification deleted successfully'
-            ]);
-        }
-
-        return redirect()->back()->with('success', 'Notification deleted successfully');
+        if ($r = $this->guard('receptionist')) return $r;
+        return $this->deleteFor('receptionist', $id);
     }
 
     /**
      * ============================================================
-     * RADIOLOGIST NOTIFICATION METHODS
+     * RADIOLOGIST
      * ============================================================
      */
-
     public function radiologistIndex()
     {
-        if (!session()->get('is_logged_in')) {
-            return redirect()->to(base_url('login'));
-        }
-
-        $role = session()->get('role');
-        if ($role !== 'radiologist') {
-            return redirect()->to(base_url('login'));
-        }
-
-        $notifications = $this->notificationModel->orderBy('created_at', 'DESC')->findAll();
-        
-        foreach ($notifications as &$notif) {
-            $notif['full_link'] = $this->getFullLink($notif['link'] ?? '');
-        }
-
-        $data['notifications'] = $notifications;
-        $data['unread_count']  = $this->notificationModel->getUnreadCount();
-        $data['total_count']   = count($notifications);
-
-        return view('Radiologist/notifications', $data);
+        if ($r = $this->guard('radiologist')) return $r;
+        return $this->listFor('radiologist', 'Radiologist/notifications');
     }
 
     public function radiologistFetch()
     {
-        if (!session()->get('is_logged_in')) {
-            return $this->response->setJSON(['status' => 'error', 'message' => 'Unauthorized']);
-        }
-
-        $role = session()->get('role');
-        if ($role !== 'radiologist') {
-            return $this->response->setJSON(['status' => 'error', 'message' => 'Unauthorized']);
-        }
-
-        $unreadCount = $this->notificationModel->getUnreadCount();
-        $recent      = $this->notificationModel->getRecentNotifications(6);
-
-        $formatted = array_map(function ($item) {
-            $link = $this->cleanLink($item['link'] ?? '');
-            
-            if (!empty($link)) {
-                if (strpos($link, 'admin') !== false) {
-                    $link = str_replace('admin', 'radiologist', $link);
-                }
-                if (strpos($link, 'receptionist') !== false) {
-                    $link = str_replace('receptionist', 'radiologist', $link);
-                }
-            }
-            
-            return [
-                'id'           => $item['id'],
-                'type'         => $item['type'],
-                'title'        => $item['title'],
-                'message'      => $item['message'],
-                'link'         => base_url($link),
-                'is_read'      => (int)$item['is_read'],
-                'time_ago'     => $this->timeAgo($item['created_at']),
-                'created_at'   => $item['created_at']
-            ];
-        }, $recent);
-
-        return $this->response->setJSON([
-            'status'        => 'success',
-            'unread_count'  => $unreadCount,
-            'notifications' => $formatted
-        ]);
+        if ($r = $this->guard('radiologist')) return $r;
+        return $this->fetchFor('radiologist');
     }
 
     public function radiologistMarkRead($id)
     {
-        if (!session()->get('is_logged_in')) {
-            if ($this->request->isAJAX()) {
-                return $this->response->setJSON(['status' => 'error', 'message' => 'Unauthorized']);
-            }
-            return redirect()->to(base_url('login'));
-        }
-
-        $role = session()->get('role');
-        if ($role !== 'radiologist') {
-            return redirect()->to(base_url('login'));
-        }
-
-        $notification = $this->notificationModel->find($id);
-
-        if ($notification) {
-            $this->notificationModel->markAsRead($id);
-            $link = $this->cleanLink($notification['link'] ?? '');
-            
-            if (!empty($link)) {
-                if (strpos($link, 'admin') !== false) {
-                    $link = str_replace('admin', 'radiologist', $link);
-                }
-                if (strpos($link, 'receptionist') !== false) {
-                    $link = str_replace('receptionist', 'radiologist', $link);
-                }
-            }
-            
-            if (empty($link)) {
-                $targetLink = base_url('radiologist/dashboard');
-            } else {
-                $targetLink = base_url($link);
-            }
-        } else {
-            $targetLink = base_url('radiologist/dashboard');
-        }
-
-        if ($this->request->isAJAX()) {
-            return $this->response->setJSON([
-                'status'       => 'success',
-                'unread_count' => $this->notificationModel->getUnreadCount(),
-                'target_link'  => $targetLink
-            ]);
-        }
-
-        return redirect()->to($targetLink);
+        if ($r = $this->guard('radiologist')) return $r;
+        return $this->markReadFor('radiologist', $id);
     }
 
     public function radiologistMarkAllRead()
     {
-        if (!session()->get('is_logged_in')) {
-            if ($this->request->isAJAX()) {
-                return $this->response->setJSON(['status' => 'error', 'message' => 'Unauthorized']);
-            }
-            return redirect()->to(base_url('login'));
-        }
-
-        $role = session()->get('role');
-        if ($role !== 'radiologist') {
-            return redirect()->to(base_url('login'));
-        }
-
-        $this->notificationModel->markAllAsRead();
-
-        if ($this->request->isAJAX()) {
-            return $this->response->setJSON([
-                'status'       => 'success',
-                'unread_count' => 0,
-                'message'      => 'All notifications marked as read'
-            ]);
-        }
-
-        return redirect()->back()->with('success', 'All notifications marked as read');
+        if ($r = $this->guard('radiologist')) return $r;
+        return $this->markAllReadFor('radiologist');
     }
 
     public function radiologistDelete($id)
     {
-        if (!session()->get('is_logged_in')) {
-            return redirect()->to(base_url('login'));
-        }
-
-        $role = session()->get('role');
-        if ($role !== 'radiologist') {
-            return redirect()->to(base_url('login'));
-        }
-
-        $this->notificationModel->delete($id);
-
-        if ($this->request->isAJAX()) {
-            return $this->response->setJSON([
-                'status'  => 'success',
-                'message' => 'Notification deleted successfully'
-            ]);
-        }
-
-        return redirect()->back()->with('success', 'Notification deleted successfully');
+        if ($r = $this->guard('radiologist')) return $r;
+        return $this->deleteFor('radiologist', $id);
     }
 
     /**
      * ============================================================
-     * HELPER METHODS
+     * MED TECH
      * ============================================================
      */
-
-    private function timeAgo($datetime)
+    public function medtechIndex()
     {
-        if (!$datetime) return 'Just now';
-        $timestamp = strtotime($datetime);
-        $diff      = time() - $timestamp;
+        if ($r = $this->guard('med_tech')) return $r;
+        return $this->listFor('med_tech', 'MedTech/notifications');
+    }
 
-        if ($diff < 60) {
-            return 'Just now';
-        } elseif ($diff < 3600) {
-            $mins = floor($diff / 60);
-            return $mins . ($mins == 1 ? ' min ago' : ' mins ago');
-        } elseif ($diff < 86400) {
-            $hours = floor($diff / 3600);
-            return $hours . ($hours == 1 ? ' hour ago' : ' hours ago');
-        } elseif ($diff < 604800) {
-            $days = floor($diff / 86400);
-            return $days . ($days == 1 ? ' day ago' : ' days ago');
-        } else {
-            return date('M d, Y', $timestamp);
-        }
+    public function medtechFetch()
+    {
+        if ($r = $this->guard('med_tech')) return $r;
+        return $this->fetchFor('med_tech');
+    }
+
+    public function medtechMarkRead($id)
+    {
+        if ($r = $this->guard('med_tech')) return $r;
+        return $this->markReadFor('med_tech', $id);
+    }
+
+    public function medtechMarkAllRead()
+    {
+        if ($r = $this->guard('med_tech')) return $r;
+        return $this->markAllReadFor('med_tech');
+    }
+
+    public function medtechDelete($id)
+    {
+        if ($r = $this->guard('med_tech')) return $r;
+        return $this->deleteFor('med_tech', $id);
     }
 }

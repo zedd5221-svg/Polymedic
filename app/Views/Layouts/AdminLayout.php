@@ -1,1149 +1,1949 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
     <title>PolyMedic - Admin Dashboard</title>
 
     <!-- Main CSS -->
     <link href="/polymedic/public/assets/css/AppointmentStyle.css" rel="stylesheet">
-    <link href="/polymedic/public/assets/css/admin.css" rel="stylesheet">
-    
-    <!-- Bootstrap & Icons -->
+
+    <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    
+
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <!-- AOS for animations -->
-     <script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script> 
+    <!-- AOS -->
+    <link rel="stylesheet" href="https://unpkg.com/aos@2.3.4/dist/aos.css">
+    <script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script>
+
 </head>
+
 <body>
-    <!-- Initialize AOS -->
-    <script> AOS.init({ duration: 800, once: true }); </script>
-    
-    <div class="admin-wrapper">
-        <!-- Sidebar -->
-        <aside class="admin-sidebar" id="adminSidebar">
-            <div class="sidebar-header">
-                <div class="sidebar-logo">
-                    <img src="/polymedic/public/assets/images/logo4.png" alt="PolyMedic">
-                    <span>PolyMedic<small>Diagnostic System</small></span>
-                </div>
-                <button class="sidebar-close" onclick="toggleSidebar()">
-                    <i class="bi bi-x-lg"></i>
-                </button>
-            </div>
-            
-            <nav class="sidebar-nav">
-                <ul>
-                    <li class="nav-section">MAIN</li>
-                    <li class="menu-item <?= current_url() == base_url('admin/dashboard') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/admin/dashboard" class="menu-btn">
-                            <i class="bi bi-grid-1x2-fill menu-icon"></i>
-                            <span>Dashboard</span>
-                            <?php if (current_url() == base_url('admin/dashboard')): ?>
-                                <i class="bi bi-chevron-right menu-arrow"></i>
-                            <?php endif; ?>
-                        </a>
-                    </li>
-                    <li class="menu-item <?= current_url() == base_url('admin/appointments') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/admin/appointments" class="menu-btn">
-                            <i class="bi bi-calendar-check menu-icon"></i>
-                            <span>Appointments</span>
-                            <?php if (current_url() == base_url('admin/appointments')): ?>
-                                <i class="bi bi-chevron-right menu-arrow"></i>
-                            <?php endif; ?>
-                        </a>
-                    </li>
-                    <li class="menu-item <?= current_url() == base_url('admin/patients') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/admin/patients" class="menu-btn">
-                            <i class="bi bi-people-fill menu-icon"></i>
-                            <span>Patients</span>
-                            <?php if (current_url() == base_url('admin/patients')): ?>
-                                <i class="bi bi-chevron-right menu-arrow"></i>
-                            <?php endif; ?>
-                        </a>
-                    </li>
-                    <li class="menu-item <?= current_url() == base_url('admin/requests') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/admin/requests" class="menu-btn">
-                            <i class="bi bi-file-earmark-medical-fill menu-icon"></i>
-                            <span>Diagnostic Requests</span>
-                            <?php if (current_url() == base_url('admin/requests')): ?>
-                                <i class="bi bi-chevron-right menu-arrow"></i>
-                            <?php endif; ?>
-                        </a>
-                    </li>
 
-                    <li class="menu-item <?= current_url() == base_url('admin/services') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/admin/services" class="menu-btn">
-                             <i class="bi bi-grid-3x3-gap-fill menu-icon"></i>
-                            <span>Services</span>
-                            <?php if (current_url() == base_url('admin/services')): ?>
-                                <i class="bi bi-chevron-right menu-arrow"></i>
-                            <?php endif; ?>
-                         </a>
-                    </li>
-                    
-                    <li class="nav-section">ADMIN</li>
-                    <li class="menu-item <?= current_url() == base_url('admin/users') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/admin/users" class="menu-btn">
-                            <i class="bi bi-person-gear menu-icon"></i>
-                            <span>User Management</span>
-                            <?php if (current_url() == base_url('admin/users')): ?>
-                                <i class="bi bi-chevron-right menu-arrow"></i>
-                            <?php endif; ?>
-                        </a>
-                    </li>
-                    <li class="menu-item <?= current_url() == base_url('admin/notifications') ? 'active' : '' ?>">
-                        <a href="/polymedic/public/admin/notifications" class="menu-btn">
-                            <i class="bi bi-bell-fill menu-icon"></i>
-                            <span>Notifications</span>
-                            <?php 
-                            $unreadCount = (new \App\Models\NotificationModel())->getUnreadCount();
-                            if ($unreadCount > 0): 
-                            ?>
-                                <span class="badge-notif"><?= $unreadCount ?></span>
-                            <?php endif; ?>
-                            <?php if (current_url() == base_url('admin/notifications')): ?>
-                                <i class="bi bi-chevron-right menu-arrow"></i>
-                            <?php endif; ?>
-                        </a>
-                    </li>
-                    
-                    <li class="nav-divider"></li>
-                    
-                    <li class="menu-item logout-item">
-                        <a href="/polymedic/public/logout" class="menu-btn">
-                            <i class="bi bi-box-arrow-right menu-icon"></i>
-                            <span>Logout</span>
-                        </a>
-                    </li>
-                </ul>
-            </nav>
-        </aside>
-        
-        <!-- Mobile Overlay -->
-        <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
-        
-        <!-- Main Content -->
-        <main class="admin-main">
-            <!-- Top Navbar -->
-            <header class="admin-header">
-                <div class="header-left">
-                    <button class="hamburger-btn" onclick="toggleSidebar()">
-                        <i class="bi bi-list"></i>
+<script>
+    AOS.init({
+        duration: 800,
+        once: true
+    });
+</script>
+
+<div class="admin-wrapper">
+
+    <!-- =====================================================
+         SIDEBAR
+         ===================================================== -->
+
+    <?php
+    /* ---------------------------------------------------------
+       Sidebar data. Keeping the menu in one array means the link,
+       the icon and the active-state check can never drift apart.
+       --------------------------------------------------------- */
+
+    $currentUrl = current_url();
+
+    $isActive = static function (string $segment) use ($currentUrl): bool {
+        return strpos(rtrim($currentUrl, '/'), $segment) !== false;
+    };
+
+    // Guarded so a missing/failing model can never blank the whole layout.
+    $unreadCount = 0;
+    if (class_exists('\App\Models\NotificationModel')) {
+        try {
+            $unreadCount = (int) (new \App\Models\NotificationModel())->getUnreadCount();
+        } catch (\Throwable $e) {
+            $unreadCount = 0;
+        }
+    }
+
+    $navGroups = [
+        'Main' => [
+            ['seg' => 'admin/dashboard',           'icon' => 'bi-grid-1x2-fill',        'label' => 'Dashboard'],
+            ['seg' => 'admin/appointments',        'icon' => 'bi-calendar-check',       'label' => 'Appointments'],
+            ['seg' => 'admin/diagnostic-requests', 'icon' => 'bi-file-earmark-medical', 'label' => 'Diagnostic Requests'],
+            ['seg' => 'admin/patients',            'icon' => 'bi-people-fill',          'label' => 'Patients'],
+            ['seg' => 'admin/services',            'icon' => 'bi-grid-3x3-gap-fill',    'label' => 'Services'],
+        ],
+        'Admin' => [
+            ['seg' => 'admin/users',         'icon' => 'bi-person-gear', 'label' => 'User Management'],
+            ['seg' => 'admin/notifications', 'icon' => 'bi-bell-fill',   'label' => 'Notifications', 'badge' => $unreadCount],
+        ],
+    ];
+
+    $navIndex = 0;
+    ?>
+
+    <aside class="admin-sidebar" id="adminSidebar" aria-label="Main navigation">
+
+        <!-- SIDEBAR HEADER -->
+        <div class="sidebar-header">
+
+            <a class="sidebar-logo" href="<?= base_url('admin/dashboard') ?>">
+                <span class="logo-badge">
+                    <img src="/polymedic/public/assets/images/logo4.png" alt="">
+                </span>
+                <span class="logo-text">
+                    PolyMedic
+                    <small>Diagnostic System</small>
+                </span>
+            </a>
+
+            <!-- Mobile only: closes the drawer -->
+            <button type="button" class="sidebar-close" id="sidebarCloseBtn" aria-label="Close menu">
+                <i class="bi bi-x-lg"></i>
+            </button>
+
+        </div>
+
+        <!-- =================================================
+             NAVIGATION
+             ================================================= -->
+
+        <nav class="sidebar-nav">
+            <ul>
+
+                <!-- COLLAPSE BUTTON (desktop only) -->
+                <li class="sidebar-toggle-item">
+                    <button type="button"
+                            class="sidebar-toggle-btn"
+                            id="sidebarCollapseBtn"
+                            data-tooltip="Expand Sidebar"
+                            aria-controls="adminSidebar"
+                            aria-expanded="true"
+                            aria-label="Collapse sidebar">
+                        <i class="bi bi-chevron-double-left" aria-hidden="true"></i>
+                        <span>Collapse Sidebar</span>
                     </button>
-                    <!-- Page Title with PNG Icon -->
-                    <div class="header-title-group">
-                        <?php 
-                            $pageTitle = $this->renderSection('pageTitle') ?: 'Dashboard';
-                            $iconMap = [
-                                'Dashboard' => 'statisctics.png',
-                                'Appointments' => 'appointment1.png',
-                                'Patients' => 'sick-patient.png',
-                                'Diagnostic Requests' => 'stethoscope.png',
-                                'Laboratory Findings' => 'lab-icon.png',
-                                'User Management' => 'user-management-icon.png',
-                                'Notifications' => 'appointment1.png',
-                                'Radiologist Dashboard' => 'xray-icon.png',
-                                'X-Ray Examinations' => 'xray-icon.png',
-                                'View X-Ray Examination' => 'xray-icon.png'
-                            ];
-                            // Check if pageTitle contains specific keywords
-                            if (strpos($pageTitle, 'Radiologist') !== false) {
-                                $iconFile = 'xray-icon.png';
-                            } elseif (strpos($pageTitle, 'X-Ray') !== false) {
-                                $iconFile = 'xray-icon.png';
-                            } else {
-                                $iconFile = $iconMap[$pageTitle] ?? 'statisctics.png';
-                            }
-                        ?>
-                        <img src="/polymedic/public/assets/images/<?= $iconFile ?>" alt="<?= $pageTitle ?>" class="header-title-icon">
-                        <h4 class="page-title-header"><?= $pageTitle ?></h4>
-                    </div>
+                </li>
+
+                <?php foreach ($navGroups as $groupLabel => $items): ?>
+
+                    <li class="nav-section"><span><?= esc($groupLabel) ?></span></li>
+
+                    <?php foreach ($items as $item): $active = $isActive($item['seg']); ?>
+                        <li class="menu-item<?= $active ? ' active' : '' ?>" style="--i: <?= $navIndex++ ?>">
+                            <a href="<?= base_url($item['seg']) ?>"
+                               class="menu-btn"
+                               data-tooltip="<?= esc($item['label']) ?>"
+                               <?= $active ? 'aria-current="page"' : '' ?>>
+                                <i class="bi <?= $item['icon'] ?> menu-icon" aria-hidden="true"></i>
+                                <span><?= esc($item['label']) ?></span>
+                                <?php if (! empty($item['badge'])): ?>
+                                    <span class="badge-notif"><?= $item['badge'] > 99 ? '99+' : $item['badge'] ?></span>
+                                <?php endif; ?>
+                            </a>
+                        </li>
+                    <?php endforeach; ?>
+
+                <?php endforeach; ?>
+
+            </ul>
+        </nav>
+
+        <!-- =================================================
+             FOOTER (pinned to the bottom)
+             ================================================= -->
+
+        <div class="sidebar-footer">
+            <ul>
+                <li class="menu-item logout-item">
+                    <a href="/polymedic/public/logout" class="menu-btn" data-tooltip="Logout">
+                        <i class="bi bi-box-arrow-right menu-icon" aria-hidden="true"></i>
+                        <span>Logout</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+    </aside>
+
+    <!-- Mobile drawer backdrop -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop" hidden></div>
+
+    <!-- =====================================================
+         MAIN
+         ===================================================== -->
+
+    <main class="admin-main" id="adminMain">
+
+        <!-- =================================================
+             HEADER
+             ================================================= -->
+
+        <header class="admin-header">
+
+            <!-- HEADER LEFT -->
+            <div class="header-left">
+
+                <!-- MOBILE MENU (opens the sidebar drawer) -->
+                <button type="button"
+                        class="mobile-menu-btn"
+                        id="mobileMenuBtn"
+                        aria-controls="adminSidebar"
+                        aria-expanded="false"
+                        aria-label="Open menu">
+                    <i class="bi bi-list"></i>
+                </button>
+
+                <!-- PAGE TITLE -->
+                <div class="header-title-group">
+
+                    <?php
+                    $pageTitle = $this->renderSection('pageTitle') ?: 'Dashboard';
+
+                    $iconMap = [
+                        'Dashboard' => 'statisctics.png',
+                        'Appointments' => 'calendar.png',
+                        'Patient Management' => 'group (1).png',
+                        'Diagnostic Requests' => 'stethoscope.png',
+                        'User Management' => 'profile.png',
+                        'Notifications' => 'notification.png',
+                        'Service Management' => 'view-list.png',                       
+                    ];
+
+                    if (strpos($pageTitle, 'Radiologist') !== false) {
+                        $iconFile = 'xray-icon.png';
+                    } elseif (strpos($pageTitle, 'X-Ray') !== false) {
+                        $iconFile = 'xray-icon.png';
+                    } else {
+                        $iconFile = $iconMap[$pageTitle] ?? 'statisctics.png';
+                    }
+                    
+                    ?>
+
+
+                    <img src="/polymedic/public/assets/images/<?= $iconFile ?>"
+                         alt="<?= esc($pageTitle) ?>"
+                         class="header-title-icon">
+
+                    <h4 class="page-title-header"><?= esc($pageTitle) ?></h4>
+
                 </div>
-                <div class="header-right">
-                    <div class="header-info-group">
-                        <div class="header-datetime">
-                            <i class="bi bi-clock"></i>
-                            <span><?= date('D, M j · h:i:s A') ?></span>
-                        </div>
-                        <span class="divider-icon">|</span>
-                        
-                        <!-- NOTIFICATION DROPDOWN -->
-                        <div class="dropdown notif-dropdown-wrapper">
-                            <button class="notif-btn" type="button" id="notifDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-bell-fill"></i>
-                                <span class="notif-badge" id="notifBadge" style="display: none;">0</span>
-                            </button>
-                            <div class="dropdown-menu dropdown-menu-end notif-dropdown-menu shadow-lg border-0" aria-labelledby="notifDropdownBtn">
-                                <div class="notif-dropdown-header d-flex justify-content-between align-items-center">
-                                    <div class="d-flex align-items-center gap-2">
-                                        <i class="bi bi-bell text-primary"></i>
-                                        <span class="fw-bold text-dark fs-6">Notifications</span>
-                                    </div>
-                                    <button type="button" class="btn btn-link btn-sm p-0 text-primary text-decoration-none small" onclick="markAllNotificationsRead(event)">
-                                        Mark all read
-                                    </button>
-                                </div>
-                                <div class="notif-dropdown-body" id="notifDropdownList">
-                                    <div class="p-3 text-center text-muted small">
-                                        <div class="spinner-border spinner-border-sm text-primary me-1" role="status"></div>
-                                        Loading notifications...
-                                    </div>
-                                </div>
-                                <div class="notif-dropdown-footer text-center">
-                                    <a href="/polymedic/public/admin/notifications" class="text-primary fw-semibold small text-decoration-none">
-                                        View All Notifications <i class="bi bi-arrow-right ms-1"></i>
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <span class="divider-icon">|</span>
-                        <div class="header-user">
-                            <div class="avatar-small">
-                                <i class="bi bi-person-fill"></i>
-                            </div>
-                            <div class="user-details">
-                                <span class="user-name-header">Admin User</span>
-                                <span class="user-role-header">Administrator</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </header>
-            
-            <!-- Page Content -->
-            <div class="admin-content">
-                <?php echo $this->renderSection('adminContent'); ?>
+
             </div>
-        </main>
-    </div>
 
-    <style>
-    /* ============================================
-       ADMIN SIDEBAR - MATCHING REFERENCE DESIGN
-       ============================================ */
-    :root {
-        --sidebar-width: 280px;
-        --header-height: 64px;
-        --active-blue: #1976d2;
-        --active-blue-dark: #1565c0;
-        --active-blue-light: #e3f2fd;
-        --text-blue: #1e40af;
-        --icon-gray: #9ca3af;
-        --bg-light: #f8fafc;
+            <!-- =================================================
+                 HEADER RIGHT
+                 ================================================= -->
+
+            <div class="header-right">
+
+                <div class="header-info-group">
+
+                    <!-- DATE/TIME -->
+                    <div class="header-datetime">
+                        <i class="bi bi-clock"></i>
+                        <span><?= date('D, M j · h:i:s A') ?></span>
+                    </div>
+
+                    <span class="divider-icon">|</span>
+
+                    <!-- =================================================
+                         NOTIFICATIONS
+                         ================================================= -->
+
+                    <div class="dropdown notif-dropdown-wrapper">
+
+                        <button class="notif-btn"
+                                type="button"
+                                id="notifDropdownBtn"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false">
+                            <i class="bi bi-bell-fill"></i>
+                            <span class="notif-badge" id="notifBadge" style="display:none;">0</span>
+                        </button>
+
+                        <div class="dropdown-menu dropdown-menu-end notif-dropdown-menu shadow-lg border-0"
+                             aria-labelledby="notifDropdownBtn">
+
+                            <!-- NOTIFICATION HEADER -->
+                            <div class="notif-dropdown-header d-flex justify-content-between align-items-center">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="bi bi-bell text-primary"></i>
+                                    <span class="fw-bold text-dark fs-6">Notifications</span>
+                                </div>
+                                <button type="button"
+                                        class="btn btn-link btn-sm p-0 text-primary text-decoration-none small"
+                                        onclick="markAllNotificationsRead(event)">
+                                    Mark all read
+                                </button>
+                            </div>
+
+                            <!-- NOTIFICATION BODY -->
+                            <div class="notif-dropdown-body" id="notifDropdownList">
+                                <div class="p-3 text-center text-muted small">
+                                    <div class="spinner-border spinner-border-sm text-primary me-1" role="status"></div>
+                                    Loading notifications...
+                                </div>
+                            </div>
+
+                            <!-- NOTIFICATION FOOTER -->
+                            <div class="notif-dropdown-footer text-center">
+                                <a href="/polymedic/public/admin/notifications"
+                                   class="text-primary fw-semibold small text-decoration-none">
+                                    View All Notifications
+                                    <i class="bi bi-arrow-right ms-1"></i>
+                                </a>
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                    <span class="divider-icon">|</span>
+
+                    <!-- USER -->
+                    <div class="header-user">
+
+                        <div class="avatar-small">
+                            <i class="bi bi-person-fill"></i>
+                        </div>
+
+                        <div class="user-details">
+                            <span class="user-name-header">Admin User</span>
+                            <span class="user-role-header">Administrator</span>
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </header>
+
+        <!-- =================================================
+             PAGE CONTENT
+             ================================================= -->
+
+        <div class="admin-content">
+            <?= $this->renderSection('adminContent') ?>
+        </div>
+
+    </main>
+
+</div>
+
+<!-- =========================================================
+     SIDEBAR + HEADER CSS
+     ========================================================= -->
+
+<style>
+/* =========================================================
+   VARIABLES
+   ========================================================= */
+
+:root {
+    --sidebar-width: 282px;
+    --sidebar-collapsed-width: 84px;
+    --header-height: 64px;
+
+    --active-blue: #1976d2;
+    --active-blue-dark: #1565c0;
+    --active-blue-light: #e3f2fd;
+    --text-blue: #1e40af;
+    --icon-gray: #9ca3af;
+    --bg-light: #f4f7fb;
+
+    /* ---- SIDEBAR PALETTE (deep navy) -------------------------
+       Want the old white sidebar back? Replace just these eight
+       values with:
+         --sb-bg-top: #ffffff;  --sb-bg-bottom: #ffffff;
+         --sb-text: #1e40af;    --sb-text-dim: #9ca3af;
+         --sb-heading: #9ca3af; --sb-hover-bg: #e3f2fd;
+         --sb-hover-text: #1976d2; --sb-border: #e5e7eb;
+       ---------------------------------------------------------- */
+    --sb-bg-top: #123566;
+    --sb-bg-bottom: #0a1f3d;
+    --sb-text: #cddcef;
+    --sb-text-dim: #8aa4c4;
+    --sb-heading: #6e8bb0;
+    --sb-hover-bg: rgba(255, 255, 255, 0.08);
+    --sb-hover-text: #ffffff;
+    --sb-border: rgba(255, 255, 255, 0.10);
+
+    --sb-active-from: #1976d2;
+    --sb-active-to: #43a3f5;
+    --sb-active-glow: rgba(25, 118, 210, 0.45);
+
+    --sidebar-ease: cubic-bezier(0.4, 0, 0.2, 1);
+    --sidebar-spring: cubic-bezier(0.22, 1, 0.36, 1);
+    --sidebar-speed: 0.32s;
+}
+
+/* =========================================================
+   GLOBAL
+   ========================================================= */
+
+* {
+    box-sizing: border-box;
+}
+
+/* =========================================================
+   SIDEBAR SHELL
+   Flex column: header on top, scrolling nav in the middle,
+   logout pinned to the bottom.
+   ========================================================= */
+
+.admin-sidebar {
+    width: var(--sidebar-width);
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 1040;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(170deg, var(--sb-bg-top) 0%, var(--sb-bg-bottom) 100%) !important;
+    border-right: 1px solid var(--sb-border) !important;
+    box-shadow: 4px 0 24px rgba(8, 20, 40, 0.16);
+    overflow: visible;
+    transition: width var(--sidebar-speed) var(--sidebar-ease),
+                transform var(--sidebar-speed) var(--sidebar-ease);
+}
+
+/* Soft glow behind the top of the sidebar */
+.admin-sidebar::before {
+    content: '';
+    position: absolute;
+    top: -90px;
+    left: -60px;
+    width: 240px;
+    height: 240px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(67, 163, 245, 0.22), transparent 70%);
+    pointer-events: none;
+}
+
+/* =========================================================
+   SIDEBAR HEADER
+   ========================================================= */
+
+.sidebar-header {
+    position: relative;
+    height: 82px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--sb-border) !important;
+    transition: padding var(--sidebar-speed) var(--sidebar-ease);
+}
+
+.sidebar-logo {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    min-width: 0;
+    text-decoration: none;
+    transition: gap var(--sidebar-speed) var(--sidebar-ease);
+}
+
+.logo-badge {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    border-radius: 13px;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 16px rgba(4, 16, 35, 0.35);
+    transition: transform 0.35s var(--sidebar-spring),
+                box-shadow 0.3s ease;
+}
+
+.sidebar-logo:hover .logo-badge {
+    transform: translateY(-2px) rotate(-4deg);
+    box-shadow: 0 10px 22px rgba(4, 16, 35, 0.45);
+}
+
+.logo-badge img {
+    width: 30px;
+    height: 30px;
+    object-fit: contain;
+}
+
+.logo-text {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #ffffff !important;
+    letter-spacing: 0.3px;
+    line-height: 1.15;
+    white-space: nowrap;
+    opacity: 1;
+    max-width: 190px;
+    overflow: hidden;
+    display: inline-block;
+    transition: opacity calc(var(--sidebar-speed) * 0.55) var(--sidebar-ease),
+                max-width var(--sidebar-speed) var(--sidebar-ease);
+}
+
+.logo-text small {
+    display: block;
+    margin-top: 3px;
+    font-size: 0.62rem;
+    font-weight: 500;
+    letter-spacing: 0.4px;
+    color: var(--sb-text-dim) !important;
+}
+
+/* Mobile-only close button */
+.sidebar-close {
+    display: none;
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.10);
+    color: #ffffff;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.sidebar-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: rotate(90deg);
+}
+
+/* =========================================================
+   NAV AREA (scrolls on its own)
+   ========================================================= */
+
+.sidebar-nav {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0.85rem 0.75rem 1rem;
+    transition: padding var(--sidebar-speed) var(--sidebar-ease);
+}
+
+.sidebar-nav ul,
+.sidebar-footer ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.sidebar-nav::-webkit-scrollbar {
+    width: 5px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.16);
+    border-radius: 10px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.28);
+}
+
+.sidebar-nav {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.sidebar-footer {
+    flex-shrink: 0;
+    padding: 0.7rem 0.75rem 1.1rem;
+    border-top: 1px solid var(--sb-border);
+    transition: padding var(--sidebar-speed) var(--sidebar-ease);
+}
+
+/* =========================================================
+   COLLAPSE BUTTON
+   ========================================================= */
+
+.sidebar-toggle-item {
+    margin-bottom: 0.4rem;
+}
+
+.sidebar-toggle-btn {
+    width: 100%;
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.6rem 0.8rem;
+    border: 1px dashed rgba(255, 255, 255, 0.18);
+    border-radius: 11px;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--sb-text-dim);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    cursor: pointer;
+    transition: background 0.22s ease,
+                color 0.22s ease,
+                border-color 0.22s ease,
+                transform 0.15s ease,
+                gap var(--sidebar-speed) var(--sidebar-ease),
+                padding var(--sidebar-speed) var(--sidebar-ease);
+}
+
+.sidebar-toggle-btn i {
+    width: 24px;
+    min-width: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+    transition: transform 0.35s var(--sidebar-spring);
+}
+
+.sidebar-toggle-btn span {
+    white-space: nowrap;
+    opacity: 1;
+    max-width: 180px;
+    overflow: hidden;
+    display: inline-block;
+    transition: opacity calc(var(--sidebar-speed) * 0.55) var(--sidebar-ease),
+                max-width var(--sidebar-speed) var(--sidebar-ease);
+}
+
+.sidebar-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.10);
+    border-color: rgba(255, 255, 255, 0.32);
+    color: #ffffff;
+}
+
+.sidebar-toggle-btn:hover i {
+    transform: translateX(-3px);
+}
+
+.sidebar-toggle-btn:active {
+    transform: scale(0.97);
+}
+
+.sidebar-toggle-btn:focus-visible,
+.menu-btn:focus-visible,
+.sidebar-close:focus-visible,
+.mobile-menu-btn:focus-visible {
+    outline: 2px solid var(--sb-active-to);
+    outline-offset: 2px;
+}
+
+/* =========================================================
+   SECTION HEADINGS
+   ========================================================= */
+
+.sidebar-nav .nav-section {
+    font-size: 0.63rem;
+    text-transform: uppercase;
+    letter-spacing: 1.4px;
+    color: var(--sb-heading) !important;
+    padding: 0.95rem 0.8rem 0.3rem;
+    font-weight: 700;
+    white-space: nowrap;
+    position: relative;
+    transition: padding var(--sidebar-speed) var(--sidebar-ease);
+}
+
+.sidebar-nav .nav-section span {
+    opacity: 1;
+    display: inline-block;
+    transition: opacity calc(var(--sidebar-speed) * 0.5) var(--sidebar-ease);
+}
+
+/* =========================================================
+   MENU ITEMS
+   ========================================================= */
+
+.menu-item {
+    position: relative;
+    animation: navFadeIn 0.45s var(--sidebar-spring) both;
+    animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+@keyframes navFadeIn {
+    from { opacity: 0; transform: translateX(-14px); }
+    to   { opacity: 1; transform: none; }
+}
+
+.menu-btn {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    width: 100%;
+    min-height: 46px;
+    padding: 0.68rem 0.85rem;
+    border-radius: 12px !important;
+    text-decoration: none;
+    font-size: 0.845rem;
+    font-weight: 600;
+    letter-spacing: 0.1px;
+    background: transparent;
+    color: var(--sb-text) !important;
+    cursor: pointer;
+    overflow: hidden;
+    transition: background 0.24s var(--sidebar-ease),
+                color 0.24s var(--sidebar-ease),
+                transform 0.24s var(--sidebar-spring),
+                box-shadow 0.28s var(--sidebar-ease),
+                gap var(--sidebar-speed) var(--sidebar-ease),
+                padding var(--sidebar-speed) var(--sidebar-ease);
+}
+
+/* The little bar that slides in on the left edge */
+.menu-btn::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 3px;
+    height: 0;
+    border-radius: 0 4px 4px 0;
+    background: var(--sb-active-to);
+    transform: translateY(-50%);
+    transition: height 0.28s var(--sidebar-spring);
+}
+
+.menu-icon {
+    font-size: 1.05rem;
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    text-align: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--sb-text-dim) !important;
+    transition: color 0.24s ease,
+                transform 0.3s var(--sidebar-spring);
+}
+
+.menu-btn > span {
+    white-space: nowrap;
+    opacity: 1;
+    max-width: 180px;
+    overflow: hidden;
+    display: inline-block;
+    color: inherit !important;
+    transition: opacity calc(var(--sidebar-speed) * 0.55) var(--sidebar-ease),
+                max-width var(--sidebar-speed) var(--sidebar-ease);
+}
+
+/* =========================================================
+   HOVER
+   ========================================================= */
+
+.menu-item:not(.active) .menu-btn:hover {
+    background: var(--sb-hover-bg) !important;
+    color: var(--sb-hover-text) !important;
+    transform: translateX(4px);
+}
+
+.menu-item:not(.active) .menu-btn:hover::before {
+    height: 22px;
+}
+
+.menu-item:not(.active) .menu-btn:hover .menu-icon {
+    color: var(--sb-active-to) !important;
+    transform: scale(1.14) translateY(-1px);
+}
+
+.menu-btn:active {
+    transform: translateX(4px) scale(0.985);
+}
+
+/* =========================================================
+   ACTIVE
+   ========================================================= */
+
+.menu-item.active .menu-btn {
+    background: linear-gradient(100deg, var(--sb-active-from), var(--sb-active-to)) !important;
+    color: #ffffff !important;
+    box-shadow: 0 8px 20px var(--sb-active-glow) !important;
+}
+
+.menu-item.active .menu-btn::before {
+    height: 60%;
+    background: #ffffff;
+    opacity: 0.9;
+}
+
+.menu-item.active .menu-icon,
+.menu-item.active .menu-btn span {
+    color: #ffffff !important;
+}
+
+/* Slow shine sweeping across the active item */
+.menu-item.active .menu-btn::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -60%;
+    width: 45%;
+    height: 100%;
+    background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+    transform: skewX(-18deg);
+    animation: activeShine 4.5s ease-in-out 1.2s infinite;
+}
+
+@keyframes activeShine {
+    0%   { left: -60%; }
+    45%  { left: 130%; }
+    100% { left: 130%; }
+}
+
+/* =========================================================
+   BADGE
+   ========================================================= */
+
+.badge-notif {
+    margin-left: auto;
+    background: #ef4444 !important;
+    color: #ffffff !important;
+    font-size: 0.62rem;
+    font-weight: 700;
+    padding: 0.1rem 0.4rem;
+    border-radius: 30px;
+    min-width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.5);
+    flex-shrink: 0;
+    animation: badgePulse 2.4s ease-in-out infinite;
+    transition: opacity calc(var(--sidebar-speed) * 0.55) var(--sidebar-ease);
+}
+
+@keyframes badgePulse {
+    0%, 100% { box-shadow: 0 2px 8px rgba(239, 68, 68, 0.5); }
+    50%      { box-shadow: 0 2px 14px rgba(239, 68, 68, 0.85); }
+}
+
+.menu-item.active .badge-notif {
+    background: #ef4444 !important;
+    color: #ffffff !important; 
+    box-shadow: none;
+    animation: none;
+}
+
+/* =========================================================
+   LOGOUT
+   ========================================================= */
+
+.logout-item .menu-btn:hover {
+    background: rgba(239, 68, 68, 0.16) !important;
+    color: #fecaca !important;
+}
+
+.logout-item .menu-btn:hover::before {
+    background: #f87171;
+}
+
+.logout-item .menu-btn:hover .menu-icon {
+    color: #f87171 !important;
+    transform: translateX(2px) scale(1.1);
+}
+
+/* =========================================================
+   TOOLTIP (collapsed sidebar)
+   Rendered into <body> by JS, so the sidebar's own scrolling
+   can never clip it — that was the old bug.
+   ========================================================= */
+
+.sb-tooltip {
+    position: fixed;
+    z-index: 4000;
+    pointer-events: none;
+    background: #102a4c;
+    color: #ffffff;
+    padding: 0.45rem 0.72rem;
+    border-radius: 8px;
+    font-size: 0.74rem;
+    font-weight: 600;
+    white-space: nowrap;
+    box-shadow: 0 10px 24px rgba(4, 16, 35, 0.35);
+    opacity: 0;
+    transform: translateX(-6px);
+    transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.sb-tooltip::before {
+    content: '';
+    position: absolute;
+    left: -4px;
+    top: 50%;
+    width: 8px;
+    height: 8px;
+    background: inherit;
+    transform: translateY(-50%) rotate(45deg);
+    border-radius: 1px;
+}
+
+.sb-tooltip.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+/* =========================================================
+   COLLAPSED SIDEBAR (DESKTOP ONLY)
+   Labels fade + shrink to zero width. No display:none, so the
+   transition actually runs both ways.
+   ========================================================= */
+
+@media (min-width: 993px) {
+
+    .admin-sidebar.collapsed {
+        width: var(--sidebar-collapsed-width);
     }
 
-    /* ===== SIDEBAR ===== */
-    .admin-sidebar {
-        width: var(--sidebar-width);
-        min-height: 100vh;
-        background: #ffffff !important;
-        position: fixed;
-        top: 0;
-        left: 0;
-        bottom: 0;
-        z-index: 1000;
-        overflow-y: auto;
-        transition: transform 0.3s ease;
-        box-shadow: 2px 0 20px rgba(0,0,0,0.06);
-        border-right: 1px solid #e5e7eb !important;
+    .admin-sidebar.collapsed .sidebar-header {
+        justify-content: center;
+        padding: 1rem 0.5rem;
     }
 
-    .admin-sidebar::-webkit-scrollbar {
-        width: 4px;
-    }
-
-    .admin-sidebar::-webkit-scrollbar-thumb {
-        background: #e5e7eb;
-        border-radius: 4px;
-    }
-
-    /* Sidebar Header */
-    .sidebar-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 1.5rem 1.5rem;
-        border-bottom: 1px solid #f3f4f6 !important;
-    }
-
-    .sidebar-logo {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-    }
-
-    .sidebar-logo img {
-        height: 40px;
-        width: auto;
-        object-fit: contain;
-    }
-
-    .sidebar-logo span {
-        font-size: 1.1rem;
-        font-weight: 700;
-        color: #111827 !important;
-        letter-spacing: 0.5px;
-        line-height: 1.2;
-    }
-
-    .sidebar-logo span small {
-        font-weight: 400;
-        font-size: 0.65rem;
-        color: #6b7280 !important;
-        display: block;
-        margin-top: 2px;
-    }
-
-    .sidebar-close {
-        display: none;
-        background: transparent;
-        border: none;
-        color: #6b7280 !important;
-        font-size: 1.2rem;
-        cursor: pointer;
-        padding: 0.25rem;
-    }
-
-    .sidebar-close:hover {
-        color: #111827 !important;
-    }
-
-    /* Sidebar Navigation */
-    .sidebar-nav {
-        padding: 1rem 0.75rem 1.5rem;
-    }
-
-    .sidebar-nav ul {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 0.25rem;
-    }
-
-    .sidebar-nav .nav-section {
-        font-size: 0.65rem;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        color: #9ca3af !important;
-        padding: 1rem 0.75rem 0.25rem;
-        font-weight: 700;
-    }
-
-    /* ===== NON-ACTIVE MENU ITEMS ===== */
-    /* Blue text like reference */
-    .admin-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn,
-    .admin-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn span {
-        color: var(--text-blue) !important;
-    }
-
-    /* Gray icons */
-    .admin-sidebar .sidebar-nav ul li.menu-item:not(.active) a.menu-btn .menu-icon {
-        color: var(--icon-gray) !important;
-    }
-
-    /* ===== ACTIVE MENU ITEM ===== */
-    .admin-sidebar .sidebar-nav ul li.menu-item.active a.menu-btn,
-    .admin-sidebar .sidebar-nav ul li.menu-item.active a.menu-btn span {
-        color: #ffffff !important;
-    }
-
-    .admin-sidebar .sidebar-nav ul li.menu-item.active a.menu-btn .menu-icon {
-        color: #ffffff !important;
-    }
-
-    /* Remove any old borders */
-    .admin-sidebar .sidebar-nav ul li a,
-    .admin-sidebar .sidebar-nav ul li.active a {
-        border: none !important;
-        border-left: none !important;
-        border-right: none !important;
-        border-top: none !important;
-        border-bottom: none !important;
-        outline: none !important;
-    }
-
-    /* Menu Item Styles */
-    .menu-btn {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
+    .admin-sidebar.collapsed .sidebar-logo {
+        gap: 0;
+        justify-content: center;
         width: 100%;
-        padding: 0.75rem 1rem;
-        border-radius: 8px !important;
-        text-decoration: none;
-        font-size: 0.875rem;
-        font-weight: 600;
-        transition: all 0.2s ease;
-        background: transparent;
-        cursor: pointer;
-        position: relative;
     }
 
-    .menu-btn:hover {
-        background: var(--active-blue-light) !important;
-        color: var(--active-blue) !important;
-        box-shadow: inset 0 1px 3px rgba(25, 118, 210, 0.1) !important;
+    .admin-sidebar.collapsed .logo-text {
+        opacity: 0;
+        max-width: 0;
     }
 
-    .menu-btn:hover .menu-icon {
-        color: var(--active-blue) !important;
+    .admin-sidebar.collapsed .sidebar-nav,
+    .admin-sidebar.collapsed .sidebar-footer {
+        padding-left: 0.6rem;
+        padding-right: 0.6rem;
     }
 
-    .menu-item.active .menu-btn {
-        background: var(--active-blue) !important;
-        color: #ffffff !important;
-        box-shadow: 0 4px 12px rgba(25, 118, 210, 0.3) !important;
+    .admin-sidebar.collapsed .sidebar-toggle-btn {
+        justify-content: center;
+        gap: 0;
+        padding: 0.6rem 0;
     }
 
-    /* Menu Icon */
-    .menu-icon {
-        font-size: 1.1rem;
-        flex-shrink: 0;
-        width: 24px;
+    .admin-sidebar.collapsed .sidebar-toggle-btn span {
+        opacity: 0;
+        max-width: 0;
+    }
+
+    .admin-sidebar.collapsed .sidebar-toggle-btn:hover i {
+        transform: translateX(3px);
+    }
+
+    .admin-sidebar.collapsed .nav-section {
+        padding: 0.7rem 0 0.3rem;
         text-align: center;
-        transition: color 0.2s ease;
     }
 
-    /* Menu Arrow (Chevron) */
-    .menu-arrow {
-        font-size: 0.9rem;
-        color: #ffffff !important;
-        margin-left: auto;
-        flex-shrink: 0;
+    .admin-sidebar.collapsed .nav-section span {
+        opacity: 0;
     }
 
-    /* ===== REMOVE BADGE FROM ACTIVE ITEMS ===== */
-    .menu-item.active .badge-notif {
+    /* A short rule stands in for the hidden section label */
+    .admin-sidebar.collapsed .nav-section::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        bottom: 6px;
+        width: 22px;
+        height: 1px;
+        background: var(--sb-border);
+        transform: translateX(-50%);
+    }
+
+    .admin-sidebar.collapsed .menu-btn {
+        justify-content: center;
+        gap: 0;
+        padding: 0.68rem 0;
+    }
+
+    .admin-sidebar.collapsed .menu-btn > span {
+        opacity: 0;
+        max-width: 0;
+    }
+
+    .admin-sidebar.collapsed .menu-item:not(.active) .menu-btn:hover {
+        transform: translateX(0) scale(1.06);
+    }
+
+    .admin-sidebar.collapsed .badge-notif {
+        position: absolute;
+        top: 3px;
+        right: 8px;
+        margin: 0;
+        min-width: 17px;
+        height: 17px;
+        padding: 0 3px;
+        font-size: 0.55rem;
+    }
+
+}
+
+/* =========================================================
+   MOBILE — SIDEBAR BECOMES A SLIDE-IN DRAWER
+   ========================================================= */
+
+.sidebar-backdrop {
+    display: none;
+}
+
+.mobile-menu-btn {
+    display: none;
+    width: 38px;
+    height: 38px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #ffffff;
+    color: #1f2937;
+    font-size: 1.15rem;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
+}
+
+.mobile-menu-btn:hover {
+    background: var(--active-blue-light);
+    color: var(--active-blue);
+}
+
+.mobile-menu-btn:active {
+    transform: scale(0.94);
+}
+
+@media (max-width: 992px) {
+
+    .admin-sidebar {
+        width: min(86vw, var(--sidebar-width));
+        transform: translateX(-102%);
+        box-shadow: none;
+    }
+
+    body.sidebar-open .admin-sidebar {
+        transform: translateX(0);
+        box-shadow: 18px 0 40px rgba(8, 20, 40, 0.28);
+    }
+
+    /* Collapsed state never applies on mobile */
+    .admin-sidebar.collapsed {
+        width: min(86vw, var(--sidebar-width));
+    }
+
+    .sidebar-toggle-item {
         display: none !important;
     }
 
-    /* Badge - only shows on non-active items */
-    .badge-notif {
-        margin-left: auto;
-        background: #ffffff !important;
-        color: var(--text-blue) !important;
-        font-size: 0.65rem;
-        font-weight: 700;
-        padding: 0.15rem 0.5rem;
-        border-radius: 30px;
-        min-width: 20px;
-        height: 20px;
-        text-align: center;
+    .sidebar-close {
+        display: flex;
+    }
+
+    .mobile-menu-btn {
         display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        flex-shrink: 0;
-        line-height: 1;
     }
 
-    .badge-notif-xray {
-        margin-left: auto;
-        background: #ffffff !important;
-        color: var(--text-blue) !important;
-        font-size: 0.65rem;
-        font-weight: 700;
-        padding: 0.15rem 0.5rem;
-        border-radius: 30px;
-        min-width: 20px;
-        height: 20px;
-        text-align: center;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        flex-shrink: 0;
-        line-height: 1;
-    }
-
-    /* Logout Item */
-    .logout-item {
-        margin-top: 0.5rem;
-        border-top: 1px solid #f3f4f6 !important;
-        padding-top: 0.5rem;
-    }
-
-    .logout-item .menu-btn:hover {
-        background: #fee2e2 !important;
-        color: #dc2626 !important;
-    }
-
-    .logout-item .menu-btn:hover .menu-icon {
-        color: #dc2626 !important;
-    }
-
-    /* Nav Divider */
-    .nav-divider {
-        height: 1px;
-        background: #f3f4f6 !important;
-        margin: 0.5rem 0;
-    }
-
-    /* ===== SIDEBAR OVERLAY ===== */
-    .sidebar-overlay {
+    .sidebar-backdrop {
+        display: block;
         position: fixed;
         inset: 0;
-        background: rgba(0,0,0,0.4);
-        z-index: 999;
-        display: none;
+        z-index: 1030;
+        background: rgba(8, 20, 40, 0.5);
+        backdrop-filter: blur(2px);
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.3s ease, visibility 0s linear 0.3s;
     }
 
-    .sidebar-overlay.active {
-        display: block;
+    body.sidebar-open .sidebar-backdrop {
+        opacity: 1;
+        visibility: visible;
+        transition: opacity 0.3s ease, visibility 0s;
     }
 
-    /* ===== MAIN CONTENT ===== */
-    .admin-main {
-        flex: 1;
-        margin-left: var(--sidebar-width);
-        min-height: 100vh;
-        display: flex;
-        flex-direction: column;
-        background: var(--bg-light);
+    body.sidebar-open {
+        overflow: hidden;
     }
 
-    /* ===== HEADER ===== */
+    .admin-main,
+    .admin-main.sidebar-collapsed {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+
     .admin-header {
-        background: #ffffff !important;
-        padding: 0.75rem 2rem;
-        border-bottom: 1px solid #e5e7eb !important;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        position: sticky;
-        top: 0;
-        z-index: 100;
-        min-height: var(--header-height);
-        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        padding: 0.75rem 1rem;
     }
 
-    .header-left {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
+    .admin-content {
+        padding: 1rem;
     }
 
-    .hamburger-btn {
+    .header-info-group .divider-icon {
         display: none;
-        background: transparent;
-        border: none;
-        font-size: 1.5rem;
-        color: #111827 !important;
-        cursor: pointer;
-        padding: 0.25rem;
     }
 
-    .header-title-group {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
+}
+
+/* =========================================================
+   REDUCED MOTION
+   ========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+
+    .menu-item,
+    .menu-item.active .menu-btn::after,
+    .badge-notif {
+        animation: none !important;
     }
 
-    .header-title-icon {
-        width: 24px;
-        height: 24px;
-        object-fit: contain;
+    .menu-btn:hover,
+    .menu-item:not(.active) .menu-btn:hover {
+        transform: none !important;
+    }
+
+}
+
+/* =========================================================
+   MAIN CONTENT
+   ========================================================= */
+
+.admin-main {
+    margin-left: var(--sidebar-width);
+    width: calc(100% - var(--sidebar-width));
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-light);
+    transition: margin-left var(--sidebar-speed) var(--sidebar-ease),
+                width var(--sidebar-speed) var(--sidebar-ease);
+}
+
+.admin-main.sidebar-collapsed {
+    margin-left: var(--sidebar-collapsed-width);
+    width: calc(100% - var(--sidebar-collapsed-width));
+}
+
+/* =========================================================
+   HEADER
+   ========================================================= */
+
+.admin-header {
+    background: #ffffff !important;
+    padding: 0.75rem 2rem;
+    border-bottom: 1px solid #e5e7eb !important;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    min-height: var(--header-height);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    width: 100%;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    min-width: 0;
+}
+
+.header-title-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.header-title-icon {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.page-title-header {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #111827 !important;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* =========================================================
+   HEADER RIGHT
+   ========================================================= */
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-shrink: 0;
+}
+
+.header-info-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.header-datetime {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    color: #6b7280 !important;
+    font-size: 0.78rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.header-datetime i {
+    color: var(--active-blue) !important;
+}
+
+.divider-icon {
+    color: #d1d5db !important;
+    font-size: 0.8rem;
+}
+
+/* =========================================================
+   NOTIFICATION BUTTON
+   ========================================================= */
+
+.notif-btn {
+    position: relative;
+    background: transparent;
+    border: none;
+    font-size: 1.2rem;
+    color: #6b7280 !important;
+    cursor: pointer;
+    padding: 0.35rem 0.6rem;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+}
+
+.notif-btn:hover {
+    color: var(--active-blue) !important;
+    background: var(--active-blue-light) !important;
+}
+
+.notif-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: #dc2626 !important;
+    color: #ffffff !important;
+    font-size: 0.65rem;
+    font-weight: 700;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 99px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    border: 2px solid white;
+}
+
+/* =========================================================
+   NOTIFICATION DROPDOWN
+   ========================================================= */
+
+.notif-dropdown-menu {
+    width: 340px;
+    max-width: 90vw;
+    border-radius: 14px !important;
+    padding: 0;
+    margin-top: 10px !important;
+    overflow: hidden;
+    border: 1px solid #e5e7eb !important;
+}
+
+.notif-dropdown-header {
+    padding: 0.85rem 1rem;
+    background: #f8fafc !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+.notif-dropdown-body {
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.notif-dropdown-footer {
+    padding: 0.75rem 1rem;
+    background: #f8fafc !important;
+    border-top: 1px solid #e5e7eb !important;
+}
+
+.notif-item {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid #f3f4f6 !important;
+    text-decoration: none !important;
+    color: #374151 !important;
+    transition: background 0.15s ease;
+    position: relative;
+}
+
+.notif-item:hover {
+    background: #f8fafc !important;
+}
+
+.notif-item.unread {
+    background: #f8fafc !important;
+}
+
+.notif-item.unread::before {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 6px;
+    height: 6px;
+    background: var(--active-blue) !important;
+    border-radius: 50%;
+}
+
+.notif-icon-box {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.notif-icon-box.appointment {
+    background: #e3f2fd !important;
+    color: #1976d2 !important;
+}
+
+.notif-icon-box.xray {
+    background: #e3f2fd !important;
+    color: #1976d2 !important;
+}
+
+.notif-icon-box.system {
+    background: #fef3c7 !important;
+    color: #d97706 !important;
+}
+
+.notif-icon-box.lab {
+    background: #e8f5e9 !important;
+    color: #28a745 !important;
+}
+
+.notif-icon-box.billing {
+    background: #fff3e0 !important;
+    color: #ff6b00 !important;
+}
+
+.notif-icon-box.payment {
+    background: #ccfbf1 !important;
+    color: #0d9488 !important;
+}
+
+.notif-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.notif-title {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #111827 !important;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.notif-msg {
+    font-size: 0.75rem;
+    color: #6b7280 !important;
+    margin-bottom: 4px;
+}
+
+.notif-time {
+    font-size: 0.68rem;
+    color: #9ca3af !important;
+}
+
+/* =========================================================
+   USER
+   ========================================================= */
+
+.header-user {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.1rem 0.3rem;
+    border-radius: 8px;
+}
+
+.avatar-small {
+    background: var(--active-blue-light) !important;
+    color: var(--active-blue) !important;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.user-details {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+}
+
+.user-name-header {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #111827 !important;
+}
+
+.user-role-header {
+    font-size: 0.58rem;
+    color: #6b7280 !important;
+}
+
+/* =========================================================
+   CONTENT
+   ========================================================= */
+
+.admin-content {
+    flex: 1;
+    padding: 1.5rem 2rem 2rem;
+    width: 100%;
+    overflow-x: hidden;
+}
+
+/* =========================================================
+   SMALLER SCREENS
+   ========================================================= */
+
+@media (max-width: 768px) {
+
+    .admin-header {
+        padding: 0.5rem 0.75rem;
+        min-height: 52px;
+    }
+
+    .header-title-group .header-title-icon {
+        width: 20px;
+        height: 20px;
     }
 
     .page-title-header {
-        font-size: 1rem;
-        font-weight: 600;
-        color: #111827 !important;
-        margin: 0;
-    }
-
-    .header-right {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-    }
-
-    .header-info-group {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
+        font-size: 0.85rem;
+        max-width: 180px;
     }
 
     .header-datetime {
-        display: flex;
-        align-items: center;
-        gap: 0.3rem;
-        color: #6b7280 !important;
-        font-size: 0.78rem;
-        font-weight: 500;
-        white-space: nowrap;
-    }
-
-    .header-datetime i {
-        color: var(--active-blue) !important;
-        font-size: 0.8rem;
-    }
-
-    .divider-icon {
-        display: flex;
-        align-items: center;
-        color: #d1d5db !important;
-        font-size: 0.8rem;
-        font-weight: 300;
-        padding: 0 0.1rem;
-    }
-
-    /* Notification Button */
-    .notif-btn {
-        position: relative;
-        background: transparent;
-        border: none;
-        font-size: 1.2rem;
-        color: #6b7280 !important;
-        cursor: pointer;
-        padding: 0.35rem 0.6rem;
-        border-radius: 50%;
-        transition: all 0.2s ease;
-    }
-
-    .notif-btn:hover {
-        color: var(--active-blue) !important;
-        background: var(--active-blue-light) !important;
-    }
-
-    .notif-badge {
-        position: absolute;
-        top: 2px;
-        right: 2px;
-        background: #dc2626 !important;
-        color: white !important;
-        font-size: 0.65rem;
-        font-weight: 700;
-        min-width: 18px;
-        height: 18px;
-        border-radius: 99px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0 4px;
-        border: 2px solid white;
-        box-shadow: 0 2px 6px rgba(220, 38, 38, 0.4);
-    }
-
-    .notif-badge.has-unread {
-        animation: pulse-badge 1.8s infinite;
-    }
-
-    @keyframes pulse-badge {
-        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
-        70% { transform: scale(1.15); box-shadow: 0 0 0 6px rgba(220, 38, 38, 0); }
-        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
-    }
-
-    /* Notification Dropdown */
-    .notif-dropdown-menu {
-        width: 340px;
-        max-width: 90vw;
-        border-radius: 14px !important;
-        padding: 0;
-        margin-top: 10px !important;
-        overflow: hidden;
-        border: 1px solid #e5e7eb !important;
-    }
-
-    .notif-dropdown-header {
-        padding: 0.85rem 1rem;
-        background: #f8fafc !important;
-        border-bottom: 1px solid #e5e7eb !important;
-    }
-
-    .notif-dropdown-body {
-        max-height: 320px;
-        overflow-y: auto;
-    }
-
-    .notif-dropdown-footer {
-        padding: 0.75rem 1rem;
-        background: #f8fafc !important;
-        border-top: 1px solid #e5e7eb !important;
-    }
-
-    .notif-item {
-        display: flex;
-        gap: 0.75rem;
-        padding: 0.85rem 1rem;
-        border-bottom: 1px solid #f3f4f6 !important;
-        text-decoration: none !important;
-        color: #374151 !important;
-        transition: background 0.15s ease;
-        position: relative;
-    }
-
-    .notif-item:hover {
-        background: #f8fafc !important;
-    }
-
-    .notif-item.unread {
-        background: #f8fafc !important;
-        font-weight: 500;
-    }
-
-    .notif-item.unread::before {
-        content: '';
-        position: absolute;
-        left: 6px;
-        top: 50%;
-        transform: translateY(-50%);
-        width: 6px;
-        height: 6px;
-        background: var(--active-blue) !important;
-        border-radius: 50%;
-    }
-
-    .notif-icon-box {
-        width: 34px;
-        height: 34px;
-        border-radius: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1rem;
-        flex-shrink: 0;
-    }
-
-    .notif-icon-box.appointment { background: #e3f2fd !important; color: #1976d2 !important; }
-    .notif-icon-box.xray { background: #e3f2fd !important; color: #1976d2 !important; }
-    .notif-icon-box.system { background: #fef3c7 !important; color: #d97706 !important; }
-    .notif-icon-box.lab { background: #e8f5e9 !important; color: #28a745 !important; }
-    .notif-icon-box.billing { background: #fff3e0 !important; color: #ff6b00 !important; }
-    .notif-icon-box.payment { background: #ccfbf1 !important; color: #0d9488 !important; }
-    
-    .notif-content {
-        flex: 1;
-        min-width: 0;
-    }
-    .notif-title {
-        font-size: 0.82rem;
-        font-weight: 600;
-        color: #111827 !important;
-        margin-bottom: 2px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .notif-msg {
-        font-size: 0.75rem;
-        color: #6b7280 !important;
-        margin-bottom: 4px;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
-    .notif-time {
-        font-size: 0.68rem;
-        color: #9ca3af !important;
-    }
-
-    .text-primary {
-        color: var(--active-blue) !important;
-    }
-
-    .text-primary:hover {
-        color: var(--active-blue-dark) !important;
-    }
-
-    /* Header User */
-    .header-user {
-        display: flex;
-        align-items: center;
-        gap: 0.4rem;
-        cursor: pointer;
-        padding: 0.1rem 0.3rem;
-        border-radius: 8px;
-        transition: all 0.3s ease;
-    }
-
-    .header-user:hover {
-        background: #f8fafc !important;
-    }
-
-    .avatar-small {
-        background: var(--active-blue-light) !important;
-        color: var(--active-blue) !important;
+        display: none;
     }
 
     .user-details {
-        display: flex;
-        flex-direction: column;
-        line-height: 1.15;
+        display: none;
     }
 
-    .user-name-header {
-        font-size: 0.78rem;
-        font-weight: 600;
-        color: #111827 !important;
+    .avatar-small {
+        width: 30px;
+        height: 30px;
     }
 
-    .user-role-header {
-        font-size: 0.58rem;
-        color: #6b7280 !important;
-        font-weight: 500;
-    }
-
-    /* ===== CONTENT AREA ===== */
     .admin-content {
-        flex: 1;
-        padding: 1.5rem 2rem 2rem;
+        padding: 0.75rem;
     }
 
-    /* ============================================
-       RESPONSIVE
-    ============================================ */
-    @media (max-width: 992px) {
-        .admin-sidebar {
-            position: fixed;
-            top: 0;
-            left: -280px;
-            width: 280px;
-            height: 100%;
-            background: #ffffff !important;
-            z-index: 1060;
-            transition: left 0.3s ease;
-            box-shadow: none;
-        }
-        .admin-sidebar.open {
-            left: 0;
-            box-shadow: 4px 0 30px rgba(0,0,0,0.1) !important;
-        }
-        .sidebar-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.3);
-            z-index: 1050;
-            display: none;
-        }
-        .sidebar-overlay.active {
-            display: block;
-        }
-        .sidebar-close {
-            display: flex !important;
-        }
-        .admin-header {
-            padding: 0.75rem 1rem;
-        }
-        .header-title-group .page-title-header {
-            font-size: 0.9rem !important;
-        }
-        .header-info-group .divider-icon {
-            display: none;
-        }
-        .header-datetime span {
-            font-size: 0.7rem;
-        }
-        .user-details .user-role-header {
-            font-size: 0.6rem !important;
-        }
-        .admin-content {
-            padding: 1rem;
-        }
-        .notif-dropdown-menu {
-            width: 300px;
-        }
+    .notif-dropdown-menu {
+        width: 300px;
     }
 
-    @media (max-width: 768px) {
-        .admin-header {
-            padding: 0.5rem 0.75rem;
-        }
-        .header-title-group .header-title-icon {
-            width: 20px;
-            height: 20px;
-        }
-        .header-title-group .page-title-header {
-            font-size: 0.8rem !important;
-        }
-        .header-datetime span {
-            font-size: 0.6rem;
-        }
-        .user-details {
-            display: none;
-        }
-        .avatar-small {
-            width: 30px;
-            height: 30px;
-            font-size: 0.75rem;
-        }
-        .admin-content {
-            padding: 0.75rem;
-        }
-        .notif-dropdown-menu {
-            width: 280px;
-        }
-        .hamburger-btn {
-            font-size: 1.2rem;
-            padding: 0.2rem 0.4rem;
-        }
-        .notif-btn {
-            font-size: 1rem;
-            padding: 0.2rem 0.4rem;
-        }
-        .menu-btn {
-            padding: 0.6rem 0.75rem;
-            font-size: 0.8rem;
-        }
-        .menu-icon {
-            font-size: 0.9rem;
-            width: 20px;
-        }
-        .badge-notif,
-        .badge-notif-xray {
-            font-size: 0.5rem;
-            padding: 0.1rem 0.4rem;
-            min-width: 16px;
-            height: 16px;
+}
+
+@media (max-width: 576px) {
+
+    .admin-header {
+        padding: 0.4rem 0.6rem;
+        min-height: 48px;
+    }
+
+    .header-title-group {
+        gap: 0.35rem;
+    }
+
+    .header-title-group .header-title-icon {
+        width: 18px;
+        height: 18px;
+    }
+
+    .page-title-header {
+        font-size: 0.72rem;
+        max-width: 130px;
+    }
+
+    .notif-btn {
+        font-size: 1rem;
+        padding: 0.25rem 0.4rem;
+    }
+
+    .avatar-small {
+        width: 28px;
+        height: 28px;
+    }
+
+    .notif-dropdown-menu {
+        width: 270px;
+    }
+
+    .admin-content {
+        padding: 0.6rem;
+    }
+
+}
+
+@media (max-width: 400px) {
+
+    .page-title-header {
+        font-size: 0.67rem;
+        max-width: 105px;
+    }
+
+    .header-title-group .header-title-icon {
+        width: 17px;
+        height: 17px;
+    }
+
+    .header-user {
+        display: none;
+    }
+
+    .notif-dropdown-menu {
+        width: 250px;
+    }
+
+}
+
+</style>
+
+<!-- =========================================================
+     BOOTSTRAP
+     ========================================================= -->
+
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js"></script>
+
+<script>
+(function() {
+    'use strict';
+
+    // =========================================================
+    // SIDEBAR: COLLAPSE (desktop) + DRAWER (mobile)
+    // =========================================================
+
+    var STORAGE_KEY = 'polymedicSidebarCollapsed';
+    var DESKTOP_MIN = 993;
+
+    var sidebar     = document.getElementById('adminSidebar');
+    var adminMain   = document.getElementById('adminMain');
+    var collapseBtn = document.getElementById('sidebarCollapseBtn');
+    var menuBtn     = document.getElementById('mobileMenuBtn');
+    var closeBtn    = document.getElementById('sidebarCloseBtn');
+    var backdrop    = document.getElementById('sidebarBackdrop');
+
+    function isDesktop() {
+        return window.innerWidth >= DESKTOP_MIN;
+    }
+
+    // localStorage can throw in private mode / sandboxed iframes.
+    function readCollapsed() {
+        try {
+            return localStorage.getItem(STORAGE_KEY) === '1';
+        } catch (e) {
+            return false;
         }
     }
 
-    @media (max-width: 576px) {
-        .admin-header {
-            padding: 0.4rem 0.5rem;
-        }
-        .header-title-group .header-title-icon {
-            width: 18px;
-            height: 18px;
-        }
-        .header-title-group .page-title-header {
-            font-size: 0.7rem !important;
-        }
-        .header-datetime span {
-            font-size: 0.5rem;
-        }
-        .header-datetime i {
-            font-size: 0.65rem;
-        }
-        .notif-btn {
-            font-size: 0.9rem;
-            padding: 0.15rem 0.3rem;
-        }
-        .notif-badge {
-            width: 14px;
-            height: 14px;
-            font-size: 0.5rem;
-            min-width: 14px;
-            top: -1px;
-            right: -1px;
-        }
-        .avatar-small {
-            width: 26px;
-            height: 26px;
-            font-size: 0.65rem;
-        }
-        .admin-content {
-            padding: 0.5rem;
-        }
-        .notif-dropdown-menu {
-            width: 260px;
-        }
-        .notif-item {
-            padding: 0.6rem 0.75rem;
-        }
-        .notif-title {
-            font-size: 0.75rem;
-        }
-        .notif-msg {
-            font-size: 0.7rem;
-        }
-        .menu-btn {
-            padding: 0.5rem 0.6rem;
-            font-size: 0.8rem;
-        }
+    function writeCollapsed(value) {
+        try {
+            localStorage.setItem(STORAGE_KEY, value ? '1' : '0');
+        } catch (e) { /* ignore */ }
     }
 
-    @media (max-width: 400px) {
-        .header-datetime span {
-            font-size: 0.45rem;
-        }
-        .header-title-group .header-title-icon {
-            width: 16px;
-            height: 16px;
-        }
-        .header-title-group .page-title-header {
-            font-size: 0.65rem !important;
-        }
-        .notif-dropdown-menu {
-            width: 250px;
-        }
-        .sidebar-nav {
-            padding: 0.75rem 0.5rem;
-        }
-        .menu-btn {
-            padding: 0.5rem 0.6rem;
-            gap: 0.5rem;
-        }
-    }
-    </style>
+    function setCollapsed(collapsed, skipTransition) {
+        if (!sidebar || !adminMain) return;
 
-    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js"></script>
-    <script>
-        // Sidebar toggle
-        function toggleSidebar() {
-            const sidebar = document.getElementById('adminSidebar');
-            const overlay = document.getElementById('sidebarOverlay');
-            sidebar.classList.toggle('open');
-            overlay.classList.toggle('active');
+        if (skipTransition) {
+            sidebar.classList.add('no-transition');
+            adminMain.classList.add('no-transition');
         }
 
-        // Close sidebar on resize to desktop
-        window.addEventListener('resize', function() {
-            const sidebar = document.getElementById('adminSidebar');
-            const overlay = document.getElementById('sidebarOverlay');
-            if (window.innerWidth > 992) {
-                sidebar.classList.remove('open');
-                overlay.classList.remove('active');
-            }
-        });
+        sidebar.classList.toggle('collapsed', collapsed);
+        adminMain.classList.toggle('sidebar-collapsed', collapsed);
+        updateCollapseButton(collapsed);
 
-        // Active link highlighting
-        document.querySelectorAll('.sidebar-nav a').forEach(link => {
-            if (link.href === window.location.href) {
-                link.closest('li').classList.add('active');
-            }
-        });
-
-        // ============================================================
-        // NOTIFICATION AJAX FUNCTIONALITY - FIXED
-        // ============================================================
-
-        function fetchNotifications() {
-            fetch('/polymedic/public/admin/notifications/fetch', {
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    updateNotificationBadge(data.unread_count);
-                    renderNotificationDropdown(data.notifications);
-                }
-            })
-            .catch(err => console.error('Error fetching notifications:', err));
-        }
-
-        function updateNotificationBadge(count) {
-            const badge = document.getElementById('notifBadge');
-            if (count > 0) {
-                badge.textContent = count > 99 ? '99+' : count;
-                badge.style.display = 'flex';
-                badge.classList.add('has-unread');
-            } else {
-                badge.style.display = 'none';
-                badge.classList.remove('has-unread');
-            }
-        }
-
-        function renderNotificationDropdown(notifications) {
-            const listContainer = document.getElementById('notifDropdownList');
-            if (!notifications || notifications.length === 0) {
-                listContainer.innerHTML = '<div class="p-3 text-center text-muted small"><i class="bi bi-bell-slash d-block fs-4 mb-1"></i>No notifications yet</div>';
-                return;
-            }
-
-            let html = '';
-            notifications.forEach(item => {
-                const unreadClass = item.is_read == 0 ? 'unread' : '';
-                
-                // Map type to icon and color
-                let iconClass = 'bi-bell-fill';
-                let colorClass = 'system';
-                
-                if (item.type === 'appointment') {
-                    iconClass = 'bi-calendar-check';
-                    colorClass = 'appointment';
-                } else if (item.type === 'xray') {
-                    iconClass = 'bi-x-ray';
-                    colorClass = 'xray';
-                } else if (item.type === 'lab') {
-                    iconClass = 'bi-flask';
-                    colorClass = 'lab';
-                } else if (item.type === 'billing') {
-                    iconClass = 'bi-receipt';
-                    colorClass = 'billing';
-                } else if (item.type === 'payment') {
-                    iconClass = 'bi-credit-card';
-                    colorClass = 'payment';
-                }
-                
-                // FIXED: Use the link directly from the notification
-                // The link is already a full URL from the controller
-                const link = item.link || '#';
-                
-                html += `
-                    <a href="${link}" class="notif-item ${unreadClass}" onclick="markNotificationRead(${item.id}, event)">
-                        <div class="notif-icon-box ${colorClass}">
-                            <i class="bi ${iconClass}"></i>
-                        </div>
-                        <div class="notif-content">
-                            <div class="notif-title">${escapeHtml(item.title)}</div>
-                            <div class="notif-msg">${escapeHtml(item.message)}</div>
-                            <div class="notif-time"><i class="bi bi-clock me-1"></i>${item.time_ago}</div>
-                        </div>
-                    </a>
-                `;
+        if (skipTransition) {
+            // Two frames: one to paint the new state, one to re-enable easing.
+            requestAnimationFrame(function() {
+                requestAnimationFrame(function() {
+                    sidebar.classList.remove('no-transition');
+                    adminMain.classList.remove('no-transition');
+                });
             });
-            listContainer.innerHTML = html;
+        }
+    }
+
+    function updateCollapseButton(collapsed) {
+        if (!collapseBtn) return;
+
+        var icon = collapseBtn.querySelector('i');
+        var text = collapseBtn.querySelector('span');
+        var label = collapsed ? 'Expand Sidebar' : 'Collapse Sidebar';
+
+        // One icon, no CSS rotation, so it can't get flipped twice.
+        if (icon) {
+            icon.className = collapsed
+                ? 'bi bi-chevron-double-right'
+                : 'bi bi-chevron-double-left';
+        }
+        if (text) text.textContent = label;
+
+        collapseBtn.setAttribute('aria-label', label);
+        collapseBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        collapseBtn.setAttribute('data-tooltip', label);
+        collapseBtn.removeAttribute('title'); // avoids a duplicate native tooltip
+    }
+
+    // ---- mobile drawer -------------------------------------
+
+    function openDrawer() {
+        document.body.classList.add('sidebar-open');
+        if (menuBtn) menuBtn.setAttribute('aria-expanded', 'true');
+        if (backdrop) backdrop.removeAttribute('hidden');
+        if (closeBtn) closeBtn.focus();
+    }
+
+    function closeDrawer() {
+        document.body.classList.remove('sidebar-open');
+        if (menuBtn) menuBtn.setAttribute('aria-expanded', 'false');
+    }
+
+    if (menuBtn)  menuBtn.addEventListener('click', openDrawer);
+    if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
+    if (backdrop) backdrop.addEventListener('click', closeDrawer);
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeDrawer();
+    });
+
+    // Tapping a link closes the drawer so the new page isn't covered.
+    if (sidebar) {
+        sidebar.addEventListener('click', function(e) {
+            if (!isDesktop() && e.target.closest('.menu-btn')) closeDrawer();
+        });
+    }
+
+    // ---- collapse toggle -----------------------------------
+
+    window.toggleSidebarCollapse = function() {
+        if (!isDesktop()) return;
+        var next = !sidebar.classList.contains('collapsed');
+        setCollapsed(next, false);
+        writeCollapsed(next);
+        hideTooltip();
+    };
+
+    if (collapseBtn) {
+        collapseBtn.addEventListener('click', window.toggleSidebarCollapse);
+    }
+
+    // ---- initial state -------------------------------------
+
+    function applySidebarState() {
+        if (!sidebar || !adminMain) return;
+        setCollapsed(isDesktop() && readCollapsed(), true);
+        if (!isDesktop()) closeDrawer();
+    }
+
+    applySidebarState();
+
+    window.addEventListener('pageshow', function(e) {
+        if (e.persisted) applySidebarState();
+    });
+
+    // ---- resize (debounced) --------------------------------
+
+    var resizeTimer = null;
+    var wasDesktop = isDesktop();
+
+    window.addEventListener('resize', function() {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function() {
+            var nowDesktop = isDesktop();
+            if (nowDesktop !== wasDesktop) {
+                wasDesktop = nowDesktop;
+                applySidebarState();
+            }
+            if (nowDesktop) closeDrawer();
+            hideTooltip();
+        }, 120);
+    });
+
+    // =========================================================
+    // COLLAPSED TOOLTIPS
+    // Appended to <body>, positioned with fixed coords, so the
+    // sidebar's scroll container can never clip them.
+    // =========================================================
+
+    var tooltipEl = null;
+
+    function getTooltipEl() {
+        if (!tooltipEl) {
+            tooltipEl = document.createElement('div');
+            tooltipEl.className = 'sb-tooltip';
+            tooltipEl.setAttribute('role', 'tooltip');
+            document.body.appendChild(tooltipEl);
+        }
+        return tooltipEl;
+    }
+
+    function showTooltip(target) {
+        if (!isDesktop() || !sidebar.classList.contains('collapsed')) return;
+
+        var label = target.getAttribute('data-tooltip');
+        if (!label) return;
+
+        var tip = getTooltipEl();
+        tip.textContent = label;
+        tip.style.visibility = 'hidden';
+        tip.classList.add('show');
+
+        var rect = target.getBoundingClientRect();
+        var top = rect.top + (rect.height / 2) - (tip.offsetHeight / 2);
+
+        // Keep it on screen near the very top/bottom of the list.
+        top = Math.max(8, Math.min(top, window.innerHeight - tip.offsetHeight - 8));
+
+        tip.style.left = (rect.right + 12) + 'px';
+        tip.style.top = top + 'px';
+        tip.style.visibility = 'visible';
+    }
+
+    function hideTooltip() {
+        if (tooltipEl) tooltipEl.classList.remove('show');
+    }
+
+    if (sidebar) {
+        sidebar.querySelectorAll('[data-tooltip]').forEach(function(el) {
+            el.addEventListener('mouseenter', function() { showTooltip(el); });
+            el.addEventListener('focus', function() { showTooltip(el); });
+            el.addEventListener('mouseleave', hideTooltip);
+            el.addEventListener('blur', hideTooltip);
+        });
+
+        sidebar.addEventListener('scroll', hideTooltip, { passive: true });
+    }
+
+    // =========================================================
+    // NOTIFICATIONS
+    // =========================================================
+
+    function fetchNotifications() {
+        fetch('/polymedic/public/admin/notifications/fetch', {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(function(response) {
+            return response.json();
+        })
+        .then(function(data) {
+            if (data.status === 'success') {
+                updateNotificationBadge(data.unread_count);
+                renderNotificationDropdown(data.notifications);
+            }
+        })
+        .catch(function(error) {
+            console.error('Error fetching notifications:', error);
+        });
+    }
+
+    function updateNotificationBadge(count) {
+        var badge = document.getElementById('notifBadge');
+        if (!badge) return;
+
+        if (count > 0) {
+            badge.textContent = count > 99 ? '99+' : count;
+            badge.style.display = 'flex';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+
+    function renderNotificationDropdown(notifications) {
+        var listContainer = document.getElementById('notifDropdownList');
+        if (!listContainer) return;
+
+        if (!notifications || notifications.length === 0) {
+            listContainer.innerHTML = `
+                <div class="p-3 text-center text-muted small">
+                    <i class="bi bi-bell-slash d-block fs-4 mb-1"></i>
+                    No notifications yet
+                </div>
+            `;
+            return;
         }
 
-        function markNotificationRead(id, event) {
-            // Don't prevent default - let the link navigate
-            fetch('/polymedic/public/admin/notifications/mark-read/' + id, {
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    updateNotificationBadge(data.unread_count);
-                }
-            })
-            .catch(err => console.error('Error marking notification read:', err));
+        var html = '';
+
+        notifications.forEach(function(item) {
+            var unreadClass = item.is_read == 0 ? 'unread' : '';
+
+            var iconClass = 'bi-bell-fill';
+            var colorClass = 'system';
+
+            if (item.type === 'appointment') {
+                iconClass = 'bi-calendar-check';
+                colorClass = 'appointment';
+            } else if (item.type === 'xray') {
+                iconClass = 'bi-x-ray';
+                colorClass = 'xray';
+            } else if (item.type === 'lab') {
+                iconClass = 'bi-flask';
+                colorClass = 'lab';
+            } else if (item.type === 'billing') {
+                iconClass = 'bi-receipt';
+                colorClass = 'billing';
+            } else if (item.type === 'payment') {
+                iconClass = 'bi-credit-card';
+                colorClass = 'payment';
+            }
+
+            var link = item.link || '#';
+
+            html += `
+                <a href="${link}" class="notif-item ${unreadClass}" onclick="markNotificationRead(${item.id}, event)">
+                    <div class="notif-icon-box ${colorClass}">
+                        <i class="bi ${iconClass}"></i>
+                    </div>
+                    <div class="notif-content">
+                        <div class="notif-title">${escapeHtml(item.title)}</div>
+                        <div class="notif-msg">${escapeHtml(item.message)}</div>
+                        <div class="notif-time"><i class="bi bi-clock me-1"></i>${item.time_ago}</div>
+                    </div>
+                </a>
+            `;
+        });
+
+        listContainer.innerHTML = html;
+    }
+
+    window.markNotificationRead = function(id, event) {
+        fetch('/polymedic/public/admin/notifications/mark-read/' + id, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(function(response) {
+            return response.json();
+        })
+        .then(function(data) {
+            if (data.status === 'success') {
+                updateNotificationBadge(data.unread_count);
+            }
+        })
+        .catch(function(error) {
+            console.error('Error marking notification read:', error);
+        });
+    };
+
+    window.markAllNotificationsRead = function(event) {
+        if (event) {
+            event.stopPropagation();
         }
 
-        function markAllNotificationsRead(event) {
-            if (event) event.stopPropagation();
-            fetch('/polymedic/public/admin/notifications/mark-all-read', {
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    updateNotificationBadge(0);
-                    fetchNotifications();
-                }
-            })
-            .catch(err => console.error('Error marking notifications read:', err));
-        }
+        fetch('/polymedic/public/admin/notifications/mark-all-read', {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(function(response) {
+            return response.json();
+        })
+        .then(function(data) {
+            if (data.status === 'success') {
+                updateNotificationBadge(0);
+                fetchNotifications();
+            }
+        })
+        .catch(function(error) {
+            console.error('Error marking notifications read:', error);
+        });
+    };
 
-        function escapeHtml(text) {
-            if (!text) return '';
-            return text
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
-        }
+    function escapeHtml(text) {
+        if (!text) return '';
+        return text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
 
-        // Initialize and poll notifications every 15s
+    if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function() {
             fetchNotifications();
             setInterval(fetchNotifications, 15000);
         });
-    </script>
+    } else {
+        fetchNotifications();
+        setInterval(fetchNotifications, 15000);
+    }
+
+})();
+</script>
+
+<style>
+/* Disable transitions only during the initial state application
+   on page load, so restoring a saved collapsed/expanded state
+   never itself animates — only user clicks do. */
+.admin-sidebar.no-transition,
+.admin-sidebar.no-transition *,
+.admin-main.no-transition {
+    transition: none !important;
+}
+
+/* Skip the staggered intro when a saved collapsed state is
+   restored, otherwise items animate in on every page load. */
+.admin-sidebar.no-transition .menu-item {
+    animation: none !important;
+}
+</style>
+
 </body>
+
 </html>

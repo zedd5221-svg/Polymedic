@@ -132,21 +132,21 @@ class Auth extends BaseController
     }
     
     private function redirectToDashboard($role)
-    {
-        switch ($role) {
-            case 'admin':
-                return redirect()->to(base_url('admin/dashboard'));
-            case 'receptionist':
-                return redirect()->to(base_url('receptionist/dashboard'));
-            case 'radiologist':  // ← FIXED: Added this case
-                return redirect()->to(base_url('radiologist/dashboard'));
-            case 'med_tech':
-            case 'technologist':
-                return redirect()->to(base_url('admin/dashboard'));
-            case 'physician':
-                return redirect()->to(base_url('admin/dashboard'));
-            default:
-                return redirect()->to(base_url('admin/dashboard'));
+   {
+    switch ($role) {
+        case 'admin':
+            return redirect()->to(base_url('admin/dashboard'));
+        case 'receptionist':
+            return redirect()->to(base_url('receptionist/dashboard'));
+        case 'radiologist':
+            return redirect()->to(base_url('radiologist/dashboard'));
+        case 'med_tech':
+        case 'technologist':
+            return redirect()->to(base_url('medtech/dashboard'));
+        case 'physician':
+            return redirect()->to(base_url('admin/dashboard'));
+        default:
+            return redirect()->to(base_url('admin/dashboard'));
         }
     }
     

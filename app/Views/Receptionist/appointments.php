@@ -115,6 +115,14 @@ foreach ($appointmentList as $appt) {
         </div>
 
         <div class="dx-head-actions">
+            <button type="button" class="dx-btn" id="dxCheckAvail">
+                <i class="bi bi-calendar2-week" aria-hidden="true"></i>
+                Check availability
+            </button>
+            <button type="button" class="dx-btn" id="dxOverrideOpen">
+                <i class="bi bi-shield-exclamation" aria-hidden="true"></i>
+                Override booking
+            </button>
             <button type="button" class="dx-btn" id="dxExport">
                 <i class="bi bi-download" aria-hidden="true"></i>
                 Export CSV
@@ -169,6 +177,8 @@ foreach ($appointmentList as $appt) {
                     $canCancel   = !in_array($status, ['completed', 'cancelled'], true);
                     $isCancelled = $status === 'cancelled';
                     $isCompleted = $status === 'completed';
+
+                    $isOverride = !empty($appt['is_override']);
 
                     $ageRaw = $appt['age'] ?? '';
                     $ageText = is_numeric($ageRaw) ? ((int) $ageRaw) . ' y' : '';
@@ -236,6 +246,9 @@ foreach ($appointmentList as $appt) {
                             </button>
 
                             <div class="dx-card-flags">
+                                <?php if ($isOverride): ?>
+                                    <span class="dx-tag-ovr" title="Override booking">OVR</span>
+                                <?php endif; ?>
                                 <?php if ($showLateTag): ?>
                                     <span class="dx-tag-stat" title="Late">LATE</span>
                                 <?php endif; ?>
@@ -438,6 +451,109 @@ foreach ($appointmentList as $appt) {
 
     </section>
 
+    <!-- ============================ OVR MODALS ============================ -->
+    <div class="ovr-modal" id="ovrCheckModal" hidden>
+        <div class="ovr-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="ovrCheckTitle">
+            <header class="ovr-modal__head">
+                <h3 id="ovrCheckTitle">Check availability</h3>
+                <button type="button" class="ovr-modal__close" data-close="ovrCheckModal" aria-label="Close">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </header>
+            <div class="ovr-modal__body">
+                <div class="ovr-row">
+                    <label for="ovrCheckDate">Date</label>
+                    <input type="date" id="ovrCheckDate" class="dx-input">
+                </div>
+                <div class="ovr-row">
+                    <label for="ovrCheckType">Service</label>
+                    <select id="ovrCheckType" class="dx-select">
+                        <option value="laboratory">Laboratory</option>
+                        <option value="xray">X-Ray</option>
+                        <option value="both">Both</option>
+                    </select>
+                </div>
+                <div class="ovr-slots" id="ovrCheckSlots">
+                    <p class="dx-muted">Pick a date to see the slots.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="ovr-modal" id="ovrBookModal" hidden>
+        <div class="ovr-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="ovrBookTitle">
+            <header class="ovr-modal__head">
+                <h3 id="ovrBookTitle">Override booking</h3>
+                <button type="button" class="ovr-modal__close" data-close="ovrBookModal" aria-label="Close">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </header>
+            <form method="post" action="<?= base_url('receptionist/appointment/override-book') ?>" class="ovr-modal__body">
+                <?= csrf_field() ?>
+                <p class="ovr-warn">
+                    <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+                    Override booking creates an <strong>approved</strong> appointment only.
+                    It does <strong>not</strong> create diagnostic requests or payments — use the
+                    normal Approve button afterwards to generate them.
+                </p>
+
+                <div class="ovr-grid">
+                    <div class="ovr-row">
+                        <label for="ovrDate">Date</label>
+                        <input type="date" id="ovrDate" name="appointment_date" class="dx-input" required>
+                    </div>
+                    <div class="ovr-row">
+                        <label for="ovrTime">Time</label>
+                        <select id="ovrTime" name="appointment_time" class="dx-select" required>
+                            <option value="">Select time</option>
+                        </select>
+                    </div>
+                    <div class="ovr-row">
+                        <label for="ovrType">Service</label>
+                        <select id="ovrType" name="service_type" class="dx-select" required>
+                            <option value="laboratory">Laboratory</option>
+                            <option value="xray">X-Ray</option>
+                            <option value="both">Both</option>
+                        </select>
+                    </div>
+                    <div class="ovr-row">
+                        <label for="ovrName">Patient name</label>
+                        <input type="text" id="ovrName" name="full_name" class="dx-input" required>
+                    </div>
+                    <div class="ovr-row">
+                        <label for="ovrAge">Age</label>
+                        <input type="number" id="ovrAge" name="age" class="dx-input" min="0" max="120" required>
+                    </div>
+                    <div class="ovr-row">
+                        <label for="ovrGender">Gender</label>
+                        <select id="ovrGender" name="gender" class="dx-select" required>
+                            <option value="">Select</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="ovr-row">
+                        <label for="ovrPhone">Phone</label>
+                        <input type="text" id="ovrPhone" name="phone" class="dx-input">
+                    </div>
+                    <div class="ovr-row">
+                        <label for="ovrEmail">Email</label>
+                        <input type="email" id="ovrEmail" name="email" class="dx-input">
+                    </div>
+                </div>
+
+                <div class="ovr-actions">
+                    <button type="button" class="dx-btn" data-close="ovrBookModal">Cancel</button>
+                    <button type="submit" class="dx-btn dx-btn--primary">
+                        <i class="bi bi-shield-exclamation" aria-hidden="true"></i>
+                        Create override
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
 </div>
 
 <div class="dx-toast" id="dxToast" role="status" aria-live="polite" hidden></div>
@@ -524,7 +640,7 @@ foreach ($appointmentList as $appt) {
     color: var(--dx-muted);
 }
 
-.dx-head-actions { display: flex; gap: 0.5rem; }
+.dx-head-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 
 /* ---------- Buttons ---------- */
 
@@ -800,6 +916,18 @@ foreach ($appointmentList as $appt) {
     color: var(--dx-danger-dark);
     background: #fef2f2;
     border: 1px solid #fecaca;
+    border-radius: 4px;
+}
+
+.dx-tag-ovr {
+    padding: 0 0.35rem;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    line-height: 1.6;
+    color: #7c3aed;
+    background: #f5f3ff;
+    border: 1px solid #ddd6fe;
     border-radius: 4px;
 }
 
@@ -1185,6 +1313,138 @@ foreach ($appointmentList as $appt) {
     .dx-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .dx-card.is-hidden { display: flex; }
 }
+
+/* =========================================================
+   OVERRIDE MODALS — namespaced .ovr-* to keep clear of .dx-*
+   ========================================================= */
+
+.ovr-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.ovr-modal[hidden] { display: none; }
+
+.ovr-modal__dialog {
+    width: min(640px, 100%);
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 24px 48px -12px rgba(15, 23, 42, 0.4);
+}
+
+.ovr-modal__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.85rem 1.1rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.ovr-modal__head h3 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 650;
+    color: #0f172a;
+}
+
+.ovr-modal__close {
+    width: 34px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    color: #64748b;
+    cursor: pointer;
+}
+
+.ovr-modal__close:hover { background: #f1f5f9; color: #0f172a; }
+
+.ovr-modal__body {
+    padding: 1rem 1.1rem 1.15rem;
+    overflow-y: auto;
+}
+
+.ovr-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-bottom: 0.75rem;
+}
+
+.ovr-row label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #334155;
+}
+
+.ovr-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem 1rem;
+}
+
+.ovr-slots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.4rem;
+    min-height: 2rem;
+}
+
+.ovr-slot {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    cursor: default;
+}
+
+.ovr-slot--free  { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+.ovr-slot--full  { background: #f1f5f9; color: #94a3b8; border-color: #e2e8f0; }
+.ovr-slot--block { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+
+.ovr-warn {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin: 0 0 0.85rem;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.8rem;
+    color: #92400e;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 8px;
+}
+
+.ovr-warn i { color: #d97706; margin-top: 0.1rem; }
+
+.ovr-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 0.85rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid #f1f5f9;
+}
+
+@media (max-width: 560px) {
+    .ovr-grid { grid-template-columns: 1fr; }
+}
 </style>
 
 <script>
@@ -1399,6 +1659,137 @@ foreach ($appointmentList as $appt) {
         clearTimeout(toastTimer);
         toastTimer = setTimeout(function () { el.hidden = true; }, 4000);
     }
+
+
+    /* =====================================================
+       OVERRIDE / CHECK-AVAILABILITY MODALS
+       ===================================================== */
+
+    function openModal(id) {
+        var el = byId(id);
+        if (el) el.hidden = false;
+    }
+    function closeModal(id) {
+        var el = byId(id);
+        if (el) el.hidden = true;
+    }
+
+    document.querySelectorAll('[data-close]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            closeModal(btn.getAttribute('data-close'));
+        });
+    });
+
+    document.querySelectorAll('.ovr-modal').forEach(function (m) {
+        m.addEventListener('click', function (e) {
+            if (e.target === m) m.hidden = true;
+        });
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape') return;
+        document.querySelectorAll('.ovr-modal:not([hidden])').forEach(function (m) {
+            m.hidden = true;
+        });
+    });
+
+    /* ---------- slots loader shared by both modals ---------- */
+
+    var SLOTS_URL = '<?= base_url('receptionist/appointment/slots') ?>';
+
+    function fetchSlots(date, type) {
+        var full = SLOTS_URL + '?date=' + encodeURIComponent(date) + '&type=' + encodeURIComponent(type);
+        return fetch(full, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function (r) { return r.json(); });
+    }
+
+    /* ---------- Check availability modal ---------- */
+
+    var cDate = byId('ovrCheckDate');
+    var cType = byId('ovrCheckType');
+    var cBox  = byId('ovrCheckSlots');
+
+    function loadCheck() {
+        if (!cDate.value) return;
+        cBox.innerHTML = '<p class="dx-muted">Loading…</p>';
+
+        fetchSlots(cDate.value, cType.value).then(function (data) {
+            if (!data || !data.ok) {
+                cBox.innerHTML = '<p class="dx-muted">Could not load slots.</p>';
+                return;
+            }
+            if (!data.working) {
+                cBox.innerHTML = '<p class="dx-muted">The clinic is closed on that date.</p>';
+                return;
+            }
+            if (!data.slots || !data.slots.length) {
+                cBox.innerHTML = '<p class="dx-muted">No slots configured.</p>';
+                return;
+            }
+            cBox.innerHTML = data.slots.map(function (s) {
+                var cls = s.blocked ? 'ovr-slot--block'
+                        : (s.available ? 'ovr-slot--free' : 'ovr-slot--full');
+                var suffix = s.blocked ? ' · blocked'
+                           : (s.available ? '' : ' · full');
+                return '<span class="ovr-slot ' + cls + '">' + s.label + suffix + '</span>';
+            }).join('');
+        }).catch(function () {
+            cBox.innerHTML = '<p class="dx-muted">Could not load slots.</p>';
+        });
+    }
+
+    if (byId('dxCheckAvail')) {
+        byId('dxCheckAvail').addEventListener('click', function () {
+            openModal('ovrCheckModal');
+            var today = new Date().toISOString().slice(0, 10);
+            if (!cDate.value) cDate.value = today;
+            loadCheck();
+        });
+    }
+    if (cDate) cDate.addEventListener('change', loadCheck);
+    if (cType) cType.addEventListener('change', loadCheck);
+
+    /* ---------- Override booking modal ---------- */
+
+    var oDate = byId('ovrDate');
+    var oType = byId('ovrType');
+    var oTime = byId('ovrTime');
+
+    function loadOverrideTimes() {
+        if (!oDate.value) return;
+        oTime.innerHTML = '<option value="">Loading…</option>';
+
+        fetchSlots(oDate.value, oType.value).then(function (data) {
+            oTime.innerHTML = '';
+            var head = document.createElement('option');
+            head.value = '';
+            head.textContent = 'Select time';
+            oTime.appendChild(head);
+
+            if (!data || !data.ok || !data.working || !data.slots) {
+                return;
+            }
+            data.slots.forEach(function (s) {
+                var opt = document.createElement('option');
+                opt.value = s.time;
+                opt.textContent = s.label + (s.available ? '' : ' — full');
+                oTime.appendChild(opt);
+            });
+        });
+    }
+
+    if (byId('dxOverrideOpen')) {
+        byId('dxOverrideOpen').addEventListener('click', function () {
+            openModal('ovrBookModal');
+            var today = new Date().toISOString().slice(0, 10);
+            if (!oDate.value) {
+                oDate.value = today;
+                loadOverrideTimes();
+            }
+        });
+    }
+    if (oDate) oDate.addEventListener('change', loadOverrideTimes);
+    if (oType) oType.addEventListener('change', loadOverrideTimes);
 
 
     /* =====================================================

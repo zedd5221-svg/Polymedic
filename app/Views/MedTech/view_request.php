@@ -62,12 +62,11 @@ foreach ($results as $row) {
 $flagOptions = ['normal' => 'Normal', 'high' => 'High', 'low' => 'Low', 'critical' => 'Critical'];
 $technologist = esc(session()->get('full_name') ?: '—');
 
+/* Payment state passed by the controller. */
+$isPaid = !empty($isPaid ?? false);
+
 /*
  * Gender-based avatar for the hero.
- *
- * Avatar PNGs must exist at:
- *   public/assets/images/man-avatar.png
- *   public/assets/images/woman-avatar.png
  */
 $genderRaw = strtolower(trim((string) ($request['gender'] ?? '')));
 $isMale    = in_array($genderRaw, ['male', 'm', 'man', 'boy'], true);
@@ -100,6 +99,24 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
                         <li><?= esc($error) ?></li>
                     <?php endforeach; ?>
                 </ul>
+            </div>
+        </div>
+    <?php endif; ?>
+
+
+    <?php /* ========================================================
+             PAYMENT WARNING
+             ======================================================== */ ?>
+    <?php if (!$isPaid && !$isReleased): ?>
+        <div class="lab-msg lab-msg--err" role="alert">
+            <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+            <div>
+                <strong>This request has not been paid yet.</strong>
+                <p style="margin:.35rem 0 0;font-size:.8rem;">
+                    The receptionist must open the diagnostic-requests page and click
+                    <strong>Start</strong> before you can enter or release results.
+                    You can still view the request but saving will be refused.
+                </p>
             </div>
         </div>
     <?php endif; ?>
@@ -325,7 +342,8 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
             <form action="<?= base_url('medtech/request/release-directly/' . (int) $request['id']) ?>"
                   method="POST"
                   id="mainResultForm"
-                  novalidate>
+                  novalidate
+                  <?= !$isPaid ? 'data-unpaid="1"' : '' ?>>
 
                 <?= csrf_field() ?>
                 <input type="hidden" name="submit_action" id="submitAction" value="save">
@@ -366,21 +384,9 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
                                     <?php
                                     $flag = (string) ($result['flag'] ?? 'normal');
 
-                                    /*
-                                     * Alignment: numeric values are right-aligned,
-                                     * text values stay left. Empty fields default
-                                     * to left because typing a word is more common
-                                     * in an empty field than typing a number.
-                                     */
                                     $existingResult = trim((string) ($result['result'] ?? ''));
                                     $looksNumeric   = $existingResult !== '' && is_numeric($existingResult);
 
-                                    /*
-                                     * Placeholder: match the shape of the row.
-                                     *   has a unit              -> "0.0"
-                                     *   has a reference range   -> "e.g. <range>"
-                                     *   neither                 -> "Type result"
-                                     */
                                     $rowUnit      = trim((string) ($result['unit'] ?? ''));
                                     $rowReference = trim((string) ($result['reference_range'] ?? ''));
 
@@ -1128,7 +1134,6 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
     box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
 }
 
-/* Numeric values right-aligned; text values stay left-aligned. */
 .lab-input--num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
 
 .lab-input--num.is-filled { background: #fbfffe; border-color: #cdeae4; }
@@ -1428,6 +1433,26 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
     var form = document.getElementById('mainResultForm');
     if (!form) { return; }
 
+    /* =====================================================
+       PAYMENT GUARD
+       If the controller flagged this request as unpaid,
+       block every write path and disable the form controls.
+       The server refuses the save anyway; this just saves
+       the tech from typing results they cannot submit.
+       ===================================================== */
+    if (form.dataset.unpaid === '1') {
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            alert('This request has not been paid yet. Ask the receptionist to click Start first.');
+        });
+
+        form.querySelectorAll('input, textarea, select, button').forEach(function (el) {
+            el.disabled = true;
+        });
+
+        return;
+    }
+
     var table    = document.getElementById('resultsTable');
     var rowTpl   = document.getElementById('labRowTemplate');
     var groupTpl = document.getElementById('labGroupTemplate');
@@ -1576,10 +1601,6 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
         if (row) { row.className = 'lab-row is-flag-' + sel.value; }
     });
 
-    /*
-     * Live sync of the result alignment. Runs on every input, no debounce
-     * because the check is trivial.
-     */
     form.addEventListener('input', function (e) {
         dirty = true;
 
@@ -1595,10 +1616,6 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
         }
     });
 
-    /*
-     * On load: ensure any pre-filled numeric result is right-aligned even
-     * if the server-side class missed it.
-     */
     form.querySelectorAll('.result-input').forEach(syncAlignment);
 
     form.querySelectorAll('[data-autogrow]').forEach(function (ta) {
@@ -1643,14 +1660,6 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
         return true;
     }
 
-    /*
-     * Submit handler.
-     *
-     * Do not disable the button that triggered the submit inside the
-     * same click handler; the browser cancels the form submit if the
-     * triggering element is disabled when the default action runs.
-     * Defer the disable to the next tick.
-     */
     form.querySelectorAll('button[type="submit"][data-action]').forEach(function (btn) {
         btn.addEventListener('click', function (e) {
             var action = btn.dataset.action;

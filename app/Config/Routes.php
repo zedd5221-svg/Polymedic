@@ -20,7 +20,7 @@ $routes->group('admin', ['filter' => 'auth:admin'], function ($routes) {
     $routes->get('dashboard', 'Admin::dashboard');
     $routes->get('patients', 'Admin::patients');
 
-    // ✅ Patient detail view (used by the eye icon on the patients list)
+    // Patient detail view (used by the eye icon on the patients list)
     $routes->get('patient/view/(:num)', 'Admin::viewPatient/$1');
 
     $routes->get('requests', 'Admin::requests');
@@ -42,6 +42,12 @@ $routes->group('admin', ['filter' => 'auth:admin'], function ($routes) {
     $routes->delete('delete-diagnostic-request/(:num)/(:any)', 'Admin::deleteDiagnosticRequest/$1/$2');
     $routes->get('get-request-details/(:num)/(:any)', 'Admin::getRequestDetails/$1/$2');
     $routes->get('print-request/(:num)/(:any)', 'Admin::printRequest/$1/$2');
+
+    // ✅ NEW — Payments page + AJAX helpers
+    $routes->get('payments',                   'Admin::payments');
+    $routes->get('get-payment-details/(:num)', 'Admin::getPaymentDetails/$1');
+    $routes->get('print-receipt/(:num)',       'Admin::printReceipt/$1');
+    $routes->post('refund-payment/(:num)',     'Admin::refundPayment/$1');
 
     // Notifications
     $routes->get('notifications', 'NotificationController::index');
@@ -74,7 +80,6 @@ $routes->group('receptionist', ['filter' => 'auth:receptionist'], function ($rou
     $routes->get('dashboard', 'Receptionist::dashboard');
     $routes->get('patients', 'Receptionist::patients');
 
-    // ✅ Patient detail view (used by the eye icon on the patients list)
     $routes->get('patient/view/(:num)', 'Receptionist::viewPatient/$1');
 
     // Appointments
@@ -84,7 +89,11 @@ $routes->group('receptionist', ['filter' => 'auth:receptionist'], function ($rou
     $routes->get('appointment/cancel/(:num)', 'Receptionist::cancelAppointment/$1');
     $routes->get('appointment/complete/(:num)', 'Receptionist::completeAppointment/$1');
 
-    $routes->get('billing', 'Receptionist::billing');
+    // ⬅ EDIT #1 — the old placeholder route pointed at Receptionist::billing.
+    //            Now it points at the shared Billing controller so this URL
+    //            serves the real invoice list instead of "No bills found".
+    $routes->get('billing', 'Billing::index');
+
     $routes->get('payments', 'Receptionist::payments');
     $routes->get('reports', 'Receptionist::reports');
 
@@ -103,6 +112,11 @@ $routes->group('receptionist', ['filter' => 'auth:receptionist'], function ($rou
     $routes->delete('delete-diagnostic-request/(:num)/(:any)', 'Receptionist::deleteDiagnosticRequest/$1/$2');
     $routes->get('get-request-details/(:num)/(:any)', 'Receptionist::getRequestDetails/$1/$2');
     $routes->get('print-request/(:num)/(:any)', 'Receptionist::printRequest/$1/$2');
+
+    // Payments AJAX
+    $routes->get('get-payment-details/(:num)', 'Receptionist::getPaymentDetails/$1');
+    $routes->get('print-receipt/(:num)',       'Receptionist::printReceipt/$1');
+    $routes->post('refund-payment/(:num)',     'Receptionist::refundPayment/$1');
 
     // Patient sync / debug
     $routes->get('sync-walk-in-patients', 'Receptionist::syncWalkInPatients');
@@ -173,6 +187,69 @@ $routes->get('appointment/book', 'Appointment::book');
 $routes->post('appointment/submit', 'Appointment::submit');
 $routes->get('appointment/success/(:any)', 'Appointment::success/$1');
 $routes->get('book-now', 'Appointment::book');
+
+
+// ============================================================
+// AVAILABILITY (APPEND-ONLY, ADDED BY FEATURE)
+// ============================================================
+
+// Public slots endpoint (used by the booking wizard).
+$routes->get('appointment/slots', 'Appointment::slots');
+
+// Admin — availability management.
+$routes->group('admin', ['filter' => 'auth:admin'], function ($routes) {
+    $routes->get('availability',           'Admin::availability');
+    $routes->get('availability/day',       'Admin::availabilityDay');
+    $routes->post('availability/save',     'Admin::saveAvailabilitySettings');
+    $routes->post('availability/block',    'Admin::blockAvailabilitySlot');
+    $routes->post('availability/unblock',  'Admin::unblockAvailabilitySlot');
+});
+
+// Receptionist — availability check + override booking.
+$routes->group('receptionist', ['filter' => 'auth:receptionist'], function ($routes) {
+    $routes->get('appointment/slots',          'Receptionist::appointmentSlots');
+    $routes->post('appointment/override-book', 'Receptionist::overrideBook');
+});
+
+
+// ============================================================
+// BILLING — shared controller, role-scoped inside the class
+// ============================================================
+//
+// The controller (App\Controllers\Billing) re-checks the session
+// role on every request. The route filters below are the outer
+// guard; the inner check is what stops a hand-typed URL from
+// reaching admin-only actions when a receptionist is logged in.
+//
+// Admin gets:    index, create, store, view, pay, void, refund,
+//                receipt, reports
+// Receptionist:  index, create, store, view, pay, receipt
+//
+// ⬅ EDIT #2 — entire new block, appended here.
+// ============================================================
+
+$routes->group('admin/billing', ['filter' => 'auth:admin'], function ($routes) {
+    $routes->get('/',              'Billing::index');
+    $routes->get('create',         'Billing::create');
+    $routes->post('store',         'Billing::store');
+    $routes->get('view/(:num)',    'Billing::view/$1');
+    $routes->post('pay/(:num)',    'Billing::recordPayment/$1');
+    $routes->post('void/(:num)',   'Billing::void/$1');
+    $routes->post('refund/(:num)', 'Billing::refundPayment/$1');
+    $routes->post('sync-request/(:num)', 'Billing::syncRequest/$1');   // ← NEW
+    $routes->get('receipt/(:num)', 'Billing::receipt/$1');
+    $routes->get('reports',        'Billing::reports');
+});
+
+$routes->group('receptionist/billing', ['filter' => 'auth:receptionist'], function ($routes) {
+    $routes->get('/',              'Billing::index');
+    $routes->get('create',         'Billing::create');
+    $routes->post('store',         'Billing::store');
+    $routes->get('view/(:num)',    'Billing::view/$1');
+    $routes->post('pay/(:num)',    'Billing::recordPayment/$1');
+    $routes->get('receipt/(:num)', 'Billing::receipt/$1');
+    // Intentionally NOT registered: void, refund, reports
+});
 
 
 // ============================================================

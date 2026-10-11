@@ -9,6 +9,8 @@ use App\Models\NotificationModel;
 use App\Models\ServiceModel;
 use App\Models\PatientModel;
 use App\Models\PaymentModel;
+use App\Models\AvailabilityModel;
+use App\Models\SettingsModel;
 
 class Admin extends BaseController
 {
@@ -52,40 +54,34 @@ class Admin extends BaseController
         $month = date('m');
         $year  = date('Y');
 
-        // ===== TOTAL PATIENTS =====
         $totalPatients = $patientModel->countAll();
 
-        // ===== TODAY'S PATIENTS =====
         $todayPatients = $appointmentModel
             ->where('appointment_date', $today)
             ->countAllResults();
 
-        // ===== PENDING REQUESTS (Lab + X-Ray) =====
         $pendingRequests = $diagnosticModel
             ->where('status', 'pending')
             ->countAllResults();
 
-        // ===== COMPLETED REQUESTS (Lab + X-Ray) =====
         $completedRequests = $diagnosticModel
             ->where('status', 'completed')
             ->countAllResults();
 
-        // ===== RELEASED RESULTS (Lab + X-Ray) =====
         $releasedResults = $diagnosticModel
             ->where('status', 'released')
             ->countAllResults();
 
-        // ===== TODAY'S REVENUE (from payments table) =====
+        // Sum amount_paid (money actually collected), not total_amount.
         $todayPayments = $paymentModel
             ->where('DATE(payment_date)', $today)
             ->where('payment_status', 'paid')
             ->findAll();
         $todayRevenue = 0;
         foreach ($todayPayments as $p) {
-            $todayRevenue += floatval($p['total_amount']);
+            $todayRevenue += floatval($p['amount_paid'] ?? 0);
         }
 
-        // ===== MONTHLY REVENUE (from payments table) =====
         $monthlyPayments = $paymentModel
             ->where('MONTH(payment_date)', $month)
             ->where('YEAR(payment_date)', $year)
@@ -93,31 +89,23 @@ class Admin extends BaseController
             ->findAll();
         $monthlyRevenue = 0;
         foreach ($monthlyPayments as $p) {
-            $monthlyRevenue += floatval($p['total_amount']);
+            $monthlyRevenue += floatval($p['amount_paid'] ?? 0);
         }
 
-        // ===== REVENUE DATA (Last 12 Months) =====
         $revenueData = $this->getRevenueData();
 
-        // ===== DEPARTMENT VOLUME (Lab vs X-Ray, this week) =====
         $visitsData = $this->getDepartmentData();
 
-        // ===== PENDING APPOINTMENTS (mini approval panel) =====
         $pendingAppointments = $this->getPendingAppointments(20);
 
-        // ===== REQUESTS DATA (Last 7 Days) =====
         $requestsData = $this->getRequestsData();
 
-        // ===== TOP LAB TESTS =====
         $topTests = $this->getTopTests();
 
-        // ===== RECENT ACTIVITY =====
         $recentActivity = $this->getRecentActivity();
 
-        // ===== KPI SPARKLINES (last 14 days, real daily figures) =====
         $kpiTrends = $this->getKpiTrends(14, (int) $totalPatients);
 
-        // ===== BUILD DATA ARRAY =====
         $data = [
             'kpiTrends' => $kpiTrends,
             'totalPatients' => $totalPatients,
@@ -138,13 +126,6 @@ class Admin extends BaseController
         return view('Admin/dashboard', $data);
     }
 
-    // ===== CHART HELPERS =====
-
-    /**
-     * Daily series for the KPI sparklines, oldest day first, ending today.
-     * Every value is a real count or sum from the database; days with no
-     * activity are zero. Keys match the card keys in the dashboard view.
-     */
     private function getKpiTrends(int $days, int $totalPatients): array
     {
         $db    = db_connect();
@@ -156,7 +137,6 @@ class Admin extends BaseController
             $dates[] = date('Y-m-d', strtotime($start . ' +' . $i . ' days'));
         }
 
-        // Runs a "date, value" grouped query and returns a full day-indexed series.
         $series = function (string $table, string $dateExpr, string $valueExpr, array $where = [], array $whereIn = []) use ($db, $dates, $start, $end) {
             $b = $db->table($table)
                 ->select("$dateExpr AS d, $valueExpr AS v", false)
@@ -177,7 +157,6 @@ class Admin extends BaseController
             return array_map(fn($d) => $map[$d] ?? 0, $dates);
         };
 
-        // Patients: walk back from today's total using new registrations per day.
         $newPatients = $series('patients', 'DATE(created_at)', 'COUNT(*)');
         $patients    = [];
         $running     = $totalPatients - array_sum($newPatients);
@@ -186,12 +165,12 @@ class Admin extends BaseController
             $patients[] = $running;
         }
 
-        $revenue = $series('payments', 'DATE(payment_date)', 'SUM(total_amount)', ['payment_status' => 'paid']);
+        // Use amount_paid so the chart matches the Payments/Billing pages.
+        $revenue = $series('payments', 'DATE(payment_date)', 'SUM(amount_paid)', ['payment_status' => 'paid']);
 
-        // Month-to-date cumulative revenue, from the 1st of this month.
         $monthStart = date('Y-m-01');
         $mtdRows = $db->table('payments')
-            ->select('DATE(payment_date) AS d, SUM(total_amount) AS v', false)
+            ->select('DATE(payment_date) AS d, SUM(amount_paid) AS v', false)
             ->where('payment_status', 'paid')
             ->where("DATE(payment_date) >=", $monthStart)
             ->where("DATE(payment_date) <=", $end)
@@ -210,7 +189,6 @@ class Admin extends BaseController
             $cursor = date('Y-m-d', strtotime($cursor . ' +1 day'));
         }
         foreach ($dates as $d) {
-            // Before the 1st of the month the running total restarts at zero.
             $mtd[] = $mtdFull[$d] ?? 0;
         }
 
@@ -243,7 +221,7 @@ class Admin extends BaseController
 
             $total = 0;
             foreach ($monthPayments as $p) {
-                $total += floatval($p['total_amount']);
+                $total += floatval($p['amount_paid'] ?? 0);
             }
             $revenue[] = $total;
         }
@@ -273,9 +251,6 @@ class Admin extends BaseController
         ];
     }
 
-    /**
-     * Patients handled by each department, per day of the current week.
-     */
     private function getDepartmentData()
     {
         $days  = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -308,9 +283,6 @@ class Admin extends BaseController
         ];
     }
 
-    /**
-     * Appointments waiting for approval, soonest first.
-     */
     private function getPendingAppointments(int $limit = 20)
     {
         $model = new AppointmentModel();
@@ -424,7 +396,7 @@ class Admin extends BaseController
     }
 
     // =============================================
-    // PATIENTS - COMPLETE FIX (ALL SOURCES)
+    // PATIENTS
     // =============================================
     public function patients()
     {
@@ -575,10 +547,6 @@ class Admin extends BaseController
         return view('Admin/patients', $data);
     }
 
-    /**
-     * View a single patient using the shared appointment/patient view.
-     * Reached from the eye icon on the admin patients list.
-     */
     public function viewPatient($id = null)
     {
         $redirect = $this->checkAuth();
@@ -598,11 +566,9 @@ class Admin extends BaseController
                              ->with('error', 'Patient not found.');
         }
 
-        // Normalize "source" into a human-readable service type.
         $source      = strtolower((string) ($patient['source'] ?? ''));
         $serviceType = (strpos($source, 'walk-in') !== false) ? 'Walk-in' : 'Online';
 
-        // Shape the data the way appointment_view.php expects.
         $appointment = [
             'id'               => $patient['id']           ?? null,
             'reference_number' => $patient['patient_code'] ?? '—',
@@ -621,7 +587,6 @@ class Admin extends BaseController
             'other_requests'   => '',
         ];
 
-        // Pull this patient's diagnostic history (optional — fails silently).
         $lab_services  = [];
         $xray_services = [];
 
@@ -657,12 +622,6 @@ class Admin extends BaseController
         ]);
     }
 
-    /**
-     * Resolve a patient row's id by name (and optionally age) if it
-     * wasn't already provided. Used so the eye icon always has a valid
-     * patient id, even for rows that came from appointments or
-     * diagnostic requests rather than the patients table.
-     */
     private function resolvePatientId(?int $id, string $fullName, $age = null): ?int
     {
         if (!empty($id)) {
@@ -1079,6 +1038,8 @@ class Admin extends BaseController
         $patientModel = new PatientModel();
         $patient = $patientModel->findOrCreateFromAppointment($appointment);
 
+        $patientCodeForRequest = $patient['patient_code'] ?? null;
+
         $diagnosticModel = new DiagnosticRequestModel();
 
         $labServices = json_decode($appointment['lab_services'], true) ?? [];
@@ -1096,6 +1057,7 @@ class Admin extends BaseController
                     'type'             => DiagnosticRequestModel::TYPE_LAB,
                     'appointment_id'   => $id,
                     'patient_name'     => $appointment['full_name'],
+                    'patient_code'     => $patientCodeForRequest,
                     'age'              => $appointment['age'],
                     'gender'           => $appointment['gender'],
                     'email'            => $appointment['email'] ?? null,
@@ -1131,6 +1093,7 @@ class Admin extends BaseController
                     'type'             => DiagnosticRequestModel::TYPE_XRAY,
                     'appointment_id'   => $id,
                     'patient_name'     => $appointment['full_name'],
+                    'patient_code'     => $patientCodeForRequest,
                     'age'              => $appointment['age'],
                     'gender'           => $appointment['gender'],
                     'email'            => $appointment['email'] ?? null,
@@ -1234,6 +1197,7 @@ class Admin extends BaseController
 
         $appointmentModel = new AppointmentModel();
         $diagnosticModel  = new DiagnosticRequestModel();
+        $patientModel     = new PatientModel();
 
         $appointments = $appointmentModel
             ->where('status', 'approved')
@@ -1257,11 +1221,14 @@ class Admin extends BaseController
             if (!$existing) {
                 $examType = $this->formatXrayServices($xrayServices);
 
+                $patient = $patientModel->where('full_name', $appt['full_name'])->first();
+
                 $diagnosticModel->insert([
                     'reference_number' => 'XR-' . date('y') . '-' . strtoupper(bin2hex(random_bytes(3))),
                     'type'             => DiagnosticRequestModel::TYPE_XRAY,
                     'appointment_id'   => $appt['id'],
                     'patient_name'     => $appt['full_name'],
+                    'patient_code'     => $patient['patient_code'] ?? null,
                     'age'              => $appt['age'],
                     'gender'           => $appt['gender'],
                     'services'         => $examType,
@@ -1286,6 +1253,7 @@ class Admin extends BaseController
 
         $appointmentModel = new AppointmentModel();
         $diagnosticModel  = new DiagnosticRequestModel();
+        $patientModel     = new PatientModel();
 
         $appointments = $appointmentModel
             ->where('lab_services IS NOT NULL')
@@ -1315,11 +1283,14 @@ class Admin extends BaseController
             if (!$existing) {
                 $examType = $this->formatLabServices($labServices);
 
+                $patient = $patientModel->where('full_name', $appt['full_name'])->first();
+
                 $diagnosticModel->insert([
                     'reference_number' => 'LAB-' . date('y') . '-' . strtoupper(bin2hex(random_bytes(3))),
                     'type'             => DiagnosticRequestModel::TYPE_LAB,
                     'appointment_id'   => $appt['id'],
                     'patient_name'     => $appt['full_name'],
+                    'patient_code'     => $patient['patient_code'] ?? null,
                     'age'              => $appt['age'],
                     'gender'           => $appt['gender'],
                     'services'         => $examType,
@@ -1720,6 +1691,13 @@ class Admin extends BaseController
         log_message('error', 'Admin walk-in patient creation failed: ' . $e->getMessage());
     }
 
+    if ($patientCode === null || $patientCode === '' || $patientCode === 'N/A') {
+        return redirect()->back()
+                         ->withInput()
+                         ->with('error', 'Could not assign a patient code. '
+                             . 'Please try again, or create the patient from the Patients page first.');
+    }
+
     try {
         $model = new DiagnosticRequestModel();
 
@@ -1779,7 +1757,9 @@ class Admin extends BaseController
         }
 
         try {
-            $model = new DiagnosticRequestModel();
+            $model        = new DiagnosticRequestModel();
+            $paymentModel = new PaymentModel();
+            $serviceModel = new ServiceModel();
 
             $row = $model
                 ->where('id', (int) $id)
@@ -1788,6 +1768,159 @@ class Admin extends BaseController
 
             if (!$row) {
                 return $this->response->setJSON(['success' => false, 'message' => 'Request not found.']);
+            }
+
+            if ($status === 'in_progress') {
+
+                $existingPayment = $paymentModel->getByRequest($id, $type);
+
+                if ($existingPayment) {
+                    $model->update((int) $id, ['status' => $status]);
+
+                    return $this->response->setJSON([
+                        'success'          => true,
+                        'message'          => 'Status updated. Payment already recorded.',
+                        'payment_recorded' => true,
+                        'payment_id'       => $existingPayment['id'],
+                        'amount'           => (float) $existingPayment['total_amount'],
+                    ]);
+                }
+
+                $catalogue = $serviceModel
+                    ->where('is_active', 1)
+                    ->findAll();
+
+                $priceByLowerName = [];
+                foreach ($catalogue as $svc) {
+                    $key = strtolower(trim((string) ($svc['service_name'] ?? '')));
+                    if ($key !== '') {
+                        $priceByLowerName[$key] = [
+                            'name'   => (string) $svc['service_name'],
+                            'charge' => (float) ($svc['charge'] ?? 0),
+                        ];
+                    }
+                }
+
+                $servicesString = (string) ($row['services'] ?? '');
+
+                $totalAmount  = 0.0;
+                $servicesList = [];
+
+                if ($servicesString !== '') {
+                    $serviceNames = array_filter(
+                        array_map('trim', explode(',', $servicesString)),
+                        'strlen'
+                    );
+
+                    foreach ($serviceNames as $serviceName) {
+                        $key = strtolower($serviceName);
+
+                        if (isset($priceByLowerName[$key])) {
+                            $charge = $priceByLowerName[$key]['charge'];
+                            $totalAmount += $charge;
+
+                            $servicesList[] = [
+                                'name'   => $priceByLowerName[$key]['name'],
+                                'charge' => $charge,
+                            ];
+                        } else {
+                            log_message(
+                                'warning',
+                                'Diagnostic payment: service "' . $serviceName
+                                . '" on request #' . $id . ' (' . $type
+                                . ') has no active price in the services table.'
+                            );
+                            $servicesList[] = [
+                                'name'   => $serviceName,
+                                'charge' => 0.0,
+                            ];
+                        }
+                    }
+                }
+
+                if (empty($servicesList)) {
+                    $totalAmount   = 500.00;
+                    $servicesList  = [[
+                        'name'   => 'Consultation Fee',
+                        'charge' => 500.00,
+                    ]];
+                }
+
+                $patientCode = 'N/A';
+
+                if (!empty($row['patient_code'])) {
+                    $patientCode = (string) $row['patient_code'];
+                } else {
+                    $patientModel = new PatientModel();
+
+                    $patient = $patientModel
+                        ->where('full_name', $row['patient_name'])
+                        ->where('age', $row['age'])
+                        ->where('gender', $row['gender'])
+                        ->first();
+
+                    if (!$patient && !empty($row['email'])) {
+                        $patient = $patientModel->where('email', $row['email'])->first();
+                    }
+
+                    if (!$patient) {
+                        $patient = $patientModel
+                            ->where('full_name', $row['patient_name'])
+                            ->first();
+                    }
+
+                    if ($patient) {
+                        $patientCode = $patient['patient_code'] ?? 'N/A';
+                    }
+                }
+
+                $paymentData = [
+                    'request_id'     => (int) $id,
+                    'request_type'   => $type,
+                    'patient_name'   => (string) $row['patient_name'],
+                    'patient_code'   => $patientCode,
+                    'appointment_id' => $row['appointment_id'] ?? null,
+                    'services'       => json_encode($servicesList),
+                    'total_amount'   => $totalAmount,
+                    'amount_paid'    => $totalAmount,
+                    'payment_method' => 'cash',
+                    'notes'          => 'Payment recorded when starting processing',
+                ];
+
+                $paymentId = $paymentModel->recordPayment($paymentData);
+
+                if (!$paymentId) {
+                    log_message(
+                        'error',
+                        'Failed to record payment for diagnostic request #'
+                        . $id . ' (type: ' . $type . '). Status left at '
+                        . ($row['status'] ?? 'pending') . '.'
+                    );
+
+                    return $this->response->setJSON([
+                        'success' => false,
+                        'message' => 'Could not record the payment. The status was not changed. Please try again or record the payment manually.',
+                    ]);
+                }
+
+                $model->update((int) $id, ['status' => $status]);
+
+                log_message(
+                    'info',
+                    'Payment recorded for request #' . $id
+                    . ' (type: ' . $type
+                    . ', amount: ' . number_format($totalAmount, 2) . ')'
+                );
+
+                return $this->response->setJSON([
+                    'success'          => true,
+                    'message'          => 'Status updated to in progress. Payment recorded: ₱'
+                                          . number_format($totalAmount, 2),
+                    'payment_recorded' => true,
+                    'payment_id'       => $paymentId,
+                    'amount'           => $totalAmount,
+                    'patient_code'     => $patientCode,
+                ]);
             }
 
             $update = ['status' => $status];
@@ -1912,5 +2045,358 @@ class Admin extends BaseController
         $row['type'] = $type;
 
         return view('Receptionist/print_request', ['request' => $row, 'type' => $type]);
+    }
+
+    // =============================================
+    // PAYMENTS — admin page
+    // =============================================
+
+    public function payments()
+    {
+        $redirect = $this->checkAuth();
+        if ($redirect) return $redirect;
+
+        $paymentModel = new PaymentModel();
+        $patientModel = new PatientModel();
+
+        $payments = $paymentModel->orderBy('payment_date', 'DESC')->findAll();
+
+        $today = date('Y-m-d');
+
+        // Sum amount_paid — the money actually collected — not total_amount.
+        $todayPayments = $paymentModel
+            ->where('DATE(payment_date)', $today)
+            ->where('payment_status', 'paid')
+            ->findAll();
+
+        $todayTotal = 0;
+        foreach ($todayPayments as $p) {
+            $todayTotal += (float) ($p['amount_paid'] ?? 0);
+        }
+
+        $monthlyPayments = $paymentModel
+            ->where('MONTH(payment_date)', date('m'))
+            ->where('YEAR(payment_date)', date('Y'))
+            ->where('payment_status', 'paid')
+            ->findAll();
+
+        $monthlyTotal = 0;
+        foreach ($monthlyPayments as $p) {
+            $monthlyTotal += (float) ($p['amount_paid'] ?? 0);
+        }
+
+        $uniquePatients = [];
+        foreach ($payments as $p) {
+            if (!in_array($p['patient_name'], $uniquePatients)) {
+                $uniquePatients[] = $p['patient_name'];
+            }
+        }
+
+        $codes = [];
+        foreach ($payments as $p) {
+            $code = trim((string) ($p['patient_code'] ?? ''));
+            if ($code !== '' && strtoupper($code) !== 'N/A') {
+                $codes[$code] = true;
+            }
+        }
+
+        $genderByCode = [];
+        if (!empty($codes)) {
+            $rows = $patientModel
+                ->select('patient_code, gender')
+                ->whereIn('patient_code', array_keys($codes))
+                ->findAll();
+
+            foreach ($rows as $row) {
+                $code = trim((string) ($row['patient_code'] ?? ''));
+                if ($code !== '') {
+                    $genderByCode[$code] = (string) ($row['gender'] ?? '');
+                }
+            }
+        }
+
+        foreach ($payments as &$p) {
+            $code = trim((string) ($p['patient_code'] ?? ''));
+            $p['gender'] = $genderByCode[$code] ?? null;
+        }
+        unset($p);
+
+        $data = [
+            'payments'       => $payments,
+            'total'          => count($payments),
+            'today_total'    => $todayTotal,
+            'today_count'    => count($todayPayments),
+            'monthly_total'  => $monthlyTotal,
+            'total_patients' => count($uniquePatients),
+        ];
+
+        return view('Admin/payments', $data);
+    }
+
+    public function getPaymentDetails($id)
+    {
+        $redirect = $this->checkAuth();
+        if ($redirect) return $redirect;
+
+        try {
+            $paymentModel = new PaymentModel();
+            $payment = $paymentModel->find($id);
+
+            if (!$payment) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => 'Payment not found',
+                ]);
+            }
+
+            return $this->response->setJSON([
+                'success' => true,
+                'data'    => $payment,
+            ]);
+
+        } catch (\Exception $e) {
+            log_message('error', 'Admin get payment details error: ' . $e->getMessage());
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Error fetching payment details',
+            ]);
+        }
+    }
+
+    public function printReceipt($id)
+    {
+        $redirect = $this->checkAuth();
+        if ($redirect) return $redirect;
+
+        try {
+            $paymentModel = new PaymentModel();
+            $payment = $paymentModel->find($id);
+
+            if (!$payment) {
+                return redirect()->back()->with('error', 'Payment not found');
+            }
+
+            $services = json_decode($payment['services'] ?? '[]', true);
+
+            return view('Receptionist/print_receipt', [
+                'payment'  => $payment,
+                'services' => $services,
+            ]);
+
+        } catch (\Exception $e) {
+            log_message('error', 'Admin print receipt error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Error generating receipt');
+        }
+    }
+
+    public function refundPayment($id)
+    {
+        $redirect = $this->checkAuth();
+        if ($redirect) return $redirect;
+
+        try {
+            $paymentModel = new PaymentModel();
+            $payment = $paymentModel->find($id);
+
+            if (!$payment) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => 'Payment not found',
+                ]);
+            }
+
+            if ($payment['payment_status'] !== 'paid') {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => 'Only paid payments can be refunded',
+                ]);
+            }
+
+            $paymentModel->update($id, [
+                'payment_status' => 'refunded',
+                'notes'          => ($payment['notes'] ?? '') . ' | Refunded on ' . date('Y-m-d H:i:s'),
+            ]);
+
+            log_message('info', 'Admin refunded payment #' . $id);
+
+            return $this->response->setJSON([
+                'success' => true,
+                'message' => 'Payment refunded successfully',
+            ]);
+
+        } catch (\Exception $e) {
+            log_message('error', 'Admin refund payment error: ' . $e->getMessage());
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Error refunding payment',
+            ]);
+        }
+    }
+
+    // =============================================
+    // AVAILABILITY
+    // =============================================
+
+    public function availability()
+    {
+        $redirect = $this->checkAuth();
+        if ($redirect) return $redirect;
+
+        $settingsModel = new SettingsModel();
+        $availability  = new AvailabilityModel();
+
+        $data = [
+            'settings' => [
+                'clinic_open_time'  => $settingsModel->openTime(),
+                'clinic_close_time' => $settingsModel->closeTime(),
+                'slot_interval'     => $settingsModel->slotInterval(),
+                'lunch_start'       => $settingsModel->lunchStart(),
+                'lunch_end'         => $settingsModel->lunchEnd(),
+                'closed_weekdays'   => $settingsModel->closedWeekdays(),
+                'holidays'          => $settingsModel->holidays(),
+                'booking_horizon'   => $settingsModel->bookingHorizon(),
+            ],
+            'preview'        => $availability->previewDays(14),
+            'slot_intervals' => [15, 20, 30, 45, 60, 90, 120],
+            'weekday_labels' => [
+                0 => 'Sunday', 1 => 'Monday', 2 => 'Tuesday', 3 => 'Wednesday',
+                4 => 'Thursday', 5 => 'Friday', 6 => 'Saturday',
+            ],
+        ];
+
+        return view('Admin/availability', $data);
+    }
+
+    public function saveAvailabilitySettings()
+    {
+        $redirect = $this->checkAuth();
+        if ($redirect) return $redirect;
+
+        $settingsModel = new SettingsModel();
+
+        $open    = (string) $this->request->getPost('clinic_open_time');
+        $close   = (string) $this->request->getPost('clinic_close_time');
+        $lunchS  = (string) $this->request->getPost('lunch_start');
+        $lunchE  = (string) $this->request->getPost('lunch_end');
+        $step    = (int)    $this->request->getPost('slot_interval');
+        $horizon = (int)    $this->request->getPost('booking_horizon');
+
+        $allowedSteps = [15, 20, 30, 45, 60, 90, 120];
+        if (!in_array($step, $allowedSteps, true)) $step = 60;
+        if ($horizon < 1)   $horizon = 90;
+        if ($horizon > 365) $horizon = 365;
+
+        $timePattern = '/^\d{2}:\d{2}$/';
+
+        if (!preg_match($timePattern, $open)   || !preg_match($timePattern, $close)
+            || !preg_match($timePattern, $lunchS) || !preg_match($timePattern, $lunchE)) {
+            return redirect()->back()->with('error', 'Times must be HH:MM.');
+        }
+
+        if ($close <= $open) {
+            return redirect()->back()->with('error', 'Closing time must be after opening time.');
+        }
+
+        $closedRaw = $this->request->getPost('closed_weekdays') ?? [];
+        $closed    = [];
+        if (is_array($closedRaw)) {
+            foreach ($closedRaw as $d) {
+                $d = (int) $d;
+                if ($d >= 0 && $d <= 6) $closed[] = $d;
+            }
+        }
+
+        $holidayRaw = (string) $this->request->getPost('holidays');
+        $holidays   = [];
+        foreach (preg_split('/\r\n|\r|\n/', $holidayRaw) as $line) {
+            $line = trim($line);
+            if ($line === '') continue;
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $line)) $holidays[] = $line;
+        }
+
+        $settingsModel->saveMany([
+            'clinic_open_time'  => $open,
+            'clinic_close_time' => $close,
+            'lunch_start'       => $lunchS,
+            'lunch_end'         => $lunchE,
+            'slot_interval'     => $step,
+            'booking_horizon'   => $horizon,
+            'closed_weekdays'   => json_encode(array_values(array_unique($closed))),
+            'holidays'          => json_encode(array_values(array_unique($holidays))),
+        ]);
+
+        return redirect()->to(base_url('admin/availability'))
+            ->with('success', 'Availability settings saved.');
+    }
+
+    public function blockAvailabilitySlot()
+    {
+        $redirect = $this->checkAuth();
+        if ($redirect) return $redirect;
+
+        $date   = (string) $this->request->getPost('slot_date');
+        $time   = (string) $this->request->getPost('slot_time');
+        $dept   = (string) $this->request->getPost('department');
+        $reason = (string) $this->request->getPost('block_reason');
+
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)
+            || !preg_match('/^\d{2}:\d{2}$/', $time)
+            || !in_array($dept, ['lab', 'xray'], true)) {
+            return redirect()->back()->with('error', 'Invalid slot to block.');
+        }
+
+        (new AvailabilityModel())->blockSlot($date, $time, $dept, $reason ?: null);
+
+        return redirect()->to(base_url('admin/availability'))
+            ->with('success', 'Slot blocked.');
+    }
+
+    public function unblockAvailabilitySlot()
+    {
+        $redirect = $this->checkAuth();
+        if ($redirect) return $redirect;
+
+        $date = (string) $this->request->getPost('slot_date');
+        $time = (string) $this->request->getPost('slot_time');
+        $dept = (string) $this->request->getPost('department');
+
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)
+            || !preg_match('/^\d{2}:\d{2}$/', $time)
+            || !in_array($dept, ['lab', 'xray'], true)) {
+            return redirect()->back()->with('error', 'Invalid slot to unblock.');
+        }
+
+        (new AvailabilityModel())->unblockSlot($date, $time, $dept);
+
+        return redirect()->to(base_url('admin/availability'))
+            ->with('success', 'Slot unblocked.');
+    }
+
+    public function availabilityDay()
+    {
+        $redirect = $this->checkAuth();
+        if ($redirect) return $redirect;
+
+        $date = (string) $this->request->getGet('date');
+        $dept = (string) ($this->request->getGet('department') ?? 'lab');
+
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)
+            || !in_array($dept, ['lab', 'xray'], true)) {
+            return $this->response->setStatusCode(400)
+                ->setJSON(['ok' => false, 'error' => 'Invalid request.']);
+        }
+
+        $availability = new AvailabilityModel();
+        $slots        = $availability->isWorkingDay($date)
+            ? $availability->slotsFor($date, $dept)
+            : [];
+
+        return $this->response->setJSON([
+            'ok'      => true,
+            'date'    => $date,
+            'dept'    => $dept,
+            'working' => $availability->isWorkingDay($date),
+            'slots'   => $slots,
+        ]);
     }
 }

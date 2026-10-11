@@ -8,6 +8,7 @@ use App\Models\NotificationModel;
 use App\Models\ServiceModel;
 use App\Models\PatientModel;
 use App\Models\PaymentModel;
+use App\Models\AvailabilityModel;
 
 class Receptionist extends BaseController
 {
@@ -59,6 +60,7 @@ class Receptionist extends BaseController
             ->where('status', 'approved')
             ->countAllResults();
 
+        // Sum amount_paid (money collected) instead of total_amount (invoice total).
         $todayPayments = $paymentModel
             ->where('DATE(payment_date)', $today)
             ->where('payment_status', 'paid')
@@ -66,7 +68,7 @@ class Receptionist extends BaseController
 
         $todayCollections = 0;
         foreach ($todayPayments as $payment) {
-            $todayCollections += floatval($payment['total_amount']);
+            $todayCollections += (float) ($payment['amount_paid'] ?? 0);
         }
         $data['today_collections'] = $todayCollections;
 
@@ -78,19 +80,11 @@ class Receptionist extends BaseController
         $data['service_labels'] = $serviceData['labels'];
         $data['service_counts'] = $serviceData['counts'];
 
-        // KPI sparklines — same look as the Admin dashboard.
         $data['kpiTrends'] = $this->getKpiTrends(14, (int) $data['total_patients']);
 
         return view('Receptionist/dashboard', $data);
     }
 
-    /**
-     * Daily series for the KPI sparklines on the Receptionist dashboard.
-     * Oldest day first, ending today. Every value is a real per-day
-     * count from the same tables the KPI cards themselves read.
-     *
-     * Keys match the card keys in the Receptionist dashboard view.
-     */
     private function getKpiTrends(int $days, int $totalPatients): array
     {
         $db    = db_connect();
@@ -102,7 +96,6 @@ class Receptionist extends BaseController
             $dates[] = date('Y-m-d', strtotime($start . ' +' . $i . ' days'));
         }
 
-        // Generic "date, value" grouped query → day-indexed series.
         $series = function (string $table, string $dateExpr, string $valueExpr, array $where = []) use ($db, $dates, $start, $end) {
             $b = $db->table($table)
                 ->select("$dateExpr AS d, $valueExpr AS v", false)
@@ -120,8 +113,6 @@ class Receptionist extends BaseController
             return array_map(fn($d) => $map[$d] ?? 0, $dates);
         };
 
-        // All patients: cumulative walk-back from today's total using
-        // the patients table's per-day new registrations.
         $newPatients = $series('patients', 'DATE(created_at)', 'COUNT(*)');
         $patients    = [];
         $running     = $totalPatients - array_sum($newPatients);
@@ -142,9 +133,6 @@ class Receptionist extends BaseController
         ];
     }
 
-    /**
-     * Daily paid revenue — real per-day sums from the payments table.
-     */
     private function getCollectionsSeries(array $dates): array
     {
         if (empty($dates)) { return []; }
@@ -154,7 +142,7 @@ class Receptionist extends BaseController
         $end   = end($dates);
 
         $rows = $db->table('payments')
-            ->select('DATE(payment_date) AS d, SUM(total_amount) AS v', false)
+            ->select('DATE(payment_date) AS d, SUM(amount_paid) AS v', false)
             ->where('payment_status', 'paid')
             ->where('DATE(payment_date) >=', $start)
             ->where('DATE(payment_date) <=', $end)
@@ -305,12 +293,6 @@ class Receptionist extends BaseController
         return $allPatients;
     }
 
-    /**
-     * Resolve a patient row's id by name (and optionally age) if it
-     * wasn't already provided. Used so the eye icon always has a valid
-     * patient id, even for rows that came from appointments or
-     * diagnostic requests rather than the patients table.
-     */
     private function resolvePatientId(?int $id, string $fullName, $age = null): ?int
     {
         if (!empty($id)) {
@@ -396,10 +378,6 @@ class Receptionist extends BaseController
         return view('Receptionist/appointment_view', $data);
     }
 
-    /**
-     * View a single patient using the shared appointment/patient view.
-     * Reached from the eye icon on the patients list.
-     */
     public function viewPatient($id = null)
     {
         $redirect = $this->checkAuth();
@@ -419,11 +397,9 @@ class Receptionist extends BaseController
                              ->with('error', 'Patient not found.');
         }
 
-        // Normalize "source" into a human-readable service type.
         $source      = strtolower((string) ($patient['source'] ?? ''));
         $serviceType = (strpos($source, 'walk-in') !== false) ? 'Walk-in' : 'Online';
 
-        // Shape the data the way appointment_view.php expects.
         $appointment = [
             'id'               => $patient['id']           ?? null,
             'reference_number' => $patient['patient_code'] ?? '—',
@@ -442,7 +418,6 @@ class Receptionist extends BaseController
             'other_requests'   => '',
         ];
 
-        // Pull this patient's diagnostic history (optional — fails silently).
         $lab_services  = [];
         $xray_services = [];
 
@@ -504,6 +479,8 @@ class Receptionist extends BaseController
         $patientModel = new PatientModel();
         $patient = $patientModel->findOrCreateFromAppointment($appointment);
 
+        $patientCodeForRequest = $patient['patient_code'] ?? null;
+
         $labServices = json_decode($appointment['lab_services'], true) ?? [];
         $xrayServices = json_decode($appointment['xray_services'], true) ?? [];
         $successMessages = [];
@@ -531,6 +508,7 @@ class Receptionist extends BaseController
                     'type'             => DiagnosticRequestModel::TYPE_LAB,
                     'appointment_id'   => $appointment['id'],
                     'patient_name'     => $appointment['full_name'],
+                    'patient_code'     => $patientCodeForRequest,
                     'age'              => $appointment['age'],
                     'gender'           => $appointment['gender'],
                     'email'            => $appointment['email'] ?? null,
@@ -577,6 +555,7 @@ class Receptionist extends BaseController
                     'type'             => DiagnosticRequestModel::TYPE_XRAY,
                     'appointment_id'   => $appointment['id'],
                     'patient_name'     => $appointment['full_name'],
+                    'patient_code'     => $patientCodeForRequest,
                     'age'              => $appointment['age'],
                     'gender'           => $appointment['gender'],
                     'email'            => $appointment['email'] ?? null,
@@ -696,16 +675,18 @@ class Receptionist extends BaseController
         $payments = $paymentModel->orderBy('payment_date', 'DESC')->findAll();
 
         $today = date('Y-m-d');
+
+        // Sum amount_paid — money actually collected — not total_amount.
         $todayPayments = $paymentModel->where('DATE(payment_date)', $today)->where('payment_status', 'paid')->findAll();
         $todayTotal = 0;
         foreach ($todayPayments as $p) {
-            $todayTotal += floatval($p['total_amount']);
+            $todayTotal += (float) ($p['amount_paid'] ?? 0);
         }
 
         $monthlyPayments = $paymentModel->where('MONTH(payment_date)', date('m'))->where('YEAR(payment_date)', date('Y'))->where('payment_status', 'paid')->findAll();
         $monthlyTotal = 0;
         foreach ($monthlyPayments as $p) {
-            $monthlyTotal += floatval($p['total_amount']);
+            $monthlyTotal += (float) ($p['amount_paid'] ?? 0);
         }
 
         $uniquePatients = [];
@@ -817,6 +798,7 @@ class Receptionist extends BaseController
                     'type'             => DiagnosticRequestModel::TYPE_LAB,
                     'appointment_id'   => $appointment['id'],
                     'patient_name'     => $appointment['full_name'],
+                    'patient_code'     => $patient['patient_code'] ?? null,
                     'age'              => $appointment['age'],
                     'gender'           => $appointment['gender'],
                     'services'         => implode(', ', $cleanedServices),
@@ -859,11 +841,14 @@ class Receptionist extends BaseController
                     return trim($service);
                 }, $xrayServices);
 
+                $xrayPatient = $patientModel->where('full_name', $appointment['full_name'])->first();
+
                 $diagnosticModel->insert([
                     'reference_number' => 'XR-' . date('y') . '-' . strtoupper(bin2hex(random_bytes(3))),
                     'type'             => DiagnosticRequestModel::TYPE_XRAY,
                     'appointment_id'   => $appointment['id'],
                     'patient_name'     => $appointment['full_name'],
+                    'patient_code'     => $xrayPatient['patient_code'] ?? null,
                     'age'              => $appointment['age'],
                     'gender'           => $appointment['gender'],
                     'services'         => implode(', ', $cleanedServices),
@@ -1133,6 +1118,13 @@ class Receptionist extends BaseController
             log_message('error', 'Stack trace: ' . $e->getTraceAsString());
         }
 
+        if ($patientCode === null || $patientCode === '' || $patientCode === 'N/A') {
+            return redirect()->back()
+                             ->withInput()
+                             ->with('error', 'Could not assign a patient code. '
+                                 . 'Please try again, or create the patient from the Patients page first.');
+        }
+
         if ($requestType === 'lab' || $requestType === 'xray') {
             $model = new DiagnosticRequestModel();
 
@@ -1143,7 +1135,7 @@ class Receptionist extends BaseController
                 'type'             => $requestType,
                 'appointment_id'   => null,
                 'patient_name'     => $patientName,
-                'patient_code'     => $patientCode !== 'N/A' ? $patientCode : null,
+                'patient_code'     => $patientCode,
                 'age'              => $age,
                 'gender'           => $gender,
                 'email'            => $email ?: null,
@@ -1182,12 +1174,12 @@ class Receptionist extends BaseController
         if ($redirect) return $redirect;
 
         $validStatuses = ['pending', 'in_progress', 'completed', 'released', 'cancelled'];
-        if (!in_array($status, $validStatuses)) {
+        if (!in_array($status, $validStatuses, true)) {
             return $this->response->setJSON(['success' => false, 'message' => 'Invalid status']);
         }
 
         try {
-            $model = new DiagnosticRequestModel();
+            $model        = new DiagnosticRequestModel();
             $paymentModel = new PaymentModel();
             $serviceModel = new ServiceModel();
 
@@ -1200,8 +1192,6 @@ class Receptionist extends BaseController
                 return $this->response->setJSON(['success' => false, 'message' => 'Request not found']);
             }
 
-            $servicesString = $request['services'] ?? '';
-
             if ($status === 'in_progress') {
 
                 $existingPayment = $paymentModel->getByRequest($id, $type);
@@ -1210,80 +1200,148 @@ class Receptionist extends BaseController
                     $model->update($id, ['status' => $status]);
 
                     return $this->response->setJSON([
-                        'success' => true,
-                        'message' => 'Status updated successfully. Payment already recorded.',
+                        'success'          => true,
+                        'message'          => 'Status updated successfully. Payment already recorded.',
                         'payment_recorded' => true,
-                        'payment_id' => $existingPayment['id']
+                        'payment_id'       => $existingPayment['id'],
+                        'amount'           => (float) $existingPayment['total_amount'],
                     ]);
                 }
 
-                $totalAmount = 0;
+                $catalogue = $serviceModel
+                    ->where('is_active', 1)
+                    ->findAll();
+
+                $priceByLowerName = [];
+                foreach ($catalogue as $svc) {
+                    $key = strtolower(trim((string) ($svc['service_name'] ?? '')));
+                    if ($key !== '') {
+                        $priceByLowerName[$key] = [
+                            'name'   => (string) $svc['service_name'],
+                            'charge' => (float) ($svc['charge'] ?? 0),
+                        ];
+                    }
+                }
+
+                $servicesString = (string) ($request['services'] ?? '');
+
+                $totalAmount  = 0.0;
                 $servicesList = [];
 
-                if (!empty($servicesString)) {
-                    $serviceNames = array_map('trim', explode(',', $servicesString));
+                if ($servicesString !== '') {
+                    $serviceNames = array_filter(
+                        array_map('trim', explode(',', $servicesString)),
+                        'strlen'
+                    );
 
                     foreach ($serviceNames as $serviceName) {
-                        if (!empty($serviceName)) {
-                            $service = $serviceModel->where('service_name', $serviceName)->first();
-                            if ($service) {
-                                $charge = floatval($service['charge'] ?? 0);
-                                $totalAmount += $charge;
-                                $servicesList[] = [
-                                    'name' => $serviceName,
-                                    'charge' => $charge
-                                ];
-                            }
+                        $key = strtolower($serviceName);
+
+                        if (isset($priceByLowerName[$key])) {
+                            $charge = $priceByLowerName[$key]['charge'];
+                            $totalAmount += $charge;
+
+                            $servicesList[] = [
+                                'name'   => $priceByLowerName[$key]['name'],
+                                'charge' => $charge,
+                            ];
+                        } else {
+                            log_message(
+                                'warning',
+                                'Diagnostic payment: service "' . $serviceName
+                                . '" on request #' . $id . ' (' . $type
+                                . ') has no active price in the services table.'
+                            );
+                            $servicesList[] = [
+                                'name'   => $serviceName,
+                                'charge' => 0.0,
+                            ];
                         }
                     }
                 }
 
-                if ($totalAmount == 0) {
-                    $totalAmount = 500.00;
-                    $servicesList[] = [
-                        'name' => 'Consultation Fee',
-                        'charge' => 500.00
-                    ];
+                if (empty($servicesList)) {
+                    $totalAmount   = 500.00;
+                    $servicesList  = [[
+                        'name'   => 'Consultation Fee',
+                        'charge' => 500.00,
+                    ]];
                 }
 
                 $patientCode = 'N/A';
-                $patientModel = new PatientModel();
-                $patient = $patientModel->where('full_name', $request['patient_name'])->first();
-                if ($patient) {
-                    $patientCode = $patient['patient_code'] ?? 'N/A';
+
+                if (!empty($request['patient_code'])) {
+                    $patientCode = (string) $request['patient_code'];
+                } else {
+                    $patientModel = new PatientModel();
+
+                    $patient = $patientModel
+                        ->where('full_name', $request['patient_name'])
+                        ->where('age', $request['age'])
+                        ->where('gender', $request['gender'])
+                        ->first();
+
+                    if (!$patient && !empty($request['email'])) {
+                        $patient = $patientModel->where('email', $request['email'])->first();
+                    }
+
+                    if (!$patient) {
+                        $patient = $patientModel
+                            ->where('full_name', $request['patient_name'])
+                            ->first();
+                    }
+
+                    if ($patient) {
+                        $patientCode = $patient['patient_code'] ?? 'N/A';
+                    }
                 }
 
                 $paymentData = [
-                    'request_id' => $id,
-                    'request_type' => $type,
-                    'patient_name' => $request['patient_name'],
-                    'patient_code' => $patientCode,
+                    'request_id'     => (int) $id,
+                    'request_type'   => $type,
+                    'patient_name'   => (string) $request['patient_name'],
+                    'patient_code'   => $patientCode,
                     'appointment_id' => $request['appointment_id'] ?? null,
-                    'services' => json_encode($servicesList),
-                    'total_amount' => $totalAmount,
-                    'amount_paid' => $totalAmount,
+                    'services'       => json_encode($servicesList),
+                    'total_amount'   => $totalAmount,
+                    'amount_paid'    => $totalAmount,
                     'payment_method' => 'cash',
-                    'received_by' => session()->get('username') ?? 'receptionist',
-                    'notes' => 'Payment recorded when starting processing'
+                    'notes'          => 'Payment recorded when starting processing',
                 ];
 
                 $paymentId = $paymentModel->recordPayment($paymentData);
 
-                if ($paymentId) {
-                    log_message('info', 'Payment recorded for request #' . $id . ' (Type: ' . $type . ', Amount: ₱' . $totalAmount . ')');
-                } else {
-                    log_message('error', 'Failed to record payment for request #' . $id);
+                if (!$paymentId) {
+                    log_message(
+                        'error',
+                        'Failed to record payment for diagnostic request #'
+                        . $id . ' (type: ' . $type . '). Status left at '
+                        . ($request['status'] ?? 'pending') . '.'
+                    );
+
+                    return $this->response->setJSON([
+                        'success' => false,
+                        'message' => 'Could not record the payment. The status was not changed. Please try again or record the payment manually.',
+                    ]);
                 }
 
                 $model->update($id, ['status' => $status]);
 
+                log_message(
+                    'info',
+                    'Payment recorded for request #' . $id
+                    . ' (type: ' . $type
+                    . ', amount: ' . number_format($totalAmount, 2) . ')'
+                );
+
                 return $this->response->setJSON([
-                    'success' => true,
-                    'message' => 'Status updated to in_progress. Payment recorded: ₱' . number_format($totalAmount, 2),
+                    'success'          => true,
+                    'message'          => 'Status updated to in progress. Payment recorded: ₱'
+                                          . number_format($totalAmount, 2),
                     'payment_recorded' => true,
-                    'payment_id' => $paymentId,
-                    'amount' => $totalAmount,
-                    'patient_code' => $patientCode
+                    'payment_id'       => $paymentId,
+                    'amount'           => $totalAmount,
+                    'patient_code'     => $patientCode,
                 ]);
             }
 
@@ -1294,16 +1352,17 @@ class Receptionist extends BaseController
             $model->update($id, $update);
 
             return $this->response->setJSON([
-                'success' => true,
-                'message' => 'Status updated successfully',
-                'payment_recorded' => false
+                'success'          => true,
+                'message'          => 'Status updated successfully',
+                'payment_recorded' => false,
             ]);
 
         } catch (\Exception $e) {
             log_message('error', 'Update diagnostic status error: ' . $e->getMessage());
+
             return $this->response->setJSON([
                 'success' => false,
-                'message' => 'Error updating status: ' . $e->getMessage()
+                'message' => 'Error updating status: ' . $e->getMessage(),
             ]);
         }
     }
@@ -1615,5 +1674,123 @@ class Receptionist extends BaseController
             log_message('error', 'Refund payment error: ' . $e->getMessage());
             return $this->response->setJSON(['success' => false, 'message' => 'Error refunding payment']);
         }
+    }
+
+    /* ============================================================
+       AVAILABILITY + OVERRIDE BOOKING
+       ============================================================ */
+
+    public function appointmentSlots()
+    {
+        $redirect = $this->checkAuth();
+        if ($redirect) return $redirect;
+
+        $date = (string) $this->request->getGet('date');
+        $type = (string) ($this->request->getGet('type') ?? 'laboratory');
+
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            return $this->response->setStatusCode(400)
+                ->setJSON(['ok' => false, 'error' => 'Invalid date.']);
+        }
+
+        $availability = new AvailabilityModel();
+
+        if (!$availability->isWorkingDay($date)) {
+            return $this->response->setJSON([
+                'ok' => true, 'working' => false,
+                'error' => 'The clinic is closed on that date.',
+                'slots' => [],
+            ]);
+        }
+
+        $depts   = $availability->departmentsFor($type);
+        $perDept = [];
+        foreach ($depts as $d) {
+            $perDept[$d] = $availability->slotsFor($date, $d);
+        }
+
+        $merged = [];
+        foreach ($perDept[$depts[0]] as $i => $slot) {
+            $available = $slot['available'];
+            foreach ($depts as $d) {
+                if (!$perDept[$d][$i]['available']) { $available = false; break; }
+            }
+            $merged[] = [
+                'time'      => $slot['time'],
+                'label'     => $slot['label'],
+                'available' => $available,
+                'blocked'   => $slot['blocked'],
+                'reason'    => $slot['reason'],
+            ];
+        }
+
+        return $this->response->setJSON([
+            'ok' => true, 'working' => true, 'date' => $date,
+            'type' => $type, 'slots' => $merged,
+        ]);
+    }
+
+    public function overrideBook()
+    {
+        $redirect = $this->checkAuth();
+        if ($redirect) return $redirect;
+
+        $rules = [
+            'appointment_date' => 'required|valid_date',
+            'appointment_time' => 'required',
+            'full_name'        => 'required|min_length[2]',
+            'age'              => 'required|numeric|greater_than[0]',
+            'gender'           => 'required',
+            'service_type'     => 'required|in_list[laboratory,xray,both]',
+        ];
+
+        if (!$this->validate($rules)) {
+            return redirect()->back()->withInput()
+                ->with('error', 'Please fill in the override form completely.');
+        }
+
+        $date    = (string) $this->request->getPost('appointment_date');
+        $time    = (string) $this->request->getPost('appointment_time');
+        $type    = (string) $this->request->getPost('service_type');
+        $lab     = $this->request->getPost('lab_services')  ?? [];
+        $xray    = $this->request->getPost('xray_services') ?? [];
+        $email   = trim((string) $this->request->getPost('email'));
+        $phone   = trim((string) $this->request->getPost('phone'));
+
+        $reference = 'APPT-' . date('Ymd') . '-' . strtoupper(substr(uniqid(), -6));
+
+        $appointmentModel = new AppointmentModel();
+
+        $appointmentData = [
+            'reference_number' => $reference,
+            'appointment_date' => $date,
+            'appointment_time' => $time,
+            'full_name'        => $this->request->getPost('full_name'),
+            'age'              => $this->request->getPost('age'),
+            'gender'           => $this->request->getPost('gender'),
+            'email'            => $email !== '' ? $email : null,
+            'phone'            => $phone !== '' ? $phone : null,
+            'service_type'     => $type,
+            'lab_services'     => !empty($lab)  ? json_encode(array_values($lab))  : null,
+            'xray_services'    => !empty($xray) ? json_encode(array_values($xray)) : null,
+            'other_requests'   => $this->request->getPost('other_requests') ?: null,
+            'status'           => 'approved',
+            'is_override'      => 1,
+            'arrival_time'     => date('Y-m-d H:i:s'),
+        ];
+
+        $appointmentId = $appointmentModel->insert($appointmentData);
+
+        if (!$appointmentId) {
+            return redirect()->back()->withInput()
+                ->with('error', 'Could not create the override appointment.');
+        }
+
+        $patientModel = new PatientModel();
+        $patientModel->findOrCreateFromAppointment($appointmentData);
+
+        return redirect()->to(base_url('receptionist/appointments'))
+            ->with('success', 'Override booking created (' . $reference . '). '
+                . 'Use the Approve button to generate the diagnostic request(s).');
     }
 }

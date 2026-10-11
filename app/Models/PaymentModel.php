@@ -8,8 +8,9 @@ class PaymentModel extends Model
 {
     protected $table = 'payments';
     protected $primaryKey = 'id';
-    
+
     protected $allowedFields = [
+        'invoice_id',
         'request_id',
         'request_type',
         'patient_name',
@@ -20,100 +21,223 @@ class PaymentModel extends Model
         'amount_paid',
         'change_amount',
         'payment_method',
+        'reference_no',
         'payment_status',
         'payment_date',
         'reference_number',
         'received_by',
-        'notes'
+        'voided_by',
+        'voided_at',
+        'void_reason',
+        'notes',
     ];
-    
+
     protected $useTimestamps = true;
-    protected $createdField = 'created_at';
-    protected $updatedField = 'updated_at';
-    
-    // Payment status constants
-    const STATUS_PAID = 'paid';
-    const STATUS_PENDING = 'pending';
+    protected $createdField  = 'created_at';
+    protected $updatedField  = 'updated_at';
+
+    // ── Statuses (matches the DB enum) ───────────────────────────
+    const STATUS_PAID     = 'paid';
+    const STATUS_PENDING  = 'pending';
     const STATUS_REFUNDED = 'refunded';
-    const STATUS_FAILED = 'failed';
-    
-    // Payment method constants
-    const METHOD_CASH = 'cash';
-    const METHOD_CARD = 'card';
-    const METHOD_GCASH = 'gcash';
-    const METHOD_PAYMAYA = 'paymaya';
+    const STATUS_FAILED   = 'failed';
+
+    // ── Methods (matches the DB enum) ────────────────────────────
+    const METHOD_CASH      = 'cash';
+    const METHOD_CARD      = 'card';
+    const METHOD_GCASH     = 'gcash';
+    const METHOD_PAYMAYA   = 'paymaya';
     const METHOD_INSURANCE = 'insurance';
-    
-    /**
-     * Generate unique reference number
-     */
+
+    // ============================================================
+    // EXISTING HELPERS — unchanged
+    // ============================================================
+
+    public static function currentCashierName(): string
+    {
+        $session = session();
+
+        $name = trim((string) ($session->get('full_name') ?? ''));
+        if ($name !== '') {
+            return $name;
+        }
+
+        $userId = (int) ($session->get('user_id') ?? 0);
+        if ($userId > 0) {
+            try {
+                $row  = (new UserModel())->find($userId);
+                $name = trim((string) ($row['full_name'] ?? ''));
+                if ($name !== '') {
+                    return $name;
+                }
+            } catch (\Throwable $e) {
+                // fall through
+            }
+        }
+
+        $username = trim((string) ($session->get('username') ?? ''));
+        return $username !== '' ? $username : 'Front desk';
+    }
+
     public function generateReference()
     {
         $prefix = 'PAY-';
-        $year = date('y');
-        $month = date('m');
-        $day = date('d');
+        $year   = date('y');
+        $month  = date('m');
+        $day    = date('d');
         $random = strtoupper(substr(uniqid(), -4));
-        
+
         return $prefix . $year . $month . $day . '-' . $random;
     }
-    
-    /**
-     * Record a new payment
-     */
+
+    // ============================================================
+    // recordPayment — INSERT + AUTO-LINK + AUTO-RECALC
+    // ============================================================
+    //
+    // Returns the new row id on success, or 0 on failure.
+    //
+    // What this version does, in order:
+    //   1. Auto-link to an existing invoice for the same
+    //      (request_id, request_type) if the caller didn't supply
+    //      an invoice_id. This prevents orphan payments from any
+    //      code path that forgets to set it.
+    //   2. Insert the payment row.
+    //   3. Recalculate the linked invoice immediately, so paid /
+    //      balance / status are correct before the next page load —
+    //      regardless of who called this method.
+    //
+    // Every step is wrapped so a failure in linking or recalc never
+    // blocks the payment row itself.
+    // ============================================================
+
     public function recordPayment($data)
     {
-        // Calculate change if cash payment
         $changeAmount = 0;
         if (isset($data['amount_paid']) && isset($data['total_amount'])) {
             $changeAmount = $data['amount_paid'] - $data['total_amount'];
         }
-        
+
+        $referenceNumber = $this->generateReference();
+
         $paymentData = [
-            'request_id' => $data['request_id'],
-            'request_type' => $data['request_type'],
-            'patient_name' => $data['patient_name'],
-            'patient_code' => $data['patient_code'] ?? null,
-            'appointment_id' => $data['appointment_id'] ?? null,
-            'services' => $data['services'] ?? null,
-            'total_amount' => $data['total_amount'],
-            'amount_paid' => $data['amount_paid'] ?? $data['total_amount'],
-            'change_amount' => $changeAmount > 0 ? $changeAmount : 0,
-            'payment_method' => $data['payment_method'] ?? self::METHOD_CASH,
-            'payment_status' => self::STATUS_PAID,
-            'payment_date' => date('Y-m-d H:i:s'),
-            'reference_number' => $this->generateReference(),
-            'received_by' => $data['received_by'] ?? null,
-            'notes' => $data['notes'] ?? null
+            'invoice_id'       => isset($data['invoice_id']) ? (int) $data['invoice_id'] : null,
+            'request_id'       => $data['request_id'],
+            'request_type'     => $data['request_type'],
+            'patient_name'     => $data['patient_name'],
+            'patient_code'     => $data['patient_code'] ?? null,
+            'appointment_id'   => $data['appointment_id'] ?? null,
+            'services'         => $data['services'] ?? null,
+            'total_amount'     => $data['total_amount'],
+            'amount_paid'      => $data['amount_paid'] ?? $data['total_amount'],
+            'change_amount'    => $changeAmount > 0 ? $changeAmount : 0,
+            'payment_method'   => $data['payment_method'] ?? self::METHOD_CASH,
+            'payment_status'   => self::STATUS_PAID,
+            'payment_date'     => date('Y-m-d H:i:s'),
+            'reference_number' => $referenceNumber,
+            'reference_no'     => $data['reference_no'] ?? $referenceNumber,
+            'received_by'      => $data['received_by'] ?? self::currentCashierName(),
+            'notes'            => $data['notes'] ?? null,
         ];
-        
-        $this->insert($paymentData);
-        return $this->getInsertID();
+
+        // ── STEP 1: auto-link to an existing invoice if possible ──
+        if (empty($paymentData['invoice_id'])
+            && !empty($paymentData['request_id'])
+            && !empty($paymentData['request_type'])
+            && in_array($paymentData['request_type'], ['lab', 'xray'], true)
+        ) {
+            try {
+                $existing = $this->db->table('invoices')
+                    ->select('id')
+                    ->where('request_id', (int) $paymentData['request_id'])
+                    ->where('request_type', (string) $paymentData['request_type'])
+                    ->orderBy('id', 'ASC')
+                    ->get()
+                    ->getRowArray();
+
+                if ($existing && !empty($existing['id'])) {
+                    $paymentData['invoice_id'] = (int) $existing['id'];
+
+                    log_message(
+                        'info',
+                        'PaymentModel: auto-linked new payment for request #'
+                        . $paymentData['request_id']
+                        . ' (' . $paymentData['request_type']
+                        . ') to invoice #' . $paymentData['invoice_id']
+                    );
+                }
+            } catch (\Throwable $e) {
+                log_message('warning', 'PaymentModel: auto-link lookup failed: ' . $e->getMessage());
+            }
+        }
+
+        // ── STEP 2: insert the payment row ────────────────────────
+        try {
+            $this->insert($paymentData);
+            $id = (int) $this->getInsertID();
+
+            if ($id <= 0) {
+                $err = $this->db->error();
+                log_message(
+                    'error',
+                    'PaymentModel::recordPayment — insert returned no id. DB error: '
+                    . ($err['message'] ?? 'unknown')
+                    . ' | Code: ' . ($err['code'] ?? 'n/a')
+                );
+                return 0;
+            }
+        } catch (\Throwable $e) {
+            log_message('error', 'PaymentModel::recordPayment — exception: ' . $e->getMessage());
+            return 0;
+        }
+
+        // ── STEP 3: recalculate the linked invoice immediately ────
+        //
+        // This is the permanent fix. No matter which caller inserted
+        // the payment (Start button, manual record, sync hook,
+        // backfill script), the invoice's amount_paid / balance /
+        // status are updated before the request returns.
+        if (!empty($paymentData['invoice_id'])) {
+            try {
+                (new InvoiceModel())->recalculate((int) $paymentData['invoice_id']);
+
+                log_message(
+                    'info',
+                    'PaymentModel: invoice #' . $paymentData['invoice_id']
+                    . ' recalculated after payment #' . $id
+                );
+            } catch (\Throwable $e) {
+                // Never let the recalc failure hide the successful payment.
+                // The next view of the invoice will fix it via
+                // Billing::view()'s own recalculate call.
+                log_message(
+                    'error',
+                    'PaymentModel: post-insert recalc failed for invoice #'
+                    . $paymentData['invoice_id'] . ': ' . $e->getMessage()
+                );
+            }
+        }
+
+        return $id;
     }
-    
-    /**
-     * Get payment by request ID
-     */
+
+    // ============================================================
+    // EXISTING QUERY HELPERS — unchanged
+    // ============================================================
+
     public function getByRequest($requestId, $requestType)
     {
         return $this->where('request_id', $requestId)
                     ->where('request_type', $requestType)
                     ->first();
     }
-    
-    /**
-     * Get payments by patient
-     */
+
     public function getByPatient($patientName)
     {
         return $this->where('patient_name', $patientName)
                     ->orderBy('payment_date', 'DESC')
                     ->findAll();
     }
-    
-    /**
-     * Get payments by date range
-     */
+
     public function getByDateRange($startDate, $endDate)
     {
         return $this->where('payment_date >=', $startDate . ' 00:00:00')
@@ -121,10 +245,7 @@ class PaymentModel extends Model
                     ->orderBy('payment_date', 'DESC')
                     ->findAll();
     }
-    
-    /**
-     * Get today's collections
-     */
+
     public function getTodayCollections()
     {
         $today = date('Y-m-d');
@@ -132,10 +253,7 @@ class PaymentModel extends Model
                     ->where('payment_status', self::STATUS_PAID)
                     ->findAll();
     }
-    
-    /**
-     * Get total collections for today
-     */
+
     public function getTodayTotal()
     {
         $today = date('Y-m-d');
@@ -145,10 +263,7 @@ class PaymentModel extends Model
                        ->first();
         return $result['total'] ?? 0;
     }
-    
-    /**
-     * Get monthly collections
-     */
+
     public function getMonthlyCollections($year, $month)
     {
         return $this->where('YEAR(payment_date)', $year)
@@ -157,37 +272,18 @@ class PaymentModel extends Model
                     ->orderBy('payment_date', 'DESC')
                     ->findAll();
     }
-    
-    /**
-     * Get payment counts by status
-     */
+
     public function getCounts()
     {
         return [
-            'total' => $this->countAll(),
-            'paid' => $this->where('payment_status', self::STATUS_PAID)->countAllResults(),
-            'pending' => $this->where('payment_status', self::STATUS_PENDING)->countAllResults(),
+            'total'    => $this->countAll(),
+            'paid'     => $this->where('payment_status', self::STATUS_PAID)->countAllResults(),
+            'pending'  => $this->where('payment_status', self::STATUS_PENDING)->countAllResults(),
             'refunded' => $this->where('payment_status', self::STATUS_REFUNDED)->countAllResults(),
-            'failed' => $this->where('payment_status', self::STATUS_FAILED)->countAllResults()
+            'failed'   => $this->where('payment_status', self::STATUS_FAILED)->countAllResults(),
         ];
     }
 
-    /**
-     * ============================================================
-     * RADIOLOGY REVENUE
-     * ============================================================
-     * Sums payments recorded against x-ray requests. Only rows
-     * whose payment_status is 'paid' are counted, so cancelled,
-     * pending, refunded, and failed payments never inflate the
-     * figure.
-     *
-     * The `request_type` column already partitions payments by
-     * department ('lab' or 'xray'), so no join is needed.
-     *
-     * @param  string $from  Inclusive lower bound, 'YYYY-MM-DD'
-     * @param  string $to    Inclusive upper bound, 'YYYY-MM-DD'
-     * @return float
-     */
     public function getXrayRevenueBetween(string $from, string $to): float
     {
         $row = $this->selectSum('total_amount', 'revenue')
@@ -200,27 +296,76 @@ class PaymentModel extends Model
         return (float) ($row['revenue'] ?? 0);
     }
 
-    /**
-     * Today's x-ray revenue.
-     */
     public function getXrayRevenueToday(): float
     {
-        $today = date('Y-m-d');
-        return $this->getXrayRevenueBetween($today, $today);
+        return $this->getXrayRevenueBetween(date('Y-m-d'), date('Y-m-d'));
+    }
+
+    public function getXrayRevenueThisMonth(): float
+    {
+        return $this->getXrayRevenueBetween(date('Y-m-01'), date('Y-m-d'));
+    }
+
+    // ============================================================
+    // NEW METHODS (invoice-aware)
+    // ============================================================
+
+    /**
+     * All payments that belong to an invoice, oldest first.
+     */
+    public function getForInvoice(int $invoiceId): array
+    {
+        return $this->where('invoice_id', $invoiceId)
+                    ->orderBy('payment_date', 'ASC')
+                    ->findAll();
     }
 
     /**
-     * Month-to-date x-ray revenue.
-     *
-     * The upper bound is today, not the last calendar day, so a
-     * post-dated payment cannot appear as revenue before it was
-     * actually collected.
+     * Sum of amount_paid for an invoice, restricted to successful rows.
      */
-    public function getXrayRevenueThisMonth(): float
+    public function getSumForInvoice(int $invoiceId): float
     {
-        return $this->getXrayRevenueBetween(
-            date('Y-m-01'),
-            date('Y-m-d')
-        );
+        $row = $this->selectSum('amount_paid', 'total')
+                    ->where('invoice_id', $invoiceId)
+                    ->where('payment_status', self::STATUS_PAID)
+                    ->first();
+
+        return (float) ($row['total'] ?? 0);
+    }
+
+    /**
+     * Void a payment (bookkeeping only — no money moves).
+     * Automatically recalculates the linked invoice afterwards.
+     */
+    public function voidPayment(int $paymentId, string $reason, string $byName): bool
+    {
+        $payment = $this->find($paymentId);
+        if (!$payment || $payment['payment_status'] === self::STATUS_REFUNDED) {
+            return false;
+        }
+
+        $ok = (bool) $this->update($paymentId, [
+            'payment_status' => self::STATUS_REFUNDED,
+            'voided_by'      => $byName,
+            'voided_at'      => date('Y-m-d H:i:s'),
+            'void_reason'    => $reason,
+            'notes'          => trim(($payment['notes'] ?? '') . ' | Voided: ' . $reason),
+        ]);
+
+        // Recalculate the affected invoice so its status/balance
+        // reflect the refund right away.
+        if ($ok && !empty($payment['invoice_id'])) {
+            try {
+                (new InvoiceModel())->recalculate((int) $payment['invoice_id']);
+            } catch (\Throwable $e) {
+                log_message(
+                    'error',
+                    'PaymentModel::voidPayment recalc failed for invoice #'
+                    . $payment['invoice_id'] . ': ' . $e->getMessage()
+                );
+            }
+        }
+
+        return $ok;
     }
 }

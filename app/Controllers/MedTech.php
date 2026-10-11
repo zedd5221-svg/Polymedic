@@ -6,6 +6,7 @@ use App\Models\AppointmentModel;
 use App\Models\DiagnosticRequestModel;
 use App\Models\LabResultModel;
 use App\Models\NotificationModel;
+use App\Models\PaymentModel;
 use App\Models\ServiceModel;
 use App\Models\UserModel;
 
@@ -39,6 +40,22 @@ class MedTech extends BaseController
             DiagnosticRequestModel::STATUS_COMPLETED,
             DiagnosticRequestModel::STATUS_RELEASED,
         ];
+    }
+
+    /**
+     * ------------------------------------------------------------------
+     * Payment precondition helper.
+     *
+     * The receptionist's "Start" button is the only entry point that
+     * writes a payments row. Every department-side writer must check
+     * this first, otherwise the diagnostic request can advance past
+     * `pending` without any money being recorded — exactly the bug
+     * that created the historical orphan rows.
+     * ------------------------------------------------------------------
+     */
+    private function requestIsPaid(int $id, string $type = DiagnosticRequestModel::TYPE_LAB): bool
+    {
+        return !empty((new PaymentModel())->getByRequest($id, $type));
     }
 
     // =============================================
@@ -111,15 +128,11 @@ class MedTech extends BaseController
         $data['turnaroundData']  = $this->getTurnaroundTimes($labRequestModel, $labResultModel);
         $data['serviceCatalog']  = $this->getAvailableServices();
 
-        // KPI sparklines — same look as the admin dashboard.
         $data['kpiTrends'] = $this->getKpiTrends(14, (int) ($data['counts']['total'] ?? 0));
 
         return view('MedTech/dashboard', $data);
     }
 
-    // =============================================
-    // KPI SPARKLINE TRENDS (last N days, ending today)
-    // =============================================
     private function getKpiTrends(int $days, int $totalRequests): array
     {
         $db    = db_connect();
@@ -153,7 +166,6 @@ class MedTech extends BaseController
             return array_map(fn($d) => $map[$d] ?? 0, $dates);
         };
 
-        // Total requests: cumulative walk-back from today's total.
         $newTotal = $series('DATE(created_at)', 'COUNT(*)');
         $total    = [];
         $running  = $totalRequests - array_sum($newTotal);
@@ -168,7 +180,6 @@ class MedTech extends BaseController
         $completed   = $series('DATE(updated_at)', 'COUNT(*)', ['status' => 'completed']);
         $released    = $series('DATE(released_at)', 'COUNT(*)', ['status' => 'released']);
 
-        // In queue = pending + in_progress + draft, summed per day.
         $inQueue = [];
         for ($i = 0; $i < $days; $i++) {
             $inQueue[] = ($pending[$i] ?? 0) + ($inProgress[$i] ?? 0) + ($draft[$i] ?? 0);
@@ -543,6 +554,12 @@ class MedTech extends BaseController
             'released'    => 'info',
         ];
 
+        // Pass a flag so the view can disable inputs when the request
+        // is not yet paid. This is the same invariant the controller
+        // enforces, surfaced at the UI level so the tech never wastes
+        // time typing results they cannot save.
+        $data['isPaid'] = $this->requestIsPaid((int) $id, DiagnosticRequestModel::TYPE_LAB);
+
         return view('MedTech/view_request', $data);
     }
 
@@ -579,6 +596,15 @@ class MedTech extends BaseController
                             ->with('error', 'Laboratory request not found');
         }
 
+        // Payment precondition: a request that has not been paid must
+        // never leave `pending`. The receptionist's Start button is the
+        // only writer of payments rows.
+        if (!$this->requestIsPaid((int) $id, DiagnosticRequestModel::TYPE_LAB)) {
+            return redirect()->to(base_url('medtech/requests'))
+                            ->with('error', 'This request has not been paid yet. '
+                                . 'The receptionist must click Start before results can be entered.');
+        }
+
         $testNames = $this->request->getPost('test_name') ?? [];
         $results   = $this->request->getPost('result') ?? [];
         $units     = $this->request->getPost('unit') ?? [];
@@ -599,7 +625,12 @@ class MedTech extends BaseController
         }
 
         $labResultModel->saveResults($id, $resultData, false);
-        $labRequestModel->update($id, ['status' => DiagnosticRequestModel::STATUS_IN_PROGRESS]);
+
+        // Only advance a `pending` request to `in_progress`. Never
+        // overwrite a later status (completed, released, draft).
+        if ($request['status'] === DiagnosticRequestModel::STATUS_PENDING) {
+            $labRequestModel->update($id, ['status' => DiagnosticRequestModel::STATUS_IN_PROGRESS]);
+        }
 
         return redirect()->to(base_url('medtech/request/view/' . $id))
                         ->with('success', 'Results saved successfully!');
@@ -619,6 +650,13 @@ class MedTech extends BaseController
         if (!$request) {
             return redirect()->to(base_url('medtech/requests'))
                             ->with('error', 'Laboratory request not found');
+        }
+
+        // Payment precondition.
+        if (!$this->requestIsPaid((int) $id, DiagnosticRequestModel::TYPE_LAB)) {
+            return redirect()->to(base_url('medtech/requests'))
+                            ->with('error', 'This request has not been paid yet. '
+                                . 'The receptionist must click Start before findings can be saved.');
         }
 
         $findings = $this->request->getPost('findings');
@@ -661,6 +699,12 @@ class MedTech extends BaseController
                             ->with('error', 'Laboratory request not found');
         }
 
+        // Payment precondition.
+        if (!$this->requestIsPaid((int) $id, DiagnosticRequestModel::TYPE_LAB)) {
+            return redirect()->to(base_url('medtech/requests'))
+                            ->with('error', 'This request has not been paid yet.');
+        }
+
         $results = $labResultModel->getByRequest($id);
         if (empty($results)) {
             return redirect()->back()->with('error', 'Please enter test results first');
@@ -695,6 +739,13 @@ class MedTech extends BaseController
         if (!$request) {
             return redirect()->to(base_url('medtech/requests'))
                             ->with('error', 'Laboratory request not found');
+        }
+
+        // Payment precondition.
+        if (!$this->requestIsPaid((int) $id, DiagnosticRequestModel::TYPE_LAB)) {
+            return redirect()->to(base_url('medtech/requests'))
+                            ->with('error', 'This request has not been paid yet. '
+                                . 'The receptionist must click Start before results can be released.');
         }
 
         $action = (string) ($this->request->getPost('submit_action') ?? 'save');
@@ -771,6 +822,17 @@ class MedTech extends BaseController
         } elseif ($action === 'release') {
             $status = DiagnosticRequestModel::STATUS_RELEASED;
             $update['released_at'] = date('Y-m-d H:i:s');
+        } else {
+            // "save" — preserve the current status if it's already
+            // something more advanced than draft.
+            if (in_array($request['status'], [
+                DiagnosticRequestModel::STATUS_COMPLETED,
+                DiagnosticRequestModel::STATUS_RELEASED,
+            ], true)) {
+                $status = $request['status'];
+            } elseif ($request['status'] === DiagnosticRequestModel::STATUS_IN_PROGRESS) {
+                $status = DiagnosticRequestModel::STATUS_DRAFT;
+            }
         }
 
         $update['status'] = $status;

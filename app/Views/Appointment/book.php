@@ -30,7 +30,11 @@
     ];
 
     $oldCountry = old('phone_country') ?: 'PH';
-    $maxDate    = date('Y-m-d', strtotime('+90 days'));
+
+    // Driven by the clinic_settings table — no hardcoded 90.
+    $horizonDays = (int) ($scheduling['horizon'] ?? 90);
+    $maxDate     = date('Y-m-d', strtotime('+' . $horizonDays . ' days'));
+    $slotDataUrl = site_url('appointment/slots');
 ?>
 
 <!-- ====== BOOKING PAGE ====== -->
@@ -66,8 +70,6 @@
                     <span class="step-label" id="stepLabel3">Services</span>
                 </div>
 
-                <!-- Review & Payment is one step; the old markup had a fifth
-                     circle the script never advanced to. -->
                 <div class="step-item" data-step="4">
                     <div class="step-circle" id="stepCircle4">
                         <span class="step-number">4</span>
@@ -102,6 +104,14 @@
                     </div>
                 <?php endif ?>
 
+                <?php if (session()->getFlashdata('error')): ?>
+                    <div class="alert alert-danger alert-dismissible fade show rounded-3" role="alert">
+                        <strong><i class="bi bi-exclamation-triangle-fill me-2"></i></strong>
+                        <?= esc(session()->getFlashdata('error')) ?>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                <?php endif ?>
+
                 <form action="/polymedic/public/appointment/submit" method="POST" id="bookingForm" novalidate>
                     <?= csrf_field() ?>
 
@@ -128,11 +138,12 @@
                                        value="<?= esc(old('appointment_date') ?? '', 'attr') ?>"
                                        min="<?= date('Y-m-d') ?>"
                                        max="<?= $maxDate ?>"
+                                       data-slots-url="<?= esc($slotDataUrl, 'attr') ?>"
                                        aria-describedby="appointment_date_hint appointment_date_error"
                                        required>
                                 <p class="field-hint" id="appointment_date_hint">
                                     Format <code>YYYY-MM-DD</code> — e.g. <code><?= date('Y-m-d', strtotime('+3 days')) ?></code>.
-                                    You can book up to 90 days ahead.
+                                    You can book up to <?= $horizonDays ?> days ahead.
                                 </p>
                                 <p class="field-echo" id="dateEcho" hidden></p>
                                 <p class="field-error" id="appointment_date_error" role="alert"></p>
@@ -149,21 +160,16 @@
                                         aria-describedby="appointment_time_hint appointment_time_error"
                                         required>
                                     <option value="">Select time</option>
-                                    <optgroup label="Morning">
-                                        <option value="08:00">8:00 AM</option>
-                                        <option value="09:00">9:00 AM</option>
-                                        <option value="10:00">10:00 AM</option>
-                                        <option value="11:00">11:00 AM</option>
-                                    </optgroup>
-                                    <optgroup label="Afternoon">
-                                        <option value="13:00">1:00 PM</option>
-                                        <option value="14:00">2:00 PM</option>
-                                        <option value="15:00">3:00 PM</option>
-                                        <option value="16:00">4:00 PM</option>
-                                    </optgroup>
                                 </select>
+                                <p class="field-hint" id="appointment_time_loading" hidden>
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                    Loading available times…
+                                </p>
                                 <p class="field-hint" id="appointment_time_hint">
-                                    Clinic hours are 8:00 AM – 5:00 PM. Lunch break 12:00 – 1:00 PM.
+                                    Clinic hours are <?= esc(date('g:i A', strtotime($scheduling['open'] ?? '08:00'))) ?> –
+                                    <?= esc(date('g:i A', strtotime($scheduling['close'] ?? '17:00'))) ?>.
+                                    Lunch break <?= esc(date('g:i A', strtotime($scheduling['lunch_start'] ?? '12:00'))) ?> –
+                                    <?= esc(date('g:i A', strtotime($scheduling['lunch_end'] ?? '13:00'))) ?>.
                                 </p>
                                 <p class="field-error" id="appointment_time_error" role="alert"></p>
                             </div>
@@ -314,7 +320,6 @@
                                            required>
                                 </div>
 
-                                <!-- What the controller receives (unchanged field name) -->
                                 <input type="hidden" name="phone" id="phone">
                                 <input type="hidden" name="phone_e164" id="phone_e164">
 
@@ -1017,6 +1022,22 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function validateStep1() {
+        // If the chosen option is gone (slot filled between load and submit),
+        // force a re-fetch and reject.
+        if (timeInput.value) {
+            var picked = null;
+            for (var i = 0; i < timeInput.options.length; i++) {
+                if (timeInput.options[i].value === timeInput.value) {
+                    picked = timeInput.options[i];
+                    break;
+                }
+            }
+            if (!picked || picked.disabled) {
+                return showError(timeInput, 'appointment_time_error',
+                    'That time just became unavailable. Please choose another.');
+            }
+        }
+
         if (!dateInput.value) {
             return showError(dateInput, 'appointment_date_error', 'Please choose an appointment date.');
         }
@@ -1031,7 +1052,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return showError(dateInput, 'appointment_date_error', 'The date has already passed. Pick today or a later date.');
         }
         if (dateInput.max && dateInput.value > dateInput.max) {
-            return showError(dateInput, 'appointment_date_error', 'Bookings are open up to 90 days ahead only.');
+            return showError(dateInput, 'appointment_date_error', 'Bookings are open up to the configured horizon only.');
         }
         clearError(dateInput, 'appointment_date_error');
 
@@ -1064,7 +1085,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const phoneE164    = $('phone_e164');
     const phoneField   = $('phoneField');
 
-    // ---- phone: country-aware formatting ----
     function country() {
         const opt = countrySel.options[countrySel.selectedIndex];
         return {
@@ -1078,8 +1098,6 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     }
 
-    // Strip the trunk prefix (the leading 0 in PH, UK, AU...) and any
-    // symbols, leaving the national significant number.
     function nationalDigits(raw, c) {
         let digits = (raw || '').replace(/\D/g, '');
 
@@ -1146,7 +1164,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!domain || commonDomains.indexOf(domain) !== -1) return null;
 
         for (const good of commonDomains) {
-            // one-character difference is almost always a typo
             if (Math.abs(good.length - domain.length) <= 1) {
                 let diff = 0;
                 const len = Math.max(good.length, domain.length);
@@ -1181,7 +1198,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function validateStep2() {
-        // name
         const nameVal = nameInput.value.trim().replace(/\s+/g, ' ');
         nameInput.value = nameVal;
 
@@ -1193,7 +1209,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         clearError(nameInput, 'full_name_error');
 
-        // age
         const ageVal = parseInt(ageInput.value, 10);
         if (ageInput.value === '' || isNaN(ageVal)) {
             return showError(ageInput, 'age_error', 'Please enter your age in years — e.g. 25.');
@@ -1203,13 +1218,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         clearError(ageInput, 'age_error');
 
-        // gender
         if (!genderInput.value) {
             return showError(genderInput, 'gender_error', 'Please select a gender.');
         }
         clearError(genderInput, 'gender_error');
 
-        // email
         const emailVal = emailInput.value.trim();
         if (!emailVal) {
             return showError(emailInput, 'email_error', 'Please enter your email address.');
@@ -1220,7 +1233,6 @@ document.addEventListener('DOMContentLoaded', function() {
         emailInput.value = emailVal;
         clearError(emailInput, 'email_error');
 
-        // phone
         const c = country();
         const digits = nationalDigits(phoneNat.value, c);
 
@@ -1240,12 +1252,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         clearError(phoneField, 'phone_error');
 
-        /* What gets posted:
-           - phone      → local format for PH (0912 345 6789 → 09123456789) so
-                          existing server-side rules keep working; international
-                          numbers post as +<dial><digits>.
-           - phone_e164 → always the full international form.
-           Change the PH branch below if you'd rather always store E.164. */
         const e164 = '+' + c.dial + digits;
         phoneE164.value = e164;
         phoneHidden.value = (c.iso === 'PH') ? (c.trunk + digits) : e164;
@@ -1311,7 +1317,6 @@ document.addEventListener('DOMContentLoaded', function() {
         labContainer.style.display  = (type === 'xray') ? 'none' : 'block';
         xrayContainer.style.display = (type === 'laboratory') ? 'none' : 'block';
 
-        // Uncheck anything that just became hidden
         if (type === 'laboratory') {
             xrayContainer.querySelectorAll('.service-checkbox').forEach(function(cb) { cb.checked = false; });
         } else if (type === 'xray') {
@@ -1340,7 +1345,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // character counter
     const otherInput = $('other_requests');
     const otherCount = $('otherCount');
 
@@ -1434,7 +1438,6 @@ document.addEventListener('DOMContentLoaded', function() {
         $('bookingForm').submit();
     });
 
-    // Restore the button if the user comes back with the Back button
     window.addEventListener('pageshow', function(e) {
         if (e.persisted) {
             submitted = false;
@@ -1460,6 +1463,135 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     calculateTotal();
+
+    // =========================================================
+    // DYNAMIC SLOT LOADING
+    // =========================================================
+    (function () {
+        var dateEl    = document.getElementById('appointment_date');
+        var timeEl    = document.getElementById('appointment_time');
+        var loaderEl  = document.getElementById('appointment_time_loading');
+        var url       = dateEl ? dateEl.getAttribute('data-slots-url') : null;
+        var lastFetch = '';
+
+        if (!dateEl || !timeEl || !url) return;
+
+        function currentServiceType() {
+            var active = document.querySelector('.service-type-card.active');
+            if (!active) return 'laboratory';
+            var t = (active.dataset.type || '').toLowerCase();
+            if (t === 'xray')   return 'xray';
+            if (t === 'both')   return 'both';
+            return 'laboratory';
+        }
+
+        function setLoading(on) {
+            if (loaderEl) loaderEl.hidden = !on;
+            timeEl.disabled = !!on;
+        }
+
+        function resetTimeSelect(message) {
+            timeEl.innerHTML = '';
+            var opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = message || 'Select time';
+            timeEl.appendChild(opt);
+        }
+
+        function renderSlots(slots) {
+            timeEl.innerHTML = '';
+            var head = document.createElement('option');
+            head.value = '';
+            head.textContent = 'Select time';
+            timeEl.appendChild(head);
+
+            var groups = { Morning: [], Afternoon: [] };
+            slots.forEach(function (s) {
+                var hour = parseInt(String(s.time).substring(0, 2), 10);
+                var bucket = hour < 12 ? 'Morning' : 'Afternoon';
+                groups[bucket].push(s);
+            });
+
+            ['Morning', 'Afternoon'].forEach(function (name) {
+                if (!groups[name].length) return;
+                var og = document.createElement('optgroup');
+                og.label = name;
+                groups[name].forEach(function (s) {
+                    var opt = document.createElement('option');
+                    opt.value = s.time;
+                    opt.textContent = s.label + (s.available ? '' : ' — Unavailable');
+                    if (!s.available) {
+                        opt.disabled = true;
+                        opt.style.color = '#94a3b8';
+                    }
+                    og.appendChild(opt);
+                });
+                timeEl.appendChild(og);
+            });
+        }
+
+        function fetchSlots() {
+            var date = dateEl.value;
+            var type = currentServiceType();
+
+            if (!date) {
+                resetTimeSelect('Select a date first');
+                return;
+            }
+
+            var key = date + '|' + type;
+            if (key === lastFetch) return;
+            lastFetch = key;
+
+            setLoading(true);
+
+            // window.location.origin works whether or not index.php is in
+            // the browser URL, and whether or not the URL is a sub-path.
+            var fullUrl = new URL(url, window.location.origin).toString()
+                        + '?date=' + encodeURIComponent(date)
+                        + '&type=' + encodeURIComponent(type);
+
+            fetch(fullUrl, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!data || !data.ok) {
+                    resetTimeSelect('No slots available');
+                    return;
+                }
+                if (!data.working) {
+                    resetTimeSelect('Clinic closed on this date');
+                    return;
+                }
+                renderSlots(data.slots || []);
+            })
+            .catch(function () {
+                resetTimeSelect('Could not load times');
+            })
+            .finally(function () {
+                setLoading(false);
+            });
+        }
+
+        dateEl.addEventListener('change', fetchSlots);
+
+        var cards = document.querySelectorAll('.service-type-card');
+        cards.forEach(function (card) {
+            card.addEventListener('click', function () {
+                lastFetch = '';
+                if (dateEl.value) fetchSlots();
+            });
+            card.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    lastFetch = '';
+                    if (dateEl.value) setTimeout(fetchSlots, 0);
+                }
+            });
+        });
+
+        if (dateEl.value) fetchSlots();
+    })();
 });
 </script>
 

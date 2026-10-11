@@ -11,6 +11,9 @@
     $isReleased = $statusKey === 'released';
     $isEditable = !$isReleased;
 
+    /* Payment state passed by the controller. */
+    $isPaid = !empty($isPaid ?? false);
+
     $statusMeta = [
         'pending'     => ['label' => 'Pending',     'tone' => 'pending'],
         'in_progress' => ['label' => 'In reading',  'tone' => 'progress'],
@@ -32,13 +35,6 @@
 
     /*
      * Collect every image path for this study.
-     *
-     * Preference order:
-     *   1. image_paths (JSON array, new format, up to 5)
-     *   2. image_path  (legacy single-column)
-     *
-     * Duplicates are removed so a study saved under both columns
-     * does not show the same image twice.
      */
     $imagePaths = [];
 
@@ -190,7 +186,7 @@
                     <?php if ($imageCount > 1): ?>
                         <div class="xv-thumbs" role="tablist" aria-label="Image thumbnails">
                             <?php foreach ($imagePaths as $i => $path): ?>
-                                <?php if ($isEditable): ?>
+                                <?php if ($isEditable && $isPaid): ?>
                                     <form action="<?= base_url('radiologist/examination/remove-image/' . (int) $examination['id']) ?>"
                                           method="POST"
                                           class="xv-thumb-form"
@@ -352,10 +348,22 @@
 
             <?php else: ?>
 
+                <?php if (!$isPaid): ?>
+                    <div class="xv-alert xv-alert--error" role="alert" style="margin:1rem 1.25rem 0;">
+                        <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+                        <span>
+                            <strong>This study has not been paid yet.</strong>
+                            Ask the receptionist to click <strong>Start</strong>
+                            on the diagnostic-requests page before you write the report.
+                        </span>
+                    </div>
+                <?php endif; ?>
+
                 <form action="<?= base_url('radiologist/examination/save/' . (int) $examination['id']) ?>"
                       method="POST"
                       id="xvReportForm"
-                      novalidate>
+                      novalidate
+                      <?= !$isPaid ? 'data-unpaid="1"' : '' ?>>
 
                     <?= csrf_field() ?>
 
@@ -1032,6 +1040,25 @@
     'use strict';
 
     /* =====================================================
+       PAYMENT GUARD
+       Block the report form entirely when the study has not
+       been paid. The server refuses the save anyway; this
+       is a UX guard that stops the radiologist from wasting
+       time on a report that cannot be submitted.
+       ===================================================== */
+    var reportForm = document.getElementById('xvReportForm');
+    if (reportForm && reportForm.dataset.unpaid === '1') {
+        reportForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            alert('This study has not been paid yet. Ask the receptionist to click Start first.');
+        });
+        reportForm.querySelectorAll('textarea, button[type="submit"]').forEach(function (el) {
+            el.disabled = true;
+        });
+        return;
+    }
+
+    /* =====================================================
        Upload button: reveal the confirm button once files are
        selected, and summarise how many were chosen.
        ===================================================== */
@@ -1062,9 +1089,6 @@
 
     /* =====================================================
        Image viewer.
-       Thumbnails switch the main image; prev/next step
-       through the set; a counter shows the current position.
-       Nothing is fetched — every image is already in the DOM.
        ===================================================== */
 
     var viewer = document.getElementById('xvViewer');
@@ -1120,9 +1144,6 @@
 
     /* =====================================================
        Completeness gate for the report.
-       Save report (and its release step) are only allowed when
-       both Findings and Impression have content. The server
-       checks the same rule again.
        ===================================================== */
 
     var findingsEl = document.getElementById('findingsInput');

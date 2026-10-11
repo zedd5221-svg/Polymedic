@@ -42,6 +42,17 @@ class Radiologist extends BaseController
         ];
     }
 
+    /**
+     * ------------------------------------------------------------------
+     * Payment precondition helper.
+     * Mirrors the same guard used by MedTech.
+     * ------------------------------------------------------------------
+     */
+    private function requestIsPaid(int $id, string $type = DiagnosticRequestModel::TYPE_XRAY): bool
+    {
+        return !empty((new PaymentModel())->getByRequest($id, $type));
+    }
+
     private function getAvailableXrayServices()
     {
         $serviceModel = new ServiceModel();
@@ -165,16 +176,11 @@ class Radiologist extends BaseController
 
         $data['servicesCatalog'] = $this->getAvailableXrayServices();
 
-        // KPI sparklines — same look as the Admin dashboard.
         $data['kpiTrends'] = $this->getKpiTrends(14, (int) $data['total']);
 
         return view('Radiologist/dashboard', $data);
     }
 
-    /**
-     * Daily series for the KPI sparklines on the Radiologist dashboard.
-     * Oldest day first, ending today.
-     */
     private function getKpiTrends(int $days, int $totalStudies): array
     {
         $db    = db_connect();
@@ -205,7 +211,6 @@ class Radiologist extends BaseController
             return array_map(fn($d) => $map[$d] ?? 0, $dates);
         };
 
-        // Total studies: cumulative walk-back from today's total.
         $newTotal = $series('DATE(created_at)', 'COUNT(*)');
         $total    = [];
         $running  = $totalStudies - array_sum($newTotal);
@@ -221,17 +226,11 @@ class Radiologist extends BaseController
             'completed'   => $series('DATE(updated_at)', 'COUNT(*)', ['status' => 'completed']),
             'released'    => $series('DATE(released_at)', 'COUNT(*)', ['status' => 'released']),
             'total'       => $total,
-
-            // Revenue sparklines — read from the payments table.
             'revenue_today' => $this->getXrayRevenueSeries($dates, false),
             'revenue_month' => $this->getXrayRevenueSeries($dates, true),
         ];
     }
 
-    /**
-     * Daily paid revenue, or a running month-to-date cumulative total
-     * when $cumulative is true.
-     */
     private function getXrayRevenueSeries(array $dates, bool $cumulative): array
     {
         if (empty($dates)) { return []; }
@@ -260,7 +259,6 @@ class Radiologist extends BaseController
             return $series;
         }
 
-        // Month-to-date cumulative — resets on the first of the month.
         $monthStart = date('Y-m-01');
         $running    = 0;
         $out        = [];
@@ -335,6 +333,10 @@ class Radiologist extends BaseController
                             ->with('error', 'Examination not found');
         }
 
+        // Pass the payment state to the view so it can disable the
+        // report form when the study has not been paid yet.
+        $data['isPaid'] = $this->requestIsPaid((int) $id, DiagnosticRequestModel::TYPE_XRAY);
+
         return view('Radiologist/view_examination', $data);
     }
 
@@ -377,15 +379,28 @@ class Radiologist extends BaseController
                                 ->with('error', 'Examination not found');
             }
 
+            // Payment precondition.
+            if (!$this->requestIsPaid((int) $id, DiagnosticRequestModel::TYPE_XRAY)) {
+                return redirect()->to(base_url('radiologist/examinations'))
+                                ->with('error', 'This study has not been paid yet. '
+                                    . 'The receptionist must click Start before the report can be written.');
+            }
+
             if ($examination['status'] === 'released') {
                 return redirect()->to(base_url('radiologist/examination/view/' . $id))
                                 ->with('error', 'This report has already been released and cannot be edited.');
             }
 
+            // Preserve an already-advanced status. Only a `pending`
+            // request is moved to `in_progress` by saving a draft.
+            $status = $examination['status'] === DiagnosticRequestModel::STATUS_PENDING
+                ? DiagnosticRequestModel::STATUS_IN_PROGRESS
+                : $examination['status'];
+
             $update = [
                 'findings'       => $findings,
                 'interpretation' => $interpretation,
-                'status'         => 'in_progress',
+                'status'         => $status,
             ];
 
             if (empty($examination['radiologist_name'])) {
@@ -418,6 +433,13 @@ class Radiologist extends BaseController
             if (!$examination) {
                 return redirect()->to(base_url('radiologist/examinations'))
                                 ->with('error', 'Examination not found');
+            }
+
+            // Payment precondition.
+            if (!$this->requestIsPaid((int) $id, DiagnosticRequestModel::TYPE_XRAY)) {
+                return redirect()->to(base_url('radiologist/examinations'))
+                                ->with('error', 'This study has not been paid yet. '
+                                    . 'The receptionist must click Start before the report can be saved.');
             }
 
             if ($examination['status'] === 'released') {
@@ -622,6 +644,12 @@ class Radiologist extends BaseController
             return redirect()->back()->with('error', 'Examination not found.');
         }
 
+        // Payment precondition — a study that hasn't been paid cannot
+        // have images uploaded against it.
+        if (!$this->requestIsPaid((int) $id, DiagnosticRequestModel::TYPE_XRAY)) {
+            return redirect()->back()->with('error', 'This study has not been paid yet.');
+        }
+
         if (($examination['status'] ?? '') === 'released') {
             return redirect()->back()->with('error', 'This report has already been released. Images can no longer be changed.');
         }
@@ -732,6 +760,10 @@ class Radiologist extends BaseController
             return redirect()->back()->with('error', 'Examination not found.');
         }
 
+        if (!$this->requestIsPaid((int) $id, DiagnosticRequestModel::TYPE_XRAY)) {
+            return redirect()->back()->with('error', 'This study has not been paid yet.');
+        }
+
         if (($examination['status'] ?? '') === 'released') {
             return redirect()->back()->with('error', 'This report has already been released. Images can no longer be changed.');
         }
@@ -776,6 +808,12 @@ class Radiologist extends BaseController
             if (!$examination) {
                 return redirect()->to(base_url('radiologist/examinations'))
                                 ->with('error', 'Examination not found');
+            }
+
+            // Payment precondition.
+            if (!$this->requestIsPaid((int) $id, DiagnosticRequestModel::TYPE_XRAY)) {
+                return redirect()->to(base_url('radiologist/examinations'))
+                                ->with('error', 'This study has not been paid yet.');
             }
 
             if ($examination['status'] === 'released') {

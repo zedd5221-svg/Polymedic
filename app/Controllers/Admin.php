@@ -11,6 +11,7 @@ use App\Models\PatientModel;
 use App\Models\PaymentModel;
 use App\Models\AvailabilityModel;
 use App\Models\SettingsModel;
+use App\Models\LabResultModel;
 
 class Admin extends BaseController
 {
@@ -201,6 +202,167 @@ class Admin extends BaseController
             'released'      => $series('diagnostic_requests', 'DATE(released_at)', 'COUNT(*)', ['status' => 'released']),
             'revenue_today' => $revenue,
             'revenue_month' => $mtd,
+        ];
+    }
+
+    /**
+     * Build a 14-day daily series for each Payments KPI card.
+     */
+    private function getPaymentsKpiTrends(int $days = 14): array
+    {
+        $db    = db_connect();
+        $end   = date('Y-m-d');
+        $start = date('Y-m-d', strtotime('-' . ($days - 1) . ' days'));
+
+        $dates = [];
+        for ($i = 0; $i < $days; $i++) {
+            $dates[] = date('Y-m-d', strtotime($start . ' +' . $i . ' days'));
+        }
+
+        $series = function (string $sql, array $bind) use ($db, $dates): array {
+            try {
+                $rows = $db->query($sql, $bind)->getResultArray();
+                $map  = [];
+                foreach ($rows as $r) {
+                    $map[$r['d']] = (float) ($r['v'] ?? 0);
+                }
+                return array_map(fn($d) => $map[$d] ?? 0.0, $dates);
+            } catch (\Throwable $e) {
+                log_message('warning', 'Admin::getPaymentsKpiTrends query failed: ' . $e->getMessage());
+                return array_fill(0, count($dates), 0.0);
+            }
+        };
+
+        $today = $series("
+            SELECT DATE(payment_date) AS d, SUM(amount_paid) AS v
+            FROM payments
+            WHERE payment_status = 'paid'
+              AND DATE(payment_date) BETWEEN ? AND ?
+            GROUP BY d
+        ", [$start, $end]);
+
+        $count = $series("
+            SELECT DATE(payment_date) AS d, COUNT(*) AS v
+            FROM payments
+            WHERE payment_status = 'paid'
+              AND DATE(payment_date) BETWEEN ? AND ?
+            GROUP BY d
+        ", [$start, $end]);
+
+        $patients = $series("
+            SELECT DATE(payment_date) AS d, COUNT(DISTINCT patient_code) AS v
+            FROM payments
+            WHERE payment_status = 'paid'
+              AND patient_code IS NOT NULL
+              AND patient_code <> ''
+              AND patient_code <> 'N/A'
+              AND DATE(payment_date) BETWEEN ? AND ?
+            GROUP BY d
+        ", [$start, $end]);
+
+        $monthStart = date('Y-m-01');
+        $monthDaily = $series("
+            SELECT DATE(payment_date) AS d, SUM(amount_paid) AS v
+            FROM payments
+            WHERE payment_status = 'paid'
+              AND DATE(payment_date) BETWEEN ? AND ?
+            GROUP BY d
+        ", [$monthStart, $end]);
+
+        $monthMap = [];
+        foreach ($dates as $i => $d) {
+            $monthMap[$d] = $monthDaily[$i] ?? 0.0;
+        }
+        $running = 0.0;
+        $cursor  = $monthStart;
+        $sumLookup = [];
+        while ($cursor <= $end) {
+            $running += $monthMap[$cursor] ?? 0.0;
+            $sumLookup[$cursor] = $running;
+            $cursor = date('Y-m-d', strtotime($cursor . ' +1 day'));
+        }
+        $monthly = [];
+        foreach ($dates as $d) {
+            $monthly[] = $sumLookup[$d] ?? 0.0;
+        }
+
+        return [
+            'today'    => $today,
+            'count'    => $count,
+            'patients' => $patients,
+            'monthly'  => $monthly,
+        ];
+    }
+
+    /**
+     * Build a 14-day daily series for each Patients KPI card.
+     *
+     * Returned shape:
+     *   [
+     *     'total'  => [float, ... 14 values],   // new registrations per day
+     *     'online' => [float, ... 14 values],   // online signups per day
+     *     'walkin' => [float, ... 14 values],   // walk-in signups per day
+     *   ]
+     */
+    private function getPatientsKpiTrends(int $days = 14): array
+    {
+        $db    = db_connect();
+        $end   = date('Y-m-d');
+        $start = date('Y-m-d', strtotime('-' . ($days - 1) . ' days'));
+
+        $dates = [];
+        for ($i = 0; $i < $days; $i++) {
+            $dates[] = date('Y-m-d', strtotime($start . ' +' . $i . ' days'));
+        }
+
+        $series = function (string $sql, array $bind) use ($db, $dates): array {
+            try {
+                $rows = $db->query($sql, $bind)->getResultArray();
+                $map  = [];
+                foreach ($rows as $r) {
+                    $map[$r['d']] = (float) ($r['v'] ?? 0);
+                }
+                return array_map(fn($d) => $map[$d] ?? 0.0, $dates);
+            } catch (\Throwable $e) {
+                log_message('warning', 'Admin::getPatientsKpiTrends query failed: ' . $e->getMessage());
+                return array_fill(0, count($dates), 0.0);
+            }
+        };
+
+        // New patient registrations per day — any source.
+        $total = $series("
+            SELECT DATE(created_at) AS d, COUNT(*) AS v
+            FROM patients
+            WHERE DATE(created_at) BETWEEN ? AND ?
+            GROUP BY d
+        ", [$start, $end]);
+
+        // Online signups. Matches the view's strpos check by accepting
+        // several common spellings of the source value.
+        $online = $series("
+            SELECT DATE(created_at) AS d, COUNT(*) AS v
+            FROM patients
+            WHERE LOWER(source) LIKE 'online%'
+              AND DATE(created_at) BETWEEN ? AND ?
+            GROUP BY d
+        ", [$start, $end]);
+
+        // Walk-in signups. Same idea — accept 'walk-in', 'walkin', etc.
+        $walkin = $series("
+            SELECT DATE(created_at) AS d, COUNT(*) AS v
+            FROM patients
+            WHERE (
+                LOWER(source) LIKE 'walk%-in%'
+                OR LOWER(source) LIKE 'walkin%'
+            )
+              AND DATE(created_at) BETWEEN ? AND ?
+            GROUP BY d
+        ", [$start, $end]);
+
+        return [
+            'total'  => $total,
+            'online' => $online,
+            'walkin' => $walkin,
         ];
     }
 
@@ -541,8 +703,12 @@ class Admin extends BaseController
             return strtotime($b['last_visit'] ?? '0') - strtotime($a['last_visit'] ?? '0');
         });
 
-        $data['patients'] = $allPatients;
-        $data['total'] = count($allPatients);
+        // 14-day series feeding the KPI sparklines in Admin/patients.
+        $kpiTrends = $this->getPatientsKpiTrends(14);
+
+        $data['patients']  = $allPatients;
+        $data['total']     = count($allPatients);
+        $data['kpiTrends'] = $kpiTrends;
 
         return view('Admin/patients', $data);
     }
@@ -2020,6 +2186,9 @@ class Admin extends BaseController
         }
     }
 
+    // =============================================
+    // PRINT (department-aware — X-Ray vs Laboratory)
+    // =============================================
     public function printRequest($id, $type)
     {
         $redirect = $this->checkAuth();
@@ -2027,11 +2196,11 @@ class Admin extends BaseController
 
         $type = strtolower((string) $type);
         if (!in_array($type, ['lab', 'xray'], true)) {
-            return redirect()->to(base_url('admin/diagnostic-requests'));
+            return redirect()->to(base_url('admin/diagnostic-requests'))
+                             ->with('error', 'Unknown request type.');
         }
 
         $model = new DiagnosticRequestModel();
-
         $row = $model
             ->where('id', (int) $id)
             ->where('type', $type)
@@ -2042,9 +2211,159 @@ class Admin extends BaseController
                              ->with('error', 'Request not found.');
         }
 
-        $row['type'] = $type;
+        // Only released results can be printed as final reports.
+        // Anything else falls back to the request slip so the admin
+        // still has something useful to hand to the patient.
+        if (($row['status'] ?? '') !== 'released') {
+            $row['type'] = $type;
+            return view('Receptionist/print_request', [
+                'request' => $row,
+                'type'    => $type,
+            ]);
+        }
 
-        return view('Receptionist/print_request', ['request' => $row, 'type' => $type]);
+        if ($type === 'xray') {
+            return $this->printXrayResult($row);
+        }
+
+        return $this->printLabResult($row);
+    }
+
+    /**
+     * Render the Radiologist result template for an X-Ray row.
+     *
+     * The Radiologist view expects `exam_type` and `exam_date`
+     * columns which the diagnostic_requests table does not have;
+     * it only stores `services` and `request_date`. We map them
+     * here so the shared template keeps working unchanged.
+     */
+    private function printXrayResult(array $examination)
+    {
+        $examination['type']      = 'xray';
+        $examination['exam_type'] = $examination['exam_type']
+            ?? $examination['services']
+            ?? 'X-Ray Examination';
+        $examination['exam_date'] = $examination['exam_date']
+            ?? $examination['request_date']
+            ?? ($examination['created_at'] ?? date('Y-m-d'));
+
+        $appointmentModel = new AppointmentModel();
+        $userModel        = new UserModel();
+
+        $radiologistName = trim((string) ($examination['radiologist_name'] ?? ''));
+        if ($radiologistName === '') {
+            $radiologistName = trim((string) (session()->get('full_name') ?? ''));
+        }
+
+        $radiologist_license = '';
+
+        if ($radiologistName !== '') {
+            $radiologistUser = $userModel
+                ->where('full_name', $radiologistName)
+                ->where('role', 'radiologist')
+                ->first();
+
+            if ($radiologistUser && !empty($radiologistUser['prc_license'])) {
+                $radiologist_license = trim((string) $radiologistUser['prc_license']);
+            }
+        }
+
+        $appointment = null;
+        if (!empty($examination['appointment_id'])) {
+            $appointment = $appointmentModel->find($examination['appointment_id']);
+        }
+
+        return view('Radiologist/print_result', [
+            'examination'         => $examination,
+            'radiologist_license' => $radiologist_license,
+            'appointment'         => $appointment,
+        ]);
+    }
+
+    /**
+     * Render the MedTech result template for a Laboratory row.
+     *
+     * IMPORTANT: The signing technologist must NOT be the currently
+     * logged-in user when an admin is reprinting the result. It must
+     * be the Medical Technologist who actually handled the request,
+     * so the admin's name never appears on a patient report.
+     *
+     * Resolution order for the signing technologist:
+     *   1. diagnostic_requests.technologist_name (if the column exists)
+     *   2. lab_results.created_by  → users row (first result row)
+     *   3. First active user with role IN ('med_tech','technologist')
+     */
+    private function printLabResult(array $request)
+    {
+        $request['type'] = 'lab';
+
+        $labResultModel   = new LabResultModel();
+        $appointmentModel = new AppointmentModel();
+        $userModel        = new UserModel();
+
+        $results = $labResultModel->getByRequest((int) $request['id']);
+
+        $technologistUser = $this->resolveLabTechnologistFor($request, $results, $userModel);
+
+        $appointment = null;
+        if (!empty($request['appointment_id'])) {
+            $appointment = $appointmentModel->find($request['appointment_id']);
+        }
+
+        return view('MedTech/print_result', [
+            'request'          => $request,
+            'results'          => $results,
+            'appointment'      => $appointment,
+            'technologistUser' => $technologistUser,
+            'pathologistUser'  => null,
+        ]);
+    }
+
+    /**
+     * Resolve which Medical Technologist should sign the lab report.
+     *
+     * Never returns the currently logged-in admin. If no technologist
+     * can be resolved, returns null so the view falls back to its own
+     * placeholder text ("Medical Technologist") — it will NOT show the
+     * admin's name.
+     */
+    private function resolveLabTechnologistFor(array $request, array $results, UserModel $userModel): ?array
+    {
+        // 1) Explicit column on the diagnostic_requests row, if present.
+        $name = trim((string) ($request['technologist_name'] ?? ''));
+
+        if ($name !== '') {
+            $user = $userModel
+                ->where('full_name', $name)
+                ->whereIn('role', ['med_tech', 'technologist'])
+                ->first();
+
+            if ($user) {
+                return $user;
+            }
+        }
+
+        // 2) lab_results.created_by → users row.
+        foreach ($results as $row) {
+            $uid = (int) ($row['created_by'] ?? 0);
+            if ($uid > 0) {
+                $user = $userModel->find($uid);
+                if ($user && in_array($user['role'] ?? '', ['med_tech', 'technologist'], true)) {
+                    return $user;
+                }
+            }
+        }
+
+        // 3) Fallback: first active Medical Technologist on record.
+        //    This guarantees the admin's name is never printed, and
+        //    the report is still signed by a real technologist.
+        $fallback = $userModel
+            ->whereIn('role', ['med_tech', 'technologist'])
+            ->where('status', 'active')
+            ->orderBy('id', 'ASC')
+            ->first();
+
+        return $fallback ?: null;
     }
 
     // =============================================
@@ -2121,6 +2440,9 @@ class Admin extends BaseController
         }
         unset($p);
 
+        // 14-day series feeding the KPI sparklines in Admin/payments.
+        $kpiTrends = $this->getPaymentsKpiTrends(14);
+
         $data = [
             'payments'       => $payments,
             'total'          => count($payments),
@@ -2128,6 +2450,7 @@ class Admin extends BaseController
             'today_count'    => count($todayPayments),
             'monthly_total'  => $monthlyTotal,
             'total_patients' => count($uniquePatients),
+            'kpiTrends'      => $kpiTrends,
         ];
 
         return view('Admin/payments', $data);

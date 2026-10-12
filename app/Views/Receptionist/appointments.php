@@ -563,6 +563,7 @@ foreach ($appointmentList as $appt) {
    APPOINTMENTS
    Namespaced under .dx so the receptionist layout's generic
    card and table rules cannot leak in.
+   Accent aligned with the AdminLayout sidebar blue palette.
    ========================================================= */
 
 .dx {
@@ -574,16 +575,19 @@ foreach ($appointmentList as $appt) {
     --dx-line-soft:   #f1f5f9;
     --dx-surface:     #ffffff;
     --dx-subtle:      #f8fafc;
-    --dx-accent:      #0d9488;
-    --dx-accent-dark: #0f766e;
-    --dx-accent-soft: #e6f7f7;
+
+    /* === Aligned with the layout's --active-blue === */
+    --dx-accent:      #1976d2;
+    --dx-accent-dark: #1565c0;
+    --dx-accent-soft: #e3f2fd;
+
     --dx-success:     #16a34a;
     --dx-success-dark:#15803d;
     --dx-danger:      #dc2626;
     --dx-danger-dark: #b91c1c;
     --dx-radius:      10px;
     --dx-radius-sm:   7px;
-    --dx-ring:        0 0 0 3px rgba(13, 148, 136, 0.2);
+    --dx-ring:        0 0 0 3px rgba(25, 118, 210, 0.2);
     --dx-mono:        ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 
     color: var(--dx-text);
@@ -954,7 +958,7 @@ foreach ($appointmentList as $appt) {
     overflow: hidden;
 }
 
-.dx-avatar--male    { color: #1d4ed8; background: #eaf2fe; }
+.dx-avatar--male    { color: #1565c0; background: #e3f2fd; }
 .dx-avatar--female  { color: #b32e50; background: #fce9ee; }
 .dx-avatar--neutral { color: var(--dx-accent); background: var(--dx-accent-soft); }
 
@@ -1005,7 +1009,7 @@ foreach ($appointmentList as $appt) {
     white-space: nowrap;
 }
 
-.dx-kind--lab  { color: #0e7490; background: #ecfeff; border-color: #cffafe; }
+.dx-kind--lab  { color: #1565c0; background: #e3f2fd; border-color: #cfe3f7; }
 .dx-kind--xray { color: #4338ca; background: #eef2ff; border-color: #e0e7ff; }
 .dx-kind--both { color: #b45309; background: #fff7ed; border-color: #fed7aa; }
 
@@ -1193,7 +1197,7 @@ foreach ($appointmentList as $appt) {
 }
 
 .dx-status--pending   { --tone-bg: #fffbeb; --tone-fg: #b45309; --tone-dot: #f59e0b; }
-.dx-status--approved  { --tone-bg: #eff6ff; --tone-fg: #1d4ed8; --tone-dot: #3b82f6; }
+.dx-status--approved  { --tone-bg: #e3f2fd; --tone-fg: #1565c0; --tone-dot: #1976d2; }
 .dx-status--completed { --tone-bg: #ecfdf5; --tone-fg: #047857; --tone-dot: #10b981; }
 .dx-status--cancelled { --tone-bg: #f1f5f9; --tone-fg: #64748b; --tone-dot: #94a3b8; }
 .dx-status--late      { --tone-bg: #fff7ed; --tone-fg: #b45309; --tone-dot: #f97316; }
@@ -1252,7 +1256,7 @@ foreach ($appointmentList as $appt) {
 
 .dx-page:hover:not(:disabled) { background: var(--dx-subtle); border-color: #cbd5e1; }
 .dx-page:disabled { opacity: 0.45; cursor: not-allowed; }
-.dx-page[aria-current="page"] { color: var(--dx-accent); background: var(--dx-accent-soft); border-color: #bcd6f3; }
+.dx-page[aria-current="page"] { color: var(--dx-accent); background: var(--dx-accent-soft); border-color: #bbdefb; }
 .dx-page-gap { min-width: 20px; text-align: center; color: var(--dx-faint); }
 
 /* ---------- Toast ---------- */
@@ -1316,6 +1320,7 @@ foreach ($appointmentList as $appt) {
 
 /* =========================================================
    OVERRIDE MODALS — namespaced .ovr-* to keep clear of .dx-*
+   Accent aligned with the layout's --active-blue.
    ========================================================= */
 
 .ovr-modal {

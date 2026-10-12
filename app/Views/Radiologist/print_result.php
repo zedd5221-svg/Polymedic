@@ -257,21 +257,24 @@ html, body {
     color: #333;
 }
 
-/* ================= Signatures ================= */
+/* ================= Signature (single, centered) ================= */
 
 .sig-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10mm;
-    margin-top: 18mm;
+    display: flex;
+    justify-content: center;
+    margin-top: 22mm;
     page-break-inside: avoid;
 }
 
-.sig-col { text-align: center; font-size: 9pt; }
+.sig-col {
+    text-align: center;
+    font-size: 9pt;
+    width: 100%;
+    max-width: 70mm;
+}
 
 .sig-line {
     width: 100%;
-    max-width: 62mm;
     margin: 0 auto 1.4mm;
     border-top: 0.75pt solid #000;
 }
@@ -369,7 +372,6 @@ html, body {
     .letterhead { flex-direction: column; text-align: center; gap: 3mm; }
     .patient-grid { grid-template-columns: 1fr; }
     .patient-cell:nth-child(odd) { border-right: 0; }
-    .sig-row { grid-template-columns: 1fr; gap: 12mm; }
     .plate-frame { height: 120mm; }
 }
 </style>
@@ -416,17 +418,12 @@ $findings       = trim((string) ($examination['findings'] ?? ''));
 $interpretation = trim((string) ($examination['interpretation'] ?? ''));
 
 /*
- * -------- PRC license numbers --------
+ * -------- PRC license number --------
  *
  * $radiologist_license is supplied by the controller when it can
  * match the signing radiologist to a users row. It is empty when
  * no match is found; the view falls back to a blank underline in
  * that case so a wrong number is never printed.
- *
- * The technologist licence is left as the blank underline for now.
- * Filling it requires a policy decision about whose number should
- * appear (the session user, or a dedicated technologist assigned to
- * the study), so it is left deliberately blank until that is decided.
  */
 $radiologistLicence = trim((string) ($radiologist_license ?? ''));
 
@@ -601,14 +598,8 @@ $imageCount = count($imageUrls);
         <?php endif; ?>
     </div>
 
-    <!-- ================= SIGNATURES ================= -->
+    <!-- ================= SIGNATURE (Radiologist only) ================= -->
     <div class="sig-row">
-        <div class="sig-col">
-            <div class="sig-line"></div>
-            <div class="sig-name"><?= esc(strtoupper(session()->get('full_name') ?: 'Radiologic Technologist')) ?></div>
-            <div class="sig-sub">Radiologic Technologist</div>
-            <div class="sig-lic">Lic. No. ____________</div>
-        </div>
         <div class="sig-col">
             <div class="sig-line"></div>
             <div class="sig-name"><?= esc($radiologist) ?></div>

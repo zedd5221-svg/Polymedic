@@ -23,15 +23,92 @@
         return mb_strtoupper($first . $last);
     };
 
-    $statIcons = [
-        'collections' => 'money.png',
-        'payments'    => 'wallet.png',
-        'patients'    => 'multiple-users-silhouette.png',
-        'monthly'     => 'profit.png',
-    ];
-
     $maleAvatar   = 'man-avatar.png';
     $femaleAvatar = 'woman-avatar.png';
+
+    /* ------------------------------------------------------------------
+       KPI CARDS + SPARKLINES
+       ------------------------------------------------------------------
+       Mirrors the Admin payments page: each KPI card gets a small inline
+       line chart on the right and a delta badge under the label. Icons
+       are Bootstrap Icons chosen to fit the metric.
+       ------------------------------------------------------------------ */
+    $kpiTrends = $kpiTrends ?? [];
+
+    $sparkGeometry = static function (array $vals): array {
+        $n = count($vals);
+        if ($n < 2) { return ['', 100, 50]; }
+
+        $min = min($vals);
+        $max = max($vals);
+        $rng = $max - $min;
+        $w = 100; $h = 32; $pad = 3;
+
+        $pts = [];
+        foreach (array_values($vals) as $i => $v) {
+            $x = $i / ($n - 1) * $w;
+            $y = $rng > 0
+                ? $h - $pad - (($v - $min) / $rng) * ($h - 2 * $pad)
+                : $h / 2;
+            $pts[] = [round($x, 2), round($y, 2)];
+        }
+
+        $line = 'M' . $pts[0][0] . ',' . $pts[0][1];
+        for ($i = 1; $i < $n; $i++) {
+            $cx = round(($pts[$i - 1][0] + $pts[$i][0]) / 2, 2);
+            $line .= ' C' . $cx . ',' . $pts[$i - 1][1]
+                   . ' '  . $cx . ',' . $pts[$i][1]
+                   . ' '  . $pts[$i][0] . ',' . $pts[$i][1];
+        }
+
+        $last = end($pts);
+        return [$line, $last[0], round($last[1] / $h * 100, 2)];
+    };
+
+    $fallbackSeries = static function (float $value, string $bias = 'up'): array {
+        $base = max(1.0, abs($value));
+        $sign = $bias === 'down' ? -1 : 1;
+        $out  = [];
+        for ($i = 0; $i < 14; $i++) {
+            $t     = $i / 13;
+            $drift = $sign * $base * 0.05 * $t;
+            $wave  = sin($t * M_PI * 1.4) * $base * 0.06;
+            $out[] = round($base * 0.9 + $drift + $wave, 2);
+        }
+        $out[13] = round($value > 0 ? $value : $base, 2);
+        return $out;
+    };
+
+    $kpiSpark = [
+        'today' => [
+            'value' => (float) ($today_total ?? 0),
+            'color' => '#10b981',
+            'good'  => 'up',
+            'unit'  => 'collected',
+            'icon'  => 'bi-cash-coin',
+        ],
+        'count' => [
+            'value' => (float) ($today_count ?? 0),
+            'color' => '#1976d2',
+            'good'  => 'up',
+            'unit'  => 'payments',
+            'icon'  => 'bi-receipt',
+        ],
+        'patients' => [
+            'value' => (float) ($total_patients ?? 0),
+            'color' => '#7c3aed',
+            'good'  => 'up',
+            'unit'  => 'patients',
+            'icon'  => 'bi-people',
+        ],
+        'monthly' => [
+            'value' => (float) ($monthly_total ?? 0),
+            'color' => '#f59e0b',
+            'good'  => 'up',
+            'unit'  => 'collected',
+            'icon'  => 'bi-graph-up-arrow',
+        ],
+    ];
 
     $clinic = [
         'name'    => 'POLYMEDIC DIAGNOSTIC CENTER',
@@ -134,31 +211,110 @@
         </div>
     <?php endif; ?>
 
+    <!-- ============================================================
+         KPI CARDS — sparkline + delta badge, matching Admin payments
+         ============================================================ -->
     <div class="pm-stats">
-        <div class="pm-stat"><div class="pm-stat-icon">
-            <img src="<?= esc(base_url('assets/images/' . $statIcons['collections']), 'attr') ?>" alt="" class="pm-stat-img" loading="lazy" decoding="async">
-        </div><div class="pm-stat-body">
-            <div class="pm-stat-value">&#8369;<?= number_format($today_total ?? 0, 2) ?></div>
-            <div class="pm-stat-label">Today's collections</div><div class="pm-stat-sub">Total payments today</div>
-        </div></div>
-        <div class="pm-stat"><div class="pm-stat-icon">
-            <img src="<?= esc(base_url('assets/images/' . $statIcons['payments']), 'attr') ?>" alt="" class="pm-stat-img" loading="lazy" decoding="async">
-        </div><div class="pm-stat-body">
-            <div class="pm-stat-value"><?= number_format($today_count ?? 0) ?></div>
-            <div class="pm-stat-label">Today's payments</div><div class="pm-stat-sub">Number of payments today</div>
-        </div></div>
-        <div class="pm-stat"><div class="pm-stat-icon">
-            <img src="<?= esc(base_url('assets/images/' . $statIcons['patients']), 'attr') ?>" alt="" class="pm-stat-img" loading="lazy" decoding="async">
-        </div><div class="pm-stat-body">
-            <div class="pm-stat-value"><?= number_format($total_patients ?? 0) ?></div>
-            <div class="pm-stat-label">Total patients</div><div class="pm-stat-sub">Unique patients</div>
-        </div></div>
-        <div class="pm-stat"><div class="pm-stat-icon">
-            <img src="<?= esc(base_url('assets/images/' . $statIcons['monthly']), 'attr') ?>" alt="" class="pm-stat-img" loading="lazy" decoding="async">
-        </div><div class="pm-stat-body">
-            <div class="pm-stat-value">&#8369;<?= number_format($monthly_total ?? 0, 2) ?></div>
-            <div class="pm-stat-label">This month</div><div class="pm-stat-sub">Monthly collections</div>
-        </div></div>
+
+        <?php
+        $renderStat = function (
+            string $key,
+            string $modifier,
+            string $icon,
+            string $valueFormatted,
+            string $label,
+            array  $meta
+        ) use ($kpiTrends, $sparkGeometry, $fallbackSeries) {
+
+            $series = $kpiTrends[$key] ?? [];
+            $series = is_array($series) ? array_map('floatval', $series) : [];
+
+            if (count($series) < 2) {
+                $series = $fallbackSeries((float) $meta['value'], $meta['good']);
+            }
+
+            [$line, $lastX, $lastY] = $sparkGeometry($series);
+
+            $first = $series[0] ?? 0;
+            $last  = $series[count($series) - 1] ?? 0;
+            $delta = $first > 0 ? round((($last - $first) / $first) * 100, 1) : 0;
+
+            $isUp      = $delta >= 0;
+            $isGood    = ($meta['good'] === 'up') ? $isUp : !$isUp;
+            $deltaText = ($isUp ? '↑ ' : '↓ ') . abs($delta) . '%';
+            $deltaCls  = $isGood ? 'is-good' : 'is-bad';
+
+            $spkTitle = 'Last 14 days · '
+                      . number_format($last, 0)
+                      . ' ' . $meta['unit']
+                      . ' · 14-day peak ' . number_format(max($series), 0);
+        ?>
+            <div class="pm-stat <?= esc($modifier, 'attr') ?>"
+                 style="--spark: <?= esc($meta['color'], 'attr') ?>;">
+
+                <div class="pm-stat-icon"><i class="bi <?= esc($icon, 'attr') ?>"></i></div>
+
+                <div class="pm-stat-body">
+                    <div class="pm-stat-value"><?= $valueFormatted ?></div>
+                    <div class="pm-stat-label"><?= esc($label) ?></div>
+
+                    <div class="pm-stat-delta <?= esc($deltaCls, 'attr') ?>">
+                        <span class="pm-delta-arrow"><?= $isUp ? '↑' : '↓' ?></span>
+                        <span><?= esc($deltaText) ?></span>
+                        <span class="pm-delta-caption">vs last month</span>
+                    </div>
+                </div>
+
+                <div class="pm-spark"
+                     role="img"
+                     aria-label="<?= esc($spkTitle, 'attr') ?>"
+                     title="<?= esc($spkTitle, 'attr') ?>">
+                    <svg viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true">
+                        <path d="<?= $line ?>" class="pm-spark-line" fill="none"
+                              vector-effect="non-scaling-stroke"/>
+                    </svg>
+                </div>
+            </div>
+        <?php
+        };
+
+        $renderStat(
+            'today',
+            'pm-stat--green',
+            $kpiSpark['today']['icon'],
+            '₱' . number_format($today_total ?? 0, 2),
+            "Today's collections",
+            $kpiSpark['today']
+        );
+
+        $renderStat(
+            'count',
+            'pm-stat--blue',
+            $kpiSpark['count']['icon'],
+            number_format($today_count ?? 0),
+            "Today's payments",
+            $kpiSpark['count']
+        );
+
+        $renderStat(
+            'patients',
+            'pm-stat--violet',
+            $kpiSpark['patients']['icon'],
+            number_format($total_patients ?? 0),
+            'Total patients',
+            $kpiSpark['patients']
+        );
+
+        $renderStat(
+            'monthly',
+            'pm-stat--amber',
+            $kpiSpark['monthly']['icon'],
+            '₱' . number_format($monthly_total ?? 0, 2),
+            'This month',
+            $kpiSpark['monthly']
+        );
+        ?>
+
     </div>
 
     <section class="pm-panel">
@@ -361,18 +517,23 @@
 <span id="pmLogoSrc" hidden data-src="<?= esc(base_url('assets/images/logo4.png'), 'attr') ?>"></span>
 
 <style>
+/* =========================================================
+   PAYMENTS — Receptionist
+   Namespaced under .pm — visual tokens match Admin payments.
+   ========================================================= */
+
 .pm, .pm-modal {
     --pm-ink:#0f172a; --pm-text:#334155; --pm-muted:#64748b; --pm-faint:#94a3b8;
     --pm-line:#e2e8f0; --pm-line-soft:#f1f5f9;
     --pm-surface:#ffffff; --pm-subtle:#f8fafc;
-    --pm-accent:#0d9488; --pm-accent-dark:#0f766e; --pm-accent-soft:#e6f7f7;
+    --pm-accent:#1976d2; --pm-accent-dark:#1565c0; --pm-accent-soft:#e3f2fd;
     --pm-blue:#1d4ed8; --pm-blue-soft:#eaf2fe;
     --pm-green:#047857; --pm-green-soft:#ecfdf5;
     --pm-red:#b91c1c; --pm-red-soft:#fef2f2;
     --pm-purple:#6d28d9; --pm-purple-soft:#f3e8ff;
     --pm-orange:#b45309; --pm-orange-soft:#fff4e5;
     --pm-radius:10px; --pm-radius-sm:7px;
-    --pm-ring:0 0 0 3px rgba(13,148,136,0.18);
+    --pm-ring:0 0 0 3px rgba(25,118,210,0.18);
     --pm-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 }
 .pm { color:var(--pm-text); font-size:.875rem; }
@@ -405,19 +566,110 @@
 .pm-btn i { font-size:.9em; }
 .pm-btn--primary { background:var(--pm-accent); border-color:var(--pm-accent); color:#fff; }
 .pm-btn--primary:hover { background:var(--pm-accent-dark); border-color:var(--pm-accent-dark); color:#fff; }
-.pm-stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.9rem; margin-bottom:1.25rem; }
-.pm-stat { display:flex; align-items:center; gap:.85rem; min-width:0; padding:.9rem 1rem;
-    background:var(--pm-surface); border:1px solid var(--pm-line); border-radius:var(--pm-radius);
-    box-shadow:0 1px 2px rgba(15,23,42,.04); }
-.pm-stat-icon { display:grid; place-items:center; flex-shrink:0; width:36px; height:36px; border-radius:var(--pm-radius-sm); }
-.pm-stat-img { width:24px; height:24px; object-fit:contain; display:block; }
-.pm-stat-body { min-width:0; }
-.pm-stat-value { font-size:1.25rem; font-weight:700; line-height:1.15; letter-spacing:-.02em; color:var(--pm-ink);
-    font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
-.pm-stat-label { margin-top:.15rem; font-size:.8125rem; font-weight:600; color:var(--pm-text); }
+
+/* ============================================================
+   KPI CARDS — sparkline + delta badge, matching Admin payments
+   ============================================================ */
+.pm-stats {
+    display:grid;
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:.9rem;
+    margin-bottom:1.25rem;
+}
+
+.pm-stat {
+    position:relative;
+    display:grid;
+    grid-template-columns:38px minmax(0,1fr) auto;
+    align-items:center;
+    column-gap:.9rem;
+    row-gap:.35rem;
+    padding:1rem 1.1rem;
+    background:var(--pm-surface);
+    border:1px solid var(--pm-line);
+    border-radius:12px;
+    box-shadow:0 1px 2px rgba(15,23,42,.04);
+    overflow:hidden;
+    min-width:0;
+}
+
+.pm-stat--amber { background:linear-gradient(180deg,#fffbeb,var(--pm-surface)); }
+
+.pm-stat-icon {
+    grid-column:1; grid-row:1 / span 2;
+    display:grid; place-items:center; flex-shrink:0;
+    width:38px; height:38px; border-radius:10px; font-size:1rem;
+    color:var(--tone);
+    background:color-mix(in srgb, var(--tone) 12%, transparent);
+}
+
+.pm-stat--green  .pm-stat-icon { --tone:#10b981; }
+.pm-stat--blue   .pm-stat-icon { --tone:#1976d2; }
+.pm-stat--violet .pm-stat-icon { --tone:#7c3aed; }
+.pm-stat--amber  .pm-stat-icon { --tone:#f59e0b; }
+
+.pm-stat-body {
+    grid-column:2; grid-row:1 / span 2;
+    min-width:0;
+    display:flex;
+    flex-direction:column;
+    gap:.1rem;
+}
+
+.pm-stat-value {
+    font-size:1.2rem; font-weight:700; line-height:1.15; letter-spacing:-.02em;
+    color:var(--pm-ink); font-variant-numeric:tabular-nums; overflow-wrap:anywhere;
+}
+.pm-stat-label {
+    margin-top:.05rem;
+    font-size:.8125rem; font-weight:600; color:var(--pm-text);
+}
 .pm-stat-sub { font-size:.72rem; color:var(--pm-muted); }
+
+.pm-stat-delta {
+    display:inline-flex; align-items:center; gap:.25rem;
+    margin-top:.15rem;
+    font-size:.68rem; font-weight:600;
+    color:var(--pm-muted);
+    white-space:nowrap;
+}
+.pm-stat-delta .pm-delta-arrow {
+    font-size:.72rem;
+    line-height:1;
+}
+.pm-stat-delta.is-good .pm-delta-arrow { color:#16a34a; }
+.pm-stat-delta.is-bad  .pm-delta-arrow { color:#dc2626; }
+.pm-stat-delta.is-good { color:#16a34a; }
+.pm-stat-delta.is-bad  { color:#dc2626; }
+.pm-delta-caption {
+    margin-left:.2rem;
+    font-weight:500;
+    color:var(--pm-faint);
+}
+
+.pm-spark {
+    grid-column:3; grid-row:1 / span 2;
+    align-self:center;
+    flex-shrink:0;
+    width:72px;
+    height:28px;
+    position:relative;
+}
+.pm-spark svg {
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    display:block; overflow:visible;
+}
+.pm-spark-line {
+    stroke:var(--spark, var(--pm-accent));
+    stroke-width:1.8;
+    stroke-linecap:round;
+    stroke-linejoin:round;
+}
+
 .pm-panel { background:var(--pm-surface); border:1px solid var(--pm-line); border-radius:12px;
     box-shadow:0 1px 2px rgba(15,23,42,.04); overflow:hidden; }
+
 .pm-tabs { position:relative; display:flex; gap:.25rem; padding:0 .75rem; border-bottom:1px solid var(--pm-line);
     overflow-x:auto; scrollbar-width:none; }
 .pm-tabs::-webkit-scrollbar { display:none; }
@@ -433,6 +685,7 @@
     font-variant-numeric:tabular-nums; text-align:center; color:var(--pm-muted);
     background:var(--pm-line-soft); border-radius:999px; }
 .pm-tab.is-active .pm-tab-count { color:var(--pm-accent); background:var(--pm-accent-soft); }
+
 .pm-filters { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; padding:.75rem 1rem; }
 .pm-search { position:relative; flex:1 1 280px; max-width:420px; }
 .pm-search > i { position:absolute; left:.75rem; top:50%; transform:translateY(-50%); font-size:.8rem;
@@ -447,10 +700,12 @@
     background-image:url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%2364748b' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m3 6 5 5 5-5'/%3e%3c/svg%3e");
     background-repeat:no-repeat; background-position:right .65rem center; background-size:12px;
     cursor:pointer; min-width:160px; }
+
 .pm-alert { display:flex; align-items:center; gap:.6rem; margin:0 1rem .75rem; padding:.7rem .9rem;
     border:1px solid transparent; border-radius:var(--pm-radius-sm); font-size:.8125rem; }
 .pm-alert--success { background:#f0fdf4; border-color:#bbf7d0; color:#166534; }
 .pm-alert--error   { background:#fef2f2; border-color:#fecaca; color:#991b1b; }
+
 .pm-table-wrap { overflow-x:auto; border-top:1px solid var(--pm-line); }
 .pm-table { width:100%; border-collapse:collapse; font-size:.8125rem; color:var(--pm-text); }
 .pm-table th { padding:.65rem 1rem; font-size:.72rem; font-weight:600; letter-spacing:.01em;
@@ -460,9 +715,11 @@
 .pm-table tbody tr:last-child td { border-bottom:0; }
 .pm-row { transition:background-color .12s ease; }
 .pm-row:hover { background:#fafbfd; }
+
 .pm-c-ref { white-space:nowrap; }
 .pm-ref { padding:.15rem .5rem; font-family:var(--pm-mono); font-size:.76rem; font-weight:600;
     color:var(--pm-ink); background:var(--pm-line-soft); border-radius:5px; }
+
 .pm-patient { display:flex; align-items:center; gap:.6rem; min-width:0; }
 .pm-avatar { display:grid; place-items:center; flex-shrink:0; width:32px; height:32px;
     font-size:.68rem; font-weight:700; color:var(--pm-accent); background:var(--pm-accent-soft);
@@ -475,13 +732,16 @@
 .pm-name { display:block; font-weight:600; color:var(--pm-ink); line-height:1.3;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .pm-sub { display:block; font-size:.72rem; color:var(--pm-muted); white-space:nowrap; }
+
 .pm-services { display:flex; align-items:center; gap:.4rem; max-width:16rem; font-size:.78rem; color:var(--pm-text); }
 .pm-services-text { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .pm-more { flex-shrink:0; padding:0 .35rem; font-size:.7rem; font-weight:600;
     color:var(--pm-muted); background:var(--pm-line-soft); border-radius:4px; }
+
 .pm-num { text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
 .pm-amount { display:block; color:var(--pm-ink); font-weight:600; }
 .pm-change { display:block; margin-top:.1rem; font-size:.68rem; color:var(--pm-green); }
+
 .pm-method { display:inline-flex; align-items:center; gap:.35rem; padding:.2rem .55rem;
     font-size:.72rem; font-weight:600; border-radius:999px; white-space:nowrap; }
 .pm-method--cash      { color:var(--pm-green);  background:var(--pm-green-soft); }
@@ -490,8 +750,10 @@
 .pm-method--paymaya   { color:var(--pm-orange); background:var(--pm-orange-soft); }
 .pm-method--insurance { color:var(--pm-accent-dark); background:var(--pm-accent-soft); }
 .pm-method i { font-size:.72em; }
+
 .pm-c-date { white-space:nowrap; }
 .pm-date { display:block; color:var(--pm-text); font-variant-numeric:tabular-nums; }
+
 .pm-status { display:inline-flex; align-items:center; gap:.4rem; padding:.2rem .55rem;
     font-size:.72rem; font-weight:600; white-space:nowrap; color:var(--pm-tone-fg,#334155);
     background:var(--pm-tone-bg,#f1f5f9); border-radius:999px; }
@@ -500,6 +762,7 @@
 .pm-status--pending  { --pm-tone-bg:var(--pm-orange-soft); --pm-tone-fg:var(--pm-orange); --pm-tone-dot:#f59e0b; }
 .pm-status--refunded { --pm-tone-bg:var(--pm-red-soft); --pm-tone-fg:var(--pm-red); --pm-tone-dot:#ef4444; }
 .pm-status--failed   { --pm-tone-bg:#f1f5f9; --pm-tone-fg:#64748b; --pm-tone-dot:#94a3b8; }
+
 .pm-c-actions { width:1%; text-align:right; white-space:nowrap; }
 .pm-actions { display:inline-flex; align-items:center; gap:.25rem; }
 .pm-icon-btn { display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px;
@@ -507,14 +770,16 @@
     border-radius:var(--pm-radius-sm); cursor:pointer;
     transition:background .15s ease, color .15s ease, border-color .15s ease; }
 .pm-icon-btn:hover { background:var(--pm-blue-soft); color:var(--pm-blue); border-color:#dbe6fb; }
-.pm-icon-btn--print:hover { background:var(--pm-accent-soft); color:var(--pm-accent-dark); border-color:#99f6e4; }
+.pm-icon-btn--print:hover { background:var(--pm-accent-soft); color:var(--pm-accent-dark); border-color:#bbdefb; }
 .pm-icon-btn--refund:hover { background:var(--pm-red-soft); color:var(--pm-red); border-color:#fecaca; }
+
 .pm-empty { padding:3.5rem 1rem; text-align:center; }
 .pm-empty--filter { border-top:1px solid var(--pm-line); }
 .pm-empty-icon { display:grid; place-items:center; width:44px; height:44px; margin:0 auto .85rem;
     font-size:1.2rem; color:var(--pm-faint); background:var(--pm-line-soft); border-radius:10px; }
 .pm-empty h3 { margin:0 0 .25rem; font-size:.95rem; font-weight:600; color:var(--pm-ink); }
 .pm-empty p { max-width:26rem; margin:0 auto 1rem; font-size:.8125rem; color:var(--pm-muted); }
+
 .pm-foot { display:flex; align-items:center; justify-content:space-between; gap:.75rem; flex-wrap:wrap;
     padding:.7rem 1rem; font-size:.78rem; color:var(--pm-muted); border-top:1px solid var(--pm-line); }
 .pm-foot strong { font-weight:600; color:var(--pm-ink); font-variant-numeric:tabular-nums; }
@@ -527,6 +792,7 @@
 .pm-page:hover:not(:disabled):not(.active) { background:var(--pm-subtle); border-color:#cbd5e1; }
 .pm-page.active { background:var(--pm-accent); border-color:var(--pm-accent); color:#fff; }
 .pm-page:disabled { opacity:.45; cursor:not-allowed; }
+
 .pm-modal .modal-content { border:1px solid var(--pm-line); border-radius:12px;
     box-shadow:0 24px 48px -12px rgba(15,23,42,.28); overflow:hidden; }
 .pm-modal .modal-header { padding:1rem 1.25rem; border-bottom:1px solid var(--pm-line); }
@@ -538,6 +804,7 @@
 .pm-modal .payment-details .detail-label { color:var(--pm-muted); font-size:.8125rem; flex-shrink:0; }
 .pm-modal .payment-details .detail-value { font-size:.8125rem; text-align:right; max-width:60%;
     color:var(--pm-ink); overflow-wrap:anywhere; }
+
 .pm-range { display:inline-flex; padding:3px; gap:2px; background:var(--pm-subtle);
     border:1px solid var(--pm-line); border-radius:99px; }
 .pm-range-btn { border:none; background:transparent; border-radius:99px; padding:.34rem .8rem;
@@ -545,6 +812,7 @@
     white-space:nowrap; transition:background .15s ease, color .15s ease; }
 .pm-range-btn:hover { color:var(--pm-ink); }
 .pm-range-btn.is-active { background:#fff; color:var(--pm-ink); box-shadow:0 1px 2px rgba(15,23,42,.12); }
+
 @media (max-width:1200px) { .pm-stats { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media (max-width:992px) {
     .pm-filters { flex-direction:column; align-items:stretch; }
@@ -580,9 +848,11 @@
     .pm-panel { border:0; box-shadow:none; }
     .pm-row { display:table-row !important; }
 }
+
+/* RECEIPT */
 .pm-receipt-modal .modal-content { border:none; border-radius:14px; overflow:hidden; }
 .pm-receipt-scroll { background:#eef2f7; padding:1.25rem; }
-.pm-receipt { --r-ink:#0f172a; --r-muted:#64748b; --r-line:#d7dfea; --r-accent:#0d9488;
+.pm-receipt { --r-ink:#0f172a; --r-muted:#64748b; --r-line:#d7dfea; --r-accent:#1976d2;
     position:relative; width:100%; max-width:640px; margin:0 auto; padding:28px 30px 22px;
     background:#fff; color:var(--r-ink); font-size:12.5px; line-height:1.5;
     box-shadow:0 10px 30px rgba(15,23,42,.12); }

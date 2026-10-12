@@ -67,76 +67,201 @@ class Billing extends BaseController
 
     public function index()
     {
-    $redirect = $this->checkAuth();
-    if ($redirect) return $redirect;
+        $redirect = $this->checkAuth();
+        if ($redirect) return $redirect;
 
-    $invoiceModel = new InvoiceModel();
+        $invoiceModel = new InvoiceModel();
 
-    // ── Safety pass ─────────────────────────────────────────────
-    // Recalculate every non-terminal invoice whose stored
-    // amount_paid disagrees with the live sum of its paid
-    // payments. This is cheap (one query) and makes the list
-    // self-healing even if a payment was inserted by a code
-    // path that skipped the recalc step.
-    try {
-        $drifted = db_connect()->query("
-            SELECT i.id
-            FROM invoices i
-            WHERE i.status NOT IN ('void', 'refunded')
-              AND i.amount_paid <> (
-                  SELECT COALESCE(SUM(p.amount_paid), 0)
-                  FROM payments p
-                  WHERE p.invoice_id = i.id
-                    AND p.payment_status = 'paid'
-              )
-        ")->getResultArray();
+        // ── Safety pass ─────────────────────────────────────────────
+        // Recalculate every non-terminal invoice whose stored
+        // amount_paid disagrees with the live sum of its paid
+        // payments. This is cheap (one query) and makes the list
+        // self-healing even if a payment was inserted by a code
+        // path that skipped the recalc step.
+        try {
+            $drifted = db_connect()->query("
+                SELECT i.id
+                FROM invoices i
+                WHERE i.status NOT IN ('void', 'refunded')
+                  AND i.amount_paid <> (
+                      SELECT COALESCE(SUM(p.amount_paid), 0)
+                      FROM payments p
+                      WHERE p.invoice_id = i.id
+                        AND p.payment_status = 'paid'
+                  )
+            ")->getResultArray();
 
-        foreach ($drifted as $row) {
-            $invoiceModel->recalculate((int) $row['id']);
+            foreach ($drifted as $row) {
+                $invoiceModel->recalculate((int) $row['id']);
+            }
+        } catch (\Throwable $e) {
+            // Never block the list from rendering.
+            log_message('warning', 'Billing::index safety recalc failed: ' . $e->getMessage());
         }
-    } catch (\Throwable $e) {
-        // Never block the list from rendering.
-        log_message('warning', 'Billing::index safety recalc failed: ' . $e->getMessage());
+
+        $status  = (string) ($this->request->getGet('status') ?? 'all');
+        $search  = trim((string) ($this->request->getGet('q') ?? ''));
+        $from    = (string) ($this->request->getGet('from') ?? '');
+        $to      = (string) ($this->request->getGet('to') ?? '');
+        $page    = max(1, (int) ($this->request->getGet('page') ?? 1));
+        $perPage = 15;
+
+        $filters = [
+            'status' => in_array($status, ['all','draft','unpaid','partial','paid','void','refunded'], true)
+                        ? $status : 'all',
+            'search' => $search,
+            'from'   => preg_match('/^\d{4}-\d{2}-\d{2}$/', $from) ? $from : '',
+            'to'     => preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)   ? $to   : '',
+        ];
+
+        $result = $invoiceModel->listInvoices($filters, $perPage, $page);
+        $stats  = $invoiceModel->getStats();
+
+        $counts = [
+            'all'      => (int) $invoiceModel->countAllResults(),
+            'draft'    => (int) $invoiceModel->where('status', 'draft')->countAllResults(),
+            'unpaid'   => (int) $invoiceModel->where('status', 'unpaid')->countAllResults(),
+            'partial'  => (int) $invoiceModel->where('status', 'partial')->countAllResults(),
+            'paid'     => (int) $invoiceModel->where('status', 'paid')->countAllResults(),
+            'void'     => (int) $invoiceModel->where('status', 'void')->countAllResults(),
+            'refunded' => (int) $invoiceModel->where('status', 'refunded')->countAllResults(),
+        ];
+
+        // ── KPI TRENDS FOR SPARKLINES ──────────────────────────────
+        // 14-day daily series feeding the mini line graphs on the
+        // four KPI stat cards in the index view. If a metric has no
+        // natural daily series (outstanding, unsettled), we reuse
+        // the closest proxy so the graph still trends with activity.
+        $kpiTrends = $this->getKpiTrends(14);
+
+        return view('Billing/index', $this->viewData([
+            'invoices'   => $result['rows'],
+            'total'      => $result['total'],
+            'page'       => $page,
+            'perPage'    => $perPage,
+            'totalPages' => max(1, (int) ceil($result['total'] / $perPage)),
+            'filters'    => $filters,
+            'stats'      => $stats,
+            'counts'     => $counts,
+            'kpiTrends'  => $kpiTrends,
+        ]));
     }
 
-    $status  = (string) ($this->request->getGet('status') ?? 'all');
-    $search  = trim((string) ($this->request->getGet('q') ?? ''));
-    $from    = (string) ($this->request->getGet('from') ?? '');
-    $to      = (string) ($this->request->getGet('to') ?? '');
-    $page    = max(1, (int) ($this->request->getGet('page') ?? 1));
-    $perPage = 15;
+    /**
+     * Build a 14-day daily series for each KPI card.
+     *
+     * Returned shape:
+     *   [
+     *     'today'       => [float, float, ... 14 values],
+     *     'month'       => [float, ... 14 values],
+     *     'outstanding' => [float, ... 14 values],
+     *     'unsettled'   => [float, ... 14 values],
+     *   ]
+     *
+     * All queries are wrapped so a missing column or empty table
+     * can never break the billing list — a flat-zero series is
+     * returned instead, and the view falls back to its own
+     * derived curve when fewer than 2 points are present.
+     */
+    private function getKpiTrends(int $days = 14): array
+    {
+        $db    = db_connect();
+        $end   = date('Y-m-d');
+        $start = date('Y-m-d', strtotime('-' . ($days - 1) . ' days'));
 
-    $filters = [
-        'status' => in_array($status, ['all','draft','unpaid','partial','paid','void','refunded'], true)
-                    ? $status : 'all',
-        'search' => $search,
-        'from'   => preg_match('/^\d{4}-\d{2}-\d{2}$/', $from) ? $from : '',
-        'to'     => preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)   ? $to   : '',
-    ];
+        // Build the exact date axis the view expects.
+        $dates = [];
+        for ($i = 0; $i < $days; $i++) {
+            $dates[] = date('Y-m-d', strtotime($start . ' +' . $i . ' days'));
+        }
 
-    $result = $invoiceModel->listInvoices($filters, $perPage, $page);
-    $stats  = $invoiceModel->getStats();
+        /**
+         * Run one grouped query and align its result onto $dates,
+         * filling missing days with 0. Values are cast to float.
+         */
+        $series = function (string $sql, array $bind) use ($db, $dates): array {
+            try {
+                $rows = $db->query($sql, $bind)->getResultArray();
+                $map  = [];
+                foreach ($rows as $r) {
+                    $map[$r['d']] = (float) ($r['v'] ?? 0);
+                }
+                return array_map(fn($d) => $map[$d] ?? 0.0, $dates);
+            } catch (\Throwable $e) {
+                log_message('warning', 'Billing::getKpiTrends query failed: ' . $e->getMessage());
+                return array_fill(0, count($dates), 0.0);
+            }
+        };
 
-    $counts = [
-        'all'      => (int) $invoiceModel->countAllResults(),
-        'draft'    => (int) $invoiceModel->where('status', 'draft')->countAllResults(),
-        'unpaid'   => (int) $invoiceModel->where('status', 'unpaid')->countAllResults(),
-        'partial'  => (int) $invoiceModel->where('status', 'partial')->countAllResults(),
-        'paid'     => (int) $invoiceModel->where('status', 'paid')->countAllResults(),
-        'void'     => (int) $invoiceModel->where('status', 'void')->countAllResults(),
-        'refunded' => (int) $invoiceModel->where('status', 'refunded')->countAllResults(),
-    ];
+        // ── Collected per day (today card) ────────────────────────
+        $today = $series("
+            SELECT DATE(payment_date) AS d, SUM(amount_paid) AS v
+            FROM payments
+            WHERE payment_status = 'paid'
+              AND DATE(payment_date) BETWEEN ? AND ?
+            GROUP BY d
+        ", [$start, $end]);
 
-    return view('Billing/index', $this->viewData([
-        'invoices'   => $result['rows'],
-        'total'      => $result['total'],
-        'page'       => $page,
-        'perPage'    => $perPage,
-        'totalPages' => max(1, (int) ceil($result['total'] / $perPage)),
-        'filters'    => $filters,
-        'stats'      => $stats,
-        'counts'     => $counts,
-    ]));
+        // ── Cumulative month-to-date collected (month card) ───────
+        // Sum from the first of the month up to each day, so the
+        // line always reads as "how much we've collected so far".
+        $monthStart = date('Y-m-01');
+        $monthDaily = $series("
+            SELECT DATE(payment_date) AS d, SUM(amount_paid) AS v
+            FROM payments
+            WHERE payment_status = 'paid'
+              AND DATE(payment_date) BETWEEN ? AND ?
+            GROUP BY d
+        ", [$monthStart, $end]);
+
+        // Convert daily → cumulative for the visible window.
+        // Days before the 1st contribute 0 to the running sum.
+        $monthMap = [];
+        foreach ($dates as $i => $d) {
+            $monthMap[$d] = $monthDaily[$i] ?? 0.0;
+        }
+        $monthCumulative = [];
+        $running = 0.0;
+        $cursor  = $monthStart;
+        $sumLookup = [];
+        while ($cursor <= $end) {
+            $running += $monthMap[$cursor] ?? 0.0;
+            $sumLookup[$cursor] = $running;
+            $cursor = date('Y-m-d', strtotime($cursor . ' +1 day'));
+        }
+        // Walk back over the visible 14-day window, carrying the
+        // running total that applies to each of those days.
+        $month = [];
+        foreach ($dates as $d) {
+            $month[] = $sumLookup[$d] ?? 0.0;
+        }
+
+        // ── Outstanding balance trend (outstanding card) ──────────
+        // Running balance of open invoices created up to each day.
+        // Downward is "good" for this metric.
+        $outstandingPerDay = $series("
+            SELECT DATE(created_at) AS d, SUM(balance) AS v
+            FROM invoices
+            WHERE status IN ('unpaid', 'partial')
+              AND DATE(created_at) BETWEEN ? AND ?
+            GROUP BY d
+        ", [$start, $end]);
+
+        // ── Unsettled invoice count (unsettled card) ──────────────
+        $unsettledPerDay = $series("
+            SELECT DATE(created_at) AS d, COUNT(*) AS v
+            FROM invoices
+            WHERE status IN ('unpaid', 'partial')
+              AND DATE(created_at) BETWEEN ? AND ?
+            GROUP BY d
+        ", [$start, $end]);
+
+        return [
+            'today'       => $today,
+            'month'       => $month,
+            'outstanding' => $outstandingPerDay,
+            'unsettled'   => $unsettledPerDay,
+        ];
     }
 
     // =============================================================

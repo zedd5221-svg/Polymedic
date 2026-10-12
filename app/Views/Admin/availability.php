@@ -56,7 +56,7 @@
 <style>
 /* =========================================================
    CLINIC AVAILABILITY
-   Namespaced under .av-shell.
+   Namespaced under .av-shell. Theme aligned with AdminLayout blue.
    ========================================================= */
 
 .av-shell {
@@ -67,13 +67,17 @@
     --av-line:       #e5e9f0;
     --av-line-soft:  #f1f5f9;
     --av-subtle:     #f8fafc;
-    --av-accent:     #0d9488;
-    --av-accent-dark:#0f766e;
-    --av-accent-soft:#e6f7f6;
+
+    /* === Aligned with layout blue === */
+    --av-accent:     #1976d2;
+    --av-accent-dark:#1565c0;
+    --av-accent-soft:#e3f2fd;
+
     --av-danger:     #dc2626;
     --av-danger-soft:#fef2f2;
     --av-amber:      #b45309;
-    --av-blue:       #2563eb;
+    --av-blue:       #1976d2;
+
     --av-radius:     14px;
     --av-radius-sm:  9px;
     --av-shadow:     0 1px 2px rgba(15, 23, 42, .04), 0 1px 3px rgba(15, 23, 42, .03);
@@ -82,7 +86,7 @@
     color: var(--av-text);
     font-size: .875rem;
     line-height: 1.55;
-    padding-bottom: 5rem; /* room for the sticky save bar */
+    padding-bottom: 5rem;
 }
 
 .av-shell *:focus-visible {
@@ -309,7 +313,7 @@
 .av-input:focus, .av-select:focus, .av-textarea:focus {
     outline: none;
     border-color: var(--av-accent);
-    box-shadow: 0 0 0 3px rgba(13, 148, 136, .15);
+    box-shadow: 0 0 0 3px rgba(25, 118, 210, .15);
 }
 
 .av-textarea {
@@ -563,14 +567,14 @@
     background: var(--av-accent);
     border-color: var(--av-accent);
     color: #fff;
-    box-shadow: 0 1px 2px rgba(13, 148, 136, .35);
+    box-shadow: 0 1px 2px rgba(25, 118, 210, .35);
 }
 
 .av-btn--primary:hover {
     background: var(--av-accent-dark);
     border-color: var(--av-accent-dark);
     color: #fff;
-    box-shadow: 0 4px 12px rgba(13, 148, 136, .28);
+    box-shadow: 0 4px 12px rgba(25, 118, 210, .28);
 }
 
 .av-btn--danger {
@@ -647,21 +651,17 @@
     display: inline-block;
 }
 
-/* -------- NEW: scrollable wrapper for the preview -------- */
-
 .av-preview-scroll {
-    max-height: 34rem;              /* ~544px — shows about 2 weeks */
+    max-height: 34rem;
     overflow-y: auto;
     overflow-x: hidden;
-    padding-right: .35rem;          /* room for the scrollbar */
-    margin-right: -.35rem;          /* keep outer edges flush */
+    padding-right: .35rem;
+    margin-right: -.35rem;
 
-    /* Firefox scrollbar */
     scrollbar-width: thin;
     scrollbar-color: #cbd5e1 transparent;
 }
 
-/* WebKit scrollbar — thin, muted, matches the dashboard tone */
 .av-preview-scroll::-webkit-scrollbar { width: 6px; }
 .av-preview-scroll::-webkit-scrollbar-thumb {
     background: #cbd5e1;
@@ -670,7 +670,6 @@
 .av-preview-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 .av-preview-scroll::-webkit-scrollbar-track { background: transparent; }
 
-/* Sticky week label — stays visible while its days scroll past */
 .av-preview-scroll .av-week-label {
     position: sticky;
     top: 0;
@@ -683,8 +682,6 @@
 .av-preview-scroll .av-week-label:not(:first-child) {
     margin-top: .55rem;
 }
-
-/* -------- end new block ---------------------------------- */
 
 .av-week-label {
     font-size: .68rem;
@@ -719,7 +716,7 @@
 
 .av-day.is-today {
     border-color: var(--av-accent);
-    box-shadow: 0 0 0 3px rgba(13, 148, 136, .14);
+    box-shadow: 0 0 0 3px rgba(25, 118, 210, .14);
 }
 
 .av-day-top {
@@ -782,7 +779,7 @@
     transition: width .35s ease;
 }
 
-.av-bar-row--lab  { --av-bar-color: #2563eb; }
+.av-bar-row--lab  { --av-bar-color: #1976d2; }
 .av-bar-row--xray { --av-bar-color: #7c3aed; }
 
 .av-bar-row b { color: var(--av-ink); font-weight: 650; font-variant-numeric: tabular-nums; }
@@ -858,9 +855,6 @@
         </div>
     <?php endif; ?>
 
-    <!-- =========================================================
-         HEADER
-         ========================================================= -->
     <header class="av-head">
         <div>
             <h2 class="av-title">Clinic Availability</h2>
@@ -871,7 +865,6 @@
         </div>
     </header>
 
-    <!-- Current schedule at a glance -->
     <dl class="av-summary">
         <div class="av-sum-item">
             <dt><i class="bi bi-sunrise"></i> Open hours</dt>
@@ -904,9 +897,6 @@
 
     <div class="av-grid">
 
-        <!-- =========================================================
-             LEFT — settings form
-             ========================================================= -->
         <div class="av-col">
 
             <form method="post" action="<?= base_url('admin/availability/save') ?>" id="settingsForm" novalidate>
@@ -1044,7 +1034,6 @@
                     </div>
                 </section>
 
-                <!-- Sticky save bar -->
                 <div class="av-savebar" id="saveBar" style="margin-top:1.25rem;">
                     <span class="av-savebar-note" id="saveNote">
                         <i class="bi bi-check2-circle"></i> All changes saved
@@ -1061,12 +1050,8 @@
 
         </div>
 
-        <!-- =========================================================
-             RIGHT — slot blocking + preview
-             ========================================================= -->
         <div class="av-col">
 
-            <!-- One form, two modes. -->
             <section class="av-card">
                 <header class="av-card-head">
                     <div>
@@ -1120,7 +1105,6 @@
                 </form>
             </section>
 
-            <!-- 14-day preview -->
             <section class="av-card">
                 <header class="av-card-head">
                     <div>
@@ -1144,7 +1128,7 @@
                     <?php else: ?>
 
                         <div class="av-legend">
-                            <span><i style="background:#2563eb;"></i> Laboratory</span>
+                            <span><i style="background:#1976d2;"></i> Laboratory</span>
                             <span><i style="background:#7c3aed;"></i> X-Ray</span>
                             <span><i style="background:#d97706;"></i> Fully booked</span>
                             <span><i style="background:#fecaca;"></i> Holiday</span>
@@ -1232,9 +1216,6 @@
 
     const $ = function(id) { return document.getElementById(id); };
 
-    // =====================================================
-    // HOLIDAY CHIPS  <->  TEXTAREA
-    // =====================================================
     const holidayBox    = $('holidays');
     const holidayChips  = $('holidayChips');
     const holidayPicker = $('holidayPicker');
@@ -1328,9 +1309,6 @@
     holidayBox.addEventListener('blur', renderChips);
     renderChips();
 
-    // =====================================================
-    // WEEKDAY SUMMARY
-    // =====================================================
     const weekdayChips = $('weekdayChips');
     const weekdaySummary = $('weekdaySummary');
 
@@ -1352,9 +1330,6 @@
 
     updateWeekdaySummary();
 
-    // =====================================================
-    // TIME VALIDATION + SLOT ESTIMATE
-    // =====================================================
     const openEl    = $('clinic_open_time');
     const closeEl   = $('clinic_close_time');
     const lunchFrom = $('lunch_start');
@@ -1444,9 +1419,6 @@
 
     updateSlotEstimate();
 
-    // =====================================================
-    // DIRTY STATE + SAVE BAR
-    // =====================================================
     const form     = $('settingsForm');
     const saveBar  = $('saveBar');
     const saveNote = $('saveNote');
@@ -1491,9 +1463,6 @@
         e.returnValue = '';
     });
 
-    // =====================================================
-    // BLOCK / UNBLOCK MODE SWITCH
-    // =====================================================
     const slotForm   = $('slotForm');
     const slotSubmit = $('slotSubmit');
     const reasonRow  = $('reasonRow');

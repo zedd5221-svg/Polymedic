@@ -262,11 +262,10 @@ ksort($grouped);
    This page is self-contained: the .bl design tokens and the
    shared components it uses are inlined below, so it renders
    correctly whether or not billing/_styles.php is in place.
-   Values match that partial exactly, so loading both is safe.
    ========================================================= */
 
 /* =========================================================
-   TOKENS
+   TOKENS — accent aligned with the layout's --active-blue
    ========================================================= */
 .bl {
     --bl-ink:        #0f172a;
@@ -278,9 +277,10 @@ ksort($grouped);
     --bl-surface:    #ffffff;
     --bl-subtle:     #f8fafc;
 
-    --bl-accent:      #0d9488;
-    --bl-accent-dark: #0f766e;
-    --bl-accent-soft: #e6f7f7;
+    /* Accent: navy — matches the sidebar / active nav item */
+    --bl-accent:      #1976d2;
+    --bl-accent-dark: #1565c0;
+    --bl-accent-soft: #e3f2fd;
 
     --bl-warn:        #b45309;
     --bl-warn-soft:   #fff7ed;
@@ -301,8 +301,6 @@ ksort($grouped);
     line-height: 1.55;
 }
 
-/* Inputs here set width:100% with padding, so the namespace must own
-   its box model rather than trusting the layout to set it globally. */
 .bl,
 .bl *,
 .bl *::before,
@@ -365,7 +363,8 @@ ksort($grouped);
 .bl-head-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
 
 /* =========================================================
-   BUTTONS
+   BUTTONS — only these adopt the navy accent.
+   Everything else on the page keeps its existing palette.
    ========================================================= */
 .bl-btn {
     display: inline-flex;
@@ -398,13 +397,13 @@ ksort($grouped);
 .bl-btn--primary {
     background: var(--bl-accent);
     border-color: var(--bl-accent);
-    box-shadow: 0 1px 2px rgba(13, 148, 136, .25);
+    box-shadow: 0 1px 2px rgba(25, 118, 210, .25);
 }
 
 .bl-btn--primary:hover {
     background: var(--bl-accent-dark);
     border-color: var(--bl-accent-dark);
-    box-shadow: 0 4px 12px rgba(13, 148, 136, .25);
+    box-shadow: 0 4px 12px rgba(25, 118, 210, .25);
 }
 
 .bl-btn--danger,
@@ -456,7 +455,7 @@ ksort($grouped);
 }
 
 .bl-stat--green  { --tone: #10b981; }
-.bl-stat--teal   { --tone: #0d9488; }
+.bl-stat--teal   { --tone: var(--bl-accent); }
 .bl-stat--warn   { --tone: #f59e0b; background: linear-gradient(180deg, #fffbeb, var(--bl-surface)); }
 .bl-stat--blue   { --tone: #3b82f6; }
 .bl-stat--danger { --tone: #dc2626; background: linear-gradient(180deg, #fef2f2, var(--bl-surface)); }
@@ -620,7 +619,7 @@ ksort($grouped);
 .bl-tab.is-active .bl-tab-count { color: var(--bl-accent); background: var(--bl-accent-soft); }
 
 /* =========================================================
-   FORM CONTROLS
+   FORM CONTROLS — unchanged colour scheme
    ========================================================= */
 .bl-filters {
     display: flex;
@@ -662,10 +661,11 @@ textarea.bl-input { height: auto; padding: .55rem .75rem; line-height: 1.5; }
 
 .bl-input:hover { border-color: #cbd5e1; }
 
+/* Focus ring adopts the navy accent so it matches the buttons */
 .bl-input:focus {
     outline: none;
     border-color: var(--bl-accent);
-    box-shadow: 0 0 0 3px rgba(13, 148, 136, .15);
+    box-shadow: 0 0 0 3px rgba(25, 118, 210, .15);
 }
 
 .bl-input.is-invalid {
@@ -767,7 +767,7 @@ textarea.bl-input { height: auto; padding: .55rem .75rem; line-height: 1.5; }
 }
 
 /* =========================================================
-   TABLES
+   TABLES — every colour inside the table is unchanged
    ========================================================= */
 .bl-table-wrap { overflow-x: auto; }
 
@@ -971,7 +971,7 @@ a.bl-ref:hover { background: var(--bl-accent-soft); color: var(--bl-accent-dark)
 }
 
 .bl-icon-btn:hover          { background: var(--bl-blue-soft); color: var(--bl-blue); border-color: #dbe6fb; }
-.bl-icon-btn--primary:hover { background: var(--bl-accent-soft); color: var(--bl-accent-dark); border-color: #99f6e4; }
+.bl-icon-btn--primary:hover { background: var(--bl-accent-soft); color: var(--bl-accent-dark); border-color: #bbdefb; }
 .bl-icon-btn--danger:hover  { background: var(--bl-danger-soft); color: var(--bl-danger); border-color: #fecaca; }
 
 /* =========================================================
@@ -1049,8 +1049,6 @@ a.bl-ref:hover { background: var(--bl-accent-soft); color: var(--bl-accent-dark)
 @media (max-width: 640px) {
     .bl-stats { grid-template-columns: minmax(0, 1fr); }
     .bl-filters { flex-direction: column; align-items: stretch; }
-    /* flex-grow applies to the column axis once stacked, which stretched
-       the search box to fill the bar; pin it back to its own height. */
     .bl-search { flex: 0 0 auto; }
     .bl-search, .bl-input--date { max-width: none; width: 100%; }
     .bl-date-range { width: 100%; }
@@ -1106,6 +1104,8 @@ a.bl-ref:hover { background: var(--bl-accent-soft); color: var(--bl-accent-dark)
 
 .bl-prefill .bl-label { margin-top: 0; }
 
+/* Linked-request chip already uses the accent-soft family, so it now
+   reads navy instead of teal, matching the primary buttons. */
 .bl-linked {
     display: inline-flex;
     align-items: center;
@@ -1114,7 +1114,7 @@ a.bl-ref:hover { background: var(--bl-accent-soft); color: var(--bl-accent-dark)
     padding: .3rem .4rem .3rem .65rem;
     border-radius: 999px;
     background: var(--bl-accent-soft);
-    border: 1px solid #99f6e4;
+    border: 1px solid #bbdefb;
     font-size: .76rem;
     font-weight: 600;
     color: var(--bl-accent-dark);
@@ -1145,6 +1145,7 @@ a.bl-ref:hover { background: var(--bl-accent-soft); color: var(--bl-accent-dark)
 .bl-char-count { font-size: .72rem; color: var(--bl-faint); white-space: nowrap; }
 .bl-char-count.near-limit { color: var(--bl-warn); font-weight: 600; }
 
+/* Quick discount presets — hover tints with the accent */
 .bl-quick { display: flex; gap: .35rem; flex-wrap: wrap; }
 
 .bl-quick-btn {
@@ -1160,7 +1161,11 @@ a.bl-ref:hover { background: var(--bl-accent-soft); color: var(--bl-accent-dark)
     transition: background .15s, color .15s, border-color .15s;
 }
 
-.bl-quick-btn:hover { background: var(--bl-accent-soft); color: var(--bl-accent-dark); border-color: #99f6e4; }
+.bl-quick-btn:hover {
+    background: var(--bl-accent-soft);
+    color: var(--bl-accent-dark);
+    border-color: #bbdefb;
+}
 
 /* ITEMS TABLE */
 .bl-items-wrap { overflow-x: auto; border: 1px solid var(--bl-line); border-radius: 10px; }
@@ -1197,11 +1202,12 @@ a.bl-ref:hover { background: var(--bl-accent-soft); color: var(--bl-accent-dark)
     transition: border-color .15s, box-shadow .15s;
 }
 
+/* Focus ring inside the items table adopts the navy accent too */
 .bl-items input:focus,
 .bl-items select:focus {
     outline: none;
     border-color: var(--bl-accent);
-    box-shadow: 0 0 0 2px rgba(13, 148, 136, .15);
+    box-shadow: 0 0 0 2px rgba(25, 118, 210, .15);
 }
 
 .bl-items input[readonly] { background: var(--bl-subtle); color: var(--bl-muted); }
@@ -1299,11 +1305,10 @@ a.bl-ref:hover { background: var(--bl-accent-soft); color: var(--bl-accent-dark)
 .bl-savebar-actions { display: flex; gap: .5rem; }
 
 @media (max-width: 840px) {
-    /* Leave room so the sticky bar never rests on the last line item */
-.bl-create .bl-form { padding-bottom: .5rem; }
-.bl-create .bl-card:last-of-type { margin-bottom: .75rem; }
+    .bl-create .bl-form { padding-bottom: .5rem; }
+    .bl-create .bl-card:last-of-type { margin-bottom: .75rem; }
 
-.bl-create .bl-form-cols { grid-template-columns: minmax(0, 1fr); }
+    .bl-create .bl-form-cols { grid-template-columns: minmax(0, 1fr); }
     .bl-savebar { flex-direction: column; align-items: stretch; }
     .bl-savebar-actions .bl-btn { flex: 1; }
 }

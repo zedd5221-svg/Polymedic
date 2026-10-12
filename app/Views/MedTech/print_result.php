@@ -268,48 +268,47 @@ table.result tr.group-head td {
     page-break-inside: avoid;
 }
 
-/* ================= Signatures ================= */
+/* ================= Signature (identical to Radiologist layout) ================= */
 
 .sig-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 6mm;
-    margin-top: 16mm;
+    display: flex;
+    justify-content: center;
+    margin-top: 22mm;
     page-break-inside: avoid;
 }
 
 .sig-col {
     text-align: center;
     font-size: 9pt;
-}
-
-.sig-name {
-    font-weight: 700;
-    font-size: 9pt;
-    text-transform: uppercase;
-    line-height: 1.25;
-    min-height: 4.2mm;
-    word-break: break-word;
-}
-
-.sig-lic {
-    margin-top: 0.6mm;
-    font-size: 8pt;
-    letter-spacing: 0.1pt;
+    width: 100%;
+    max-width: 70mm;
 }
 
 .sig-line {
     width: 100%;
-    max-width: 54mm;
-    margin: 1.4mm auto 1.2mm;
+    margin: 0 auto 1.4mm;
     border-top: 0.75pt solid #000;
 }
 
-.sig-sub {
-    font-size: 8pt;
+.sig-name {
     font-weight: 700;
+    font-size: 9.5pt;
     text-transform: uppercase;
-    letter-spacing: 0.4pt;
+    min-height: 4mm;
+    word-break: break-word;
+}
+
+/* Matches the Radiologist template exactly:
+   plain sentence-case text, no bold, no uppercase, no letter-spacing. */
+.sig-sub {
+    margin-top: 0.4mm;
+    font-size: 8pt;
+}
+
+.sig-lic {
+    margin-top: 0.3mm;
+    font-size: 7.5pt;
+    color: #333;
 }
 
 .sig-footnote {
@@ -396,7 +395,6 @@ table.result tr.group-head td {
     .letterhead { flex-direction: column; text-align: center; gap: 3mm; }
     .patient-grid { grid-template-columns: 1fr; }
     .patient-cell:nth-child(odd) { border-right: 0; }
-    .sig-row { grid-template-columns: 1fr; gap: 12mm; }
 }
 </style>
 </head>
@@ -454,19 +452,23 @@ $sectionTitle = count($grouped) === 1
     : 'LABORATORY REPORT';
 
 /*
- * Signature row data.
+ * Signature data.
  *
- * $technologistUser is passed by MedTech::printResult() and carries
- * the currently logged-in user's record, including prc_license.
- * $pathologistUser is null for now because there is no pathologist
- * role in the users table. The third column falls back to the
- * requesting doctor's name and leaves the PRC line blank.
+ * $technologistUser is passed by the controller:
+ *   - MedTech::printResult() passes the logged-in medtech
+ *   - Admin::printResult()  passes the resolved technologist
+ *     for the request (NOT the logged-in admin).
+ *
+ * The controller is the single source of truth. We deliberately do
+ * NOT fall back to session()->get('full_name') here — that fallback
+ * was the source of the bug where an admin printing a lab result
+ * would see their own name signed as the Medical Technologist.
+ *
+ * If no technologist can be resolved, we print a bare placeholder
+ * label rather than any real name.
  */
-$techName = trim((string) ($technologistUser['full_name'] ?? session()->get('full_name') ?? ''));
+$techName = trim((string) ($technologistUser['full_name'] ?? ''));
 $techPrc  = trim((string) ($technologistUser['prc_license'] ?? ''));
-
-$pathName = trim((string) ($pathologistUser['full_name'] ?? $doctorDisplay));
-$pathPrc  = trim((string) ($pathologistUser['prc_license'] ?? ''));
 ?>
 
 <?php if (!$isReleased): ?>
@@ -625,35 +627,17 @@ $pathPrc  = trim((string) ($pathologistUser['prc_license'] ?? ''));
         </div>
     <?php endif; ?>
 
-    <!-- ================= SIGNATURES ================= -->
+    <!-- ================= SIGNATURE (matches Radiologist layout exactly) ================= -->
     <div class="sig-row">
         <div class="sig-col">
+            <div class="sig-line"></div>
             <div class="sig-name">
                 <?= esc(strtoupper($techName !== '' ? $techName : 'Medical Technologist')) ?>
             </div>
-            <div class="sig-lic">
-                PRC LIC # <?= esc($techPrc !== '' ? $techPrc : '____________') ?>
-            </div>
-            <div class="sig-line"></div>
             <div class="sig-sub">Medical Technologist</div>
-        </div>
-
-        <div class="sig-col">
-            <div class="sig-name">&nbsp;</div>
-            <div class="sig-lic">PRC LIC # ____________</div>
-            <div class="sig-line"></div>
-            <div class="sig-sub">Medical Technologist</div>
-        </div>
-
-        <div class="sig-col">
-            <div class="sig-name">
-                <?= esc(strtoupper($pathName !== '' ? $pathName : 'Pathologist')) ?>
-            </div>
             <div class="sig-lic">
-                PRC LIC # <?= esc($pathPrc !== '' ? $pathPrc : '____________') ?>
+                Lic. No. <?= esc($techPrc !== '' ? $techPrc : '____________') ?>
             </div>
-            <div class="sig-line"></div>
-            <div class="sig-sub">Pathologist</div>
         </div>
     </div>
 

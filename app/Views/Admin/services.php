@@ -19,39 +19,27 @@ $totalPages  = (int) ($totalPages ?? 1);
 $startRow    = (int) ($startRow ?? 0);
 $endRow      = (int) ($endRow ?? 0);
 
-/* Which category filter is active, if the controller has been
-   wired to accept one. Falls back to 'all' so the view keeps
-   working while the controller is still unfiltered. */
 $activeCategory = strtolower(trim((string) ($active_category ?? 'all')));
 if (!in_array($activeCategory, ['all', 'laboratory', 'xray'], true)) {
     $activeCategory = 'all';
 }
 
-/* Category display metadata. */
 $categoryMeta = [
     'laboratory' => ['label' => 'Laboratory', 'tone' => 'lab',  'icon' => 'flask'],
     'xray'       => ['label' => 'X-Ray',      'tone' => 'xray', 'icon' => 'xray'],
 ];
 
-/* PNG icon filenames for the list rows, inside public/assets/images/.
-   Change either of these strings to point at your own files. */
 $categoryIcons = [
     'laboratory' => 'flask (2).png',
     'xray'       => 'bones (1).png',
 ];
 
-/* Same PNGs, used by the stat cards. They can be the same files as
-   above; they are declared separately so you can swap one set
-   without touching the other. */
 $statIcons = [
     'lab'   => 'flask (2).png',
     'xray'  => 'bones (1).png',
     'total' => 'paper.png',
 ];
 
-/* Normalise whatever the database holds. Handles 'xray', 'x-ray',
-   'X-Ray', and similar. Anything that is not laboratory or xray
-   falls through to laboratory so no row is orphaned. */
 $normaliseCategory = static function ($value): string {
     $v = strtolower(trim((string) $value));
     $v = str_replace([' ', '-', '_'], '', $v);
@@ -67,7 +55,6 @@ $tabs = [
     'xray'       => ['label' => 'X-Ray',      'count' => $xrayCount],
 ];
 
-/* Build a tab URL. */
 $tabUrl = static function (string $key): string {
     $base = 'admin/services';
     $qs   = $key === 'all' ? '' : ('?category=' . rawurlencode($key));
@@ -207,7 +194,6 @@ $tabUrl = static function (string $key): string {
                         data-active="<?= $isActive ? '1' : '0' ?>"
                         data-search="<?= esc($haystack, 'attr') ?>">
 
-                        <!-- Category icon rail -->
                         <div class="sv-row-icon">
                             <span class="sv-cat-icon sv-cat-icon--<?= esc($meta['tone'], 'attr') ?>" aria-hidden="true">
                                 <img src="<?= esc(base_url('assets/images/' . $png), 'attr') ?>"
@@ -218,7 +204,6 @@ $tabUrl = static function (string $key): string {
                             </span>
                         </div>
 
-                        <!-- Identity -->
                         <div class="sv-row-identity">
                             <div class="sv-row-name-line">
                                 <span class="sv-name"><?= esc($name) ?></span>
@@ -234,26 +219,22 @@ $tabUrl = static function (string $key): string {
                             </p>
                         </div>
 
-                        <!-- Category -->
                         <div class="sv-row-category">
                             <span class="sv-cat-pill sv-cat-pill--<?= esc($meta['tone'], 'attr') ?>">
                                 <?= esc($meta['label']) ?>
                             </span>
                         </div>
 
-                        <!-- Status -->
                         <div class="sv-row-status">
                             <span class="sv-status sv-status--<?= $isActive ? 'active' : 'inactive' ?>">
                                 <?= $isActive ? 'Active' : 'Inactive' ?>
                             </span>
                         </div>
 
-                        <!-- Price -->
                         <div class="sv-row-price">
                             <span class="sv-price">&#8369;<?= number_format($charge, 2) ?></span>
                         </div>
 
-                        <!-- Created -->
                         <div class="sv-row-created">
                             <?php if ($created): ?>
                                 <time datetime="<?= esc(date('c', $created), 'attr') ?>"
@@ -266,7 +247,6 @@ $tabUrl = static function (string $key): string {
                             <?php endif; ?>
                         </div>
 
-                        <!-- Actions -->
                         <div class="sv-row-actions">
                             <button type="button"
                                     class="sv-row-btn edit-service"
@@ -300,7 +280,6 @@ $tabUrl = static function (string $key): string {
                 <?php endforeach; ?>
             </ul>
 
-            <!-- Shown only when the search matches nothing on this page -->
             <div class="sv-empty sv-empty--filter" id="svNoMatch" hidden>
                 <div class="sv-empty-icon"><i class="bi bi-search" aria-hidden="true"></i></div>
                 <h3>No matching services on this page</h3>
@@ -640,6 +619,7 @@ $tabUrl = static function (string $key): string {
 <style>
 /* =========================================================
    SERVICE MANAGEMENT - LIST LAYOUT
+   Theme aligned with AdminLayout blue palette.
    ========================================================= */
 
 .sv {
@@ -651,16 +631,21 @@ $tabUrl = static function (string $key): string {
     --sv-line-soft:   #f1f5f9;
     --sv-surface:     #ffffff;
     --sv-subtle:      #f8fafc;
-    --sv-accent:      #0d9488;
-    --sv-accent-dark: #0f766e;
-    --sv-accent-soft: #e6f7f7;
-    --sv-lab:         #0d9488;
-    --sv-lab-soft:    #e6f7f7;
-    --sv-xray:        #dd00b1;
-    --sv-xray-soft:   #f8f1f7;
+
+    /* === Aligned with layout blue === */
+    --sv-accent:      #1976d2;
+    --sv-accent-dark: #1565c0;
+    --sv-accent-soft: #e3f2fd;
+
+    --sv-lab:         #1976d2;
+    --sv-lab-soft:    #e3f2fd;
+    --sv-xray:        #6d28d9;
+    --sv-xray-soft:   #f3e8ff;
+
     --sv-danger:      #dc2626;
     --sv-danger-dark: #b91c1c;
     --sv-danger-soft: #fef2f2;
+
     --sv-radius:      12px;
     --sv-radius-sm:   8px;
     --sv-radius-xs:   6px;
@@ -909,7 +894,7 @@ $tabUrl = static function (string $key): string {
 .sv-input:focus {
     outline: none;
     border-color: var(--sv-accent);
-    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.14);
+    box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.14);
 }
 
 .sv-search-clear {
@@ -970,8 +955,8 @@ $tabUrl = static function (string $key): string {
     background: var(--rail, transparent);
 }
 
-.sv-row--lab  { --rail: #0d9488; }
-.sv-row--xray { --rail: #a23ee4; }
+.sv-row--lab  { --rail: #1976d2; }
+.sv-row--xray { --rail: #6d28d9; }
 
 .sv-row.is-inactive { opacity: 0.72; }
 .sv-row.is-hidden { display: none; }
@@ -1242,7 +1227,7 @@ $tabUrl = static function (string $key): string {
     font-size: 1rem;
     color: var(--sv-accent);
     background: var(--sv-accent-soft);
-    border: 1px solid #cfeeee;
+    border: 1px solid #cfe3f7;
     border-radius: 10px;
 }
 
@@ -1311,7 +1296,7 @@ $tabUrl = static function (string $key): string {
 .sv-modal .form-control:focus,
 .sv-modal .form-select:focus {
     border-color: var(--sv-accent);
-    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+    box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.12);
 }
 
 .field-hint {

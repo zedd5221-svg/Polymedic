@@ -7,98 +7,40 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
     <title>PolyMedic - Medical Technologist Dashboard</title>
 
-    <!-- The CDN stylesheets below block the first paint; opening the
-         connections early shortens that wait. -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="preconnect" href="https://unpkg.com" crossorigin>
 
-    <!-- Main CSS -->
     <link href="/polymedic/public/assets/css/AppointmentStyle.css" rel="stylesheet">
     <link href="/polymedic/public/assets/css/admin.css" rel="stylesheet">
 
-    <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
-
-    <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
-    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <!-- AOS -->
     <link rel="stylesheet" href="https://unpkg.com/aos@2.3.4/dist/aos.css">
     <script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script>
 
-    <!-- =====================================================
-         CRITICAL ICON SIZING — must stay in <head>
-
-         The main <style> block sits below the markup, so until
-         the parser reaches it every PNG renders at its natural
-         size (512px for the icon set). That is the flash of
-         giant icons seen on each page load. These few rules
-         are duplicated up here so the first paint is already
-         correct; the rules further down still own everything
-         else about these elements.
-         ===================================================== -->
     <style>
-        /* A dropdown panel is closed unless Bootstrap has opened it.
-           Without this, a slow CDN leaves the notification and profile
-           panels dumped into the page as plain text. */
         .dropdown-menu:not(.show) { display: none !important; }
 
-        /* Header page-title icon */
-        .header-title-icon {
-            width: 24px;
-            height: 24px;
-            object-fit: contain;
-            flex-shrink: 0;
-        }
+        .header-title-icon { width: 24px; height: 24px; object-fit: contain; flex-shrink: 0; }
+        .logo-badge        { width: 44px; height: 44px; flex-shrink: 0; }
+        .logo-badge img    { width: 30px; height: 30px; object-fit: contain; }
 
-        /* Sidebar logo */
-        .logo-badge {
-            width: 44px;
-            height: 44px;
-            flex-shrink: 0;
-        }
-
-        .logo-badge img {
-            width: 30px;
-            height: 30px;
-            object-fit: contain;
-        }
-
-        /* Icons used by the page views inside this layout */
-        .pm-stat-img,
-        .av-avatar-img,
-        .pm-avatar-img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-        }
-
+        .pm-stat-img, .av-avatar-img, .pm-avatar-img { width: 100%; height: 100%; object-fit: contain; }
         .pm-stat-icon { width: 42px; height: 42px; flex-shrink: 0; }
         .pm-avatar    { width: 34px; height: 34px; flex-shrink: 0; }
         .av-avatar    { width: 72px; height: 72px; flex-shrink: 0; }
 
-        .av-avatar-img,
-        .pm-avatar-img { object-fit: cover; }
+        .av-avatar-img, .pm-avatar-img { object-fit: cover; }
 
-        /* Nothing in the chrome may ever paint oversized */
-        .admin-header img,
-        .admin-sidebar img { max-width: 100%; }
+        .admin-header img, .admin-sidebar img { max-width: 100%; }
 
-        /* Keep the header row from jumping while the PNG decodes */
         .header-title-group { display: flex; align-items: center; gap: 0.6rem; }
     </style>
 
-    <!-- =====================================================
-         LAYOUT STYLES — moved here from the <body>.
-         ===================================================== -->
     <style>
-    /* =========================================================
-       VARIABLES
-       ========================================================= */
-
     :root {
         --sidebar-width: 282px;
         --sidebar-collapsed-width: 84px;
@@ -260,17 +202,9 @@
     }
 
     .sidebar-nav::-webkit-scrollbar { width: 5px; }
-    .sidebar-nav::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.16);
-        border-radius: 10px;
-    }
-    .sidebar-nav::-webkit-scrollbar-thumb:hover {
-        background: rgba(255, 255, 255, 0.28);
-    }
-    .sidebar-nav {
-        scrollbar-width: thin;
-        scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
-    }
+    .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); border-radius: 10px; }
+    .sidebar-nav::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.28); }
+    .sidebar-nav { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.18) transparent; }
 
     .sidebar-footer {
         flex-shrink: 0;
@@ -480,6 +414,66 @@
         100% { left: 130%; }
     }
 
+    /* =========================================================
+       SPA NAVIGATION FEEDBACK
+       ========================================================= */
+
+    .menu-item.is-navigating .menu-btn {
+        animation: menuNavPulse 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    @keyframes menuNavPulse {
+        0%   { transform: translateX(4px) scale(1); }
+        35%  { transform: translateX(6px) scale(1.025); }
+        100% { transform: translateX(4px) scale(1); }
+    }
+
+    .menu-item.is-navigating .menu-btn::before {
+        height: 26px;
+        background: var(--sb-active-to);
+    }
+
+    .admin-content {
+        transition: opacity 0.14s ease, transform 0.14s ease;
+    }
+
+    .admin-content.is-leaving {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+
+    .admin-content.is-entering {
+        animation: contentEnter 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    @keyframes contentEnter {
+        from { opacity: 0; transform: translateY(10px); }
+        to   { opacity: 1; transform: none; }
+    }
+
+    .admin-main { position: relative; }
+
+    .admin-content.is-loading::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 2px;
+        width: 100%;
+        background: linear-gradient(90deg, transparent, var(--active-blue), transparent);
+        background-size: 40% 100%;
+        background-repeat: no-repeat;
+        animation: contentProgress 1s linear infinite;
+        z-index: 1;
+    }
+
+    @keyframes contentProgress {
+        0%   { background-position: -40% 0; }
+        100% { background-position: 140% 0; }
+    }
+
+    /* ========================================================= */
+
     .badge-notif {
         margin-left: auto;
         background: #ef4444 !important;
@@ -558,21 +552,9 @@
 
         .admin-sidebar.collapsed { width: var(--sidebar-collapsed-width); }
 
-        .admin-sidebar.collapsed .sidebar-header {
-            justify-content: center;
-            padding: 1rem 0.5rem;
-        }
-
-        .admin-sidebar.collapsed .sidebar-logo {
-            gap: 0;
-            justify-content: center;
-            width: 100%;
-        }
-
-        .admin-sidebar.collapsed .logo-text {
-            opacity: 0;
-            max-width: 0;
-        }
+        .admin-sidebar.collapsed .sidebar-header { justify-content: center; padding: 1rem 0.5rem; }
+        .admin-sidebar.collapsed .sidebar-logo { gap: 0; justify-content: center; width: 100%; }
+        .admin-sidebar.collapsed .logo-text { opacity: 0; max-width: 0; }
 
         .admin-sidebar.collapsed .sidebar-nav,
         .admin-sidebar.collapsed .sidebar-footer {
@@ -586,14 +568,8 @@
             padding: 0.6rem 0;
         }
 
-        .admin-sidebar.collapsed .sidebar-toggle-btn span {
-            opacity: 0;
-            max-width: 0;
-        }
-
-        .admin-sidebar.collapsed .sidebar-toggle-btn:hover i {
-            transform: translateX(3px);
-        }
+        .admin-sidebar.collapsed .sidebar-toggle-btn span { opacity: 0; max-width: 0; }
+        .admin-sidebar.collapsed .sidebar-toggle-btn:hover i { transform: translateX(3px); }
 
         .admin-sidebar.collapsed .nav-section {
             padding: 0.7rem 0 0.3rem;
@@ -613,16 +589,8 @@
             transform: translateX(-50%);
         }
 
-        .admin-sidebar.collapsed .menu-btn {
-            justify-content: center;
-            gap: 0;
-            padding: 0.68rem 0;
-        }
-
-        .admin-sidebar.collapsed .menu-btn > span {
-            opacity: 0;
-            max-width: 0;
-        }
+        .admin-sidebar.collapsed .menu-btn { justify-content: center; gap: 0; padding: 0.68rem 0; }
+        .admin-sidebar.collapsed .menu-btn > span { opacity: 0; max-width: 0; }
 
         .admin-sidebar.collapsed .menu-item:not(.active) .menu-btn:hover {
             transform: translateX(0) scale(1.06);
@@ -657,11 +625,7 @@
         transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
     }
 
-    .mobile-menu-btn:hover {
-        background: var(--active-blue-light);
-        color: var(--active-blue);
-    }
-
+    .mobile-menu-btn:hover { background: var(--active-blue-light); color: var(--active-blue); }
     .mobile-menu-btn:active { transform: scale(0.94); }
 
     @media (max-width: 992px) {
@@ -677,9 +641,7 @@
             box-shadow: 18px 0 40px rgba(8, 20, 40, 0.28);
         }
 
-        .admin-sidebar.collapsed {
-            width: min(86vw, var(--sidebar-width));
-        }
+        .admin-sidebar.collapsed { width: min(86vw, var(--sidebar-width)); }
 
         .sidebar-toggle-item { display: none !important; }
         .sidebar-close { display: flex; }
@@ -719,7 +681,9 @@
     @media (prefers-reduced-motion: reduce) {
         .menu-item,
         .menu-item.active .menu-btn::after,
-        .badge-notif { animation: none !important; }
+        .badge-notif,
+        .menu-item.is-navigating .menu-btn,
+        .admin-content.is-entering { animation: none !important; }
 
         .menu-btn:hover,
         .menu-item:not(.active) .menu-btn:hover { transform: none !important; }
@@ -756,20 +720,8 @@
         width: 100%;
     }
 
-    .header-left {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        min-width: 0;
-    }
-
-    .header-title-group {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        min-width: 0;
-    }
-
+    .header-left { display: flex; align-items: center; gap: 1rem; min-width: 0; }
+    .header-title-group { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
     .header-title-icon { width: 24px; height: 24px; object-fit: contain; flex-shrink: 0; }
 
     .page-title-header {
@@ -909,16 +861,8 @@
         text-overflow: ellipsis;
     }
 
-    .notif-msg {
-        font-size: 0.75rem;
-        color: #6b7280 !important;
-        margin-bottom: 4px;
-    }
-
-    .notif-time {
-        font-size: 0.68rem;
-        color: #9ca3af !important;
-    }
+    .notif-msg { font-size: 0.75rem; color: #6b7280 !important; margin-bottom: 4px; }
+    .notif-time { font-size: 0.68rem; color: #9ca3af !important; }
 
     .header-user {
         display: flex;
@@ -940,12 +884,7 @@
 
     .user-details { display: flex; flex-direction: column; line-height: 1.15; }
 
-    .user-name-header {
-        font-size: 0.78rem;
-        font-weight: 600;
-        color: #111827 !important;
-    }
-
+    .user-name-header { font-size: 0.78rem; font-weight: 600; color: #111827 !important; }
     .user-role-header { font-size: 0.58rem; color: #6b7280 !important; }
 
     .admin-content {
@@ -986,8 +925,6 @@
     </style>
 
     <style>
-        /* Disable transitions only during the initial state application
-           on page load. */
         .admin-sidebar.no-transition,
         .admin-sidebar.no-transition *,
         .admin-main.no-transition {
@@ -999,9 +936,6 @@
         }
     </style>
 
-    <!-- =====================================================
-         CONTENT REVEAL GATE
-         ===================================================== -->
     <style>
         html.pm-gate .admin-content { visibility: hidden; }
         html.pm-ready .admin-content { visibility: visible; }
@@ -1033,8 +967,6 @@
 <body>
 
 <script>
-    // Guarded: if unpkg is slow or blocked, AOS is undefined and an
-    // unguarded call would throw and kill the rest of this script.
     if (window.AOS && typeof AOS.init === 'function') {
         AOS.init({ duration: 800, once: true });
     }
@@ -1043,16 +975,12 @@
 <div class="admin-wrapper">
 
     <?php
-    /* ---------------------------------------------------------
-       Sidebar data. Same shape as AdminLayout.
-       --------------------------------------------------------- */
     $currentUrl = current_url();
 
     $isActive = static function (string $segment) use ($currentUrl): bool {
         return strpos(rtrim($currentUrl, '/'), $segment) !== false;
     };
 
-    /* Guarded so a missing/failing model can never blank the layout. */
     $pendingLab = 0;
     $unreadCount = 0;
 
@@ -1289,7 +1217,6 @@
 
 </div>
 
-<!-- Bootstrap -->
 <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js"></script>
 
@@ -1585,6 +1512,142 @@
         fetchNotifications();
         setInterval(fetchNotifications, 15000);
     }
+
+
+    // =========================================================
+    // SPA-STYLE NAVIGATION
+    // =========================================================
+
+    var contentEl = document.querySelector('.admin-content');
+    var cache = Object.create(null);
+    var inFlight = false;
+
+    function setActiveItem(url) {
+        document.querySelectorAll('.admin-sidebar .menu-item').forEach(function(li) {
+            var link = li.querySelector('a.menu-btn');
+            var active = link && link.href === url;
+            li.classList.toggle('active', active);
+            if (link) {
+                if (active) link.setAttribute('aria-current', 'page');
+                else link.removeAttribute('aria-current');
+            }
+        });
+    }
+
+    function playClickPulse(el) {
+        if (!el) return;
+        el.classList.remove('is-navigating');
+        void el.offsetWidth;
+        el.classList.add('is-navigating');
+        setTimeout(function() { el.classList.remove('is-navigating'); }, 480);
+    }
+
+    function extractContent(html) {
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+        var content = doc.querySelector('.admin-content');
+        if (!content) return null;
+
+        var newTitle = doc.querySelector('.page-title-header');
+        var newTitleText = newTitle ? newTitle.textContent : null;
+
+        var newTitleIcon = doc.querySelector('.header-title-icon');
+        var newIconSrc = newTitleIcon ? newTitleIcon.getAttribute('src') : null;
+
+        return { html: content.innerHTML, title: newTitleText, iconSrc: newIconSrc };
+    }
+
+    function runContentScripts(container) {
+        container.querySelectorAll('script').forEach(function(oldScript) {
+            var s = document.createElement('script');
+            Array.prototype.slice.call(oldScript.attributes).forEach(function(attr) {
+                s.setAttribute(attr.name, attr.value);
+            });
+            s.textContent = oldScript.textContent;
+            oldScript.parentNode.replaceChild(s, oldScript);
+        });
+    }
+
+    function swapContent(payload) {
+        if (!contentEl) return;
+        contentEl.classList.add('is-leaving');
+
+        setTimeout(function() {
+            contentEl.innerHTML = payload.html;
+            runContentScripts(contentEl);
+
+            if (payload.title) {
+                var titleEl = document.querySelector('.page-title-header');
+                if (titleEl) titleEl.textContent = payload.title;
+            }
+            if (payload.iconSrc) {
+                var iconEl = document.querySelector('.header-title-icon');
+                if (iconEl) iconEl.setAttribute('src', payload.iconSrc);
+            }
+
+            contentEl.classList.remove('is-leaving');
+            contentEl.classList.add('is-entering');
+            setTimeout(function() { contentEl.classList.remove('is-entering'); }, 320);
+
+            window.scrollTo(0, 0);
+        }, 120);
+    }
+
+    function navigateTo(url, push, clickedEl) {
+        if (inFlight) return;
+        if (url === window.location.href) { setActiveItem(url); return; }
+
+        playClickPulse(clickedEl);
+        setActiveItem(url);
+
+        if (contentEl) contentEl.classList.add('is-loading');
+
+        if (cache[url]) {
+            swapContent(cache[url]);
+            if (contentEl) contentEl.classList.remove('is-loading');
+            if (push) history.pushState({ url: url }, '', url);
+            return;
+        }
+
+        inFlight = true;
+
+        fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+        .then(function(res) { return res.text(); })
+        .then(function(html) {
+            var payload = extractContent(html);
+            if (!payload) { window.location.href = url; return; }
+
+            cache[url] = payload;
+            swapContent(payload);
+            if (push) history.pushState({ url: url }, '', url);
+        })
+        .catch(function() { window.location.href = url; })
+        .then(function() {
+            inFlight = false;
+            if (contentEl) contentEl.classList.remove('is-loading');
+        });
+    }
+
+    document.addEventListener('click', function(e) {
+        var link = e.target.closest('.admin-sidebar a.menu-btn');
+        if (!link) return;
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        if (link.target && link.target !== '_self') return;
+        if (link.hasAttribute('download')) return;
+        if (link.getAttribute('href') === '/polymedic/public/logout') return;
+
+        var url = link.href;
+        if (!url || url.indexOf('#') === 0) return;
+        if (url.indexOf(window.location.origin) !== 0) return;
+
+        e.preventDefault();
+        navigateTo(url, true, link.closest('.menu-item'));
+    });
+
+    window.addEventListener('popstate', function(e) {
+        var url = (e.state && e.state.url) || window.location.href;
+        navigateTo(url, false, null);
+    });
+
 })();
 </script>
 

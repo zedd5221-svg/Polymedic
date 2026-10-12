@@ -28,7 +28,7 @@ $monthlyRevenueVal = (float) ($monthlyRevenue ?? 0);
 $avgMonthlyRevenue = $monthlyRevenueVal / max(1, (int) date('m'));
 
 /* Only allow a colour value that is safe to place inside a style attribute. */
-$safeColor = static function ($color, $fallback = '#0D9488') {
+$safeColor = static function ($color, $fallback = '#1976d2') {
     $color = is_string($color) ? trim($color) : '';
     if ($color !== '' && preg_match('/^(#[0-9A-Fa-f]{3,8}|rgba?\([0-9.,%\s]+\)|hsla?\([0-9.,%\sdegrad]+\)|[A-Za-z]{3,20})$/', $color)) {
         return $color;
@@ -114,13 +114,13 @@ $statCards = [
    ------------------------------------------------------------------ */
 $kpiTrends = $kpiTrends ?? [];
 $sparkMeta = [
-    'patients'      => ['color' => '#0891B2', 'goodUp' => true,  'cumulative' => true,  'unit' => 'patients'],
-    'today'         => ['color' => '#0D9488', 'goodUp' => true,  'cumulative' => false, 'unit' => 'appointments'],
-    'pending'       => ['color' => '#EA580C', 'goodUp' => false, 'cumulative' => false, 'unit' => 'requests received'],
-    'completed'     => ['color' => '#16A34A', 'goodUp' => true,  'cumulative' => false, 'unit' => 'completed'],
-    'released'      => ['color' => '#2563EB', 'goodUp' => true,  'cumulative' => false, 'unit' => 'released'],
-    'revenue_today' => ['color' => '#CA8A04', 'goodUp' => true,  'cumulative' => false, 'unit' => 'revenue', 'money' => true],
-    'revenue_month' => ['color' => '#DB2777', 'goodUp' => true,  'cumulative' => true,  'unit' => 'revenue', 'money' => true],
+    'patients'      => ['color' => '#1976d2', 'goodUp' => true,  'cumulative' => true,  'unit' => 'patients'],
+    'today'         => ['color' => '#1565c0', 'goodUp' => true,  'cumulative' => false, 'unit' => 'appointments'],
+    'pending'       => ['color' => '#ea580c', 'goodUp' => false, 'cumulative' => false, 'unit' => 'requests received'],
+    'completed'     => ['color' => '#16a34a', 'goodUp' => true,  'cumulative' => false, 'unit' => 'completed'],
+    'released'      => ['color' => '#2563eb', 'goodUp' => true,  'cumulative' => false, 'unit' => 'released'],
+    'revenue_today' => ['color' => '#ca8a04', 'goodUp' => true,  'cumulative' => false, 'unit' => 'revenue', 'money' => true],
+    'revenue_month' => ['color' => '#db2777', 'goodUp' => true,  'cumulative' => true,  'unit' => 'revenue', 'money' => true],
 ];
 
 /* Returns [svgPath, lastX%, lastY%] for a value series. */
@@ -488,14 +488,16 @@ $sparkGeometry = static function (array $vals): array {
 <style>
 /* ============================================
    DASHBOARD
+   Theme aligned with AdminLayout blue palette.
    ============================================ */
 
 .dashboard-wrapper,
 #toastContainer {
-    --db-accent:        #0D9488;
-    --db-accent-soft:   #E6F7F7;
+    --db-accent:        #1976d2;
+    --db-accent-soft:   #e3f2fd;
+    --db-accent-dark:   #1565c0;
     --db-surface:       #FFFFFF;
-    --db-canvas:        #F8FAFC;
+    --db-canvas:        #f4f7fb;
     --db-subtle:        #F1F5F9;
     --db-border:        #E2E8F0;
     --db-border-strong: #CBD5E1;
@@ -932,8 +934,8 @@ $sparkGeometry = static function (array $vals): array {
     height: 34px;
     font-size: 0.72rem;
     font-weight: 700;
-    color: #0F766E;
-    background: #E6FBF6;
+    color: #1565c0;
+    background: #e3f2fd;
     border-radius: 50%;
 }
 
@@ -980,7 +982,7 @@ $sparkGeometry = static function (array $vals): array {
     background: #F1F5F9;
 }
 
-.pending-tag--laboratory { color: #15803D; background: #DCFCE7; }
+.pending-tag--laboratory { color: #1565c0; background: #e3f2fd; }
 .pending-tag--xray       { color: #6D28D9; background: #EDE9FE; }
 
 .pending-actions {
@@ -1018,11 +1020,11 @@ $sparkGeometry = static function (array $vals): array {
 
 .pending-btn--approve {
     color: #FFFFFF;
-    background: #0D9488;
-    border: 1px solid #0D9488;
+    background: #1976d2;
+    border: 1px solid #1976d2;
 }
 
-.pending-btn--approve:hover { background: #0F766E; border-color: #0F766E; color: #FFFFFF; }
+.pending-btn--approve:hover { background: #1565c0; border-color: #1565c0; color: #FFFFFF; }
 
 .pending-pager {
     display: flex;
@@ -1048,7 +1050,7 @@ $sparkGeometry = static function (array $vals): array {
     transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.pager-btn:hover:not(:disabled) { color: #0D9488; background: #F0FDFA; border-color: #99F6E4; }
+.pager-btn:hover:not(:disabled) { color: #1976d2; background: #e3f2fd; border-color: #90caf9; }
 .pager-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .pager-status {
@@ -1066,13 +1068,13 @@ $sparkGeometry = static function (array $vals): array {
     padding: 0.45rem;
     font-size: 0.74rem;
     font-weight: 600;
-    color: #0D9488;
+    color: #1976d2;
     text-decoration: none;
     border-radius: 7px;
     transition: background-color 0.15s ease;
 }
 
-.pending-all:hover { background: #F0FDFA; color: #0F766E; }
+.pending-all:hover { background: #e3f2fd; color: #1565c0; }
 
 .visually-hidden {
     position: absolute; width: 1px; height: 1px;
@@ -1239,7 +1241,7 @@ $sparkGeometry = static function (array $vals): array {
 
 .dashboard-wrapper {
     background:
-        radial-gradient(900px 320px at 8% -80px, rgba(13, 148, 136, 0.08), transparent 70%),
+        radial-gradient(900px 320px at 8% -80px, rgba(25, 118, 210, 0.08), transparent 70%),
         radial-gradient(700px 300px at 100% -60px, rgba(37, 99, 235, 0.05), transparent 70%),
         var(--db-canvas);
 }
@@ -1284,14 +1286,10 @@ $sparkGeometry = static function (array $vals): array {
     box-shadow: var(--db-shadow-hover);
 }
 
-/* NOTE: the colored top line (::before) has been removed. */
-
 .stat-top { margin-bottom: 12px; }
 
-/* Icon wrapper stays transparent — no tile behind the PNG. */
 .stat-icon { background: transparent; border-radius: 0; }
 
-/* Keep the reduced KPI size stable across the modern skin. */
 .stat-value { font-size: 1.35rem; margin-bottom: 0; }
 .stat-label { margin-bottom: 0; }
 
@@ -1325,7 +1323,7 @@ $sparkGeometry = static function (array $vals): array {
     border-radius: 10px;
     background: var(--db-accent-soft);
 }
-.avg-value { color: #0F766E; }
+.avg-value { color: #1565c0; }
 
 .test-progress { height: 8px; border-radius: 999px; }
 .test-fill { border-radius: 999px; }
@@ -1377,7 +1375,8 @@ const requestsData = <?= json_encode($requestsDataArr, $jsonFlags) ?>;
 // ============================================
 
 const DB_COLORS = {
-    accent:  '#0D9488',
+    accent:  '#1976d2',
+    accent2: '#1565c0',
     success: '#10B981',
     muted:   '#E2E8F0',
     grid:    '#F1F5F9',
@@ -1444,7 +1443,7 @@ const dbCrosshair = {
         ctx.save();
         ctx.beginPath();
         ctx.setLineDash([4, 4]);
-        ctx.strokeStyle = 'rgba(13, 148, 136, 0.35)';
+        ctx.strokeStyle = 'rgba(25, 118, 210, 0.35)';
         ctx.lineWidth = 1;
         ctx.moveTo(x, area.top);
         ctx.lineTo(x, area.bottom);
@@ -1580,7 +1579,7 @@ dbInitChart('revenueChart', {
             label: 'Revenue',
             data: revenueData.values,
             borderColor: DB_COLORS.accent,
-            backgroundColor: dbGradient('rgba(13, 148, 136, __A__)', 0.28, 0),
+            backgroundColor: dbGradient('rgba(25, 118, 210, __A__)', 0.28, 0),
             fill: true,
             tension: 0.4,
             pointBackgroundColor: DB_COLORS.accent,
@@ -1630,7 +1629,7 @@ const deptChart = dbInitChart('visitsChart', {
                 label: 'Laboratory',
                 data: deptLab,
                 backgroundColor: DB_COLORS.accent,
-                hoverBackgroundColor: '#0F766E',
+                hoverBackgroundColor: DB_COLORS.accent2,
                 borderRadius: { topLeft: 0, topRight: 0, bottomLeft: 6, bottomRight: 6 },
                 borderSkipped: false,
                 barPercentage: 0.7,

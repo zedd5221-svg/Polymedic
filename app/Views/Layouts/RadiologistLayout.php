@@ -533,6 +533,64 @@
     }
 
     /* =========================================================
+   SPA NAVIGATION FEEDBACK
+   ========================================================= */
+
+.menu-item.is-navigating .menu-btn {
+    animation: menuNavPulse 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes menuNavPulse {
+    0%   { transform: translateX(4px) scale(1); }
+    35%  { transform: translateX(6px) scale(1.025); }
+    100% { transform: translateX(4px) scale(1); }
+}
+
+.menu-item.is-navigating .menu-btn::before {
+    height: 26px;
+    background: var(--sb-active-to);
+}
+
+.admin-content {
+    transition: opacity 0.14s ease, transform 0.14s ease;
+}
+
+.admin-content.is-leaving {
+    opacity: 0;
+    transform: translateY(6px);
+}
+
+.admin-content.is-entering {
+    animation: contentEnter 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes contentEnter {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: none; }
+}
+
+.admin-main { position: relative; }
+
+.admin-content.is-loading::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 2px;
+    width: 100%;
+    background: linear-gradient(90deg, transparent, var(--active-blue), transparent);
+    background-size: 40% 100%;
+    background-repeat: no-repeat;
+    animation: contentProgress 1s linear infinite;
+    z-index: 1;
+}
+
+@keyframes contentProgress {
+    0%   { background-position: -40% 0; }
+    100% { background-position: 140% 0; }
+}
+
+    /* =========================================================
        BADGE
        ========================================================= */
 
@@ -791,15 +849,15 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
+    .menu-item,
+    .menu-item.active .menu-btn::after,
+    .badge-notif,
+    .menu-item.is-navigating .menu-btn,
+    .admin-content.is-entering { animation: none !important; }
 
-        .menu-item,
-        .menu-item.active .menu-btn::after,
-        .badge-notif { animation: none !important; }
-
-        .menu-btn:hover,
-        .menu-item:not(.active) .menu-btn:hover { transform: none !important; }
-    }
-
+    .menu-btn:hover,
+    .menu-item:not(.active) .menu-btn:hover { transform: none !important; }
+   }
     /* =========================================================
        MAIN CONTENT
        ========================================================= */
@@ -1806,6 +1864,141 @@
         fetchNotifications();
         setInterval(fetchNotifications, 15000);
     }
+
+        // =========================================================
+    // SPA-STYLE NAVIGATION
+    // =========================================================
+
+    var contentEl = document.querySelector('.admin-content');
+    var cache = Object.create(null);
+    var inFlight = false;
+
+    function setActiveItem(url) {
+        document.querySelectorAll('.admin-sidebar .menu-item').forEach(function(li) {
+            var link = li.querySelector('a.menu-btn');
+            var active = link && link.href === url;
+            li.classList.toggle('active', active);
+            if (link) {
+                if (active) link.setAttribute('aria-current', 'page');
+                else link.removeAttribute('aria-current');
+            }
+        });
+    }
+
+    function playClickPulse(el) {
+        if (!el) return;
+        el.classList.remove('is-navigating');
+        void el.offsetWidth;
+        el.classList.add('is-navigating');
+        setTimeout(function() { el.classList.remove('is-navigating'); }, 480);
+    }
+
+    function extractContent(html) {
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+        var content = doc.querySelector('.admin-content');
+        if (!content) return null;
+
+        var newTitle = doc.querySelector('.page-title-header');
+        var newTitleText = newTitle ? newTitle.textContent : null;
+
+        var newTitleIcon = doc.querySelector('.header-title-icon');
+        var newIconSrc = newTitleIcon ? newTitleIcon.getAttribute('src') : null;
+
+        return { html: content.innerHTML, title: newTitleText, iconSrc: newIconSrc };
+    }
+
+    function runContentScripts(container) {
+        container.querySelectorAll('script').forEach(function(oldScript) {
+            var s = document.createElement('script');
+            Array.prototype.slice.call(oldScript.attributes).forEach(function(attr) {
+                s.setAttribute(attr.name, attr.value);
+            });
+            s.textContent = oldScript.textContent;
+            oldScript.parentNode.replaceChild(s, oldScript);
+        });
+    }
+
+    function swapContent(payload) {
+        if (!contentEl) return;
+        contentEl.classList.add('is-leaving');
+
+        setTimeout(function() {
+            contentEl.innerHTML = payload.html;
+            runContentScripts(contentEl);
+
+            if (payload.title) {
+                var titleEl = document.querySelector('.page-title-header');
+                if (titleEl) titleEl.textContent = payload.title;
+            }
+            if (payload.iconSrc) {
+                var iconEl = document.querySelector('.header-title-icon');
+                if (iconEl) iconEl.setAttribute('src', payload.iconSrc);
+            }
+
+            contentEl.classList.remove('is-leaving');
+            contentEl.classList.add('is-entering');
+            setTimeout(function() { contentEl.classList.remove('is-entering'); }, 320);
+
+            window.scrollTo(0, 0);
+        }, 120);
+    }
+
+    function navigateTo(url, push, clickedEl) {
+        if (inFlight) return;
+        if (url === window.location.href) { setActiveItem(url); return; }
+
+        playClickPulse(clickedEl);
+        setActiveItem(url);
+
+        if (contentEl) contentEl.classList.add('is-loading');
+
+        if (cache[url]) {
+            swapContent(cache[url]);
+            if (contentEl) contentEl.classList.remove('is-loading');
+            if (push) history.pushState({ url: url }, '', url);
+            return;
+        }
+
+        inFlight = true;
+
+        fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+        .then(function(res) { return res.text(); })
+        .then(function(html) {
+            var payload = extractContent(html);
+            if (!payload) { window.location.href = url; return; }
+
+            cache[url] = payload;
+            swapContent(payload);
+            if (push) history.pushState({ url: url }, '', url);
+        })
+        .catch(function() { window.location.href = url; })
+        .then(function() {
+            inFlight = false;
+            if (contentEl) contentEl.classList.remove('is-loading');
+        });
+    }
+
+    document.addEventListener('click', function(e) {
+        var link = e.target.closest('.admin-sidebar a.menu-btn');
+        if (!link) return;
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        if (link.target && link.target !== '_self') return;
+        if (link.hasAttribute('download')) return;
+        if (link.getAttribute('href').indexOf('/logout') !== -1) return;
+
+        var url = link.href;
+        if (!url || url.indexOf('#') === 0) return;
+        if (url.indexOf(window.location.origin) !== 0) return;
+
+        e.preventDefault();
+        navigateTo(url, true, link.closest('.menu-item'));
+    });
+
+    window.addEventListener('popstate', function(e) {
+        var url = (e.state && e.state.url) || window.location.href;
+        navigateTo(url, false, null);
+    });
+    
 })();
 </script>
 

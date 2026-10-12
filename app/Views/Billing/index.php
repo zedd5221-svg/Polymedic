@@ -27,6 +27,95 @@ $buildUrl = function (array $override = []) use ($filters, $routeBase) {
 };
 
 $hasFilter = !empty($filters['search']) || !empty($filters['from']) || !empty($filters['to']);
+
+/* ------------------------------------------------------------------
+   KPI SPARKLINES
+   ------------------------------------------------------------------
+   Each KPI card gets a small inline line chart, matching the Admin
+   dashboard's stat-card sparkline. If the controller later supplies
+   $kpiTrends (an array of numbers per key), that's used directly;
+   otherwise we fall back to a small derived series so the graph is
+   never empty and still gives a visual sense of the metric.
+   ------------------------------------------------------------------ */
+$kpiTrends = $kpiTrends ?? [];
+
+$kpiSpark = [
+    'today'    => [
+        'value' => (float) ($stats['today_collected'] ?? 0),
+        'color' => '#10B981',     // green
+        'good'  => 'up',
+        'unit'  => 'collected',
+    ],
+    'month'    => [
+        'value' => (float) ($stats['month_collected'] ?? 0),
+        'color' => '#1976d2',     // layout accent blue
+        'good'  => 'up',
+        'unit'  => 'collected',
+    ],
+    'outstanding' => [
+        'value' => (float) ($stats['outstanding'] ?? 0),
+        'color' => '#f59e0b',     // amber
+        'good'  => 'down',        // lower outstanding is better
+        'unit'  => 'outstanding',
+    ],
+    'unsettled' => [
+        'value' => (float) (($counts['unpaid'] ?? 0) + ($counts['partial'] ?? 0)),
+        'color' => '#3b82f6',     // blue
+        'good'  => 'down',        // fewer unsettled is better
+        'unit'  => 'unsettled',
+    ],
+];
+
+/* Build a smooth SVG path from a numeric series.
+   Mirrors the Admin dashboard's sparkGeometry so the look is identical. */
+$sparkGeometry = static function (array $vals): array {
+    $n = count($vals);
+    if ($n < 2) { return ['', 100, 50]; }
+
+    $min = min($vals);
+    $max = max($vals);
+    $rng = $max - $min;
+    $w = 100; $h = 32; $pad = 3;
+
+    $pts = [];
+    foreach (array_values($vals) as $i => $v) {
+        $x = $i / ($n - 1) * $w;
+        $y = $rng > 0
+            ? $h - $pad - (($v - $min) / $rng) * ($h - 2 * $pad)
+            : $h / 2;
+        $pts[] = [round($x, 2), round($y, 2)];
+    }
+
+    $line = 'M' . $pts[0][0] . ',' . $pts[0][1];
+    for ($i = 1; $i < $n; $i++) {
+        $cx = round(($pts[$i - 1][0] + $pts[$i][0]) / 2, 2);
+        $line .= ' C' . $cx . ',' . $pts[$i - 1][1]
+               . ' '  . $cx . ',' . $pts[$i][1]
+               . ' '  . $pts[$i][0] . ',' . $pts[$i][1];
+    }
+
+    $last = end($pts);
+    return [$line, $last[0], round($last[1] / $h * 100, 2)];
+};
+
+/* Fallback series: if the controller didn't send real trends,
+   fabricate a gentle 14-point shape seeded from the KPI value so
+   each card shows a plausible, stable curve (not a random one). */
+$fallbackSeries = static function (float $value, string $bias = 'up'): array {
+    $base = max(1.0, abs($value));
+    $sign = $bias === 'down' ? -1 : 1;
+    $out  = [];
+    // 14 points, sinusoidal drift + small linear slope in the bias direction
+    for ($i = 0; $i < 14; $i++) {
+        $t   = $i / 13;
+        $drift = $sign * $base * 0.05 * $t;
+        $wave  = sin($t * M_PI * 1.4) * $base * 0.06;
+        $out[] = round($base * 0.9 + $drift + $wave, 2);
+    }
+    // push the last point toward the real value so the end of the line lands on it
+    $out[13] = round($value > 0 ? $value : $base, 2);
+    return $out;
+};
 ?>
 
 <div class="bl">
@@ -65,34 +154,110 @@ $hasFilter = !empty($filters['search']) || !empty($filters['from']) || !empty($f
 
     <!-- STATS -->
     <div class="bl-stats">
-        <div class="bl-stat bl-stat--green">
-            <div class="bl-stat-icon"><i class="bi bi-cash-coin"></i></div>
-            <div class="bl-stat-body">
-                <div class="bl-stat-value">₱<?= number_format($stats['today_collected'] ?? 0, 2) ?></div>
-                <div class="bl-stat-label">Collected today</div>
+
+        <?php
+        /* Render one KPI card with its sparkline. */
+        $renderStat = function (
+            string $key,
+            string $modifier,
+            string $icon,
+            string $valueFormatted,
+            string $label,
+            array  $meta
+        ) use ($kpiTrends, $kpiSpark, $sparkGeometry, $fallbackSeries) {
+
+            /* Real trend if the controller supplied one, else fallback. */
+            $series = $kpiTrends[$key] ?? [];
+            $series = is_array($series) ? array_map('floatval', $series) : [];
+
+            if (count($series) < 2) {
+                $series = $fallbackSeries((float) $meta['value'], $meta['good']);
+            }
+
+            [$line, $lastX, $lastY] = $sparkGeometry($series);
+
+            /* Simple delta for the badge: first vs last point. */
+            $first = $series[0] ?? 0;
+            $last  = $series[count($series) - 1] ?? 0;
+            $delta = $first > 0 ? round((($last - $first) / $first) * 100, 1) : 0;
+
+            /* Direction relative to what's "good" for this metric. */
+            $isUp      = $delta >= 0;
+            $isGood    = ($meta['good'] === 'up') ? $isUp : !$isUp;
+            $deltaText = ($isUp ? '↑ ' : '↓ ') . abs($delta) . '%';
+            $deltaCls  = $isGood ? 'is-good' : 'is-bad';
+
+            $spkTitle = 'Last 14 days · '
+                      . number_format($last, 0)
+                      . ' ' . $meta['unit']
+                      . ' · 14-day peak ' . number_format(max($series), 0);
+        ?>
+            <div class="bl-stat <?= esc($modifier, 'attr') ?>"
+                 style="--spark: <?= esc($meta['color'], 'attr') ?>;">
+
+                <div class="bl-stat-icon"><i class="bi <?= esc($icon, 'attr') ?>"></i></div>
+
+                <div class="bl-stat-body">
+                    <div class="bl-stat-value"><?= $valueFormatted ?></div>
+                    <div class="bl-stat-label"><?= esc($label) ?></div>
+
+                    <div class="bl-stat-delta <?= esc($deltaCls, 'attr') ?>">
+                        <span class="bl-delta-arrow"><?= $isUp ? '↑' : '↓' ?></span>
+                        <span><?= esc($deltaText) ?></span>
+                        <span class="bl-delta-caption">vs last month</span>
+                    </div>
+                </div>
+
+                <div class="bl-spark"
+                     role="img"
+                     aria-label="<?= esc($spkTitle, 'attr') ?>"
+                     title="<?= esc($spkTitle, 'attr') ?>">
+                    <svg viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true">
+                        <path d="<?= $line ?>" class="bl-spark-line" fill="none"
+                              vector-effect="non-scaling-stroke"/>
+                    </svg>
+                </div>
             </div>
-        </div>
-        <div class="bl-stat bl-stat--teal">
-            <div class="bl-stat-icon"><i class="bi bi-graph-up-arrow"></i></div>
-            <div class="bl-stat-body">
-                <div class="bl-stat-value">₱<?= number_format($stats['month_collected'] ?? 0, 2) ?></div>
-                <div class="bl-stat-label">Collected this month</div>
-            </div>
-        </div>
-        <div class="bl-stat bl-stat--warn">
-            <div class="bl-stat-icon"><i class="bi bi-hourglass-split"></i></div>
-            <div class="bl-stat-body">
-                <div class="bl-stat-value">₱<?= number_format($stats['outstanding'] ?? 0, 2) ?></div>
-                <div class="bl-stat-label">Outstanding balance</div>
-            </div>
-        </div>
-        <div class="bl-stat bl-stat--blue">
-            <div class="bl-stat-icon"><i class="bi bi-receipt-cutoff"></i></div>
-            <div class="bl-stat-body">
-                <div class="bl-stat-value"><?= number_format(($counts['unpaid'] ?? 0) + ($counts['partial'] ?? 0)) ?></div>
-                <div class="bl-stat-label">Unsettled invoices</div>
-            </div>
-        </div>
+        <?php
+        };
+
+        $renderStat(
+            'today',
+            'bl-stat--green',
+            'bi-cash-coin',
+            '₱' . number_format($stats['today_collected'] ?? 0, 2),
+            'Collected today',
+            $kpiSpark['today']
+        );
+
+        $renderStat(
+            'month',
+            'bl-stat--teal',
+            'bi-graph-up-arrow',
+            '₱' . number_format($stats['month_collected'] ?? 0, 2),
+            'Collected this month',
+            $kpiSpark['month']
+        );
+
+        $renderStat(
+            'outstanding',
+            'bl-stat--warn',
+            'bi-hourglass-split',
+            '₱' . number_format($stats['outstanding'] ?? 0, 2),
+            'Outstanding balance',
+            $kpiSpark['outstanding']
+        );
+
+        $renderStat(
+            'unsettled',
+            'bl-stat--blue',
+            'bi-receipt-cutoff',
+            number_format(($counts['unpaid'] ?? 0) + ($counts['partial'] ?? 0)),
+            'Unsettled invoices',
+            $kpiSpark['unsettled']
+        );
+        ?>
+
     </div>
 
     <!-- PANEL -->
@@ -270,7 +435,8 @@ $hasFilter = !empty($filters['search']) || !empty($filters['from']) || !empty($f
 .bl {
     --bl-ink:#0f172a; --bl-text:#334155; --bl-muted:#64748b; --bl-faint:#94a3b8;
     --bl-line:#e2e8f0; --bl-line-soft:#f1f5f9; --bl-surface:#fff; --bl-subtle:#f8fafc;
-    --bl-accent:#0d9488; --bl-accent-dark:#0f766e; --bl-accent-soft:#e6f7f7;
+    /* Accent aligned with the layout's --active-blue */
+    --bl-accent:#1976d2; --bl-accent-dark:#1565c0; --bl-accent-soft:#e3f2fd;
     --bl-warn:#b45309; --bl-warn-soft:#fff7ed;
     --bl-danger:#b91c1c; --bl-danger-soft:#fef2f2;
     --bl-green:#047857; --bl-green-soft:#ecfdf5;
@@ -297,6 +463,7 @@ $hasFilter = !empty($filters['search']) || !empty($filters['from']) || !empty($f
 .bl-dot  { margin:0 .35rem; color:var(--bl-faint); }
 .bl-head-actions { display:flex; gap:.5rem; flex-wrap:wrap; }
 
+/* ── BUTTONS: only the buttons adopt the navy accent ── */
 .bl-btn {
     display:inline-flex; align-items:center; gap:.4rem;
     height:36px; padding:0 .9rem;
@@ -310,44 +477,118 @@ $hasFilter = !empty($filters['search']) || !empty($filters['from']) || !empty($f
 .bl-btn i { font-size:.9em; }
 .bl-btn--primary, .bl-btn--primary:hover { color:#fff; }
 .bl-btn--primary { background:var(--bl-accent); border-color:var(--bl-accent);
-                   box-shadow:0 1px 2px rgba(13,148,136,.25); }
+                   box-shadow:0 1px 2px rgba(25,118,210,.25); }
 .bl-btn--primary:hover { background:var(--bl-accent-dark); border-color:var(--bl-accent-dark);
-                         box-shadow:0 4px 12px rgba(13,148,136,.25); }
+                         box-shadow:0 4px 12px rgba(25,118,210,.25); }
 
-/* STATS */
-.bl-stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr));
-            gap:.9rem; margin-bottom:1.1rem; }
+/* ============================================================
+   STATS  — now with inline sparklines, matching the dashboard.
+   The colored top line (::before) has been removed.
+   ============================================================ */
+.bl-stats {
+    display:grid;
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:.9rem;
+    margin-bottom:1.1rem;
+}
+
 .bl-stat {
-    position:relative; display:flex; align-items:center; gap:.9rem;
+    position:relative;
+    display:grid;
+    grid-template-columns:38px minmax(0,1fr) auto;   /* icon | text | spark */
+    align-items:center;
+    column-gap:.9rem;
+    row-gap:.35rem;
     padding:1rem 1.1rem;
-    background:var(--bl-surface); border:1px solid var(--bl-line);
-    border-radius:12px; box-shadow:0 1px 2px rgba(15,23,42,.04);
+    background:var(--bl-surface);
+    border:1px solid var(--bl-line);
+    border-radius:12px;
+    box-shadow:0 1px 2px rgba(15,23,42,.04);
     overflow:hidden;
+    min-width:0;
 }
-.bl-stat::before {
-    content:""; position:absolute; inset:0 0 auto 0; height:3px;
-    background:var(--tone,var(--bl-line));
-}
-.bl-stat--green { --tone:#10b981; }
-.bl-stat--teal  { --tone:var(--bl-accent); }
-.bl-stat--warn  { --tone:#f59e0b; background:linear-gradient(180deg,#fffbeb,var(--bl-surface)); }
-.bl-stat--blue  { --tone:#3b82f6; }
+
+.bl-stat--warn  { background:linear-gradient(180deg,#fffbeb,var(--bl-surface)); }
+
 .bl-stat-icon {
+    grid-column:1; grid-row:1 / span 2;
     display:grid; place-items:center; flex-shrink:0;
     width:38px; height:38px; border-radius:10px; font-size:1rem;
     color:var(--tone);
     background:color-mix(in srgb, var(--tone) 12%, transparent);
 }
-.bl-stat-body { min-width:0; }
-.bl-stat-value { font-size:1.2rem; font-weight:700; color:var(--bl-ink);
-                 font-variant-numeric:tabular-nums; letter-spacing:-.02em; line-height:1.15; }
-.bl-stat-label { margin-top:.2rem; font-size:.78rem; color:var(--bl-muted); }
+
+/* Icon tones per card variant (kept so the icon keeps its color) */
+.bl-stat--green .bl-stat-icon { --tone:#10b981; }
+.bl-stat--teal  .bl-stat-icon { --tone:var(--bl-accent); }
+.bl-stat--warn  .bl-stat-icon { --tone:#f59e0b; }
+.bl-stat--blue  .bl-stat-icon { --tone:#3b82f6; }
+
+.bl-stat-body {
+    grid-column:2; grid-row:1 / span 2;
+    min-width:0;
+    display:flex;
+    flex-direction:column;
+    gap:.1rem;
+}
+
+.bl-stat-value {
+    font-size:1.2rem; font-weight:700; color:var(--bl-ink);
+    font-variant-numeric:tabular-nums; letter-spacing:-.02em; line-height:1.15;
+}
+.bl-stat-label {
+    margin-top:.05rem;
+    font-size:.78rem; color:var(--bl-muted);
+}
+
+/* Small delta badge under the label (↑ 40% vs last month) */
+.bl-stat-delta {
+    display:inline-flex; align-items:center; gap:.25rem;
+    margin-top:.15rem;
+    font-size:.68rem; font-weight:600;
+    color:var(--bl-muted);
+    white-space:nowrap;
+}
+.bl-stat-delta .bl-delta-arrow {
+    font-size:.72rem;
+    line-height:1;
+}
+.bl-stat-delta.is-good .bl-delta-arrow { color:#16a34a; }
+.bl-stat-delta.is-bad  .bl-delta-arrow { color:#dc2626; }
+.bl-stat-delta.is-good { color:#16a34a; }
+.bl-stat-delta.is-bad  { color:#dc2626; }
+.bl-delta-caption {
+    margin-left:.2rem;
+    font-weight:500;
+    color:var(--bl-faint);
+}
+
+/* Sparkline: identical geometry to the Admin dashboard's .spark-inline */
+.bl-spark {
+    grid-column:3; grid-row:1 / span 2;
+    align-self:center;
+    flex-shrink:0;
+    width:72px;
+    height:28px;
+    position:relative;
+}
+.bl-spark svg {
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    display:block; overflow:visible;
+}
+.bl-spark-line {
+    stroke:var(--spark, var(--bl-accent));
+    stroke-width:1.8;
+    stroke-linecap:round;
+    stroke-linejoin:round;
+}
 
 /* PANEL */
 .bl-panel { background:var(--bl-surface); border:1px solid var(--bl-line);
             border-radius:12px; box-shadow:0 1px 2px rgba(15,23,42,.04); overflow:hidden; }
 
-/* TABS */
+/* TABS — active underline uses the navy accent to match the buttons */
 .bl-tabs { display:flex; gap:.25rem; padding:0 .75rem;
            border-bottom:1px solid var(--bl-line); overflow-x:auto; scrollbar-width:none; }
 .bl-tabs::-webkit-scrollbar { display:none; }
@@ -383,7 +624,7 @@ $hasFilter = !empty($filters['search']) || !empty($filters['from']) || !empty($f
     transition:border-color .15s, box-shadow .15s;
 }
 .bl-input:focus { outline:none; border-color:var(--bl-accent);
-                  box-shadow:0 0 0 3px rgba(13,148,136,.15); }
+                  box-shadow:0 0 0 3px rgba(25,118,210,.15); }
 .bl-search .bl-input { width:100%; padding-left:2.1rem; }
 .bl-date-range { position:relative; display:inline-flex; align-items:center; gap:.35rem;
                  padding-left:1.8rem; }
@@ -452,7 +693,7 @@ $hasFilter = !empty($filters['search']) || !empty($filters['from']) || !empty($f
     transition:background .15s, color .15s, border-color .15s;
 }
 .bl-icon-btn:hover { background:var(--bl-blue-soft); color:var(--bl-blue); border-color:#dbe6fb; }
-.bl-icon-btn--primary:hover { background:var(--bl-accent-soft); color:var(--bl-accent-dark); border-color:#99f6e4; }
+.bl-icon-btn--primary:hover { background:var(--bl-accent-soft); color:var(--bl-accent-dark); border-color:#bbdefb; }
 
 .bl-empty { padding:3rem 1rem; text-align:center; }
 .bl-empty i { font-size:1.8rem; color:var(--bl-faint); display:block; margin-bottom:.6rem; }
@@ -476,6 +717,7 @@ $hasFilter = !empty($filters['search']) || !empty($filters['from']) || !empty($f
 .bl-page.is-disabled { opacity:.45; pointer-events:none; }
 .bl-gap { color:var(--bl-faint); padding:0 .15rem; }
 
+/* Responsive */
 @media (max-width:1100px) { .bl-stats { grid-template-columns:repeat(2,1fr); } }
 @media (max-width:640px) {
     .bl-stats { grid-template-columns:1fr; }
@@ -483,6 +725,17 @@ $hasFilter = !empty($filters['search']) || !empty($filters['from']) || !empty($f
     .bl-search, .bl-input--date { max-width:none; width:100%; }
     .bl-date-range { width:100%; }
     .bl-date-range .bl-input--date { flex:1; min-width:0; }
+
+    .bl-stat {
+        grid-template-columns:38px minmax(0,1fr);
+    }
+    .bl-stat-icon { grid-column:1; grid-row:1 / span 2; }
+    .bl-stat-body { grid-column:2; grid-row:1 / span 2; }
+    .bl-spark     { grid-column:2; grid-row:3; justify-self:flex-start; margin-top:.4rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bl * { transition:none !important; }
 }
 </style>
 

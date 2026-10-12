@@ -27,7 +27,6 @@ foreach ($serviceRevenue as $row) {
 }
 $avgTicket = $dailyPayments > 0 ? $dailyCollected / $dailyPayments : 0;
 
-/* Best day in the range */
 $bestDay = null;
 $bestDayValue = 0.0;
 foreach ($daily as $d) {
@@ -37,8 +36,6 @@ foreach ($daily as $d) {
     }
 }
 
-/* Momentum: second half of the range against the first half.
-   An honest comparison — it uses only data already on the page. */
 $trendPct   = null;
 $trendLabel = 'vs first half of range';
 if (count($daily) >= 4) {
@@ -50,7 +47,6 @@ if (count($daily) >= 4) {
     }
 }
 
-/* Rank the services once, so the chart and the table agree on order */
 $rankedServices = $serviceRevenue;
 uasort($rankedServices, fn($a, $b) => ((float) ($b['revenue'] ?? 0)) <=> ((float) ($a['revenue'] ?? 0)));
 
@@ -62,7 +58,6 @@ if ($rankedServices) {
 }
 $maxServiceRev = $topServiceRev;
 
-/* Concentration: how much of revenue the top three carry */
 $topThreeRev = 0.0;
 $seen = 0;
 foreach ($rankedServices as $row) {
@@ -71,11 +66,10 @@ foreach ($rankedServices as $row) {
 }
 $topThreeShare = $serviceTotal > 0 ? ($topThreeRev / $serviceTotal) * 100 : 0;
 
-/* Aging roll-up */
 $agingTotal = array_sum(array_map('floatval', $aging));
 $overduePct = $agingTotal > 0 ? (((float) ($aging['61+'] ?? 0)) / $agingTotal) * 100 : 0;
 
-/* Sparkline drawn server-side, so the headline figure still reads
+/* Server-side sparkline so the headline figure still reads
    correctly even if Chart.js never loads */
 $spark = '';
 if (count($daily) > 1) {
@@ -90,7 +84,6 @@ if (count($daily) > 1) {
     $spark = implode(' ', $spts);
 }
 
-/* Chart data, trimmed to what Chart.js wants */
 $chartLabels  = array_map(fn($d) => date('M j', strtotime($d['d'])), $daily);
 $chartValues  = array_map(fn($d) => (float) $d['collected'], $daily);
 $chartCounts  = array_map(fn($d) => (int) $d['n'], $daily);
@@ -103,7 +96,6 @@ $rangeLabel = ($from && $to)
     ? date('M j, Y', strtotime($from)) . ' – ' . date('M j, Y', strtotime($to))
     : 'All time';
 
-/* CSV payload for the export button (built server-side, no round trip) */
 $csvRows = [
     ['PolyMedic billing report'],
     ['Range', $from ?: 'all', 'to', $to ?: 'all'],
@@ -130,7 +122,6 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
 
 <div class="bl rep">
 
-    <!-- Only ever seen on paper -->
     <div class="rep-print-head" aria-hidden="true">
         <div>
             <strong>PolyMedic Diagnostic Center</strong>
@@ -165,7 +156,7 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
         </div>
     </header>
 
-    <!-- ─── FILTERS (sticky) ──────────────────────────────────── -->
+    <!-- ─── FILTERS ───────────────────────────────────────────── -->
     <form class="bl-filters rep-filters" method="get" action="<?= base_url($routeBase . '/reports') ?>">
         <div class="rep-filters-label">
             <i class="bi bi-calendar3"></i>
@@ -198,10 +189,7 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
         </div>
     </form>
 
-    <!-- ─── HERO ──────────────────────────────────────────────
-         One headline figure with three supporting ones. Four
-         equal cards gave the page no focal point.
-         ─────────────────────────────────────────────────────── -->
+    <!-- ─── HERO ──────────────────────────────────────────────── -->
     <section class="rep-hero">
 
         <div class="rep-hero-main">
@@ -257,10 +245,7 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
         </div>
     </section>
 
-    <!-- ─── AT A GLANCE ───────────────────────────────────────
-         The sentences a manager would write under the numbers
-         anyway. All derived, nothing invented.
-         ─────────────────────────────────────────────────────── -->
+    <!-- ─── AT A GLANCE ───────────────────────────────────────── -->
     <?php if ($dailyCollected > 0 || $outstanding > 0): ?>
     <aside class="rep-insights">
         <span class="rep-insights-label"><i class="bi bi-lightbulb"></i> At a glance</span>
@@ -294,7 +279,7 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
     </aside>
     <?php endif; ?>
 
-    <!-- ─── MAIN GRID — collections (wide) + aging rail ──────── -->
+    <!-- ─── MAIN GRID — collections (wide) + aging rail ───────── -->
     <div class="rep-grid">
 
         <!-- ============ COLLECTIONS ============ -->
@@ -427,7 +412,6 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
                     ];
                     ?>
 
-                    <!-- One stacked bar carries the proportions better than three separate ones -->
                     <div class="rep-stack" role="img" aria-label="Outstanding balance split by age">
                         <?php foreach ($agingBuckets as $b):
                             $value = (float) ($aging[$b['key']] ?? 0);
@@ -569,18 +553,26 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
 
 <style>
 /* =========================================================
-   REPORTS
+   REPORTS — palette aligned with the admin chrome.
 
-   The .bl tokens are declared here as well as in the billing
-   stylesheet, so this page renders correctly on its own.
-   Values are identical, so loading both is harmless. Without
-   this block every var(--bl-*) below resolves to nothing.
+   The .bl tokens are declared here so the page renders on its
+   own even if the billing stylesheet is not loaded. Accent
+   colours read from the same navy family the layout uses for
+   its sidebar and header, so this page no longer looks like
+   a different application.
    ========================================================= */
 
 .bl {
+    /* Neutrals — unchanged from the billing stylesheet */
     --bl-ink:#0f172a; --bl-text:#334155; --bl-muted:#64748b; --bl-faint:#94a3b8;
     --bl-line:#e2e8f0; --bl-line-soft:#f1f5f9; --bl-surface:#fff; --bl-subtle:#f8fafc;
-    --bl-accent:#0d9488; --bl-accent-dark:#0f766e; --bl-accent-soft:#e6f7f7;
+
+    /* Accent — matched to the layout's --active-blue / --sb-active-* */
+    --bl-accent:#1976d2;
+    --bl-accent-dark:#1565c0;
+    --bl-accent-soft:#e3f2fd;
+    --bl-accent-glow:rgba(25,118,210,.45);
+
     --bl-warn:#b45309; --bl-warn-soft:#fff7ed;
     --bl-danger:#b91c1c; --bl-danger-soft:#fef2f2;
     --bl-green:#047857; --bl-green-soft:#ecfdf5;
@@ -614,13 +606,15 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
 .bl-btn:hover { background:var(--bl-subtle); border-color:#cbd5e1; color:var(--bl-ink); }
 .bl-btn--primary, .bl-btn--primary:hover { color:#fff; }
 .bl-btn--primary { background:var(--bl-accent); border-color:var(--bl-accent);
-                   box-shadow:0 1px 2px rgba(13,148,136,.25); }
-.bl-btn--primary:hover { background:var(--bl-accent-dark); border-color:var(--bl-accent-dark); }
+                   box-shadow:0 1px 2px var(--bl-accent-glow); }
+.bl-btn--primary:hover { background:var(--bl-accent-dark); border-color:var(--bl-accent-dark);
+                         box-shadow:0 4px 12px var(--bl-accent-glow); }
 
 .bl-input { height:36px; font-family:inherit; font-size:.8125rem; color:var(--bl-ink);
             background:var(--bl-surface); border:1px solid var(--bl-line); border-radius:9px;
             padding:0 .75rem; transition:border-color .15s, box-shadow .15s; }
-.bl-input:focus { outline:none; border-color:var(--bl-accent); box-shadow:0 0 0 3px rgba(13,148,136,.15); }
+.bl-input:focus { outline:none; border-color:var(--bl-accent);
+                  box-shadow:0 0 0 3px color-mix(in srgb, var(--bl-accent) 18%, transparent); }
 .bl-input--date { min-width:148px; }
 .bl-date-range { position:relative; display:inline-flex; align-items:center; gap:.35rem; padding-left:1.8rem; }
 .bl-date-icon { position:absolute; left:.55rem; font-size:.8rem; color:var(--bl-faint); pointer-events:none; }
@@ -643,8 +637,8 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
     font-size:.75rem;
     padding:.1rem .5rem;
     border-radius:6px;
-    background:var(--bl-line-soft);
-    color:var(--bl-muted);
+    background:var(--bl-accent-soft);
+    color:var(--bl-accent-dark);
 }
 
 /* ---- Sticky filters ---- */
@@ -666,6 +660,7 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
     padding-right:.25rem;
 }
 .rep-filters-label i { color:var(--bl-accent); }
+
 .rep-quick {
     display:inline-flex; gap:2px; padding:3px;
     background:var(--bl-subtle); border:1px solid var(--bl-line);
@@ -678,26 +673,11 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
     white-space:nowrap; transition:background .15s, color .15s;
 }
 .rep-quick-btn:hover { color:var(--bl-ink); }
-.rep-quick-btn.is-active { background:#fff; color:var(--bl-ink); box-shadow:0 1px 2px rgba(15,23,42,.1); }
+.rep-quick-btn.is-active {
+    background:#fff; color:var(--bl-accent-dark);
+    box-shadow:0 1px 2px rgba(15,23,42,.1);
+}
 .rep-filters-actions { display:inline-flex; gap:.5rem; margin-left:auto; }
-
-/* ---- Stat cards: subtext ---- */
-.rep-stats .bl-stat-sub {
-    font-size:.72rem; color:var(--bl-muted); margin-top:.25rem;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-}
-
-/* ---- Section headers ---- */
-.rep-section-head {
-    display:flex; align-items:baseline; justify-content:space-between;
-    gap:1rem; flex-wrap:wrap; margin-bottom:.85rem;
-}
-.rep-section-head .bl-section-title { margin:0; }
-.rep-section-sub {
-    font-size:.75rem; color:var(--bl-muted);
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-    max-width:60%;
-}
 
 /* =========================================================
    HERO
@@ -714,9 +694,10 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
     position:relative; overflow:hidden;
     padding:1.3rem 1.4rem 1.1rem;
     border-radius:var(--bl-radius);
-    background:linear-gradient(145deg,#0f766e 0%,#0d9488 55%,#14b8a6 100%);
+    /* Matches the sidebar gradient — navy → blue, same two-stop rhythm */
+    background:linear-gradient(145deg,#123566 0%,#1976d2 60%,#43a3f5 100%);
     color:#fff;
-    box-shadow:0 10px 24px -14px rgba(13,148,136,.9);
+    box-shadow:0 10px 24px -14px var(--bl-accent-glow);
 }
 
 .rep-hero-label { font-size:.7rem; font-weight:700; letter-spacing:.09em;
@@ -747,7 +728,7 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
 .rep-mini-label { display:flex; align-items:center; gap:.35rem;
                   font-size:.7rem; font-weight:700; letter-spacing:.07em;
                   text-transform:uppercase; color:var(--bl-faint); }
-.rep-mini-label i { color:var(--bl-muted); font-size:.95em; }
+.rep-mini-label i { color:var(--bl-accent); font-size:.95em; }
 
 .rep-mini-value { font-size:1.3rem; font-weight:700; color:var(--bl-ink);
                   font-variant-numeric:tabular-nums; letter-spacing:-.02em; line-height:1.2; }
@@ -761,7 +742,8 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
 
 .rep-insights { display:flex; align-items:flex-start; gap:1rem;
                 padding:.85rem 1.1rem; margin-bottom:1rem;
-                background:var(--bl-accent-soft); border:1px solid #99f6e4;
+                background:var(--bl-accent-soft);
+                border:1px solid color-mix(in srgb, var(--bl-accent) 25%, #ffffff);
                 border-radius:var(--bl-radius); }
 
 .rep-insights-label { display:inline-flex; align-items:center; gap:.35rem; flex-shrink:0;
@@ -769,8 +751,8 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
                       text-transform:uppercase; color:var(--bl-accent-dark); padding-top:.15rem; }
 
 .rep-insights ul { margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:.25rem; }
-.rep-insights li { font-size:.8125rem; color:#115e59; }
-.rep-insights li strong { color:#0f766e; }
+.rep-insights li { font-size:.8125rem; color:#0d47a1; }
+.rep-insights li strong { color:var(--bl-accent-dark); }
 .rep-insights li.is-warn { color:var(--bl-warn); }
 .rep-insights li.is-warn strong { color:#92400e; }
 
@@ -808,8 +790,10 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
                      font-weight:650; color:var(--bl-muted); cursor:pointer;
                      transition:background .15s, color .15s; }
 .rep-toggle button:hover { color:var(--bl-ink); }
-.rep-toggle button[aria-selected="true"] { background:#fff; color:var(--bl-ink);
-                                           box-shadow:0 1px 2px rgba(15,23,42,.12); }
+.rep-toggle button[aria-selected="true"] {
+    background:#fff; color:var(--bl-accent-dark);
+    box-shadow:0 1px 2px rgba(15,23,42,.12);
+}
 
 /* =========================================================
    AGING RAIL
@@ -819,7 +803,7 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
              background:var(--bl-line-soft); margin-bottom:1rem; }
 .rep-stack-seg { display:block; height:100%; }
 .rep-stack-seg--green  { background:#10b981; }
-.rep-stack-seg--blue   { background:#3b82f6; }
+.rep-stack-seg--blue   { background:var(--bl-accent); }
 .rep-stack-seg--danger { background:#dc2626; }
 
 .rep-aging-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; }
@@ -830,7 +814,7 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
 
 .rep-aging-dot { width:9px; height:9px; border-radius:3px; flex-shrink:0; background:var(--tone,#cbd5e1); }
 .rep-aging-row--green  { --tone:#10b981; }
-.rep-aging-row--blue   { --tone:#3b82f6; }
+.rep-aging-row--blue   { --tone:var(--bl-accent); }
 .rep-aging-row--danger { --tone:#dc2626; }
 
 .rep-aging-text { display:flex; flex-direction:column; min-width:0; }
@@ -855,8 +839,6 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
 .rep-chart--line { height:268px; }
 .rep-chart--bar  { height:320px; }
 
-/* Shown only when Chart.js fails to load, so the panel is never
-   just an empty rectangle */
 .rep-chart-fallback {
     position:absolute; inset:0;
     display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -887,7 +869,7 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
 }
 .rep-share-bar > span {
     display:block; height:100%; border-radius:99px;
-    background:linear-gradient(90deg,#5eead4,#0d9488);
+    background:linear-gradient(90deg,#90caf9,var(--bl-accent));
     transition:width .4s ease;
 }
 .rep-share-pct {
@@ -908,7 +890,7 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
 .rep-lines tbody tr:last-child td { border-bottom:0; }
 .rep-lines tbody tr { transition:background .12s; }
 .rep-lines tbody tr:hover { background:#fafbfd; }
-.rep-lines tbody tr.is-best { background:#f4fdfb; }
+.rep-lines tbody tr.is-best { background:#f0f7ff; }
 .rep-lines tbody tr.is-top .rep-rank { background:var(--bl-accent); color:#fff; }
 
 .rep-lines tfoot td {
@@ -970,11 +952,7 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
 }
 
 /* =========================================================
-   PRINT — a report that can actually be filed.
-
-   The previous rules hid .rep-chart, so a printed report came
-   out with no visuals at all. The charts print now; only the
-   controls are dropped.
+   PRINT
    ========================================================= */
 
 .rep-print-head { display:none; }
@@ -1008,7 +986,6 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
     .rep-trend { background:#f1f5f9 !important; color:#0f172a !important; }
     .rep-spark { color:#94a3b8 !important; }
 
-    /* Paper shows both views, never one or the other */
     #panelTable[hidden] { display:block !important; }
     .rep-hide-sm { display:table-cell !important; }
     .rep-chart { break-inside:avoid; page-break-inside:avoid; }
@@ -1017,16 +994,12 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
 }
 </style>
 
-<!-- Pinned: an unpinned "latest" tag can change under the page without warning -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>
 (function () {
     'use strict';
 
-    /* =========================================================
-       DATA (server-rendered)
-       ========================================================= */
     var DAILY_LABELS  = <?= json_encode($chartLabels, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     var DAILY_VALUES  = <?= json_encode($chartValues, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     var DAILY_COUNTS  = <?= json_encode($chartCounts, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
@@ -1034,7 +1007,6 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
     var SVC_VALUES    = <?= json_encode($svcValues,   JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 
     var CSV_ROWS      = <?= json_encode($csvRows, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-    var RANGE_LABEL   = <?= json_encode($rangeLabel, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 
     var $ = function (id) { return document.getElementById(id); };
 
@@ -1043,6 +1015,13 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
             minimumFractionDigits: 2, maximumFractionDigits: 2,
         });
     };
+
+    /* Accent colour, matched to the layout's --active-blue */
+    var ACCENT       = '#1976d2';
+    var ACCENT_DARK  = '#1565c0';
+    var ACCENT_SOFT  = 'rgba(25,118,210,.28)';
+    var ACCENT_FADE  = 'rgba(25,118,210,0)';
+    var BAR_MUTED    = 'rgba(148,163,184,.30)';
 
     var TOOLTIP = {
         backgroundColor: 'rgba(15,23,42,.94)',
@@ -1054,9 +1033,6 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
         displayColors: false,
     };
 
-    /* =========================================================
-       CHART 1 — DAILY COLLECTIONS (LINE + BAR MIX)
-       ========================================================= */
     var hasChart = function () { return typeof Chart !== 'undefined'; };
 
     function drawDailyChart() {
@@ -1069,11 +1045,10 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
             return;
         }
 
-        // Gradient fill under the line
         var ctx = canvas.getContext('2d');
         var gradient = ctx.createLinearGradient(0, 0, 0, 260);
-        gradient.addColorStop(0, 'rgba(13,148,136,.28)');
-        gradient.addColorStop(1, 'rgba(13,148,136,0)');
+        gradient.addColorStop(0, ACCENT_SOFT);
+        gradient.addColorStop(1, ACCENT_FADE);
 
         new Chart(ctx, {
             type: 'line',
@@ -1082,21 +1057,21 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
                 datasets: [{
                     label: 'Collected',
                     data: DAILY_VALUES,
-                    borderColor: '#0d9488',
+                    borderColor: ACCENT,
                     backgroundColor: gradient,
                     fill: true,
                     tension: 0.35,
                     borderWidth: 2.4,
                     pointRadius: 0,
                     pointHoverRadius: 6,
-                    pointHoverBackgroundColor: '#0d9488',
+                    pointHoverBackgroundColor: ACCENT,
                     pointHoverBorderColor: '#ffffff',
                     pointHoverBorderWidth: 2.5,
                     yAxisID: 'y',
                 }, {
                     label: 'Payments',
                     data: DAILY_COUNTS,
-                    backgroundColor: 'rgba(148,163,184,.30)',
+                    backgroundColor: BAR_MUTED,
                     type: 'bar',
                     borderWidth: 0,
                     borderRadius: 4,
@@ -1161,9 +1136,6 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
         });
     }
 
-    /* =========================================================
-       CHART 2 — REVENUE BY SERVICE (HORIZONTAL BAR)
-       ========================================================= */
     function drawServiceChart() {
         var canvas = $('repServiceChart');
         if (!canvas || !SVC_LABELS.length) { return; }
@@ -1174,6 +1146,10 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
             return;
         }
 
+        /* Sequential blue shades, darkest = highest revenue. */
+        var shades = ['#0b3d91', '#1565c0', '#1976d2', '#2196f3',
+                      '#42a5f5', '#64b5f6', '#90caf9', '#bbdefb'];
+
         new Chart(canvas.getContext('2d'), {
             type: 'bar',
             data: {
@@ -1181,13 +1157,9 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
                 datasets: [{
                     label: 'Revenue',
                     data: SVC_VALUES,
-                    backgroundColor: (function () {
-                        // Sequential, darkest = highest revenue. Eight unrelated
-                        // hues implied eight categories that don't exist.
-                        var shades = ['#0f766e', '#0d9488', '#14b8a6', '#2dd4bf',
-                                      '#5eead4', '#99f6e4', '#b9f8ec', '#ccfbf1'];
-                        return SVC_LABELS.map(function (_, i) { return shades[i] || '#ccfbf1'; });
-                    }()),
+                    backgroundColor: SVC_LABELS.map(function (_, i) {
+                        return shades[i] || '#bbdefb';
+                    }),
                     borderRadius: 6,
                     borderSkipped: false,
                     barPercentage: 0.75,
@@ -1234,9 +1206,6 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
         });
     }
 
-    /* =========================================================
-       CHART / TABLE TOGGLE
-       ========================================================= */
     function setupToggle() {
         var chartBtn = $('viewChart');
         var tableBtn = $('viewTable');
@@ -1253,13 +1222,9 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
         chartBtn.addEventListener('click', function () { show('chart'); });
         tableBtn.addEventListener('click', function () { show('table'); });
 
-        // No chart library? Land on the table rather than an empty box.
         if (!hasChart()) { show('table'); }
     }
 
-    /* =========================================================
-       CSV EXPORT
-       ========================================================= */
     function exportCsv() {
         if (!CSV_ROWS || !CSV_ROWS.length) { return; }
 
@@ -1282,9 +1247,6 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
         setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
     }
 
-    /* =========================================================
-       QUICK RANGE BUTTONS — populate the date inputs and submit
-       ========================================================= */
     function setupQuickRanges() {
         var from = $('rep_from');
         var to   = $('rep_to');
@@ -1317,9 +1279,6 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
         });
     }
 
-    /* =========================================================
-       INIT
-       ========================================================= */
     function ready(fn) {
         if (document.readyState !== 'loading') { fn(); }
         else { document.addEventListener('DOMContentLoaded', fn); }

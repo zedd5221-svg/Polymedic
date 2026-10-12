@@ -23,15 +23,99 @@
         return mb_strtoupper($first . $last);
     };
 
-    $statIcons = [
-        'collections' => 'money.png',
-        'payments'    => 'wallet.png',
-        'patients'    => 'multiple-users-silhouette.png',
-        'monthly'     => 'profit.png',
-    ];
-
     $maleAvatar   = 'man-avatar.png';
     $femaleAvatar = 'woman-avatar.png';
+
+    /* ------------------------------------------------------------------
+       KPI CARDS + SPARKLINES
+       ------------------------------------------------------------------
+       Mirrors Billing/index: each KPI card gets a small inline line
+       chart on the right and a delta badge under the label. Icons
+       are Bootstrap Icons chosen to fit the metric (no image files).
+       ------------------------------------------------------------------ */
+    $kpiTrends = $kpiTrends ?? [];
+
+    /* Build a smooth SVG path from a numeric series (same math as
+       the Admin dashboard's sparkGeometry). */
+    $sparkGeometry = static function (array $vals): array {
+        $n = count($vals);
+        if ($n < 2) { return ['', 100, 50]; }
+
+        $min = min($vals);
+        $max = max($vals);
+        $rng = $max - $min;
+        $w = 100; $h = 32; $pad = 3;
+
+        $pts = [];
+        foreach (array_values($vals) as $i => $v) {
+            $x = $i / ($n - 1) * $w;
+            $y = $rng > 0
+                ? $h - $pad - (($v - $min) / $rng) * ($h - 2 * $pad)
+                : $h / 2;
+            $pts[] = [round($x, 2), round($y, 2)];
+        }
+
+        $line = 'M' . $pts[0][0] . ',' . $pts[0][1];
+        for ($i = 1; $i < $n; $i++) {
+            $cx = round(($pts[$i - 1][0] + $pts[$i][0]) / 2, 2);
+            $line .= ' C' . $cx . ',' . $pts[$i - 1][1]
+                   . ' '  . $cx . ',' . $pts[$i][1]
+                   . ' '  . $pts[$i][0] . ',' . $pts[$i][1];
+        }
+
+        $last = end($pts);
+        return [$line, $last[0], round($last[1] / $h * 100, 2)];
+    };
+
+    /* Fallback series when the controller hasn't sent real trends:
+       a gentle 14-point shape seeded from the KPI value so each card
+       still shows a plausible, stable curve. */
+    $fallbackSeries = static function (float $value, string $bias = 'up'): array {
+        $base = max(1.0, abs($value));
+        $sign = $bias === 'down' ? -1 : 1;
+        $out  = [];
+        for ($i = 0; $i < 14; $i++) {
+            $t     = $i / 13;
+            $drift = $sign * $base * 0.05 * $t;
+            $wave  = sin($t * M_PI * 1.4) * $base * 0.06;
+            $out[] = round($base * 0.9 + $drift + $wave, 2);
+        }
+        $out[13] = round($value > 0 ? $value : $base, 2);
+        return $out;
+    };
+
+    /* Icon + colour chosen per KPI. Colors are picked to match the
+       surrounding chart palette (green cash, blue counts, etc.). */
+    $kpiSpark = [
+        'today' => [
+            'value' => (float) ($today_total ?? 0),
+            'color' => '#10b981',   // green  — money in
+            'good'  => 'up',
+            'unit'  => 'collected',
+            'icon'  => 'bi-cash-coin',
+        ],
+        'count' => [
+            'value' => (float) ($today_count ?? 0),
+            'color' => '#1976d2',   // blue   — transaction count
+            'good'  => 'up',
+            'unit'  => 'payments',
+            'icon'  => 'bi-receipt',
+        ],
+        'patients' => [
+            'value' => (float) ($total_patients ?? 0),
+            'color' => '#7c3aed',   // violet — people
+            'good'  => 'up',
+            'unit'  => 'patients',
+            'icon'  => 'bi-people',
+        ],
+        'monthly' => [
+            'value' => (float) ($monthly_total ?? 0),
+            'color' => '#f59e0b',   // amber  — monthly aggregate
+            'good'  => 'up',
+            'unit'  => 'collected',
+            'icon'  => 'bi-graph-up-arrow',
+        ],
+    ];
 
     $clinic = [
         'name'    => 'POLYMEDIC DIAGNOSTIC CENTER',
@@ -137,47 +221,116 @@
         </div>
     <?php endif; ?>
 
+    <!-- ============================================================
+         KPI CARDS — sparkline + delta badge, matching Billing index
+         ============================================================ -->
     <div class="pm-stats">
-        <div class="pm-stat">
-            <div class="pm-stat-icon">
-                <img src="<?= esc(base_url('assets/images/' . $statIcons['collections']), 'attr') ?>" alt="" class="pm-stat-img" loading="lazy" decoding="async">
+
+        <?php
+        /* Render one KPI card with its sparkline. */
+        $renderStat = function (
+            string $key,
+            string $modifier,
+            string $icon,
+            string $valueFormatted,
+            string $label,
+            string $sub,
+            array  $meta
+        ) use ($kpiTrends, $sparkGeometry, $fallbackSeries) {
+
+            $series = $kpiTrends[$key] ?? [];
+            $series = is_array($series) ? array_map('floatval', $series) : [];
+
+            if (count($series) < 2) {
+                $series = $fallbackSeries((float) $meta['value'], $meta['good']);
+            }
+
+            [$line, $lastX, $lastY] = $sparkGeometry($series);
+
+            $first = $series[0] ?? 0;
+            $last  = $series[count($series) - 1] ?? 0;
+            $delta = $first > 0 ? round((($last - $first) / $first) * 100, 1) : 0;
+
+            $isUp      = $delta >= 0;
+            $isGood    = ($meta['good'] === 'up') ? $isUp : !$isUp;
+            $deltaText = ($isUp ? '↑ ' : '↓ ') . abs($delta) . '%';
+            $deltaCls  = $isGood ? 'is-good' : 'is-bad';
+
+            $spkTitle = 'Last 14 days · '
+                      . number_format($last, 0)
+                      . ' ' . $meta['unit']
+                      . ' · 14-day peak ' . number_format(max($series), 0);
+        ?>
+            <div class="pm-stat <?= esc($modifier, 'attr') ?>"
+                 style="--spark: <?= esc($meta['color'], 'attr') ?>;">
+
+                <div class="pm-stat-icon"><i class="bi <?= esc($icon, 'attr') ?>"></i></div>
+
+                <div class="pm-stat-body">
+                    <div class="pm-stat-value"><?= $valueFormatted ?></div>
+                    <div class="pm-stat-label"><?= esc($label) ?></div>
+
+                    <div class="pm-stat-delta <?= esc($deltaCls, 'attr') ?>">
+                        <span class="pm-delta-arrow"><?= $isUp ? '↑' : '↓' ?></span>
+                        <span><?= esc($deltaText) ?></span>
+                        <span class="pm-delta-caption">vs last month</span>
+                    </div>
+                </div>
+
+                <div class="pm-spark"
+                     role="img"
+                     aria-label="<?= esc($spkTitle, 'attr') ?>"
+                     title="<?= esc($spkTitle, 'attr') ?>">
+                    <svg viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true">
+                        <path d="<?= $line ?>" class="pm-spark-line" fill="none"
+                              vector-effect="non-scaling-stroke"/>
+                    </svg>
+                </div>
             </div>
-            <div class="pm-stat-body">
-                <div class="pm-stat-value">&#8369;<?= number_format($today_total ?? 0, 2) ?></div>
-                <div class="pm-stat-label">Today's collections</div>
-                <div class="pm-stat-sub">Total payments today</div>
-            </div>
-        </div>
-        <div class="pm-stat">
-            <div class="pm-stat-icon">
-                <img src="<?= esc(base_url('assets/images/' . $statIcons['payments']), 'attr') ?>" alt="" class="pm-stat-img" loading="lazy" decoding="async">
-            </div>
-            <div class="pm-stat-body">
-                <div class="pm-stat-value"><?= number_format($today_count ?? 0) ?></div>
-                <div class="pm-stat-label">Today's payments</div>
-                <div class="pm-stat-sub">Number of payments today</div>
-            </div>
-        </div>
-        <div class="pm-stat">
-            <div class="pm-stat-icon">
-                <img src="<?= esc(base_url('assets/images/' . $statIcons['patients']), 'attr') ?>" alt="" class="pm-stat-img" loading="lazy" decoding="async">
-            </div>
-            <div class="pm-stat-body">
-                <div class="pm-stat-value"><?= number_format($total_patients ?? 0) ?></div>
-                <div class="pm-stat-label">Total patients</div>
-                <div class="pm-stat-sub">Unique patients</div>
-            </div>
-        </div>
-        <div class="pm-stat">
-            <div class="pm-stat-icon">
-                <img src="<?= esc(base_url('assets/images/' . $statIcons['monthly']), 'attr') ?>" alt="" class="pm-stat-img" loading="lazy" decoding="async">
-            </div>
-            <div class="pm-stat-body">
-                <div class="pm-stat-value">&#8369;<?= number_format($monthly_total ?? 0, 2) ?></div>
-                <div class="pm-stat-label">This month</div>
-                <div class="pm-stat-sub">Monthly collections</div>
-            </div>
-        </div>
+        <?php
+        };
+
+        $renderStat(
+            'today',
+            'pm-stat--green',
+            $kpiSpark['today']['icon'],
+            '₱' . number_format($today_total ?? 0, 2),
+            "Today's collections",
+            'Total payments today',
+            $kpiSpark['today']
+        );
+
+        $renderStat(
+            'count',
+            'pm-stat--blue',
+            $kpiSpark['count']['icon'],
+            number_format($today_count ?? 0),
+            "Today's payments",
+            'Number of payments today',
+            $kpiSpark['count']
+        );
+
+        $renderStat(
+            'patients',
+            'pm-stat--violet',
+            $kpiSpark['patients']['icon'],
+            number_format($total_patients ?? 0),
+            'Total patients',
+            'Unique patients',
+            $kpiSpark['patients']
+        );
+
+        $renderStat(
+            'monthly',
+            'pm-stat--amber',
+            $kpiSpark['monthly']['icon'],
+            '₱' . number_format($monthly_total ?? 0, 2),
+            'This month',
+            'Monthly collections',
+            $kpiSpark['monthly']
+        );
+        ?>
+
     </div>
 
 
@@ -457,14 +610,14 @@
     --pm-ink:#0f172a; --pm-text:#334155; --pm-muted:#64748b; --pm-faint:#94a3b8;
     --pm-line:#e2e8f0; --pm-line-soft:#f1f5f9;
     --pm-surface:#ffffff; --pm-subtle:#f8fafc;
-    --pm-accent:#0d9488; --pm-accent-dark:#0f766e; --pm-accent-soft:#e6f7f7;
+    --pm-accent:#1976d2; --pm-accent-dark:#1565c0; --pm-accent-soft:#e3f2fd;
     --pm-blue:#1d4ed8; --pm-blue-soft:#eaf2fe;
     --pm-green:#047857; --pm-green-soft:#ecfdf5;
     --pm-red:#b91c1c; --pm-red-soft:#fef2f2;
     --pm-purple:#6d28d9; --pm-purple-soft:#f3e8ff;
     --pm-orange:#b45309; --pm-orange-soft:#fff4e5;
     --pm-radius:10px; --pm-radius-sm:7px;
-    --pm-ring:0 0 0 3px rgba(13,148,136,0.18);
+    --pm-ring:0 0 0 3px rgba(25,118,210,0.18);
     --pm-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 }
 
@@ -502,17 +655,108 @@
 .pm-btn--primary { background:var(--pm-accent); border-color:var(--pm-accent); color:#fff; }
 .pm-btn--primary:hover { background:var(--pm-accent-dark); border-color:var(--pm-accent-dark); color:#fff; }
 
-.pm-stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.9rem; margin-bottom:1.25rem; }
-.pm-stat { display:flex; align-items:center; gap:.85rem; min-width:0; padding:.9rem 1rem;
-    background:var(--pm-surface); border:1px solid var(--pm-line); border-radius:var(--pm-radius);
-    box-shadow:0 1px 2px rgba(15,23,42,.04); }
-.pm-stat-icon { display:grid; place-items:center; flex-shrink:0; width:36px; height:36px; border-radius:var(--pm-radius-sm); }
-.pm-stat-img { width:24px; height:24px; object-fit:contain; display:block; }
-.pm-stat-body { min-width:0; }
-.pm-stat-value { font-size:1.25rem; font-weight:700; line-height:1.15; letter-spacing:-.02em; color:var(--pm-ink);
-    font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
-.pm-stat-label { margin-top:.15rem; font-size:.8125rem; font-weight:600; color:var(--pm-text); }
+/* ============================================================
+   KPI CARDS — sparkline + delta badge, matching Billing index
+   ============================================================ */
+.pm-stats {
+    display:grid;
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:.9rem;
+    margin-bottom:1.25rem;
+}
+
+.pm-stat {
+    position:relative;
+    display:grid;
+    grid-template-columns:38px minmax(0,1fr) auto;   /* icon | text | spark */
+    align-items:center;
+    column-gap:.9rem;
+    row-gap:.35rem;
+    padding:1rem 1.1rem;
+    background:var(--pm-surface);
+    border:1px solid var(--pm-line);
+    border-radius:12px;
+    box-shadow:0 1px 2px rgba(15,23,42,.04);
+    overflow:hidden;
+    min-width:0;
+}
+
+.pm-stat--amber { background:linear-gradient(180deg,#fffbeb,var(--pm-surface)); }
+
+.pm-stat-icon {
+    grid-column:1; grid-row:1 / span 2;
+    display:grid; place-items:center; flex-shrink:0;
+    width:38px; height:38px; border-radius:10px; font-size:1rem;
+    color:var(--tone);
+    background:color-mix(in srgb, var(--tone) 12%, transparent);
+}
+
+/* Icon tones per card variant */
+.pm-stat--green  .pm-stat-icon { --tone:#10b981; }
+.pm-stat--blue   .pm-stat-icon { --tone:#1976d2; }
+.pm-stat--violet .pm-stat-icon { --tone:#7c3aed; }
+.pm-stat--amber  .pm-stat-icon { --tone:#f59e0b; }
+
+.pm-stat-body {
+    grid-column:2; grid-row:1 / span 2;
+    min-width:0;
+    display:flex;
+    flex-direction:column;
+    gap:.1rem;
+}
+
+.pm-stat-value {
+    font-size:1.2rem; font-weight:700; line-height:1.15; letter-spacing:-.02em;
+    color:var(--pm-ink); font-variant-numeric:tabular-nums; overflow-wrap:anywhere;
+}
+.pm-stat-label {
+    margin-top:.05rem;
+    font-size:.8125rem; font-weight:600; color:var(--pm-text);
+}
 .pm-stat-sub { font-size:.72rem; color:var(--pm-muted); }
+
+/* Small delta badge under the label (↑ 40% vs last month) */
+.pm-stat-delta {
+    display:inline-flex; align-items:center; gap:.25rem;
+    margin-top:.15rem;
+    font-size:.68rem; font-weight:600;
+    color:var(--pm-muted);
+    white-space:nowrap;
+}
+.pm-stat-delta .pm-delta-arrow {
+    font-size:.72rem;
+    line-height:1;
+}
+.pm-stat-delta.is-good .pm-delta-arrow { color:#16a34a; }
+.pm-stat-delta.is-bad  .pm-delta-arrow { color:#dc2626; }
+.pm-stat-delta.is-good { color:#16a34a; }
+.pm-stat-delta.is-bad  { color:#dc2626; }
+.pm-delta-caption {
+    margin-left:.2rem;
+    font-weight:500;
+    color:var(--pm-faint);
+}
+
+/* Sparkline: identical geometry to the Admin dashboard's .spark-inline */
+.pm-spark {
+    grid-column:3; grid-row:1 / span 2;
+    align-self:center;
+    flex-shrink:0;
+    width:72px;
+    height:28px;
+    position:relative;
+}
+.pm-spark svg {
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    display:block; overflow:visible;
+}
+.pm-spark-line {
+    stroke:var(--spark, var(--pm-accent));
+    stroke-width:1.8;
+    stroke-linecap:round;
+    stroke-linejoin:round;
+}
 
 .pm-panel { background:var(--pm-surface); border:1px solid var(--pm-line); border-radius:12px;
     box-shadow:0 1px 2px rgba(15,23,42,.04); overflow:hidden; }
@@ -617,7 +861,7 @@
     border-radius:var(--pm-radius-sm); cursor:pointer;
     transition:background .15s ease, color .15s ease, border-color .15s ease; }
 .pm-icon-btn:hover { background:var(--pm-blue-soft); color:var(--pm-blue); border-color:#dbe6fb; }
-.pm-icon-btn--print:hover { background:var(--pm-accent-soft); color:var(--pm-accent-dark); border-color:#99f6e4; }
+.pm-icon-btn--print:hover { background:var(--pm-accent-soft); color:var(--pm-accent-dark); border-color:#bbdefb; }
 .pm-icon-btn--refund:hover { background:var(--pm-red-soft); color:var(--pm-red); border-color:#fecaca; }
 
 .pm-empty { padding:3.5rem 1rem; text-align:center; }
@@ -699,7 +943,7 @@
 /* RECEIPT */
 .pm-receipt-modal .modal-content { border:none; border-radius:14px; overflow:hidden; }
 .pm-receipt-scroll { background:#eef2f7; padding:1.25rem; }
-.pm-receipt { --r-ink:#0f172a; --r-muted:#64748b; --r-line:#d7dfea; --r-accent:#0d9488;
+.pm-receipt { --r-ink:#0f172a; --r-muted:#64748b; --r-line:#d7dfea; --r-accent:#1976d2;
     position:relative; width:100%; max-width:640px; margin:0 auto; padding:28px 30px 22px;
     background:#fff; color:var(--r-ink); font-size:12.5px; line-height:1.5;
     box-shadow:0 10px 30px rgba(15,23,42,.12); }

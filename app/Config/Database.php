@@ -26,10 +26,11 @@ class Database extends Config
      */
     public array $default = [
         'DSN'          => '',
-        'hostname'     => 'localhost',
-        'username'     => 'root',
+        // Connection credentials are supplied by .env (database.default.*).
+        'hostname'     => '',
+        'username'     => '',
         'password'     => '',
-        'database'     => 'polymedic_db',
+        'database'     => '',
         'DBDriver'     => 'MySQLi',
         'DBPrefix'     => '',
         'pConnect'     => false,

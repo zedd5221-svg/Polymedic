@@ -1,4 +1,4 @@
-<?= $this->extend('layouts/AdminLayout') ?>
+<?= $this->extend('Layouts/AdminLayout') ?>
 
 <?= $this->section('pageTitle') ?>User Management<?= $this->endSection() ?>
 
@@ -275,7 +275,7 @@ $userAvatar = 'default-avatar.png';
                                 <div class="password-field">
                                     <input type="password"
                                            class="form-control"
-                                           id="add_password"
+                                           id="add_password" minlength="8"
                                            name="password"
                                            autocomplete="new-password"
                                            placeholder="Minimum 8 characters"
@@ -436,7 +436,7 @@ $userAvatar = 'default-avatar.png';
                                     <input type="password"
                                            class="form-control"
                                            name="password"
-                                           id="edit_password"
+                                           id="edit_password" minlength="8"
                                            autocomplete="new-password"
                                            placeholder="Leave blank to keep current password">
                                     <button type="button"
@@ -529,7 +529,7 @@ $userAvatar = 'default-avatar.png';
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <a href="#" id="toggle_user_link" class="btn btn-primary" role="button">Confirm</a>
+                <a href="#" data-post id="toggle_user_link" class="btn btn-primary" role="button">Confirm</a>
             </div>
         </div>
     </div>
@@ -549,7 +549,7 @@ $userAvatar = 'default-avatar.png';
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <a href="#" id="delete_user_link" class="btn btn-danger" role="button">Delete User</a>
+                <a href="#" data-post id="delete_user_link" class="btn btn-danger" role="button">Delete User</a>
             </div>
         </div>
     </div>
@@ -1516,7 +1516,7 @@ $userAvatar = 'default-avatar.png';
 
             if (!modalEl || !hasBootstrap) {
                 if (window.confirm('Are you sure you want to ' + verb + ' this user?')) {
-                    window.location.href = target;
+                    window.pmPost(target);
                 }
                 return;
             }

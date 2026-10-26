@@ -1250,16 +1250,12 @@
     $pendingXray = 0;
     $unreadCount = 0;
 
-    if (class_exists('\App\Models\XrayExaminationModel')) {
-        try {
-            $pendingXray = (int) (new \App\Models\XrayExaminationModel())
-                ->where('status', 'pending')
-                ->countAllResults();
-        } catch (\Throwable $e) {
-            $pendingXray = 0;
-        }
+    try {
+        // paid studies no radiologist has started reading yet
+        $pendingXray = (new \App\Models\DiagnosticRequestModel())->getDepartmentCounts('xray')['pending'];
+    } catch (\Throwable $e) {
+        $pendingXray = 0;
     }
-
     if (class_exists('\App\Models\NotificationModel')) {
         try {
             $unreadCount = (int) (new \App\Models\NotificationModel())->getUnreadCount();
@@ -1397,6 +1393,7 @@
                     $pageTitle = $this->renderSection('pageTitle') ?: 'Dashboard';
 
                     $iconMap = [
+                        'My Profile' => 'profile.png',
                         'Dashboard' => 'statisctics.png',
                         'Examinations' => 'x-rays.png',
                         'View X-Ray Examination' => 'xray-icon.png',
@@ -1484,18 +1481,7 @@
                     <span class="divider-icon">|</span>
 
                     <!-- USER -->
-                    <div class="header-user">
-
-                        <div class="avatar-small">
-                            <i class="bi bi-person-fill"></i>
-                        </div>
-
-                        <div class="user-details">
-                            <span class="user-name-header"><?= session()->get('full_name') ?? 'Radiologist' ?></span>
-                            <span class="user-role-header">Radiologist</span>
-                        </div>
-
-                    </div>
+                    <?= view('partials/headerUser', ['prefix' => 'radiologist', 'fallbackName' => 'Radiologist', 'roleLabel' => 'Radiologist']) ?>
 
                 </div>
 
@@ -1721,7 +1707,7 @@
     // =========================================================
 
     function fetchNotifications() {
-        fetch('/polymedic/public/radiologist/notifications/fetch', {
+        fetch('<?= base_url() ?>radiologist/notifications/fetch', {
             headers: {
                 'X-Requested-With': 'XMLHttpRequest'
             }
@@ -1809,7 +1795,7 @@
     }
 
     window.markNotificationRead = function(id, event) {
-        fetch('/polymedic/public/radiologist/notifications/mark-read/' + id, {
+        fetch('<?= base_url() ?>radiologist/notifications/mark-read/' + id, {
             headers: {
                 'X-Requested-With': 'XMLHttpRequest'
             }
@@ -1828,7 +1814,7 @@
     window.markAllNotificationsRead = function(event) {
         if (event) { event.stopPropagation(); }
 
-        fetch('/polymedic/public/radiologist/notifications/mark-all-read', {
+        fetch('<?= base_url() ?>radiologist/notifications/mark-all-read', {
             headers: {
                 'X-Requested-With': 'XMLHttpRequest'
             }
@@ -1907,15 +1893,77 @@
         return { html: content.innerHTML, title: newTitleText, iconSrc: newIconSrc };
     }
 
-    function runContentScripts(container) {
-        container.querySelectorAll('script').forEach(function(oldScript) {
+    // Re-execute the <script> tags of freshly swapped content, in order.
+    // - Inline code is wrapped in a block so a page's top-level
+    //   const/let can be declared again on the next visit (re-running it
+    //   verbatim throws "already declared" and kills the page's charts).
+    // - DOMContentLoaded / load already fired, so handlers registered for
+    //   them during the re-run are called straight away.
+    // - External scripts load one at a time before the code that needs
+    //   them; ones already on the page (e.g. Chart.js) are not reloaded.
+    // - Data blocks (type="application/json", ...) are left alone.
+    var loadedSrc = Object.create(null);
+    document.querySelectorAll('script[src]').forEach(function(s) { loadedSrc[s.src] = true; });
+
+    function isJsScript(script) {
+        var type = (script.getAttribute('type') || '').trim().toLowerCase();
+        return type === '' || type === 'text/javascript' || type === 'application/javascript';
+    }
+
+    function runInlineScript(oldScript) {
+        var docAdd = document.addEventListener;
+        var winAdd = window.addEventListener;
+        var immediate = function(add) {
+            return function(type, fn, opts) {
+                if (type === 'DOMContentLoaded' || type === 'load') {
+                    setTimeout(function() {
+                        if (typeof fn === 'function') { fn.call(document, new Event(type)); }
+                        else if (fn && typeof fn.handleEvent === 'function') { fn.handleEvent(new Event(type)); }
+                    }, 0);
+                    return;
+                }
+                return add.call(this, type, fn, opts);
+            };
+        };
+
+        document.addEventListener = immediate(docAdd);
+        window.addEventListener   = immediate(winAdd);
+        try {
             var s = document.createElement('script');
             Array.prototype.slice.call(oldScript.attributes).forEach(function(attr) {
                 s.setAttribute(attr.name, attr.value);
             });
-            s.textContent = oldScript.textContent;
+            s.textContent = '{\n' + oldScript.textContent + '\n}';
             oldScript.parentNode.replaceChild(s, oldScript);
-        });
+        } finally {
+            document.addEventListener = docAdd;
+            window.addEventListener   = winAdd;
+        }
+    }
+
+    function runContentScripts(container) {
+        var queue = Array.prototype.slice.call(container.querySelectorAll('script')).filter(isJsScript);
+
+        (function next() {
+            var oldScript = queue.shift();
+            if (!oldScript) return;
+
+            if (!oldScript.src) {
+                runInlineScript(oldScript);
+                next();
+                return;
+            }
+
+            if (loadedSrc[oldScript.src]) { next(); return; }
+
+            var s = document.createElement('script');
+            Array.prototype.slice.call(oldScript.attributes).forEach(function(attr) {
+                s.setAttribute(attr.name, attr.value);
+            });
+            s.async = false;
+            s.onload = s.onerror = function() { loadedSrc[s.src] = true; next(); };
+            oldScript.parentNode.replaceChild(s, oldScript);
+        })();
     }
 
     function swapContent(payload) {
@@ -2002,6 +2050,7 @@
 })();
 </script>
 
+<?= view('partials/postLinks') ?>
 </body>
 
 </html>

@@ -1,4 +1,4 @@
-<?= $this->extend('layouts/ReceptionistLayout') ?>
+<?= $this->extend('Layouts/ReceptionistLayout') ?>
 
 <?= $this->section('pageTitle') ?>Dashboard<?= $this->endSection() ?>
 
@@ -113,8 +113,8 @@ $statCards = [
         'tone'  => 'icon-blue',
         'label' => 'Pending Diagnostics',
         'value' => number_format((int) ($pending_diagnostic ?? 0)),
-        'note'  => 'Tests requested',
-        'link'  => null,
+        'note'  => 'Waiting to be started',
+        'link'  => base_url('receptionist/diagnostic-requests'),
     ],
     [
         'key'   => 'unpaid',
@@ -123,7 +123,7 @@ $statCards = [
         'label' => 'Unpaid Bills',
         'value' => number_format((int) ($unpaid_bills ?? 0)),
         'note'  => 'Outstanding balance',
-        'link'  => null,
+        'link'  => base_url('receptionist/billing?status=unpaid'),
     ],
     [
         'key'   => 'collections',
@@ -440,7 +440,7 @@ $sparkGeometry = static function (array $vals): array {
                                     </a>
 
                                     <?php if ($statusKey === 'pending'): ?>
-                                        <a href="<?= base_url('receptionist/appointment/approve/' . $apptId) ?>"
+                                        <a data-post href="<?= base_url('receptionist/appointment/approve/' . $apptId) ?>"
                                            class="action-icon-btn approve" title="Approve"
                                            aria-label="Approve appointment for <?= esc($fullName, 'attr') ?>"
                                            onclick="return confirm('Approve the <?= esc($apptTime, 'attr') ?> appointment for <?= esc($fullName, 'attr') ?>?')">
@@ -449,7 +449,7 @@ $sparkGeometry = static function (array $vals): array {
                                     <?php endif; ?>
 
                                     <?php if ($statusKey === 'approved'): ?>
-                                        <a href="<?= base_url('receptionist/appointment/complete/' . $apptId) ?>"
+                                        <a data-post href="<?= base_url('receptionist/appointment/complete/' . $apptId) ?>"
                                            class="action-icon-btn complete" title="Complete"
                                            aria-label="Mark complete for <?= esc($fullName, 'attr') ?>"
                                            onclick="return confirm('Mark the <?= esc($apptTime, 'attr') ?> appointment for <?= esc($fullName, 'attr') ?> as completed?')">
@@ -458,7 +458,7 @@ $sparkGeometry = static function (array $vals): array {
                                     <?php endif; ?>
 
                                     <?php if ($statusKey === 'pending' || $statusKey === 'approved'): ?>
-                                        <a href="<?= base_url('receptionist/appointment/cancel/' . $apptId) ?>"
+                                        <a data-post href="<?= base_url('receptionist/appointment/cancel/' . $apptId) ?>"
                                            class="action-icon-btn cancel" title="Cancel"
                                            aria-label="Cancel appointment for <?= esc($fullName, 'attr') ?>"
                                            onclick="return confirm('Cancel the <?= esc($apptTime, 'attr') ?> appointment for <?= esc($fullName, 'attr') ?>? This cannot be undone.')">

@@ -1,4 +1,4 @@
-<?= $this->extend('layouts/MedTechLayout') ?>
+<?= $this->extend('Layouts/MedTechLayout') ?>
 
 <?= $this->section('pageTitle') ?>Laboratory Findings<?= $this->endSection() ?>
 
@@ -144,6 +144,11 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
             <div class="lab-hero-text">
                 <div class="lab-hero-titleline">
                     <h1 class="lab-hero-title"><?= esc($request['patient_name']) ?></h1>
+                    <?php if ($status === 'draft'): ?>
+                        <span class="lab-pill lab-pill--blue">
+                            <span class="lab-pill-dot" aria-hidden="true"></span>In progress
+                        </span>
+                    <?php endif; ?>
                     <span class="lab-pill lab-pill--<?= esc($statusTone, 'attr') ?>">
                         <span class="lab-pill-dot" aria-hidden="true"></span><?= esc($statusLabel) ?>
                     </span>
@@ -1700,7 +1705,7 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
 
 function releaseResult(id) {
     if (confirm('Release this result? This will make it available for printing.')) {
-        window.location.href = '<?= base_url('medtech/request/release/') ?>' + id;
+        window.pmPost('<?= base_url('medtech/request/release/') ?>' + id);
     }
 }
 </script>

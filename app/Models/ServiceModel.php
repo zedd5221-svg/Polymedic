@@ -83,11 +83,14 @@ class ServiceModel extends Model
      */
     public function getCountByCategory()
     {
+        $rows   = $this->db->table($this->table)->select('category, COUNT(*) AS n')->groupBy('category')->get()->getResultArray();
+        $counts = array_map('intval', array_column($rows, 'n', 'category'));
+
         return [
-            'laboratory' => $this->where('category', 'laboratory')->countAllResults(),
-            'xray' => $this->where('category', 'xray')->countAllResults(),
-            'other' => $this->where('category', 'other')->countAllResults(),
-            'total' => $this->countAll()
+            'laboratory' => $counts['laboratory'] ?? 0,
+            'xray'       => $counts['xray'] ?? 0,
+            'other'      => $counts['other'] ?? 0,
+            'total'      => array_sum($counts),
         ];
     }
 }

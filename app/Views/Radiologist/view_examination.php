@@ -1,4 +1,4 @@
-<?= $this->extend('layouts/RadiologistLayout') ?>
+<?= $this->extend('Layouts/RadiologistLayout') ?>
 
 <?= $this->section('pageTitle') ?>View X-Ray Examination<?= $this->endSection() ?>
 
@@ -423,7 +423,7 @@
                             </button>
 
                             <?php if ($statusKey === 'completed'): ?>
-                                <a href="<?= base_url('radiologist/examination/release/' . (int) $examination['id']) ?>"
+                                <a data-post href="<?= base_url('radiologist/examination/release/' . (int) $examination['id']) ?>"
                                    class="xv-btn xv-btn--success"
                                    id="xvReleaseBtn"
                                    onclick="return confirm('Release this result? The receptionist will be able to print it.')">

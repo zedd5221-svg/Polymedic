@@ -1,4 +1,4 @@
-<?= $this->extend('layouts/MedTechLayout') ?>
+<?= $this->extend('Layouts/MedTechLayout') ?>
 
 <?= $this->section('pageTitle') ?>Notifications<?= $this->endSection() ?>
 

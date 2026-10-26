@@ -1,4 +1,4 @@
-<?= $this->extend('layouts/RadiologistLayout') ?>
+<?= $this->extend('Layouts/RadiologistLayout') ?>
 
 <?= $this->section('pageTitle') ?>Examinations<?= $this->endSection() ?>
 

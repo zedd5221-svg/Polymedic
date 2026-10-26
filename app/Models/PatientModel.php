@@ -286,7 +286,7 @@ class PatientModel extends Model
     }
     
     /**
-     * Sync walk-in patients from lab_requests and xray_examinations
+     * Sync walk-in patients from diagnostic_requests (no appointment)
      * This prevents duplicate patients when syncing
      */
     public function syncWalkInPatients()
@@ -297,8 +297,9 @@ class PatientModel extends Model
         
         // Get all lab requests with walk-in patients (appointment_id = 0)
         try {
-            $labRequests = $db->table('lab_requests')
-                              ->where('appointment_id', 0)
+            $labRequests = $db->table('diagnostic_requests')
+                              ->where('type', 'lab')
+                              ->groupStart()->where('appointment_id', null)->orWhere('appointment_id', 0)->groupEnd()
                               ->get()
                               ->getResultArray();
             
@@ -329,8 +330,9 @@ class PatientModel extends Model
         
         // Get all x-ray examinations with walk-in patients (appointment_id = 0)
         try {
-            $xrayRequests = $db->table('xray_examinations')
-                               ->where('appointment_id', 0)
+            $xrayRequests = $db->table('diagnostic_requests')
+                               ->where('type', 'xray')
+                               ->groupStart()->where('appointment_id', null)->orWhere('appointment_id', 0)->groupEnd()
                                ->get()
                                ->getResultArray();
             

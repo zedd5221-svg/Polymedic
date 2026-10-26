@@ -22,6 +22,7 @@ class AppointmentModel extends Model
         'xray_services',
         'other_requests',
         'status',
+        'is_override',
         'arrival_time'
     ];
     protected $useTimestamps = true;

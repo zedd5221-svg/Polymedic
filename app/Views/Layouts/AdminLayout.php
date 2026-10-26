@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://unpkg.com" crossorigin>
 
     <!-- Main CSS -->
-    <link href="/polymedic/public/assets/css/AppointmentStyle.css" rel="stylesheet">
+    <link href="<?= base_url() ?>assets/css/AppointmentStyle.css" rel="stylesheet">
 
     <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -1455,7 +1455,7 @@
 
             <a class="sidebar-logo" href="<?= base_url('admin/dashboard') ?>">
                 <span class="logo-badge">
-                    <img src="/polymedic/public/assets/images/logo4.png"
+                    <img src="<?= base_url() ?>assets/images/logo4.png"
                          alt=""
                          width="30"
                          height="30"
@@ -1527,7 +1527,7 @@
         <div class="sidebar-footer">
             <ul>
                 <li class="menu-item logout-item">
-                    <a href="/polymedic/public/logout" class="menu-btn" data-tooltip="Logout">
+                    <a href="<?= base_url() ?>logout" class="menu-btn" data-tooltip="Logout">
                         <i class="bi bi-box-arrow-right menu-icon" aria-hidden="true"></i>
                         <span>Logout</span>
                     </a>
@@ -1572,6 +1572,7 @@
                     $pageTitle = $this->renderSection('pageTitle') ?: 'Dashboard';
 
                     $iconMap = [
+                        'My Profile' => 'profile.png',
                         'Dashboard'            => 'statisctics.png',
                         'Appointments'         => 'calendar.png',
                         'Patient Management'   => 'group (1).png',
@@ -1595,7 +1596,7 @@
                     ?>
 
 
-                    <img src="/polymedic/public/assets/images/<?= $iconFile ?>"
+                    <img src="<?= base_url() ?>assets/images/<?= $iconFile ?>"
                          alt=""
                          class="header-title-icon"
                          width="24"
@@ -1666,7 +1667,7 @@
 
                             <!-- NOTIFICATION FOOTER -->
                             <div class="notif-dropdown-footer text-center">
-                                <a href="/polymedic/public/admin/notifications"
+                                <a href="<?= base_url() ?>admin/notifications"
                                    class="text-primary fw-semibold small text-decoration-none">
                                     View All Notifications
                                     <i class="bi bi-arrow-right ms-1"></i>
@@ -1680,18 +1681,7 @@
                     <span class="divider-icon">|</span>
 
                     <!-- USER -->
-                    <div class="header-user">
-
-                        <div class="avatar-small">
-                            <i class="bi bi-person-fill"></i>
-                        </div>
-
-                        <div class="user-details">
-                            <span class="user-name-header">Admin User</span>
-                            <span class="user-role-header">Administrator</span>
-                        </div>
-
-                    </div>
+                    <?= view('partials/headerUser', ['prefix' => 'admin', 'fallbackName' => 'Admin User', 'roleLabel' => 'Administrator']) ?>
 
                 </div>
 
@@ -1919,7 +1909,7 @@
     // =========================================================
 
     function fetchNotifications() {
-        fetch('/polymedic/public/admin/notifications/fetch', {
+        fetch('<?= base_url() ?>admin/notifications/fetch', {
             headers: {
                 'X-Requested-With': 'XMLHttpRequest'
             }
@@ -2009,7 +1999,7 @@
     }
 
     window.markNotificationRead = function(id, event) {
-        fetch('/polymedic/public/admin/notifications/mark-read/' + id, {
+        fetch('<?= base_url() ?>admin/notifications/mark-read/' + id, {
             headers: {
                 'X-Requested-With': 'XMLHttpRequest'
             }
@@ -2032,7 +2022,7 @@
             event.stopPropagation();
         }
 
-        fetch('/polymedic/public/admin/notifications/mark-all-read', {
+        fetch('<?= base_url() ?>admin/notifications/mark-all-read', {
             headers: {
                 'X-Requested-With': 'XMLHttpRequest'
             }
@@ -2127,17 +2117,77 @@
         };
     }
 
-    function runContentScripts(container) {
-        // Re-execute <script> tags inside the freshly swapped content.
-        var scripts = container.querySelectorAll('script');
-        scripts.forEach(function(oldScript) {
+    // Re-execute the <script> tags of freshly swapped content, in order.
+    // - Inline code is wrapped in a block so a page's top-level
+    //   const/let can be declared again on the next visit (re-running it
+    //   verbatim throws "already declared" and kills the page's charts).
+    // - DOMContentLoaded / load already fired, so handlers registered for
+    //   them during the re-run are called straight away.
+    // - External scripts load one at a time before the code that needs
+    //   them; ones already on the page (e.g. Chart.js) are not reloaded.
+    // - Data blocks (type="application/json", ...) are left alone.
+    var loadedSrc = Object.create(null);
+    document.querySelectorAll('script[src]').forEach(function(s) { loadedSrc[s.src] = true; });
+
+    function isJsScript(script) {
+        var type = (script.getAttribute('type') || '').trim().toLowerCase();
+        return type === '' || type === 'text/javascript' || type === 'application/javascript';
+    }
+
+    function runInlineScript(oldScript) {
+        var docAdd = document.addEventListener;
+        var winAdd = window.addEventListener;
+        var immediate = function(add) {
+            return function(type, fn, opts) {
+                if (type === 'DOMContentLoaded' || type === 'load') {
+                    setTimeout(function() {
+                        if (typeof fn === 'function') { fn.call(document, new Event(type)); }
+                        else if (fn && typeof fn.handleEvent === 'function') { fn.handleEvent(new Event(type)); }
+                    }, 0);
+                    return;
+                }
+                return add.call(this, type, fn, opts);
+            };
+        };
+
+        document.addEventListener = immediate(docAdd);
+        window.addEventListener   = immediate(winAdd);
+        try {
             var s = document.createElement('script');
             Array.prototype.slice.call(oldScript.attributes).forEach(function(attr) {
                 s.setAttribute(attr.name, attr.value);
             });
-            s.textContent = oldScript.textContent;
+            s.textContent = '{\n' + oldScript.textContent + '\n}';
             oldScript.parentNode.replaceChild(s, oldScript);
-        });
+        } finally {
+            document.addEventListener = docAdd;
+            window.addEventListener   = winAdd;
+        }
+    }
+
+    function runContentScripts(container) {
+        var queue = Array.prototype.slice.call(container.querySelectorAll('script')).filter(isJsScript);
+
+        (function next() {
+            var oldScript = queue.shift();
+            if (!oldScript) return;
+
+            if (!oldScript.src) {
+                runInlineScript(oldScript);
+                next();
+                return;
+            }
+
+            if (loadedSrc[oldScript.src]) { next(); return; }
+
+            var s = document.createElement('script');
+            Array.prototype.slice.call(oldScript.attributes).forEach(function(attr) {
+                s.setAttribute(attr.name, attr.value);
+            });
+            s.async = false;
+            s.onload = s.onerror = function() { loadedSrc[s.src] = true; next(); };
+            oldScript.parentNode.replaceChild(s, oldScript);
+        })();
     }
 
     function swapContent(payload) {
@@ -2227,7 +2277,7 @@
         if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;   // let modified clicks through
         if (link.target && link.target !== '_self') return;
         if (link.hasAttribute('download')) return;
-        if (link.getAttribute('href') === '/polymedic/public/logout') return; // let logout hard-navigate
+        if (link.getAttribute('href') === '<?= base_url() ?>logout') return; // let logout hard-navigate
 
         var url = link.href;
         if (!url || url.indexOf('#') === 0) return;
@@ -2251,6 +2301,7 @@
 </script>
 
 
+<?= view('partials/postLinks') ?>
 </body>
 
 </html>

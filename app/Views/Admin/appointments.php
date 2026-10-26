@@ -1,4 +1,4 @@
-<?= $this->extend('layouts/AdminLayout') ?>
+<?= $this->extend('Layouts/AdminLayout') ?>
 
 <?= $this->section('pageTitle') ?>Appointments<?= $this->endSection() ?>
 
@@ -338,7 +338,7 @@ foreach ($appointmentList as $appt) {
 
                             <?php if ($canApprove): ?>
                                 <a class="dx-btn dx-btn--sm dx-btn--success"
-                                   href="<?= base_url('admin/appointment/approve/' . (int) $id) ?>"
+                                   data-post href="<?= base_url('admin/appointment/approve/' . (int) $id) ?>"
                                    aria-label="Approve appointment <?= esc($reference, 'attr') ?>"
                                    onclick="return confirm('Approve this appointment?')">
                                     <i class="bi bi-check2-circle" aria-hidden="true"></i>
@@ -368,7 +368,7 @@ foreach ($appointmentList as $appt) {
                                     <?php if ($canApprove): ?>
                                         <li>
                                             <a class="dropdown-item"
-                                               href="<?= base_url('admin/appointment/approve/' . (int) $id) ?>"
+                                               data-post href="<?= base_url('admin/appointment/approve/' . (int) $id) ?>"
                                                onclick="return confirm('Approve this appointment?')">
                                                 <i class="bi bi-check2-circle" aria-hidden="true"></i>
                                                 Approve appointment
@@ -379,7 +379,7 @@ foreach ($appointmentList as $appt) {
                                     <?php if ($canCancel): ?>
                                         <li>
                                             <a class="dropdown-item dx-menu-danger"
-                                               href="<?= base_url('admin/appointment/cancel/' . (int) $id) ?>"
+                                               data-post href="<?= base_url('admin/appointment/cancel/' . (int) $id) ?>"
                                                onclick="return confirm('Cancel this appointment?')">
                                                 <i class="bi bi-x-circle" aria-hidden="true"></i>
                                                 Cancel appointment

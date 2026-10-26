@@ -1,4 +1,4 @@
-<?= $this->extend('layouts/ReceptionistLayout') ?>
+<?= $this->extend('Layouts/ReceptionistLayout') ?>
 
 <?= $this->section('pageTitle') ?>Diagnostic Requests<?= $this->endSection() ?>
 
@@ -1838,7 +1838,7 @@ $filterTabs = [
 (function () {
     'use strict';
 
-    var API        = '/polymedic/public/receptionist/';
+    var API        = '<?= base_url() ?>receptionist/';
     var PRINT_BASE = <?= json_encode(base_url('receptionist/print-request')) ?>;
     var PER_PAGE   = 9;
 
@@ -2247,7 +2247,7 @@ $filterTabs = [
                 return fetch(
                     API + 'update-diagnostic-status/' + encodeURIComponent(ctx.id) + '/' +
                         encodeURIComponent(ctx.type) + '/' + encodeURIComponent(to),
-                    { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' } }
+                    { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '<?= csrf_hash() ?>' } }
                 )
                 .then(parseJson)
                 .then(function (data) {
@@ -2271,7 +2271,7 @@ $filterTabs = [
             run: function () {
                 return fetch(
                     API + 'delete-diagnostic-request/' + encodeURIComponent(ctx.id) + '/' + encodeURIComponent(ctx.type),
-                    { method: 'DELETE', headers: { 'X-Requested-With': 'XMLHttpRequest' } }
+                    { method: 'DELETE', headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '<?= csrf_hash() ?>' } }
                 )
                 .then(parseJson)
                 .then(function (data) {

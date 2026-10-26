@@ -10,8 +10,8 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="preconnect" href="https://unpkg.com" crossorigin>
 
-    <link href="/polymedic/public/assets/css/AppointmentStyle.css" rel="stylesheet">
-    <link href="/polymedic/public/assets/css/admin.css" rel="stylesheet">
+    <link href="<?= base_url() ?>assets/css/AppointmentStyle.css" rel="stylesheet">
+    <link href="<?= base_url() ?>assets/css/admin.css" rel="stylesheet">
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -984,16 +984,12 @@
     $pendingLab = 0;
     $unreadCount = 0;
 
-    if (class_exists('\App\Models\LabRequestModel')) {
-        try {
-            $pendingLab = (int) (new \App\Models\LabRequestModel())
-                ->where('status', 'pending')
-                ->countAllResults();
-        } catch (\Throwable $e) {
-            $pendingLab = 0;
-        }
+    try {
+        // paid requests no med tech has started yet
+        $pendingLab = (new \App\Models\DiagnosticRequestModel())->getDepartmentCounts('lab')['pending'];
+    } catch (\Throwable $e) {
+        $pendingLab = 0;
     }
-
     if (class_exists('\App\Models\NotificationModel')) {
         try {
             $unreadCount = (int) (new \App\Models\NotificationModel())->getUnreadCount();
@@ -1023,7 +1019,7 @@
         <div class="sidebar-header">
             <a class="sidebar-logo" href="<?= base_url('medtech/dashboard') ?>">
                 <span class="logo-badge">
-                    <img src="/polymedic/public/assets/images/logo4.png"
+                    <img src="<?= base_url() ?>assets/images/logo4.png"
                          alt=""
                          width="30"
                          height="30"
@@ -1084,7 +1080,7 @@
         <div class="sidebar-footer">
             <ul>
                 <li class="menu-item logout-item">
-                    <a href="/polymedic/public/logout" class="menu-btn" data-tooltip="Logout">
+                    <a href="<?= base_url() ?>logout" class="menu-btn" data-tooltip="Logout">
                         <i class="bi bi-box-arrow-right menu-icon" aria-hidden="true"></i>
                         <span>Logout</span>
                     </a>
@@ -1116,6 +1112,7 @@
                     $pageTitle = $this->renderSection('pageTitle') ?: 'Dashboard';
 
                     $iconMap = [
+                        'My Profile' => 'profile.png',
                         'Dashboard' => 'statisctics.png',
                         'Lab Requests' => 'lab-icon.png',
                         'Laboratory Requests' => 'chemistry-lab-instrument.png',
@@ -1129,7 +1126,7 @@
                     $iconFile = $iconMap[$pageTitle] ?? 'lab-icon.png';
                     ?>
 
-                    <img src="/polymedic/public/assets/images/<?= $iconFile ?>"
+                    <img src="<?= base_url() ?>assets/images/<?= $iconFile ?>"
                          alt=""
                          class="header-title-icon"
                          width="24"
@@ -1184,7 +1181,7 @@
                             </div>
 
                             <div class="notif-dropdown-footer text-center">
-                                <a href="/polymedic/public/medtech/notifications"
+                                <a href="<?= base_url() ?>medtech/notifications"
                                    class="text-primary fw-semibold small text-decoration-none">
                                     View All Notifications
                                     <i class="bi bi-arrow-right ms-1"></i>
@@ -1195,15 +1192,7 @@
 
                     <span class="divider-icon">|</span>
 
-                    <div class="header-user">
-                        <div class="avatar-small">
-                            <i class="bi bi-person-fill"></i>
-                        </div>
-                        <div class="user-details">
-                            <span class="user-name-header"><?= session()->get('full_name') ?? 'Med Tech' ?></span>
-                            <span class="user-role-header">Medical Technologist</span>
-                        </div>
-                    </div>
+                    <?= view('partials/headerUser', ['prefix' => 'medtech', 'fallbackName' => 'Med Tech', 'roleLabel' => 'Medical Technologist']) ?>
                 </div>
             </div>
 
@@ -1401,7 +1390,7 @@
     }
 
     function fetchNotifications() {
-        fetch('/polymedic/public/medtech/notifications/fetch', {
+        fetch('<?= base_url() ?>medtech/notifications/fetch', {
             headers: { 'X-Requested-With': 'XMLHttpRequest' }
         })
         .then(function(r) { return r.json(); })
@@ -1467,7 +1456,7 @@
     }
 
     window.markNotificationRead = function(id, event) {
-        fetch('/polymedic/public/medtech/notifications/mark-read/' + id, {
+        fetch('<?= base_url() ?>medtech/notifications/mark-read/' + id, {
             headers: { 'X-Requested-With': 'XMLHttpRequest' }
         })
         .then(function(r) { return r.json(); })
@@ -1480,7 +1469,7 @@
     window.markAllNotificationsRead = function(event) {
         if (event) event.stopPropagation();
 
-        fetch('/polymedic/public/medtech/notifications/mark-all-read', {
+        fetch('<?= base_url() ?>medtech/notifications/mark-all-read', {
             headers: { 'X-Requested-With': 'XMLHttpRequest' }
         })
         .then(function(r) { return r.json(); })
@@ -1556,15 +1545,77 @@
         return { html: content.innerHTML, title: newTitleText, iconSrc: newIconSrc };
     }
 
-    function runContentScripts(container) {
-        container.querySelectorAll('script').forEach(function(oldScript) {
+    // Re-execute the <script> tags of freshly swapped content, in order.
+    // - Inline code is wrapped in a block so a page's top-level
+    //   const/let can be declared again on the next visit (re-running it
+    //   verbatim throws "already declared" and kills the page's charts).
+    // - DOMContentLoaded / load already fired, so handlers registered for
+    //   them during the re-run are called straight away.
+    // - External scripts load one at a time before the code that needs
+    //   them; ones already on the page (e.g. Chart.js) are not reloaded.
+    // - Data blocks (type="application/json", ...) are left alone.
+    var loadedSrc = Object.create(null);
+    document.querySelectorAll('script[src]').forEach(function(s) { loadedSrc[s.src] = true; });
+
+    function isJsScript(script) {
+        var type = (script.getAttribute('type') || '').trim().toLowerCase();
+        return type === '' || type === 'text/javascript' || type === 'application/javascript';
+    }
+
+    function runInlineScript(oldScript) {
+        var docAdd = document.addEventListener;
+        var winAdd = window.addEventListener;
+        var immediate = function(add) {
+            return function(type, fn, opts) {
+                if (type === 'DOMContentLoaded' || type === 'load') {
+                    setTimeout(function() {
+                        if (typeof fn === 'function') { fn.call(document, new Event(type)); }
+                        else if (fn && typeof fn.handleEvent === 'function') { fn.handleEvent(new Event(type)); }
+                    }, 0);
+                    return;
+                }
+                return add.call(this, type, fn, opts);
+            };
+        };
+
+        document.addEventListener = immediate(docAdd);
+        window.addEventListener   = immediate(winAdd);
+        try {
             var s = document.createElement('script');
             Array.prototype.slice.call(oldScript.attributes).forEach(function(attr) {
                 s.setAttribute(attr.name, attr.value);
             });
-            s.textContent = oldScript.textContent;
+            s.textContent = '{\n' + oldScript.textContent + '\n}';
             oldScript.parentNode.replaceChild(s, oldScript);
-        });
+        } finally {
+            document.addEventListener = docAdd;
+            window.addEventListener   = winAdd;
+        }
+    }
+
+    function runContentScripts(container) {
+        var queue = Array.prototype.slice.call(container.querySelectorAll('script')).filter(isJsScript);
+
+        (function next() {
+            var oldScript = queue.shift();
+            if (!oldScript) return;
+
+            if (!oldScript.src) {
+                runInlineScript(oldScript);
+                next();
+                return;
+            }
+
+            if (loadedSrc[oldScript.src]) { next(); return; }
+
+            var s = document.createElement('script');
+            Array.prototype.slice.call(oldScript.attributes).forEach(function(attr) {
+                s.setAttribute(attr.name, attr.value);
+            });
+            s.async = false;
+            s.onload = s.onerror = function() { loadedSrc[s.src] = true; next(); };
+            oldScript.parentNode.replaceChild(s, oldScript);
+        })();
     }
 
     function swapContent(payload) {
@@ -1633,7 +1684,7 @@
         if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
         if (link.target && link.target !== '_self') return;
         if (link.hasAttribute('download')) return;
-        if (link.getAttribute('href') === '/polymedic/public/logout') return;
+        if (link.getAttribute('href') === '<?= base_url() ?>logout') return;
 
         var url = link.href;
         if (!url || url.indexOf('#') === 0) return;
@@ -1651,5 +1702,6 @@
 })();
 </script>
 
+<?= view('partials/postLinks') ?>
 </body>
 </html>

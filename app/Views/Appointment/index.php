@@ -1,4 +1,4 @@
-<?= $this->extend('layouts/AppointmentLayout') ?>
+<?= $this->extend('Layouts/AppointmentLayout') ?>
 
 <?= $this->section('AppointmentContent') ?>
 
@@ -35,7 +35,7 @@ $services = [
     ],
 ];
 
-$bookUrl = '/polymedic/public/index.php/appointment/book';
+$bookUrl = site_url('appointment/book');
 $mapUrl  = 'https://www.google.com/maps/place/Cotabato+Polymedic+and+Diagnostic+Center/@7.1978084,124.241251,17z/data=!3m1!4b1!4m6!3m5!1s0x32563a20c200452b:0x2ec643833068de46!8m2!3d7.1978031!4d124.2438313!16s%2Fg%2F1tltjwz7?entry=ttu&g_ep=EgoyMDI2MDcyNy4wIKXMDSoASAFQAw%3D%3D';
 
 $countTests = static function (array $panel): int {
@@ -610,7 +610,7 @@ $tabLabel = ['lab' => 'Laboratory', 'xray' => 'X-ray'];
     <nav class="pm-nav" aria-label="Main">
         <div class="container pm-nav-inner">
             <a class="pm-brand" href="<?= base_url() ?>">
-                <img src="/polymedic/public/assets/images/logo4.png" alt="">
+                <img src="<?= base_url() ?>assets/images/logo4.png" alt="">
                 <span>
                     <span class="pm-brand-name">PolyMedic</span>
                     <span class="pm-brand-tag">Diagnostic &amp; Laboratory Center</span>
@@ -736,7 +736,7 @@ $tabLabel = ['lab' => 'Laboratory', 'xray' => 'X-ray'];
         <div class="container">
             <div class="row g-5 align-items-center">
                 <div class="col-lg-6 order-lg-2">
-                    <img class="pm-illustration" src="/polymedic/public/assets/images/Appointment2.png" alt="Patient booking an appointment on a phone" loading="lazy">
+                    <img class="pm-illustration" src="<?= base_url() ?>assets/images/Appointment2.png" alt="Patient booking an appointment on a phone" loading="lazy">
                 </div>
                 <div class="col-lg-6 order-lg-1">
                     <h2>How to book an appointment</h2>

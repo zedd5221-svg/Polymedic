@@ -25,7 +25,7 @@ class Billing extends BaseController
         if (!in_array($role, $allowedRoles, true)) {
             if ($role === 'admin')        return redirect()->to(base_url('admin/dashboard'));
             if ($role === 'receptionist') return redirect()->to(base_url('receptionist/dashboard'));
-            if ($role === 'medtech')      return redirect()->to(base_url('medtech/dashboard'));
+            if ($role === 'med_tech')     return redirect()->to(base_url('medtech/dashboard'));
             if ($role === 'radiologist')  return redirect()->to(base_url('radiologist/dashboard'));
             return redirect()->to(base_url('login'));
         }
@@ -41,8 +41,8 @@ class Billing extends BaseController
     private function layoutFor(): array
     {
         return $this->isAdmin()
-            ? ['layout' => 'layouts/AdminLayout',        'section' => 'adminContent']
-            : ['layout' => 'layouts/ReceptionistLayout', 'section' => 'receptionistContent'];
+            ? ['layout' => 'Layouts/AdminLayout',        'section' => 'adminContent']
+            : ['layout' => 'Layouts/ReceptionistLayout', 'section' => 'receptionistContent'];
     }
 
     private function routeBase(): string
@@ -117,15 +117,15 @@ class Billing extends BaseController
         $result = $invoiceModel->listInvoices($filters, $perPage, $page);
         $stats  = $invoiceModel->getStats();
 
-        $counts = [
-            'all'      => (int) $invoiceModel->countAllResults(),
-            'draft'    => (int) $invoiceModel->where('status', 'draft')->countAllResults(),
-            'unpaid'   => (int) $invoiceModel->where('status', 'unpaid')->countAllResults(),
-            'partial'  => (int) $invoiceModel->where('status', 'partial')->countAllResults(),
-            'paid'     => (int) $invoiceModel->where('status', 'paid')->countAllResults(),
-            'void'     => (int) $invoiceModel->where('status', 'void')->countAllResults(),
-            'refunded' => (int) $invoiceModel->where('status', 'refunded')->countAllResults(),
-        ];
+        $byStatus = array_map('intval', array_column(
+            db_connect()->table('invoices')->select('status, COUNT(*) AS n')->groupBy('status')->get()->getResultArray(),
+            'n',
+            'status'
+        ));
+        $counts = ['all' => array_sum($byStatus)];
+        foreach (['draft', 'unpaid', 'partial', 'paid', 'void', 'refunded'] as $st) {
+            $counts[$st] = $byStatus[$st] ?? 0;
+        }
 
         // ── KPI TRENDS FOR SPARKLINES ──────────────────────────────
         // 14-day daily series feeding the mini line graphs on the
@@ -400,6 +400,7 @@ class Billing extends BaseController
             'status'          => InvoiceModel::STATUS_UNPAID,
             'notes'           => trim((string) ($post['notes'] ?? '')) ?: null,
             'created_by'      => PaymentModel::currentCashierName(),
+            'created_by_id'   => PaymentModel::currentStaffId(),
         ]) ? (int) $invoiceModel->getInsertID() : 0;
 
         if (!$invoiceId) {
@@ -532,6 +533,16 @@ class Billing extends BaseController
         if ($amount <= 0) {
             return redirect()->back()->withInput()
                              ->with('error', 'Payment amount must be greater than zero.');
+        }
+
+        // Bring the stored balance up to date before comparing against it.
+        $invoice = $invoiceModel->recalculate($id) ?? $invoice;
+        $balance = round((float) $invoice['balance'], 2);
+        if ($amount > $balance + 0.005) {
+            return redirect()->back()->withInput()
+                             ->with('error', 'Payment of ₱' . number_format($amount, 2)
+                                 . ' is more than the remaining balance of ₱' . number_format($balance, 2)
+                                 . '. Enter the cash tendered separately to compute change.');
         }
 
         $itemModel = new InvoiceItemModel();
@@ -686,14 +697,7 @@ class Billing extends BaseController
             }
         }
 
-        $clinic = [
-            'name'    => 'POLYMEDIC DIAGNOSTIC CENTER',
-            'tagline' => 'Clinical Laboratory & Radiology Services',
-            'address' => 'Quezon Avenue, Kidapawan City, Cotabato 9400',
-            'phone'   => '(064) 123-4567',
-            'email'   => 'info@polymedic.ph',
-            'tin'     => '000-000-000-000',
-        ];
+        $clinic = config('Clinic')->toArray();
 
         return view('Billing/receipt', [
             'payment' => $payment,

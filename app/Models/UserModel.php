@@ -8,7 +8,12 @@ class UserModel extends Model
 {
     protected $table = 'users';
     protected $primaryKey = 'id';
-    protected $allowedFields = ['username', 'password', 'email', 'full_name', 'role', 'prc_license', 'status'];
+    protected $allowedFields = [
+        'username', 'password', 'email', 'full_name', 'role', 'prc_license', 'status',
+        // Self-service profile fields (see Profile controller)
+        'contact_number', 'gender', 'birthdate', 'address', 'bio', 'avatar',
+        'last_login_at', 'password_changed_at',
+    ];
     protected $useTimestamps = true;
     protected $createdField = 'created_at';
     protected $updatedField = 'updated_at';
@@ -33,7 +38,7 @@ class UserModel extends Model
 
         if ($user) {
             /* MD5 legacy upgrade */
-            if ($user['password'] === md5($password)) {
+            if (hash_equals((string) $user['password'], md5((string) $password))) {
                 $this->update($user['id'], ['password' => password_hash($password, PASSWORD_DEFAULT)]);
                 return $user;
             }
@@ -109,6 +114,27 @@ class UserModel extends Model
     public function requiresPrcLicense(string $role): bool
     {
         return in_array($role, ['med_tech', 'radiologist'], true);
+    }
+
+    /* Human-readable role label */
+    public static function roleLabel(?string $role): string
+    {
+        return [
+            'admin'        => 'Administrator',
+            'receptionist' => 'Receptionist',
+            'radiologist'  => 'Radiologist',
+            'med_tech'     => 'Medical Technologist',
+            'physician'    => 'Physician',
+        ][$role] ?? ucfirst((string) $role);
+    }
+
+    /* Public URL of a user's avatar, or the default placeholder */
+    public static function avatarUrl(?string $avatar): string
+    {
+        if ($avatar && is_file(FCPATH . $avatar)) {
+            return base_url($avatar);
+        }
+        return base_url('assets/images/default-avatar.png');
     }
 
     /* Search users */

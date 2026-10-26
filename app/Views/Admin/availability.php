@@ -1,4 +1,4 @@
-<?= $this->extend('layouts/AdminLayout') ?>
+<?= $this->extend('Layouts/AdminLayout') ?>
 
 <?= $this->section('pageTitle') ?>Availability<?= $this->endSection() ?>
 

@@ -4,8 +4,6 @@ namespace App\Controllers;
 
 use App\Models\AppointmentModel;
 use App\Models\ServiceModel;
-use App\Models\LabRequestModel;
-use App\Models\XrayExaminationModel;
 use App\Models\NotificationModel;
 use App\Models\PatientModel;
 use App\Models\SettingsModel;
@@ -44,23 +42,33 @@ class Appointment extends BaseController
     public function submit()
     {
         $rules = [
-            'appointment_date' => 'required|valid_date',
-            'appointment_time' => 'required',
-            'email'            => 'required|valid_email',
-            'phone'            => 'required|min_length[10]',
-            'full_name'        => 'required|min_length[2]',
-            'age'              => 'required|numeric|greater_than[0]',
-            'gender'           => 'required',
-            'other_requests'   => 'permit_empty',
+            'appointment_date' => 'required|valid_date[Y-m-d]',
+            'appointment_time' => 'required|regex_match[/^\d{2}:\d{2}$/]',
+            'email'            => 'required|valid_email|max_length[100]',
+            'phone'            => 'required|min_length[10]|max_length[20]',
+            'full_name'        => 'required|min_length[2]|max_length[150]',
+            'age'              => 'required|is_natural_no_zero|less_than_equal_to[130]',
+            'gender'           => 'required|in_list[Male,Female,Other]',
+            'other_requests'   => 'permit_empty|max_length[1000]',
         ];
 
         if (!$this->validate($rules)) {
             return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
         }
 
-        $labServices  = $this->request->getPost('lab_services') ?? [];
-        $xrayServices = $this->request->getPost('xray_services') ?? [];
-        $serviceType  = $this->request->getPost('service_type') ?? 'laboratory';
+        $labServices  = $this->cleanServices($this->request->getPost('lab_services'));
+        $xrayServices = $this->cleanServices($this->request->getPost('xray_services'));
+
+        if ($labServices === [] && $xrayServices === []) {
+            return redirect()->back()->withInput()
+                ->with('error', 'Please select at least one laboratory or X-ray service.');
+        }
+
+        // The slot capacity is per department, so the type must follow
+        // what was actually selected (the form does not post it).
+        $serviceType = $labServices !== [] && $xrayServices !== []
+            ? 'both'
+            : ($xrayServices !== [] ? 'xray' : 'laboratory');
 
         $date = (string) $this->request->getPost('appointment_date');
         $time = (string) $this->request->getPost('appointment_time');
@@ -95,24 +103,25 @@ class Appointment extends BaseController
                     ->with('error', 'Sorry, that time slot just became unavailable. Please choose another.');
             }
 
-            $reference = 'APPT-' . date('Ymd') . '-' . strtoupper(substr(uniqid(), -6));
+            $reference = 'APPT-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(4)));
 
             $appointmentData = [
                 'reference_number' => $reference,
                 'appointment_date' => $date,
                 'appointment_time' => $time,
-                'full_name'        => $this->request->getPost('full_name'),
-                'age'              => $this->request->getPost('age'),
-                'gender'           => $this->request->getPost('gender'),
-                'email'            => $this->request->getPost('email'),
-                'phone'            => $this->request->getPost('phone'),
+                'full_name'        => trim((string) $this->request->getPost('full_name')),
+                'age'              => (int) $this->request->getPost('age'),
+                'gender'           => (string) $this->request->getPost('gender'),
+                'email'            => trim((string) $this->request->getPost('email')),
+                'phone'            => trim((string) $this->request->getPost('phone')),
                 'service_type'     => $serviceType,
-                'lab_services'     => !empty($labServices) ? json_encode($labServices) : null,
-                'xray_services'    => !empty($xrayServices) ? json_encode($xrayServices) : null,
-                'other_requests'   => $this->request->getPost('other_requests'),
+                'lab_services'     => $labServices !== [] ? json_encode($labServices) : null,
+                'xray_services'    => $xrayServices !== [] ? json_encode($xrayServices) : null,
+                'other_requests'   => trim((string) $this->request->getPost('other_requests')) ?: null,
                 'status'           => 'pending',
                 'is_override'      => 0,
             ];
+
 
             $appointmentModel = new AppointmentModel();
             $appointmentId    = $appointmentModel->insert($appointmentData);
@@ -175,10 +184,40 @@ class Appointment extends BaseController
 
     public function success($reference = null)
     {
-        $model = new AppointmentModel();
-        $data['appointment'] = $model->where('reference_number', $reference)->first();
-        $data['reference']   = $reference;
-        return view('Appointment/success', $data);
+        $reference = (string) $reference;
+
+        // Only the browser that made the booking sees the patient's
+        // details; anyone else with the reference just sees the number.
+        $own         = session()->get('appointment_data');
+        $appointment = null;
+        if (is_array($own) && ($own['reference_number'] ?? null) === $reference) {
+            $appointment = (new AppointmentModel())->where('reference_number', $reference)->first();
+            if ($appointment) {
+                $appointment['lab_services']  = json_decode((string) $appointment['lab_services'], true) ?: [];
+                $appointment['xray_services'] = json_decode((string) $appointment['xray_services'], true) ?: [];
+            }
+        }
+
+        return view('Appointment/success', [
+            'appointment' => $appointment,
+            'reference'   => $reference,
+        ]);
+    }
+
+    /** Selected service names from the form, de-duplicated and trimmed. */
+    private function cleanServices($raw): array
+    {
+        if (!is_array($raw)) {
+            return [];
+        }
+        $out = [];
+        foreach ($raw as $name) {
+            $name = trim((string) $name);
+            if ($name !== '' && strlen($name) <= 150) {
+                $out[] = $name;
+            }
+        }
+        return array_values(array_unique($out));
     }
 
     public function getServicePrices()

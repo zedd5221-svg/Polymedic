@@ -1,4 +1,4 @@
-<?= $this->extend('layouts/AdminLayout') ?>
+<?= $this->extend('Layouts/AdminLayout') ?>
 
 <?= $this->section('pageTitle') ?>Service Management<?= $this->endSection() ?>
 
@@ -259,7 +259,7 @@ $tabUrl = static function (string $key): string {
                             </button>
 
                             <a class="sv-row-btn"
-                               href="<?= base_url('admin/services/toggle/' . (int) ($service['id'] ?? 0)) ?>"
+                               data-post href="<?= base_url('admin/services/toggle/' . (int) ($service['id'] ?? 0)) ?>"
                                title="<?= $isActive ? 'Deactivate' : 'Activate' ?>"
                                aria-label="<?= $isActive ? 'Deactivate' : 'Activate' ?> <?= esc($name, 'attr') ?>">
                                 <i class="bi bi-<?= $isActive ? 'toggle-on' : 'toggle-off' ?>" aria-hidden="true"></i>
@@ -267,7 +267,7 @@ $tabUrl = static function (string $key): string {
                             </a>
 
                             <a class="sv-row-btn sv-row-btn--danger"
-                               href="<?= base_url('admin/services/delete/' . (int) ($service['id'] ?? 0)) ?>"
+                               data-post href="<?= base_url('admin/services/delete/' . (int) ($service['id'] ?? 0)) ?>"
                                title="Delete"
                                aria-label="Delete <?= esc($name, 'attr') ?>"
                                onclick="return confirm('Delete <?= esc(addslashes($name), 'attr') ?>? This cannot be undone.')">

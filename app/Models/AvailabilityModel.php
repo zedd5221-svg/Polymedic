@@ -25,6 +25,12 @@ class AvailabilityModel extends Model
     /** Appointment statuses that DO count against capacity. */
     private const ACTIVE_STATUSES = ['pending', 'approved', 'completed', 'late'];
 
+    /** service_type values that consume a slot in each department. */
+    private const DEPARTMENT_SERVICE_TYPES = [
+        'lab'  => ['laboratory', 'lab', 'both'],
+        'xray' => ['xray', 'both'],
+    ];
+
     private ?SettingsModel $settings = null;
 
     public function __construct()
@@ -118,29 +124,31 @@ class AvailabilityModel extends Model
      */
     public function countActiveBookings(string $date, string $time, string $department): int
     {
-        $db = db_connect();
+        return $this->bookingsByTime($date, $department)[$time] ?? 0;
+    }
 
-        if ($department === 'lab') {
-            $rows = $db->table('appointments')
-                ->select('service_type')
-                ->where('appointment_date', $date)
-                ->where('appointment_time', $time)
-                ->whereIn('status', self::ACTIVE_STATUSES)
-                ->whereIn('service_type', ['laboratory', 'lab', 'both'])
-                ->get()->getResultArray();
-        } elseif ($department === 'xray') {
-            $rows = $db->table('appointments')
-                ->select('service_type')
-                ->where('appointment_date', $date)
-                ->where('appointment_time', $time)
-                ->whereIn('status', self::ACTIVE_STATUSES)
-                ->whereIn('service_type', ['xray', 'both'])
-                ->get()->getResultArray();
-        } else {
-            return 0;
+    /**
+     * Active bookings for one date + department, keyed by slot time,
+     * in a single query (instead of one query per slot).
+     *
+     * @return array<string,int>
+     */
+    public function bookingsByTime(string $date, string $department): array
+    {
+        $types = self::DEPARTMENT_SERVICE_TYPES[$department] ?? null;
+        if ($types === null) {
+            return [];
         }
 
-        return count($rows);
+        $rows = db_connect()->table('appointments')
+            ->select('appointment_time, COUNT(*) AS n')
+            ->where('appointment_date', $date)
+            ->whereIn('status', self::ACTIVE_STATUSES)
+            ->whereIn('service_type', $types)
+            ->groupBy('appointment_time')
+            ->get()->getResultArray();
+
+        return array_map('intval', array_column($rows, 'n', 'appointment_time'));
     }
 
     /**
@@ -155,6 +163,9 @@ class AvailabilityModel extends Model
     {
         $times    = $this->generateSlotTimes();
         $override = $this->slotOverridesFor($date, $department);
+        $bookings = $this->bookingsByTime($date, $department);
+        $isToday  = $date === date('Y-m-d');
+        $now      = date('H:i');
         $result   = [];
 
         foreach ($times as $time) {
@@ -162,10 +173,9 @@ class AvailabilityModel extends Model
             $capacity    = $overrideRow ? (int) $overrideRow['capacity'] : 1;
             $blocked     = $overrideRow ? ((int) $overrideRow['is_blocked'] === 1) : false;
             $reason      = $overrideRow['blocked_reason'] ?? null;
+            $booked      = $bookings[$time] ?? 0;
 
-            $booked = $this->countActiveBookings($date, $time, $department);
-
-            $available = !$blocked && $booked < $capacity;
+            $available = !$blocked && $booked < $capacity && !($isToday && $time <= $now);
 
             $result[] = [
                 'time'      => $time,
@@ -210,6 +220,14 @@ class AvailabilityModel extends Model
         if (!$this->isWithinHorizon($date)) {
             return false;
         }
+        // Only real clinic slots, and never one that has already passed.
+        if (!in_array($time, $this->generateSlotTimes(), true)) {
+            return false;
+        }
+        if ($date === date('Y-m-d') && $time <= date('H:i')) {
+            return false;
+        }
+
 
         $depts = $this->departmentsFor($serviceType);
         foreach ($depts as $dept) {
@@ -296,10 +314,10 @@ class AvailabilityModel extends Model
             $labBooked = 0;
             $xrayBooked = 0;
             if ($working) {
-                foreach ($times as $t) {
-                    $labBooked  += $this->countActiveBookings($date, $t, 'lab');
-                    $xrayBooked += $this->countActiveBookings($date, $t, 'xray');
-                }
+                $lab        = $this->bookingsByTime($date, 'lab');
+                $xray       = $this->bookingsByTime($date, 'xray');
+                $labBooked  = array_sum(array_intersect_key($lab, array_flip($times)));
+                $xrayBooked = array_sum(array_intersect_key($xray, array_flip($times)));
             }
 
             $out[] = [

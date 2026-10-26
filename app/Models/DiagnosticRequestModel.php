@@ -68,8 +68,8 @@ class DiagnosticRequestModel extends Model
         'patient_name', 'patient_code', 'age', 'gender',
         'email', 'phone',
         'services', 'request_date', 'doctor_name', 'priority', 'status',
-        'med_tech_name', 'remarks',
-        'radiologist_name', 'interpretation',
+        'med_tech_name', 'med_tech_id', 'remarks',
+        'radiologist_name', 'radiologist_id', 'interpretation',
         'image_path', 'image_paths',
         'findings', 'released_at',
     ];
@@ -98,6 +98,105 @@ class DiagnosticRequestModel extends Model
 
     const TYPE_LAB  = 'lab';
     const TYPE_XRAY = 'xray';
+
+    // ----------------------------------------------------------------
+    // Department view of a request
+    // ----------------------------------------------------------------
+    // The stored status follows the front desk: 'pending' = not started
+    // (unpaid), 'in_progress' = started and paid. Inside the lab / x-ray
+    // room a paid request nobody has worked on yet is still "pending";
+    // it becomes "in progress" when a med tech / radiologist first saves
+    // on it, which is also when their name and id are stamped on the row.
+
+    /** Staff columns that record who worked a request, per type. */
+    const STAFF_COLUMNS = [
+        self::TYPE_LAB  => ['id' => 'med_tech_id',    'name' => 'med_tech_name'],
+        self::TYPE_XRAY => ['id' => 'radiologist_id', 'name' => 'radiologist_name'],
+    ];
+
+    /** Statuses a department works with (unpaid 'pending' rows excluded). */
+    const DEPARTMENT_STATUSES = [
+        self::STATUS_IN_PROGRESS, self::STATUS_DRAFT, self::STATUS_COMPLETED, self::STATUS_RELEASED,
+    ];
+
+    /** Paid, but not yet touched by the department. */
+    public static function isUntouched(array $row): bool
+    {
+        $cols = self::STAFF_COLUMNS[$row['type'] ?? ''] ?? null;
+
+        return $cols !== null
+            && ($row['status'] ?? '') === self::STATUS_IN_PROGRESS
+            && empty($row[$cols['id']])
+            && trim((string) ($row[$cols['name']] ?? '')) === '';
+    }
+
+    /** Status as the department sees it: untouched in_progress => 'pending'. */
+    public static function departmentStatus(array $row): string
+    {
+        return self::isUntouched($row) ? self::STATUS_PENDING : (string) ($row['status'] ?? '');
+    }
+
+    /** SQL condition for "paid but untouched" rows of one type. */
+    public static function untouchedSql(string $type): string
+    {
+        $cols = self::STAFF_COLUMNS[$type];
+        return "(status = '" . self::STATUS_IN_PROGRESS . "' AND {$cols['id']} IS NULL AND COALESCE({$cols['name']}, '') = '')";
+    }
+
+    /**
+     * Department counts in one query, keyed the way the department views
+     * read them: pending = paid but untouched, in_progress/processing =
+     * being worked on, plus draft / completed / released and total.
+     */
+    public function getDepartmentCounts(string $type): array
+    {
+        $untouched = self::untouchedSql($type);
+
+        $row = $this->db->table($this->table)
+            ->select("COALESCE(SUM({$untouched}), 0) AS pending,
+                      COALESCE(SUM(status = 'in_progress' AND NOT {$untouched}), 0) AS in_progress,
+                      COALESCE(SUM(status = 'draft'), 0) AS draft,
+                      COALESCE(SUM(status = 'completed'), 0) AS completed,
+                      COALESCE(SUM(status = 'released'), 0) AS released", false)
+            ->where('type', $type)
+            ->whereIn('status', self::DEPARTMENT_STATUSES)
+            ->get()->getRowArray();
+
+        $c = array_map('intval', $row ?: []);
+
+        // A draft is work in progress that has been saved but not finished,
+        // so it counts as both "In progress" and "Draft". in_progress_only
+        // is the exclusive figure for charts whose slices must add up.
+        $c['in_progress_only'] = $c['in_progress'];
+        $c['in_progress']     += $c['draft'];
+        $c['processing']       = $c['in_progress'];   // legacy alias
+        $c['cancelled']        = 0;
+        $c['total']            = $c['pending'] + $c['in_progress_only'] + $c['draft'] + $c['completed'] + $c['released'];
+
+        return $c;
+    }
+
+    /**
+     * Every status a row should be listed under in the department views.
+     * A draft is listed under both "draft" and "in_progress".
+     */
+    public static function statusTags(string $status): array
+    {
+        return $status === self::STATUS_DRAFT
+            ? [self::STATUS_IN_PROGRESS, self::STATUS_DRAFT]
+            : [$status];
+    }
+
+    /** Replace each row's status with the department view (keeps the stored one in db_status). */
+    public static function withDepartmentStatus(array $rows): array
+    {
+        foreach ($rows as &$row) {
+            $row['db_status'] = $row['status'] ?? null;
+            $row['status']    = self::departmentStatus($row);
+        }
+        unset($row);
+        return $rows;
+    }
 
     // ================================================================
     // ROW DECORATION
@@ -347,29 +446,28 @@ class DiagnosticRequestModel extends Model
      */
     public function getCounts(?string $type = null): array
     {
-        $typeFilter = $type !== null ? ['type' => $type] : [];
+        // One grouped query instead of one COUNT per status.
+        $builder = $this->db->table($this->table)->select('status, COUNT(*) AS n');
+        if ($type !== null) {
+            $builder->where('type', $type);
+        }
+        $rows   = $builder->groupBy('status')->get()->getResultArray();
+        $counts = array_map('intval', array_column($rows, 'n', 'status'));
 
-        $countStatus = function (string $status) use ($typeFilter) {
-            $this->resetQuery();
-            foreach ($typeFilter as $k => $v) {
-                $this->where($k, $v);
-            }
-            return (int) $this->where('status', $status)->countAllResults();
-        };
-
-        $inProgress = $countStatus(self::STATUS_IN_PROGRESS);
+        $inProgress = $counts[self::STATUS_IN_PROGRESS] ?? 0;
 
         return [
-            'total'       => $this->countAllForType($type),
-            'pending'     => $countStatus(self::STATUS_PENDING),
+            'total'       => array_sum($counts),
+            'pending'     => $counts[self::STATUS_PENDING] ?? 0,
             'in_progress' => $inProgress,
             'processing'  => $inProgress,   // legacy alias
-            'draft'       => $countStatus(self::STATUS_DRAFT),
-            'completed'   => $countStatus(self::STATUS_COMPLETED),
-            'released'    => $countStatus(self::STATUS_RELEASED),
-            'cancelled'   => $countStatus(self::STATUS_CANCELLED),
+            'draft'       => $counts[self::STATUS_DRAFT] ?? 0,
+            'completed'   => $counts[self::STATUS_COMPLETED] ?? 0,
+            'released'    => $counts[self::STATUS_RELEASED] ?? 0,
+            'cancelled'   => $counts[self::STATUS_CANCELLED] ?? 0,
         ];
     }
+
 
     protected function countAllForType(?string $type): int
     {

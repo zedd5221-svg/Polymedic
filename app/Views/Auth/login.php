@@ -805,7 +805,7 @@ $roles = [
 
             <div class="brand-header">
                 <span class="brand-mark">
-                    <img src="/polymedic/public/assets/images/logo4.png" alt="">
+                    <img src="<?= base_url() ?>assets/images/logo4.png" alt="">
                 </span>
                 <h1>
                     Poly<span>Medic</span>
@@ -848,7 +848,7 @@ $roles = [
 
             <div class="form-head">
                 <span class="head-logo">
-                    <img src="/polymedic/public/assets/images/logo4.png" alt="PolyMedic">
+                    <img src="<?= base_url() ?>assets/images/logo4.png" alt="PolyMedic">
                 </span>
                 <h2>Welcome back</h2>
                 <p>Sign in to continue to your workspace</p>

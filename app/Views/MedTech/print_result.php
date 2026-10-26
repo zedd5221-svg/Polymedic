@@ -401,8 +401,9 @@ table.result tr.group-head td {
 <body>
 
 <div class="controls">
-    <a class="secondary" href="<?= base_url('medtech/request/view/' . (int) $request['id']) ?>">
-        Back to report
+    <?php /* Admin / Receptionist reprints pass $backUrl so Back returns to their own list. */ ?>
+    <a class="secondary" href="<?= esc($backUrl ?? base_url('medtech/request/view/' . (int) $request['id']), 'attr') ?>">
+        <?= esc($backLabel ?? 'Back to report') ?>
     </a>
     <button type="button" onclick="window.print()">Print</button>
 </div>

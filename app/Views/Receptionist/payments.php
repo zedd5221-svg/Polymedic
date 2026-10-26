@@ -1,4 +1,4 @@
-<?= $this->extend('layouts/ReceptionistLayout') ?>
+<?= $this->extend('Layouts/ReceptionistLayout') ?>
 
 <?= $this->section('pageTitle') ?>Payments<?= $this->endSection() ?>
 
@@ -451,9 +451,6 @@
                                     <button type="button" class="pm-icon-btn" onclick="viewPayment(<?= $payId ?>)" title="View details"><i class="bi bi-eye" aria-hidden="true"></i></button>
                                     <button type="button" class="pm-icon-btn" onclick="viewReceipt(<?= $payId ?>)" title="View receipt"><i class="bi bi-receipt" aria-hidden="true"></i></button>
                                     <button type="button" class="pm-icon-btn pm-icon-btn--print" onclick="printReceipt(<?= $payId ?>)" title="Print receipt"><i class="bi bi-printer" aria-hidden="true"></i></button>
-                                    <?php if ($status === 'paid'): ?>
-                                        <button type="button" class="pm-icon-btn pm-icon-btn--refund" onclick="refundPayment(<?= $payId ?>)" title="Refund"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i></button>
-                                    <?php endif; ?>
                                 </div></td>
                             </tr>
                         <?php endforeach; ?>
@@ -1116,7 +1113,7 @@
         }
         content.innerHTML='<div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Loading...</p></div>';
         modal.show();
-        fetch('/polymedic/public/receptionist/get-payment-details/'+encodeURIComponent(id))
+        fetch('<?= base_url() ?>receptionist/get-payment-details/'+encodeURIComponent(id))
             .then(function(r){return r.json();})
             .then(function(res){
                 if(!res.success)throw new Error(res.message||'Not found');
@@ -1131,15 +1128,6 @@
             .catch(function(){content.innerHTML='<div class="alert alert-danger">Could not load payment details.</div>';});
     };
 
-    window.refundPayment=function(id){
-        var data=RECEIPTS[String(id)]||RECEIPTS[id]||{};
-        var label=data.ref?(' '+data.ref+' ('+peso(data.paid)+')'):'';
-        if(!confirm('Refund payment'+label+'? This cannot be undone.'))return;
-        fetch('/polymedic/public/receptionist/refund-payment/'+encodeURIComponent(id),{method:'POST',headers:{'X-Requested-With':'XMLHttpRequest'}})
-            .then(function(r){return r.json();})
-            .then(function(res){if(res.success)location.reload();else alert('Error: '+(res.message||'Refund failed.'));})
-            .catch(function(){alert('Error processing refund.');});
-    };
 }());
 </script>
 

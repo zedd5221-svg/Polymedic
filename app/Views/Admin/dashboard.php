@@ -1,4 +1,4 @@
-<?= $this->extend('layouts/AdminLayout') ?>
+<?= $this->extend('Layouts/AdminLayout') ?>
 
 <?= $this->section('pageTitle') ?>Dashboard<?= $this->endSection() ?>
 
@@ -58,7 +58,7 @@ $statCards = [
         'label' => "Today's Patients",
         'value' => number_format((int) ($todayPatients ?? 0)),
         'note'  => 'Checked in today',
-        'link'  => base_url('admin/visits'),
+        'link'  => base_url('admin/appointments'),
     ],
     [
         'key'   => 'pending',
@@ -67,7 +67,7 @@ $statCards = [
         'label' => 'Pending Requests',
         'value' => number_format((int) ($pendingRequests ?? 0)),
         'note'  => 'Awaiting processing',
-        'link'  => base_url('admin/requests'),
+        'link'  => base_url('admin/diagnostic-requests'),
     ],
     [
         'key'   => 'completed',
@@ -76,7 +76,7 @@ $statCards = [
         'label' => 'Completed Requests',
         'value' => number_format((int) ($completedRequests ?? 0)),
         'note'  => 'Results encoded',
-        'link'  => base_url('admin/requests'),
+        'link'  => base_url('admin/diagnostic-requests'),
     ],
     [
         'key'   => 'released',
@@ -85,7 +85,7 @@ $statCards = [
         'label' => 'Released Results',
         'value' => number_format((int) ($releasedResults ?? 0)),
         'note'  => 'Sent to doctors',
-        'link'  => base_url('admin/results'),
+        'link'  => base_url('admin/diagnostic-requests'),
     ],
     [
         'key'   => 'revenue_today',
@@ -105,7 +105,7 @@ $statCards = [
         'value' => '&#8369;' . number_format($monthlyRevenueVal, 2),
         'note'  => date('F Y'),
         'raw'   => true,
-        'link'  => base_url('admin/reports/revenue'),
+        'link'  => base_url('admin/billing/reports'),
     ],
 ];
 
@@ -331,7 +331,7 @@ $sparkGeometry = static function (array $vals): array {
                                     </svg>
                                     <span class="visually-hidden">View <?= esc($apptName) ?></span>
                                 </a>
-                                <a href="<?= base_url('admin/appointment/approve/' . $apptId) ?>?from=dashboard"
+                                <a data-post href="<?= base_url('admin/appointment/approve/' . $apptId) ?>?from=dashboard"
                                    class="pending-btn pending-btn--approve"
                                    data-name="<?= esc($apptName, 'attr') ?>"
                                    data-confirm-approve>

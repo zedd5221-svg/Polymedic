@@ -1,4 +1,4 @@
-<?= $this->extend('layouts/ReceptionistLayout') ?>
+<?= $this->extend('Layouts/ReceptionistLayout') ?>
 
 <?= $this->section('pageTitle') ?><?= ($viewMode ?? 'appointment') === 'patient' ? 'Patient Details' : 'Appointment Details' ?><?= $this->endSection() ?>
 
@@ -98,13 +98,13 @@
 
                 <?php if (! $isPatientView): ?>
                     <?php if ($statusKey === 'pending' || $statusKey === 'late'): ?>
-                        <a href="<?= base_url('receptionist/appointment/cancel/' . $appointmentId) ?>"
+                        <a data-post href="<?= base_url('receptionist/appointment/cancel/' . $appointmentId) ?>"
                            class="av-btn av-btn--danger-ghost"
                            onclick="return confirm('Cancel this appointment?')">
                             <i class="bi bi-x-lg" aria-hidden="true"></i>
                             <span>Cancel</span>
                         </a>
-                        <a href="<?= base_url('receptionist/appointment/approve/' . $appointmentId) ?>"
+                        <a data-post href="<?= base_url('receptionist/appointment/approve/' . $appointmentId) ?>"
                            class="av-btn av-btn--primary"
                            onclick="return confirm('Approve this appointment?')">
                             <i class="bi bi-check-lg" aria-hidden="true"></i>
@@ -112,13 +112,13 @@
                         </a>
 
                     <?php elseif ($statusKey === 'approved'): ?>
-                        <a href="<?= base_url('receptionist/appointment/cancel/' . $appointmentId) ?>"
+                        <a data-post href="<?= base_url('receptionist/appointment/cancel/' . $appointmentId) ?>"
                            class="av-btn av-btn--danger-ghost"
                            onclick="return confirm('Cancel this appointment?')">
                             <i class="bi bi-x-lg" aria-hidden="true"></i>
                             <span>Cancel</span>
                         </a>
-                        <a href="<?= base_url('receptionist/appointment/complete/' . $appointmentId) ?>"
+                        <a data-post href="<?= base_url('receptionist/appointment/complete/' . $appointmentId) ?>"
                            class="av-btn av-btn--primary"
                            onclick="return confirm('Mark this appointment as completed?')">
                             <i class="bi bi-check2-all" aria-hidden="true"></i>

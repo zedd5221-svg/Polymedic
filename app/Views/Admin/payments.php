@@ -1,4 +1,4 @@
-<?= $this->extend('layouts/AdminLayout') ?>
+<?= $this->extend('Layouts/AdminLayout') ?>
 
 <?= $this->section('pageTitle') ?>Payments<?= $this->endSection() ?>
 
@@ -1207,7 +1207,7 @@
         }
         content.innerHTML='<div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Loading...</p></div>';
         modal.show();
-        fetch('/polymedic/public/admin/get-payment-details/'+encodeURIComponent(id))
+        fetch('<?= base_url() ?>admin/get-payment-details/'+encodeURIComponent(id))
             .then(function(r){return r.json();})
             .then(function(res){
                 if(!res.success)throw new Error(res.message||'Not found');
@@ -1226,7 +1226,7 @@
         var data=RECEIPTS[String(id)]||RECEIPTS[id]||{};
         var label=data.ref?(' '+data.ref+' ('+peso(data.paid)+')'):'';
         if(!confirm('Refund payment'+label+'? This cannot be undone.'))return;
-        fetch('/polymedic/public/admin/refund-payment/'+encodeURIComponent(id),{method:'POST',headers:{'X-Requested-With':'XMLHttpRequest'}})
+        fetch('<?= base_url() ?>admin/refund-payment/'+encodeURIComponent(id),{method:'POST',headers:{'X-Requested-With':'XMLHttpRequest','X-CSRF-TOKEN':'<?= csrf_hash() ?>'}})
             .then(function(r){return r.json();})
             .then(function(res){if(res.success)location.reload();else alert('Error: '+(res.message||'Refund failed.'));})
             .catch(function(){alert('Error processing refund.');});

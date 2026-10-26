@@ -1,4 +1,4 @@
-<?= $this->extend('layouts/AdminLayout') ?>
+<?= $this->extend('Layouts/AdminLayout') ?>
 
 <?= $this->section('pageTitle') ?>Diagnostic Requests<?= $this->endSection() ?>
 
@@ -1817,7 +1817,7 @@ $filterTabs = [
      * The only two lines that differ from the receptionist page.
      * Everything below is identical.
      */
-    var API        = '/polymedic/public/admin/';
+    var API        = '<?= base_url() ?>admin/';
     var PRINT_BASE = <?= json_encode(base_url('admin/print-request')) ?>;
     var PER_PAGE   = 9;
 
@@ -2189,7 +2189,7 @@ $filterTabs = [
                 return fetch(
                     API + 'update-diagnostic-status/' + encodeURIComponent(ctx.id) + '/' +
                         encodeURIComponent(ctx.type) + '/' + encodeURIComponent(to),
-                    { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' } }
+                    { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '<?= csrf_hash() ?>' } }
                 )
                 .then(parseJson)
                 .then(function (data) {
@@ -2212,7 +2212,7 @@ $filterTabs = [
             run: function () {
                 return fetch(
                     API + 'delete-diagnostic-request/' + encodeURIComponent(ctx.id) + '/' + encodeURIComponent(ctx.type),
-                    { method: 'DELETE', headers: { 'X-Requested-With': 'XMLHttpRequest' } }
+                    { method: 'DELETE', headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '<?= csrf_hash() ?>' } }
                 )
                 .then(parseJson)
                 .then(function (data) {

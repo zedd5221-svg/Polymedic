@@ -27,6 +27,7 @@ class InvoiceModel extends Model
         'status',
         'notes',
         'created_by',
+        'created_by_id',
         'voided_by',
         'voided_at',
         'void_reason',
@@ -221,6 +222,7 @@ class InvoiceModel extends Model
             'status'          => $status,
             'notes'           => null,
             'created_by'      => $payment['received_by'] ?? PaymentModel::currentCashierName(),
+            'created_by_id'   => $payment['received_by_id'] ?? PaymentModel::currentStaffId(),
         ]) ? (int) $this->getInsertID() : 0;
 
         if (!$invoiceId) {
@@ -406,7 +408,8 @@ class InvoiceModel extends Model
         }
 
         if (!empty($filters['search'])) {
-            $s = '%' . $filters['search'] . '%';
+            // like() adds the % wildcards itself (and escapes any in the term)
+            $s = $filters['search'];
             $builder->groupStart()
                     ->like('invoice_no', $s)
                     ->orLike('patient_name', $s)

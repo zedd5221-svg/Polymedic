@@ -1,4 +1,4 @@
-<?= $this->extend('layouts/ReceptionistLayout') ?>
+<?= $this->extend('Layouts/ReceptionistLayout') ?>
 
 <?= $this->section('pageTitle') ?>Patient Management<?= $this->endSection() ?>
 

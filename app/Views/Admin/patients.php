@@ -1,4 +1,4 @@
-<?= $this->extend('layouts/AdminLayout') ?>
+<?= $this->extend('Layouts/AdminLayout') ?>
 
 <?= $this->section('pageTitle') ?>Patient Management<?= $this->endSection() ?>
 
@@ -131,7 +131,7 @@
                 Export
             </button>
             <a class="pt-btn pt-btn--primary"
-               href="<?= base_url('admin/patient/add') ?>">
+               href="<?= base_url('admin/diagnostic-requests') ?>">
                 <i class="bi bi-person-plus" aria-hidden="true"></i>
                 Add Patient
             </a>
@@ -445,13 +445,6 @@
                                             <i class="bi bi-eye" aria-hidden="true"></i>
                                         </button>
 
-                                        <button type="button" class="pt-icon-btn"
-                                                title="Edit patient"
-                                                aria-label="Edit <?= esc($name, 'attr') ?>"
-                                                onclick="editPatient(<?= $patientId ?>)">
-                                            <i class="bi bi-pencil" aria-hidden="true"></i>
-                                        </button>
-
                                         <?php if ($email !== ''): ?>
                                             <a href="mailto:<?= esc($email, 'attr') ?>"
                                                class="pt-icon-btn"
@@ -480,7 +473,7 @@
                                     <div class="pt-empty-icon"><i class="bi bi-people" aria-hidden="true"></i></div>
                                     <h3>No patients registered yet</h3>
                                     <p>Patients will appear here once they book online or are registered at the desk.</p>
-                                    <a class="pt-btn pt-btn--primary" href="<?= base_url('admin/patient/add') ?>">
+                                    <a class="pt-btn pt-btn--primary" href="<?= base_url('admin/diagnostic-requests') ?>">
                                         <i class="bi bi-person-plus" aria-hidden="true"></i>
                                         Add patient
                                     </a>
@@ -1486,11 +1479,11 @@ function approvePatient(patientId) {
         btn.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span>';
     }
 
-    fetch('/polymedic/public/admin/approve-patient/' + patientId, {
+    fetch('<?= base_url() ?>admin/approve-patient/' + patientId, {
         method: 'POST',
         headers: {
             'X-Requested-With': 'XMLHttpRequest',
-            'Content-Type': 'application/json'
+            'X-CSRF-TOKEN': '<?= csrf_hash() ?>'
         }
     })
     .then(function (response) { return response.json(); })
@@ -1521,15 +1514,7 @@ function viewPatient(patientId) {
         alert('Patient details not available.');
         return;
     }
-    window.location.href = '/polymedic/public/admin/patient/view/' + patientId;
-}
-
-function editPatient(patientId) {
-    if (!patientId || patientId === 0) {
-        alert('Patient cannot be edited.');
-        return;
-    }
-    window.location.href = '/polymedic/public/admin/patient/edit/' + patientId;
+    window.location.href = '<?= base_url() ?>admin/patient/view/' + patientId;
 }
 
 function exportPatients() {

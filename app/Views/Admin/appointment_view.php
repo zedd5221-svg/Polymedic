@@ -1,4 +1,4 @@
-<?= $this->extend('layouts/AdminLayout') ?>
+<?= $this->extend('Layouts/AdminLayout') ?>
 
 <?= $this->section('pageTitle') ?><?= ($viewMode ?? 'appointment') === 'patient' ? 'Patient Details' : 'Appointment Details' ?><?= $this->endSection() ?>
 
@@ -99,13 +99,13 @@
 
                 <?php if (! $isPatientView): ?>
                     <?php if ($statusKey === 'pending' || $statusKey === 'late'): ?>
-                        <a href="<?= base_url('admin/appointment/cancel/' . $appointmentId) ?>"
+                        <a data-post href="<?= base_url('admin/appointment/cancel/' . $appointmentId) ?>"
                            class="av-btn av-btn--danger-ghost"
                            onclick="return confirm('Cancel this appointment?')">
                             <i class="bi bi-x-lg" aria-hidden="true"></i>
                             <span>Cancel</span>
                         </a>
-                        <a href="<?= base_url('admin/appointment/approve/' . $appointmentId) ?>"
+                        <a data-post href="<?= base_url('admin/appointment/approve/' . $appointmentId) ?>"
                            class="av-btn av-btn--primary"
                            onclick="return confirm('Approve this appointment?')">
                             <i class="bi bi-check-lg" aria-hidden="true"></i>
@@ -113,13 +113,13 @@
                         </a>
 
                     <?php elseif ($statusKey === 'approved'): ?>
-                        <a href="<?= base_url('admin/appointment/cancel/' . $appointmentId) ?>"
+                        <a data-post href="<?= base_url('admin/appointment/cancel/' . $appointmentId) ?>"
                            class="av-btn av-btn--danger-ghost"
                            onclick="return confirm('Cancel this appointment?')">
                             <i class="bi bi-x-lg" aria-hidden="true"></i>
                             <span>Cancel</span>
                         </a>
-                        <a href="<?= base_url('admin/appointment/complete/' . $appointmentId) ?>"
+                        <a data-post href="<?= base_url('admin/appointment/complete/' . $appointmentId) ?>"
                            class="av-btn av-btn--primary"
                            onclick="return confirm('Mark this appointment as completed?')">
                             <i class="bi bi-check2-all" aria-hidden="true"></i>
@@ -128,7 +128,7 @@
                     <?php endif; ?>
 
                     <!-- Delete stays admin-only -->
-                    <a href="<?= base_url('admin/appointment/delete/' . $appointmentId) ?>"
+                    <a data-post href="<?= base_url('admin/appointment/delete/' . $appointmentId) ?>"
                        class="av-btn av-btn--ghost"
                        onclick="return confirm('Permanently delete this appointment? This cannot be undone.')">
                         <i class="bi bi-trash3" aria-hidden="true"></i>

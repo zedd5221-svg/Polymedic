@@ -26,6 +26,7 @@ class PaymentModel extends Model
         'payment_date',
         'reference_number',
         'received_by',
+        'received_by_id',
         'voided_by',
         'voided_at',
         'void_reason',
@@ -53,30 +54,52 @@ class PaymentModel extends Model
     // EXISTING HELPERS — unchanged
     // ============================================================
 
-    public static function currentCashierName(): string
+    /**
+     * The signed-in staff member as [id, full name].
+     *
+     * The name is read from the users table (once per request) rather
+     * than the session, so a rename by an admin is picked up straight
+     * away instead of stamping the old name on new records.
+     *
+     * @return array{id: ?int, name: string}
+     */
+    public static function currentStaff(): array
     {
-        $session = session();
+        static $cache = [];
 
-        $name = trim((string) ($session->get('full_name') ?? ''));
-        if ($name !== '') {
-            return $name;
+        $session = session();
+        $userId  = (int) ($session->get('user_id') ?? 0);
+
+        if (isset($cache[$userId])) {
+            return $cache[$userId];
         }
 
-        $userId = (int) ($session->get('user_id') ?? 0);
+        $name = '';
         if ($userId > 0) {
             try {
-                $row  = (new UserModel())->find($userId);
+                $row  = (new UserModel())->select('full_name')->find($userId);
                 $name = trim((string) ($row['full_name'] ?? ''));
-                if ($name !== '') {
-                    return $name;
-                }
             } catch (\Throwable $e) {
-                // fall through
+                // fall back to the session below
             }
         }
+        if ($name === '') {
+            $name = trim((string) ($session->get('full_name') ?? ''))
+                ?: trim((string) ($session->get('username') ?? ''))
+                ?: 'Front desk';
+        }
 
-        $username = trim((string) ($session->get('username') ?? ''));
-        return $username !== '' ? $username : 'Front desk';
+        return $cache[$userId] = ['id' => $userId > 0 ? $userId : null, 'name' => $name];
+    }
+
+    public static function currentCashierName(): string
+    {
+        return self::currentStaff()['name'];
+    }
+
+    public static function currentStaffId(): ?int
+    {
+        return self::currentStaff()['id'];
     }
 
     public function generateReference()
@@ -112,9 +135,15 @@ class PaymentModel extends Model
 
     public function recordPayment($data)
     {
-        $changeAmount = 0;
-        if (isset($data['amount_paid']) && isset($data['total_amount'])) {
-            $changeAmount = $data['amount_paid'] - $data['total_amount'];
+        // Callers that know the cash tendered (Billing) pass the change
+        // explicitly; otherwise derive it from an over-payment.
+        if (isset($data['change_amount'])) {
+            $changeAmount = (float) $data['change_amount'];
+        } else {
+            $changeAmount = 0;
+            if (isset($data['amount_paid']) && isset($data['total_amount'])) {
+                $changeAmount = $data['amount_paid'] - $data['total_amount'];
+            }
         }
 
         $referenceNumber = $this->generateReference();
@@ -136,6 +165,7 @@ class PaymentModel extends Model
             'reference_number' => $referenceNumber,
             'reference_no'     => $data['reference_no'] ?? $referenceNumber,
             'received_by'      => $data['received_by'] ?? self::currentCashierName(),
+            'received_by_id'   => $data['received_by_id'] ?? self::currentStaffId(),
             'notes'            => $data['notes'] ?? null,
         ];
 
@@ -286,7 +316,7 @@ class PaymentModel extends Model
 
     public function getXrayRevenueBetween(string $from, string $to): float
     {
-        $row = $this->selectSum('total_amount', 'revenue')
+        $row = $this->selectSum('amount_paid', 'revenue')
                     ->where('request_type', 'xray')
                     ->where('payment_status', self::STATUS_PAID)
                     ->where('payment_date >=', $from . ' 00:00:00')

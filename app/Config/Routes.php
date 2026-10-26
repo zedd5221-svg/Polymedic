@@ -22,18 +22,20 @@ $routes->group('admin', ['filter' => 'auth:admin'], function ($routes) {
 
     // Patient detail view (used by the eye icon on the patients list)
     $routes->get('patient/view/(:num)', 'Admin::viewPatient/$1');
+    $routes->post('approve-patient/(:num)', 'Admin::approvePatient/$1');
 
+    // Old link target; redirects to diagnostic-requests
     $routes->get('requests', 'Admin::requests');
     $routes->get('users', 'Admin::users');
-    $routes->get('sync-xray', 'Admin::syncXrayExaminations');
+    $routes->post('sync-xray', 'Admin::syncXrayExaminations');
 
     // Appointments
     $routes->get('appointments', 'Admin::appointments');
     $routes->get('appointment/view/(:num)', 'Admin::appointmentView/$1');
-    $routes->get('appointment/approve/(:num)', 'Admin::approveAppointment/$1');
-    $routes->get('appointment/cancel/(:num)', 'Admin::cancelAppointment/$1');
-    $routes->get('appointment/complete/(:num)', 'Admin::completeAppointment/$1');
-    $routes->get('appointment/delete/(:num)', 'Admin::deleteAppointment/$1');
+    $routes->post('appointment/approve/(:num)', 'Admin::approveAppointment/$1');
+    $routes->post('appointment/cancel/(:num)', 'Admin::cancelAppointment/$1');
+    $routes->post('appointment/complete/(:num)', 'Admin::completeAppointment/$1');
+    $routes->post('appointment/delete/(:num)', 'Admin::deleteAppointment/$1');
 
     // Diagnostic requests
     $routes->get('diagnostic-requests', 'Admin::diagnosticRequests');
@@ -61,14 +63,14 @@ $routes->group('admin', ['filter' => 'auth:admin'], function ($routes) {
     $routes->get('services', 'Admin::services');
     $routes->post('services/create', 'Admin::createService');
     $routes->post('services/update/(:num)', 'Admin::updateService/$1');
-    $routes->get('services/delete/(:num)', 'Admin::deleteService/$1');
-    $routes->get('services/toggle/(:num)', 'Admin::toggleServiceStatus/$1');
+    $routes->post('services/delete/(:num)', 'Admin::deleteService/$1');
+    $routes->post('services/toggle/(:num)', 'Admin::toggleServiceStatus/$1');
 
     // Users
     $routes->post('users/create', 'Admin::createUser');
     $routes->post('users/update/(:num)', 'Admin::updateUser/$1');
-    $routes->get('users/delete/(:num)', 'Admin::deleteUser/$1');
-    $routes->get('users/toggle/(:num)', 'Admin::toggleUserStatus/$1');
+    $routes->post('users/delete/(:num)', 'Admin::deleteUser/$1');
+    $routes->post('users/toggle/(:num)', 'Admin::toggleUserStatus/$1');
     $routes->get('users/data/(:num)', 'Admin::getUserData/$1');
 });
 
@@ -85,9 +87,9 @@ $routes->group('receptionist', ['filter' => 'auth:receptionist'], function ($rou
     // Appointments
     $routes->get('appointments', 'Receptionist::appointments');
     $routes->get('appointment/view/(:num)', 'Receptionist::appointmentView/$1');
-    $routes->get('appointment/approve/(:num)', 'Receptionist::approveAppointment/$1');
-    $routes->get('appointment/cancel/(:num)', 'Receptionist::cancelAppointment/$1');
-    $routes->get('appointment/complete/(:num)', 'Receptionist::completeAppointment/$1');
+    $routes->post('appointment/approve/(:num)', 'Receptionist::approveAppointment/$1');
+    $routes->post('appointment/cancel/(:num)', 'Receptionist::cancelAppointment/$1');
+    $routes->post('appointment/complete/(:num)', 'Receptionist::completeAppointment/$1');
 
     // ⬅ EDIT #1 — the old placeholder route pointed at Receptionist::billing.
     //            Now it points at the shared Billing controller so this URL
@@ -116,12 +118,10 @@ $routes->group('receptionist', ['filter' => 'auth:receptionist'], function ($rou
     // Payments AJAX
     $routes->get('get-payment-details/(:num)', 'Receptionist::getPaymentDetails/$1');
     $routes->get('print-receipt/(:num)',       'Receptionist::printReceipt/$1');
-    $routes->post('refund-payment/(:num)',     'Receptionist::refundPayment/$1');
+    // Refunds are admin-only (see the billing block below)
 
-    // Patient sync / debug
-    $routes->get('sync-walk-in-patients', 'Receptionist::syncWalkInPatients');
-    $routes->get('verify-sync', 'Receptionist::verifySync');
-    $routes->get('debug-patients', 'Receptionist::debugPatients');
+    // Patient sync (manual tool, POST only)
+    $routes->post('sync-walk-in-patients', 'Receptionist::syncWalkInPatients');
 });
 
 
@@ -139,7 +139,7 @@ $routes->group('radiologist', ['filter' => 'auth:radiologist'], function ($route
     $routes->post('examination/remove-image/(:num)', 'Radiologist::removeImage/$1');
     $routes->post('examination/save/(:num)', 'Radiologist::saveFindings/$1');
     $routes->post('examination/save-draft/(:num)', 'Radiologist::saveDraft/$1');
-    $routes->get('examination/release/(:num)', 'Radiologist::releaseResult/$1');
+    $routes->post('examination/release/(:num)', 'Radiologist::releaseResult/$1');
     $routes->get('examination/print/(:num)', 'Radiologist::printResult/$1');
 
     // Notifications
@@ -164,7 +164,7 @@ $routes->group('medtech', ['filter' => 'auth:med_tech'], function ($routes) {
     $routes->get('request/view/(:num)', 'MedTech::viewRequest/$1');
     $routes->post('request/save-results/(:num)', 'MedTech::saveResults/$1');
     $routes->post('request/save-findings/(:num)', 'MedTech::saveFindings/$1');
-    $routes->get('request/release/(:num)', 'MedTech::releaseResult/$1');
+    $routes->post('request/release/(:num)', 'MedTech::releaseResult/$1');
     $routes->post('request/release-directly/(:num)', 'MedTech::releaseDirectly/$1');
     $routes->get('request/print/(:num)', 'MedTech::printResult/$1');
     $routes->get('template/(:any)', 'MedTech::getTemplate/$1');
@@ -251,6 +251,28 @@ $routes->group('receptionist/billing', ['filter' => 'auth:receptionist'], functi
     // Intentionally NOT registered: void, refund, reports
 });
 
+
+// ============================================================
+// MY PROFILE — shared controller, one set of routes per role
+// ============================================================
+//
+// Each role gets its own prefix so the role's auth filter applies
+// and the page renders inside that role's layout.
+
+foreach ([
+    'admin'        => 'admin',
+    'receptionist' => 'receptionist',
+    'radiologist'  => 'radiologist',
+    'medtech'      => 'med_tech',
+] as $prefix => $role) {
+    $routes->group($prefix, ['filter' => 'auth:' . $role], function ($routes) {
+        $routes->get('profile',                 'Profile::index');
+        $routes->post('profile/update',         'Profile::update');
+        $routes->post('profile/password',       'Profile::password');
+        $routes->post('profile/avatar',         'Profile::avatar');
+        $routes->post('profile/avatar/remove',  'Profile::removeAvatar');
+    });
+}
 
 // ============================================================
 // REMOVED - READ THIS BEFORE PUTTING ANY OF IT BACK

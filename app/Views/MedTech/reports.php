@@ -1,4 +1,4 @@
-<?= $this->extend('layouts/MedTechLayout') ?>
+<?= $this->extend('Layouts/MedTechLayout') ?>
 
 <?= $this->section('pageTitle') ?>Reports<?= $this->endSection() ?>
 
@@ -140,7 +140,7 @@ $tatTargets = $turnaroundData ?? [
         <article class="rp-stat">
             <div class="rp-stat-value"><?= number_format((int) ($counts['in_progress'] ?? 0)) ?></div>
             <div class="rp-stat-label">In progress</div>
-            <div class="rp-stat-sub"><?= $pct((int) ($counts['in_progress'] ?? 0)) ?>% of total</div>
+            <div class="rp-stat-sub"><?= $pct((int) ($counts['in_progress'] ?? 0)) ?>% of total · incl. <?= number_format((int) ($counts['draft'] ?? 0)) ?> draft<?= (int) ($counts['draft'] ?? 0) === 1 ? '' : 's' ?></div>
             <div class="rp-stat-bar">
                 <div class="rp-stat-bar-fill" style="width: <?= $pct((int) ($counts['in_progress'] ?? 0)) ?>%; background: #3b82f6;"></div>
             </div>
@@ -206,7 +206,7 @@ $tatTargets = $turnaroundData ?? [
                 <?php
                 $legendRows = [
                     ['label' => 'Pending',     'value' => (int) ($counts['pending'] ?? 0),     'tone' => 'pending'],
-                    ['label' => 'In progress', 'value' => (int) ($counts['in_progress'] ?? 0), 'tone' => 'progress'],
+                    ['label' => 'In progress (not draft)', 'value' => (int) ($counts['in_progress_only'] ?? $counts['in_progress'] ?? 0), 'tone' => 'progress'],
                     ['label' => 'Draft',       'value' => (int) ($counts['draft'] ?? 0),       'tone' => 'draft'],
                     ['label' => 'Completed',   'value' => (int) ($counts['completed'] ?? 0),   'tone' => 'completed'],
                     ['label' => 'Released',    'value' => (int) ($counts['released'] ?? 0),    'tone' => 'released'],
@@ -1264,10 +1264,10 @@ $tatTargets = $turnaroundData ?? [
 
     var distCanvas = document.getElementById('statusDistributionChart');
     if (distCanvas) {
-        var distLabels = ['Pending', 'In progress', 'Draft', 'Completed', 'Released'];
+        var distLabels = ['Pending', 'In progress (not draft)', 'Draft', 'Completed', 'Released'];
         var distData   = [
             <?= (int) ($counts['pending'] ?? 0) ?>,
-            <?= (int) ($counts['in_progress'] ?? 0) ?>,
+            <?= (int) ($counts['in_progress_only'] ?? $counts['in_progress'] ?? 0) ?>,
             <?= (int) ($counts['draft'] ?? 0) ?>,
             <?= (int) ($counts['completed'] ?? 0) ?>,
             <?= (int) ($counts['released'] ?? 0) ?>

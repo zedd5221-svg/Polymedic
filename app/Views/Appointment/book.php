@@ -1,9 +1,9 @@
-<?= $this->extend('layouts/AppointmentLayout') ?>
+<?= $this->extend('Layouts/AppointmentLayout') ?>
 
 <?= $this->section('AppointmentContent') ?>
 
 <!-- Load booking CSS -->
-<link href="/polymedic/public/assets/css/booking.css" rel="stylesheet">
+<link href="<?= base_url() ?>assets/css/booking.css" rel="stylesheet">
 
 <?php
     // Country dialling options for the phone field.
@@ -112,7 +112,7 @@
                     </div>
                 <?php endif ?>
 
-                <form action="/polymedic/public/appointment/submit" method="POST" id="bookingForm" novalidate>
+                <form action="<?= site_url('appointment/submit') ?>" method="POST" id="bookingForm" novalidate>
                     <?= csrf_field() ?>
 
                     <!-- =========================================================
@@ -176,7 +176,7 @@
                         </div>
 
                         <div class="btn-group-custom">
-                            <a href="/polymedic/public/" class="btn-home">
+                            <a href="<?= base_url() ?>" class="btn-home">
                                 <i class="bi bi-house me-2"></i>Home
                             </a>
                             <button type="button" class="btn btn-primary-custom" id="step1Next">
@@ -333,7 +333,7 @@
                         </div>
 
                         <div class="btn-group-custom">
-                            <a href="/polymedic/public/" class="btn-home">
+                            <a href="<?= base_url() ?>" class="btn-home">
                                 <i class="bi bi-house me-2"></i>Home
                             </a>
                             <button type="button" class="btn btn-outline-custom" id="step2Prev">
@@ -363,7 +363,7 @@
                             <div class="service-type-card active" data-type="laboratory" id="serviceLab" tabindex="0" role="button" aria-pressed="true">
                                 <span class="check-mark"><i class="bi bi-check"></i></span>
                                 <span class="icon">
-                                    <img src="/polymedic/public/assets/images/lab-icon.png" alt="" style="width: 55px; height: 55px; object-fit: contain;">
+                                    <img src="<?= base_url() ?>assets/images/lab-icon.png" alt="" style="width: 55px; height: 55px; object-fit: contain;">
                                 </span>
                                 <div class="title">Laboratory</div>
                                 <div class="desc">Blood tests, urinalysis, etc.</div>
@@ -371,7 +371,7 @@
                             <div class="service-type-card" data-type="xray" id="serviceXray" tabindex="0" role="button" aria-pressed="false">
                                 <span class="check-mark"><i class="bi bi-check"></i></span>
                                 <span class="icon">
-                                    <img src="/polymedic/public/assets/images/xray-icon.png" alt="" style="width: 55px; height: 55px; object-fit: contain;">
+                                    <img src="<?= base_url() ?>assets/images/xray-icon.png" alt="" style="width: 55px; height: 55px; object-fit: contain;">
                                 </span>
                                 <div class="title">X-Ray &amp; Imaging</div>
                                 <div class="desc">Chest, skeletal, etc.</div>
@@ -379,7 +379,7 @@
                             <div class="service-type-card" data-type="both" id="serviceBoth" tabindex="0" role="button" aria-pressed="false">
                                 <span class="check-mark"><i class="bi bi-check"></i></span>
                                 <span class="icon">
-                                    <img src="/polymedic/public/assets/images/both-icon.png" alt="" style="width: 55px; height: 55px; object-fit: contain;">
+                                    <img src="<?= base_url() ?>assets/images/both-icon.png" alt="" style="width: 55px; height: 55px; object-fit: contain;">
                                 </span>
                                 <div class="title">Both</div>
                                 <div class="desc">Laboratory &amp; X-Ray</div>
@@ -475,7 +475,7 @@
                         </div>
 
                         <div class="btn-group-custom">
-                            <a href="/polymedic/public/" class="btn-home">
+                            <a href="<?= base_url() ?>" class="btn-home">
                                 <i class="bi bi-house me-2"></i>Home
                             </a>
                             <button type="button" class="btn btn-outline-custom" id="step3Prev">
@@ -563,7 +563,7 @@
                         </div>
 
                         <div class="btn-group-custom">
-                            <a href="/polymedic/public/" class="btn-home">
+                            <a href="<?= base_url() ?>" class="btn-home">
                                 <i class="bi bi-house me-2"></i>Home
                             </a>
                             <button type="button" class="btn btn-outline-custom" id="step4Prev">

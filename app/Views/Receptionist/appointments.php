@@ -1,4 +1,4 @@
-<?= $this->extend('layouts/ReceptionistLayout') ?>
+<?= $this->extend('Layouts/ReceptionistLayout') ?>
 
 <?= $this->section('pageTitle') ?>Appointments<?= $this->endSection() ?>
 
@@ -348,7 +348,7 @@ foreach ($appointmentList as $appt) {
 
                             <?php if ($canApprove): ?>
                                 <a class="dx-btn dx-btn--sm dx-btn--success"
-                                   href="<?= base_url('receptionist/appointment/approve/' . (int) $id) ?>"
+                                   data-post href="<?= base_url('receptionist/appointment/approve/' . (int) $id) ?>"
                                    aria-label="Approve appointment <?= esc($reference, 'attr') ?>"
                                    onclick="return confirm('Approve this appointment?')">
                                     <i class="bi bi-check2-circle" aria-hidden="true"></i>
@@ -378,7 +378,7 @@ foreach ($appointmentList as $appt) {
                                     <?php if ($canApprove): ?>
                                         <li>
                                             <a class="dropdown-item"
-                                               href="<?= base_url('receptionist/appointment/approve/' . (int) $id) ?>"
+                                               data-post href="<?= base_url('receptionist/appointment/approve/' . (int) $id) ?>"
                                                onclick="return confirm('Approve this appointment?')">
                                                 <i class="bi bi-check2-circle" aria-hidden="true"></i>
                                                 Approve appointment
@@ -389,7 +389,7 @@ foreach ($appointmentList as $appt) {
                                     <?php if ($status === 'approved'): ?>
                                         <li>
                                             <a class="dropdown-item"
-                                               href="<?= base_url('receptionist/appointment/complete/' . (int) $id) ?>"
+                                               data-post href="<?= base_url('receptionist/appointment/complete/' . (int) $id) ?>"
                                                onclick="return confirm('Mark this appointment as completed?')">
                                                 <i class="bi bi-check-all" aria-hidden="true"></i>
                                                 Mark as completed
@@ -400,7 +400,7 @@ foreach ($appointmentList as $appt) {
                                     <?php if ($canCancel): ?>
                                         <li>
                                             <a class="dropdown-item dx-menu-danger"
-                                               href="<?= base_url('receptionist/appointment/cancel/' . (int) $id) ?>"
+                                               data-post href="<?= base_url('receptionist/appointment/cancel/' . (int) $id) ?>"
                                                onclick="return confirm('Cancel this appointment?')">
                                                 <i class="bi bi-x-circle" aria-hidden="true"></i>
                                                 Cancel appointment

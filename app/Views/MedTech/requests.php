@@ -1,4 +1,4 @@
-<?= $this->extend('layouts/MedTechLayout') ?>
+<?= $this->extend('Layouts/MedTechLayout') ?>
 
 <?= $this->section('pageTitle') ?>Laboratory Requests<?= $this->endSection() ?>
 
@@ -120,6 +120,7 @@ $filterTabs = [
                     $patient   = (string) ($request['patient_name'] ?? 'Unknown patient');
                     $status    = strtolower((string) ($request['status'] ?? 'pending'));
                     $meta      = $statusMeta[$status] ?? $statusMeta['pending'];
+                    $tags      = \App\Models\DiagnosticRequestModel::statusTags($status);
 
                     /* Priority — same rule as the Admin diagnostic view.
                        Anything other than "stat" is treated as routine. */
@@ -169,6 +170,7 @@ $filterTabs = [
                              data-key="<?= esc($key, 'attr') ?>"
                              data-id="<?= esc($id, 'attr') ?>"
                              data-status="<?= esc($status, 'attr') ?>"
+                             data-statuses="<?= esc(implode(' ', $tags), 'attr') ?>"
                              data-accession="<?= esc($accession, 'attr') ?>"
                              data-patient="<?= esc($patient, 'attr') ?>"
                              data-priority="<?= $isStat ? 'stat' : 'routine' ?>"
@@ -181,7 +183,9 @@ $filterTabs = [
                                 <?php if ($isStat): ?>
                                     <span class="dx-tag-stat" title="Urgent">STAT</span>
                                 <?php endif; ?>
-                                <span class="dx-status dx-status--<?= $meta['tone'] ?>"><?= esc($meta['label']) ?></span>
+                                <?php foreach ($tags as $tag): $tm = $statusMeta[$tag] ?? $meta; ?>
+                                    <span class="dx-status dx-status--<?= $tm['tone'] ?>"><?= esc($tm['label']) ?></span>
+                                <?php endforeach; ?>
                             </div>
                         </header>
 
@@ -1011,7 +1015,8 @@ $filterTabs = [
 
     function applyFilters(keepPage) {
         matches = cards.filter(function (card) {
-            return (state.status === 'all' || card.dataset.status === state.status) &&
+            var tags = ' ' + (card.dataset.statuses || card.dataset.status || '') + ' ';
+            return (state.status === 'all' || tags.indexOf(' ' + state.status + ' ') !== -1) &&
                    (state.term === '' || (card.dataset.search || '').indexOf(state.term) !== -1);
         });
         if (!keepPage) { state.page = 1; }

@@ -19,18 +19,18 @@ class Radiologist extends BaseController
 
         $role = session()->get('role');
         if ($role !== 'radiologist') {
-            if ($role === 'admin') {
-                return redirect()->to(base_url('admin/dashboard'));
-            }
-            if ($role === 'receptionist') {
-                return redirect()->to(base_url('receptionist/dashboard'));
-            }
-            if ($role === 'medtech') {
-                return redirect()->to(base_url('medtech/dashboard'));
-            }
-            return redirect()->to(base_url('login'));
+            return redirect()->to((new NotificationModel())->dashboardFor($role));
         }
         return null;
+    }
+
+    /** An X-ray request by id; lab rows are never reachable from here. */
+    private function findXray($id): ?array
+    {
+        return (new DiagnosticRequestModel())
+            ->where('id', (int) $id)
+            ->where('type', DiagnosticRequestModel::TYPE_XRAY)
+            ->first();
     }
 
     private function departmentStatuses(): array
@@ -40,6 +40,16 @@ class Radiologist extends BaseController
             DiagnosticRequestModel::STATUS_COMPLETED,
             DiagnosticRequestModel::STATUS_RELEASED,
         ];
+    }
+
+    /**
+     * X-ray worklist counts from one grouped query.
+     * pending = paid but not opened-and-saved by a radiologist yet,
+     * processing = in reading (a radiologist has saved a draft).
+     */
+    private function departmentCounts(): array
+    {
+        return (new DiagnosticRequestModel())->getDepartmentCounts(DiagnosticRequestModel::TYPE_XRAY);
     }
 
     /**
@@ -129,31 +139,7 @@ class Radiologist extends BaseController
 
         $departmentStatuses = $this->departmentStatuses();
 
-        $data['pending']    = $model
-            ->where('type', $type)
-            ->where('status', DiagnosticRequestModel::STATUS_IN_PROGRESS)
-            ->countAllResults();
-
-        $model->resetQuery();
-        $data['processing'] = $data['pending'];
-
-        $model->resetQuery();
-        $data['completed'] = $model
-            ->where('type', $type)
-            ->where('status', DiagnosticRequestModel::STATUS_COMPLETED)
-            ->countAllResults();
-
-        $model->resetQuery();
-        $data['released'] = $model
-            ->where('type', $type)
-            ->where('status', DiagnosticRequestModel::STATUS_RELEASED)
-            ->countAllResults();
-
-        $model->resetQuery();
-        $data['total'] = $model
-            ->where('type', $type)
-            ->whereIn('status', $departmentStatuses)
-            ->countAllResults();
+        $data = $this->departmentCounts();
 
         $model->resetQuery();
         $data['recent_examinations'] = $model
@@ -162,6 +148,7 @@ class Radiologist extends BaseController
             ->orderBy('created_at', 'DESC')
             ->limit(10)
             ->findAll();
+        $data['recent_examinations'] = DiagnosticRequestModel::withDepartmentStatus($data['recent_examinations']);
 
         $model->resetQuery();
         $data['pending_examinations'] = $model
@@ -170,6 +157,7 @@ class Radiologist extends BaseController
             ->orderBy('created_at', 'ASC')
             ->limit(5)
             ->findAll();
+        $data['pending_examinations'] = DiagnosticRequestModel::withDepartmentStatus($data['pending_examinations']);
 
         $data['today_revenue']   = $paymentModel->getXrayRevenueToday();
         $data['monthly_revenue'] = $paymentModel->getXrayRevenueThisMonth();
@@ -200,7 +188,8 @@ class Radiologist extends BaseController
                 ->where("$dateExpr >=", $start)
                 ->where("$dateExpr <=", $end);
             foreach ($where as $col => $val) {
-                $b->where($col, $val);
+                // a null value means $col is a raw SQL condition
+                $val === null ? $b->where($col, null, false) : $b->where($col, $val);
             }
             $rows = $b->groupBy('d')->get()->getResultArray();
 
@@ -221,8 +210,8 @@ class Radiologist extends BaseController
 
         return [
             'dates'       => $dates,
-            'pending'     => $series('DATE(created_at)', 'COUNT(*)', ['status' => 'in_progress']),
-            'processing'  => $series('DATE(created_at)', 'COUNT(*)', ['status' => 'in_progress']),
+            'pending'     => $series('DATE(created_at)', 'COUNT(*)', [DiagnosticRequestModel::untouchedSql($type) => null]),
+            'processing'  => $series('DATE(created_at)', 'COUNT(*)', ['status' => 'in_progress', 'NOT ' . DiagnosticRequestModel::untouchedSql($type) => null]),
             'completed'   => $series('DATE(updated_at)', 'COUNT(*)', ['status' => 'completed']),
             'released'    => $series('DATE(released_at)', 'COUNT(*)', ['status' => 'released']),
             'total'       => $total,
@@ -240,8 +229,9 @@ class Radiologist extends BaseController
         $end   = end($dates);
 
         $rows = $db->table('payments')
-            ->select('DATE(payment_date) AS d, SUM(total_amount) AS v', false)
+            ->select('DATE(payment_date) AS d, SUM(amount_paid) AS v', false)
             ->where('payment_status', 'paid')
+            ->where('request_type', DiagnosticRequestModel::TYPE_XRAY)
             ->where('DATE(payment_date) >=', $start)
             ->where('DATE(payment_date) <=', $end)
             ->groupBy('d')
@@ -289,33 +279,8 @@ class Radiologist extends BaseController
             ->orderBy('created_at', 'DESC')
             ->findAll();
 
-        $model->resetQuery();
-        $data['counts'] = [
-            'pending'    => $model
-                ->where('type', $type)
-                ->where('status', DiagnosticRequestModel::STATUS_IN_PROGRESS)
-                ->countAllResults(),
-
-            'processing' => $model
-                ->where('type', $type)
-                ->where('status', DiagnosticRequestModel::STATUS_IN_PROGRESS)
-                ->countAllResults(),
-
-            'completed'  => $model
-                ->where('type', $type)
-                ->where('status', DiagnosticRequestModel::STATUS_COMPLETED)
-                ->countAllResults(),
-
-            'released'   => $model
-                ->where('type', $type)
-                ->where('status', DiagnosticRequestModel::STATUS_RELEASED)
-                ->countAllResults(),
-
-            'total'      => $model
-                ->where('type', $type)
-                ->whereIn('status', $departmentStatuses)
-                ->countAllResults(),
-        ];
+        $data['examinations'] = DiagnosticRequestModel::withDepartmentStatus($data['examinations']);
+        $data['counts']       = $this->departmentCounts();
 
         return view('Radiologist/examinations', $data);
     }
@@ -326,7 +291,10 @@ class Radiologist extends BaseController
         if ($redirect) return $redirect;
 
         $model = new DiagnosticRequestModel();
-        $data['examination'] = $model->find($id);
+        $data['examination'] = $this->findXray($id);
+        if ($data['examination']) {
+            [$data['examination']] = DiagnosticRequestModel::withDepartmentStatus([$data['examination']]);
+        }
 
         if (!$data['examination']) {
             return redirect()->to(base_url('radiologist/examinations'))
@@ -340,28 +308,6 @@ class Radiologist extends BaseController
         return view('Radiologist/view_examination', $data);
     }
 
-    public function updateStatus($id, $status)
-    {
-        $redirect = $this->checkAuth();
-        if ($redirect) return $redirect;
-
-        $validStatuses = ['pending', 'in_progress', 'completed', 'released', 'cancelled'];
-        if (!in_array($status, $validStatuses)) {
-            return $this->response->setJSON(['success' => false, 'message' => 'Invalid status']);
-        }
-
-        try {
-            $model = new DiagnosticRequestModel();
-            $model->updateStatus($id, $status);
-
-            return $this->response->setJSON(['success' => true, 'message' => 'Status updated successfully']);
-
-        } catch (\Exception $e) {
-            log_message('error', 'Update examination status error: ' . $e->getMessage());
-            return $this->response->setJSON(['success' => false, 'message' => 'Error updating status']);
-        }
-    }
-
     public function saveDraft($id)
     {
         $redirect = $this->checkAuth();
@@ -372,7 +318,7 @@ class Radiologist extends BaseController
 
         try {
             $model       = new DiagnosticRequestModel();
-            $examination = $model->find($id);
+            $examination = $this->findXray($id);
 
             if (!$examination) {
                 return redirect()->to(base_url('radiologist/examinations'))
@@ -404,7 +350,8 @@ class Radiologist extends BaseController
             ];
 
             if (empty($examination['radiologist_name'])) {
-                $update['radiologist_name'] = session()->get('full_name') ?? 'Radiologist';
+                $update['radiologist_name'] = PaymentModel::currentCashierName();
+                $update['radiologist_id']   = PaymentModel::currentStaffId();
             }
 
             $model->update($id, $update);
@@ -428,7 +375,7 @@ class Radiologist extends BaseController
 
         try {
             $model       = new DiagnosticRequestModel();
-            $examination = $model->find($id);
+            $examination = $this->findXray($id);
 
             if (!$examination) {
                 return redirect()->to(base_url('radiologist/examinations'))
@@ -463,7 +410,8 @@ class Radiologist extends BaseController
             ];
 
             if (empty($examination['radiologist_name'])) {
-                $update['radiologist_name'] = session()->get('full_name') ?? 'Radiologist';
+                $update['radiologist_name'] = PaymentModel::currentCashierName();
+                $update['radiologist_id']   = PaymentModel::currentStaffId();
             }
 
             $model->update($id, $update);
@@ -477,84 +425,6 @@ class Radiologist extends BaseController
         }
     }
 
-    public function notifications()
-    {
-        $redirect = $this->checkAuth();
-        if ($redirect) return $redirect;
-
-        $notificationModel = new NotificationModel();
-
-        $data['notifications'] = $notificationModel
-            ->where('user_role', 'radiologist')
-            ->orderBy('created_at', 'DESC')
-            ->findAll();
-
-        $data['unread_count'] = $notificationModel
-            ->where('user_role', 'radiologist')
-            ->where('is_read', 0)
-            ->countAllResults();
-
-        $data['total_count'] = count($data['notifications']);
-
-        return view('Radiologist/notifications', $data);
-    }
-
-    public function markNotificationRead($id)
-    {
-        $redirect = $this->checkAuth();
-        if ($redirect) return $redirect;
-
-        try {
-            $notificationModel = new NotificationModel();
-            $notificationModel->update($id, ['is_read' => 1]);
-
-            return redirect()->to(base_url('radiologist/notifications'))
-                            ->with('success', 'Notification marked as read');
-
-        } catch (\Exception $e) {
-            log_message('error', 'Mark notification read error: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Error marking notification as read');
-        }
-    }
-
-    public function markAllRead()
-    {
-        $redirect = $this->checkAuth();
-        if ($redirect) return $redirect;
-
-        try {
-            $notificationModel = new NotificationModel();
-            $notificationModel->where('user_role', 'radiologist')
-                             ->set(['is_read' => 1])
-                             ->update();
-
-            return redirect()->to(base_url('radiologist/notifications'))
-                            ->with('success', 'All notifications marked as read');
-
-        } catch (\Exception $e) {
-            log_message('error', 'Mark all read error: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Error marking all as read');
-        }
-    }
-
-    public function deleteNotification($id)
-    {
-        $redirect = $this->checkAuth();
-        if ($redirect) return $redirect;
-
-        try {
-            $notificationModel = new NotificationModel();
-            $notificationModel->delete($id);
-
-            return redirect()->to(base_url('radiologist/notifications'))
-                            ->with('success', 'Notification deleted');
-
-        } catch (\Exception $e) {
-            log_message('error', 'Delete notification error: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Error deleting notification');
-        }
-    }
-
     public function reports()
     {
         $redirect = $this->checkAuth();
@@ -565,29 +435,11 @@ class Radiologist extends BaseController
 
         $departmentStatuses = $this->departmentStatuses();
 
-        $model->resetQuery();
-        $data['total_examinations'] = $model
-            ->where('type', $type)
-            ->whereIn('status', $departmentStatuses)
-            ->countAllResults();
-
-        $model->resetQuery();
-        $data['pending_count'] = $model
-            ->where('type', $type)
-            ->where('status', DiagnosticRequestModel::STATUS_IN_PROGRESS)
-            ->countAllResults();
-
-        $model->resetQuery();
-        $data['completed_count'] = $model
-            ->where('type', $type)
-            ->where('status', DiagnosticRequestModel::STATUS_COMPLETED)
-            ->countAllResults();
-
-        $model->resetQuery();
-        $data['released_count'] = $model
-            ->where('type', $type)
-            ->where('status', DiagnosticRequestModel::STATUS_RELEASED)
-            ->countAllResults();
+        $counts = $this->departmentCounts();
+        $data['total_examinations'] = $counts['total'];
+        $data['pending_count']      = $counts['pending'];
+        $data['completed_count']    = $counts['completed'];
+        $data['released_count']     = $counts['released'];
 
         $data['weekly_data'] = $model->getWeeklyVolumeData();
 
@@ -600,7 +452,7 @@ class Radiologist extends BaseController
         if ($redirect) return $redirect;
 
         $model = new DiagnosticRequestModel();
-        $examination = $model->find($id);
+        $examination = $this->findXray($id);
 
         if (!$examination) {
             return redirect()->to(base_url('radiologist/examinations'))
@@ -638,7 +490,7 @@ class Radiologist extends BaseController
         if ($redirect) return $redirect;
 
         $model       = new DiagnosticRequestModel();
-        $examination = $model->find($id);
+        $examination = $this->findXray($id);
 
         if (!$examination) {
             return redirect()->back()->with('error', 'Examination not found.');
@@ -754,7 +606,7 @@ class Radiologist extends BaseController
         }
 
         $model       = new DiagnosticRequestModel();
-        $examination = $model->find($id);
+        $examination = $this->findXray($id);
 
         if (!$examination) {
             return redirect()->back()->with('error', 'Examination not found.');
@@ -778,10 +630,15 @@ class Radiologist extends BaseController
             $paths = [$examination['image_path']];
         }
 
+        // Only ever delete a file this examination actually references.
+        if (!in_array($path, $paths, true)) {
+            return redirect()->back()->with('error', 'That image does not belong to this examination.');
+        }
+
         $paths = array_values(array_filter($paths, static fn ($p) => $p !== $path));
 
         $normalized = str_replace('\\', '/', $path);
-        if (str_starts_with($normalized, 'uploads/xray/')) {
+        if (str_starts_with($normalized, 'uploads/xray/') && !str_contains($normalized, '..')) {
             $full = FCPATH . $normalized;
             if (is_file($full)) {
                 @unlink($full);
@@ -803,7 +660,7 @@ class Radiologist extends BaseController
 
         try {
             $model       = new DiagnosticRequestModel();
-            $examination = $model->find($id);
+            $examination = $this->findXray($id);
 
             if (!$examination) {
                 return redirect()->to(base_url('radiologist/examinations'))
@@ -836,7 +693,8 @@ class Radiologist extends BaseController
             ];
 
             if (empty($examination['radiologist_name'])) {
-                $update['radiologist_name'] = session()->get('full_name') ?? 'Radiologist';
+                $update['radiologist_name'] = PaymentModel::currentCashierName();
+                $update['radiologist_id']   = PaymentModel::currentStaffId();
             }
 
             $model->update($id, $update);

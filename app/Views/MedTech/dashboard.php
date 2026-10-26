@@ -1,4 +1,4 @@
-<?= $this->extend('layouts/MedTechLayout') ?>
+<?= $this->extend('Layouts/MedTechLayout') ?>
 
 <?= $this->section('pageTitle') ?>MedTech Dashboard<?= $this->endSection() ?>
 
@@ -322,7 +322,8 @@ $catalog = $serviceCatalog ?? [
                     <tbody>
                         <?php if (!empty($allRequests)): ?>
                             <?php foreach ($allRequests as $request): ?>
-                                <tr class="queue-row" data-status="<?= esc($request['status']) ?>">
+                                <?php $rowTags = \App\Models\DiagnosticRequestModel::statusTags((string) $request['status']); ?>
+                                <tr class="queue-row" data-status="<?= esc($request['status']) ?>" data-statuses="<?= esc(implode(' ', $rowTags), 'attr') ?>">
                                     <td class="accession">LAB-<?= date('y') ?>-<?= str_pad($request['id'], 4, '0', STR_PAD_LEFT) ?></td>
                                     <td>
                                         <div class="patient-cell">
@@ -347,10 +348,12 @@ $catalog = $serviceCatalog ?? [
                                     </td>
                                     <td><?= date('h:i A', strtotime($request['created_at'] ?? date('Y-m-d H:i:s'))) ?></td>
                                     <td>
-                                        <span class="status-badge <?= esc($request['status']) ?>">
-                                            <i class="bi bi-circle-fill"></i>
-                                            <?= ucfirst(str_replace('_', ' ', $request['status'])) ?>
-                                        </span>
+                                        <?php foreach ($rowTags as $tag): ?>
+                                            <span class="status-badge <?= esc($tag, 'attr') ?>">
+                                                <i class="bi bi-circle-fill"></i>
+                                                <?= esc(ucfirst(str_replace('_', ' ', $tag))) ?>
+                                            </span>
+                                        <?php endforeach; ?>
                                     </td>
                                     <td>
                                         <a href="<?= base_url('medtech/request/view/' . $request['id']) ?>" class="action-icons" title="View">
@@ -1376,8 +1379,8 @@ document.querySelectorAll('.filter-btn').forEach(function (btn) {
         var rows = document.querySelectorAll('#queueTable .queue-row');
 
         rows.forEach(function (row) {
-            var status = row.dataset.status ? row.dataset.status.toLowerCase() : '';
-            row.style.display = (filter === 'all' || status === filter) ? '' : 'none';
+            var tags = ' ' + (row.dataset.statuses || row.dataset.status || '').toLowerCase() + ' ';
+            row.style.display = (filter === 'all' || tags.indexOf(' ' + filter + ' ') !== -1) ? '' : 'none';
         });
     });
 });

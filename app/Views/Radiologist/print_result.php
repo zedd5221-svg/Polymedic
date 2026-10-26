@@ -379,8 +379,9 @@ html, body {
 <body>
 
 <div class="controls">
-    <a class="secondary" href="<?= base_url('radiologist/examination/view/' . (int) $examination['id']) ?>">
-        Back to report
+    <?php /* Admin / Receptionist reprints pass $backUrl so Back returns to their own list. */ ?>
+    <a class="secondary" href="<?= esc($backUrl ?? base_url('radiologist/examination/view/' . (int) $examination['id']), 'attr') ?>">
+        <?= esc($backLabel ?? 'Back to report') ?>
     </a>
     <button type="button" onclick="window.print()">Print</button>
     <button type="button" class="secondary" onclick="window.close()">Close</button>

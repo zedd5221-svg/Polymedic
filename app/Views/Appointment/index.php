@@ -187,7 +187,9 @@ $countTests = static function (array $panel): int {
     .pm-nav .pm-nav-links a:not(.pm-btn):hover { background: var(--pm-page); color: var(--pm-ink); }
     .pm-nav .pm-nav-links .pm-btn { margin-left: .5rem; }
     @media (max-width: 767.98px) {
-        .pm-nav .pm-nav-links { display: none; }
+        /* Only the staff login stays in the bar on phones; patients use the sticky booking bar */
+        .pm-nav .pm-nav-links > :not(.pm-staff-login) { display: none; }
+        .pm-nav .pm-nav-links .pm-staff-login { margin-left: 0; }
         .pm-nav .pm-brand img { width: 36px; height: 36px; }
     }
 
@@ -593,6 +595,7 @@ $countTests = static function (array $panel): int {
 /* Small inline icons so the page doesn't depend on an icon font version */
 $icon = [
     'pin'     => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>',
+    'lock'    => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
     'cal'     => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>',
     'down'    => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>',
     'search'  => '<svg class="pm-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
@@ -620,6 +623,7 @@ $tabLabel = ['lab' => 'Laboratory', 'xray' => 'X-ray'];
                 <a href="#Services">Tests</a>
                 <a href="#Tutorial">How it works</a>
                 <a class="pm-btn pm-btn-primary pm-btn-sm" href="<?= $bookUrl ?>">Book appointment</a>
+                <a class="pm-btn pm-btn-outline pm-btn-sm pm-staff-login" href="<?= site_url('login') ?>"><?= $icon['lock'] ?>Staff login</a>
             </div>
         </div>
     </nav>

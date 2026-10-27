@@ -199,4 +199,38 @@ class App extends BaseConfig
      * @see http://www.w3.org/TR/CSP/
      */
     public bool $CSPEnabled = false;
+
+    public function __construct()
+    {
+        parent::__construct();
+
+        $this->useTunnelHost();
+    }
+
+    /**
+     * When the site is opened through a tunnel domain listed in
+     * `polymedic.tunnelHostSuffixes` (e.g. a Cloudflare quick tunnel), build
+     * links and redirects from that host instead of the localhost baseURL.
+     * Quick-tunnel hostnames change on every run, so they are matched by suffix.
+     */
+    private function useTunnelHost(): void
+    {
+        $suffixes = array_filter(array_map('trim', explode(',', (string) env('polymedic.tunnelHostSuffixes', ''))));
+        $host     = strtolower(explode(':', (string) ($_SERVER['HTTP_HOST'] ?? ''), 2)[0]);
+
+        if ($suffixes === [] || preg_match('/^[a-z0-9.-]+$/', $host) !== 1) {
+            return;
+        }
+
+        foreach ($suffixes as $suffix) {
+            if (str_starts_with($suffix, '.') && str_ends_with($host, strtolower($suffix))) {
+                $scheme = strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? 'https')) === 'http' ? 'http' : 'https';
+                $path   = parse_url($this->baseURL, PHP_URL_PATH) ?: '/';
+
+                $this->baseURL = $scheme . '://' . $host . $path;
+
+                return;
+            }
+        }
+    }
 }

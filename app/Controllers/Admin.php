@@ -1187,6 +1187,8 @@ class Admin extends BaseController
                                            ->where('is_active', 1)
                                            ->orderBy('service_name', 'ASC')
                                            ->findAll(),
+            // Suggestions for the "Referring physician" field.
+            'referringStaff' => (new UserModel())->getReferringStaff(),
         ];
 
         return view('Admin/diagnostic_requests', $data);
@@ -1271,13 +1273,13 @@ class Admin extends BaseController
     if (!in_array($post['gender'] ?? '', ['Male', 'Female'], true)) {
         $errors[] = 'Sex must be Male or Female.';
     }
-    if (!in_array($post['request_type'] ?? '', ['lab', 'xray'], true)) {
-        $errors[] = 'Select Laboratory or X-Ray as the request type.';
+    // 'lab', 'xray' or 'both' (one request per department).
+    $types = $this->walkInTypes($post['request_type'] ?? null);
+    if ($types === []) {
+        $errors[] = 'Select Laboratory, X-Ray or Lab + X-Ray as the request type.';
     }
-    $services = $post['services'] ?? [];
-    if (!is_array($services) || count(array_filter($services)) === 0) {
-        $errors[] = 'Select at least one service.';
-    }
+    $servicesByType = $this->walkInServices($post['services'] ?? [], $types);
+    $errors = array_merge($errors, $this->walkInServiceErrors($servicesByType));
 
     if (!empty($errors)) {
         return redirect()->back()
@@ -1285,16 +1287,13 @@ class Admin extends BaseController
                          ->with('validation_errors', $errors);
     }
 
-    $requestType = $post['request_type'];
-    $serviceList = implode(', ', array_map('trim', (array) $services));
     $priority    = ($post['priority'] ?? 'routine') === 'stat' ? 'stat' : 'routine';
     $patientName = trim((string) $post['patient_name']);
     $age         = (int) $post['age'];
     $gender      = (string) $post['gender'];
-    $doctor      = trim((string) ($post['doctor_name'] ?? ''));
+    $doctors     = $this->walkInDoctors($post['doctor_name'] ?? '', $post['doctor_by_type'] ?? [], $types);
     $phone       = trim((string) ($post['phone'] ?? ''));
     $email       = trim((string) ($post['email'] ?? ''));
-    $today       = date('Y-m-d');
 
     $patientModel = new PatientModel();
     $patientCode  = null;
@@ -1368,46 +1367,35 @@ class Admin extends BaseController
     }
 
     try {
-        $model = new DiagnosticRequestModel();
-
-        $prefix = $requestType === 'xray' ? 'XR' : 'LAB';
-
-        $model->insert([
-            'reference_number' => $prefix . '-' . date('y') . '-' . strtoupper(bin2hex(random_bytes(3))),
-            'type'             => $requestType,
-            'appointment_id'   => null,
-            'patient_name'     => $patientName,
-            'patient_code'     => $patientCode,
-            'age'              => $age,
-            'gender'           => $gender,
-            'email'            => $email !== '' ? $email : null,
-            'phone'            => $phone !== '' ? $phone : null,
-            'services'         => $serviceList,
-            'request_date'     => $today,
-            'doctor_name'      => $doctor,
-            'priority'         => $requestType === 'xray'
-                                    ? ($priority === 'stat' ? 'STAT' : 'Routine')
-                                    : $priority,
-            'status'           => DiagnosticRequestModel::STATUS_PENDING,
-        ]);
-
-        NotificationModel::dispatch(
-            $requestType,
-            $requestType === 'lab' ? 'New Laboratory Request' : 'New X-Ray Request',
-            'New ' . ($requestType === 'lab' ? 'laboratory' : 'x-ray') . ' request for ' . $patientName,
-            (int) $model->getInsertID(),
-            null,
-            true,
-            $gender
-        );
-
-    } catch (\Exception $e) {
+        $created = $this->insertWalkInRequests($servicesByType, [
+            'name'   => $patientName,
+            'code'   => $patientCode,
+            'age'    => $age,
+            'gender' => $gender,
+            'email'  => $email,
+            'phone'  => $phone,
+        ], $doctors, $priority);
+    } catch (\Throwable $e) {
         log_message('error', 'Create diagnostic request error: ' . $e->getMessage());
         return redirect()->back()->withInput()->with('error', 'Could not create the request.');
     }
 
+    foreach ($created as $type => $row) {
+        NotificationModel::dispatch(
+            $type,
+            $type === 'lab' ? 'New Laboratory Request' : 'New X-Ray Request',
+            'New ' . ($type === 'lab' ? 'laboratory' : 'x-ray') . ' request for ' . $patientName,
+            $row['id'],
+            null,
+            true,
+            $gender
+        );
+    }
+
     return redirect()->to(base_url('admin/diagnostic-requests'))
-                     ->with('success', 'Diagnostic request created.');
+                     ->with('success', count($created) > 1
+                         ? 'Lab and X-Ray requests created (' . implode(', ', array_column($created, 'reference')) . ').'
+                         : 'Diagnostic request created.');
     }
 
     public function updateDiagnosticStatus($id, $type, $status)

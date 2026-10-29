@@ -137,6 +137,38 @@ class UserModel extends Model
         return base_url('assets/images/default-avatar.png');
     }
 
+    /** Diagnostic request type each clinical role reads. */
+    public const STAFF_DEPARTMENT = ['med_tech' => 'lab', 'radiologist' => 'xray'];
+
+    /**
+     * Active clinical staff offered as "Referring physician" choices on the
+     * new diagnostic request form. 'dept' is the request type they serve
+     * (med tech -> lab, radiologist -> xray); the form only offers the
+     * staff whose dept matches the services picked.
+     *
+     * @return list<array{id: int, name: string, role: string, role_label: string, dept: string, prc_license: string}>
+     */
+    public function getReferringStaff(): array
+    {
+        $rows = $this->select('id, full_name, role, prc_license')
+                     ->whereIn('role', array_keys(self::STAFF_DEPARTMENT))
+                     ->where('status', 'active')
+                     ->where('full_name IS NOT NULL')
+                     ->where('full_name <>', '')
+                     ->orderBy("FIELD(role, 'med_tech', 'radiologist')", '', false)
+                     ->orderBy('full_name', 'ASC')
+                     ->findAll();
+
+        return array_map(static fn(array $u): array => [
+            'id'          => (int) $u['id'],
+            'name'        => trim((string) $u['full_name']),
+            'role'        => (string) $u['role'],
+            'role_label'  => self::roleLabel($u['role']),
+            'dept'        => self::STAFF_DEPARTMENT[$u['role']],
+            'prc_license' => trim((string) ($u['prc_license'] ?? '')),
+        ], $rows);
+    }
+
     /* Search users */
     public function searchUsers($keyword)
     {

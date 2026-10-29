@@ -10,6 +10,7 @@ use App\Models\PatientModel;
 use App\Models\PaymentModel;
 use App\Models\AvailabilityModel;
 use App\Models\InvoiceModel;
+use App\Models\UserModel;
 use App\Controllers\Concerns\HandlesDiagnosticRequests;
 
 class Receptionist extends BaseController
@@ -511,12 +512,324 @@ class Receptionist extends BaseController
         ]);
     }
 
+    /* ============================================================
+       FRONT-DESK REPORT
+       ============================================================
+       End-of-shift / period collection report. Money figures come
+       from the payments table by payment_date (same source as the
+       Payments page), so "collected" here always matches there.
+       Refunded rows are listed and subtracted from gross receipts;
+       unpaid balances come from invoices and are "as of now".
+       GET: range (today|yesterday|week|month|last_month|custom),
+            from, to, cashier, export=csv
+       ============================================================ */
     public function reports()
     {
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
 
-        return view('Receptionist/reports');
+        [$range, $from, $to] = $this->reportRange();
+        $cashier = trim((string) ($this->request->getGet('cashier') ?? ''));
+
+        // Same-length window just before this one, for the deltas.
+        $days     = (int) ((strtotime($to) - strtotime($from)) / 86400) + 1;
+        $prevTo   = date('Y-m-d', strtotime($from . ' -1 day'));
+        $prevFrom = date('Y-m-d', strtotime($prevTo . ' -' . ($days - 1) . ' days'));
+
+        $payments = $this->reportPayments($from, $to, $cashier);
+
+        if ($this->request->getGet('export') === 'csv') {
+            return $this->reportCsv($payments, $from, $to);
+        }
+
+        $summary = $this->summarisePayments($payments);
+        $prev    = $this->summarisePayments($this->reportPayments($prevFrom, $prevTo, $cashier));
+
+        $cashiers = array_column(
+            db_connect()->table('payments')
+                ->select('received_by')->distinct()
+                ->where('received_by IS NOT NULL')->where('received_by <>', '')
+                ->orderBy('received_by')->get()->getResultArray(),
+            'received_by'
+        );
+
+        $clinic = config('Clinic')->toArray();
+
+        return view('Receptionist/reports', [
+            'range'       => $range,
+            'from'        => $from,
+            'to'          => $to,
+            'days'        => $days,
+            'prevFrom'    => $prevFrom,
+            'prevTo'      => $prevTo,
+            'cashier'     => $cashier,
+            'cashiers'    => $cashiers,
+            'payments'    => $payments,
+            'summary'     => $summary,
+            'prev'        => $prev,
+            'daily'       => $this->dailyCollections($payments, $from, $to),
+            'activity'    => $this->frontDeskActivity($from, $to),
+            'unpaid'      => $this->unpaidInvoices(),
+            'clinic'      => $clinic,
+            'preparedBy'  => PaymentModel::currentCashierName(),
+        ]);
+    }
+
+    /** Resolve the report window from the GET params. Returns [range, from, to]. */
+    private function reportRange(): array
+    {
+        $range = (string) ($this->request->getGet('range') ?? 'today');
+        $today = date('Y-m-d');
+
+        switch ($range) {
+            case 'yesterday':
+                $d = date('Y-m-d', strtotime('-1 day'));
+                return [$range, $d, $d];
+            case 'week':
+                return [$range, date('Y-m-d', strtotime('monday this week')), $today];
+            case 'month':
+                return [$range, date('Y-m-01'), $today];
+            case 'last_month':
+                return [$range, date('Y-m-01', strtotime('first day of last month')), date('Y-m-t', strtotime('last day of last month'))];
+            case 'custom':
+                $from = (string) $this->request->getGet('from');
+                $to   = (string) $this->request->getGet('to');
+                if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from)) $from = $today;
+                if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $to))   $to   = $today;
+                if ($from > $to) [$from, $to] = [$to, $from];
+                // Keep the transaction log a sane size.
+                if ((strtotime($to) - strtotime($from)) / 86400 > 366) {
+                    $from = date('Y-m-d', strtotime($to . ' -366 days'));
+                }
+                return [$range, $from, $to];
+            default:
+                return ['today', $today, $today];
+        }
+    }
+
+    /** Paid + refunded payments in the window, newest first. */
+    private function reportPayments(string $from, string $to, string $cashier = ''): array
+    {
+        $builder = (new PaymentModel())
+            ->whereIn('payment_status', [PaymentModel::STATUS_PAID, PaymentModel::STATUS_REFUNDED])
+            ->where('payment_date >=', $from . ' 00:00:00')
+            ->where('payment_date <=', $to . ' 23:59:59');
+
+        if ($cashier !== '') {
+            $builder->where('received_by', $cashier);
+        }
+
+        return $builder->orderBy('payment_date', 'DESC')->findAll();
+    }
+
+    /** Totals and breakdowns for a set of payment rows. */
+    private function summarisePayments(array $payments): array
+    {
+        $s = [
+            'gross' => 0.0, 'refunds' => 0.0, 'net' => 0.0,
+            'count' => 0, 'refund_count' => 0, 'patients' => 0, 'avg' => 0.0,
+            'cash' => 0.0, 'noncash' => 0.0, 'change' => 0.0,
+            'methods' => [], 'types' => [], 'cashiers' => [], 'services' => [],
+        ];
+        $patients = [];
+
+        foreach ($payments as $p) {
+            $amount = (float) ($p['amount_paid'] ?? 0);
+            $s['gross'] += $amount;
+
+            if (($p['payment_status'] ?? '') === PaymentModel::STATUS_REFUNDED) {
+                $s['refunds'] += $amount;
+                $s['refund_count']++;
+                continue;
+            }
+
+            $s['count']++;
+            $s['change'] += (float) ($p['change_amount'] ?? 0);
+
+            $method = strtolower((string) ($p['payment_method'] ?? '')) ?: 'other';
+            $s['methods'][$method]['count']  = ($s['methods'][$method]['count'] ?? 0) + 1;
+            $s['methods'][$method]['amount'] = ($s['methods'][$method]['amount'] ?? 0) + $amount;
+            if ($method === PaymentModel::METHOD_CASH) {
+                $s['cash'] += $amount;
+            } else {
+                $s['noncash'] += $amount;
+            }
+
+            $type = strtolower((string) ($p['request_type'] ?? '')) ?: 'other';
+            $s['types'][$type]['count']  = ($s['types'][$type]['count'] ?? 0) + 1;
+            $s['types'][$type]['amount'] = ($s['types'][$type]['amount'] ?? 0) + $amount;
+
+            $who = trim((string) ($p['received_by'] ?? '')) ?: 'Unassigned';
+            $s['cashiers'][$who]['count']  = ($s['cashiers'][$who]['count'] ?? 0) + 1;
+            $s['cashiers'][$who]['amount'] = ($s['cashiers'][$who]['amount'] ?? 0) + $amount;
+
+            $key = trim((string) ($p['patient_code'] ?? ''));
+            if ($key === '' || strtoupper($key) === 'N/A') {
+                $key = strtolower(trim((string) ($p['patient_name'] ?? '')));
+            }
+            if ($key !== '') $patients[$key] = true;
+
+            // Line items are billed charges, not money received
+            // (a partial payment still lists every service).
+            $decoded = json_decode((string) ($p['services'] ?? '[]'), true);
+            foreach (is_array($decoded) ? $decoded : [] as $item) {
+                $name   = trim((string) (is_array($item) ? ($item['name'] ?? $item['service_name'] ?? '') : $item));
+                $charge = is_array($item) ? (float) ($item['price'] ?? $item['charge'] ?? $item['amount'] ?? 0) : 0.0;
+                if ($name === '') continue;
+                $s['services'][$name]['count']  = ($s['services'][$name]['count'] ?? 0) + 1;
+                $s['services'][$name]['charge'] = ($s['services'][$name]['charge'] ?? 0) + $charge;
+                $s['services'][$name]['type']   = $type;
+            }
+        }
+
+        $s['net']      = $s['gross'] - $s['refunds'];
+        $s['patients'] = count($patients);
+        $s['avg']      = $s['count'] > 0 ? $s['net'] / $s['count'] : 0.0;
+
+        uasort($s['methods'], fn($a, $b) => $b['amount'] <=> $a['amount']);
+        uasort($s['cashiers'], fn($a, $b) => $b['amount'] <=> $a['amount']);
+        uasort($s['services'], fn($a, $b) => [$b['count'], $b['charge']] <=> [$a['count'], $a['charge']]);
+
+        return $s;
+    }
+
+    /** Net collected per day across the window (zero-filled), or per hour for a single day. */
+    private function dailyCollections(array $payments, string $from, string $to): array
+    {
+        $hourly  = $from === $to;
+        $buckets = [];
+
+        if ($hourly) {
+            for ($h = 7; $h <= 19; $h++) {
+                $buckets[sprintf('%02d', $h)] = ['label' => date('g A', mktime($h, 0, 0)), 'amount' => 0.0, 'count' => 0];
+            }
+        } else {
+            for ($d = $from; $d <= $to; $d = date('Y-m-d', strtotime($d . ' +1 day'))) {
+                $buckets[$d] = ['label' => date('M j', strtotime($d)), 'amount' => 0.0, 'count' => 0];
+            }
+        }
+
+        foreach ($payments as $p) {
+            if (($p['payment_status'] ?? '') !== PaymentModel::STATUS_PAID) continue;
+            $ts  = strtotime((string) $p['payment_date']);
+            $key = $hourly ? date('H', $ts) : date('Y-m-d', $ts);
+            if (!isset($buckets[$key])) {
+                // Out-of-hours payment: add a bucket rather than drop it.
+                $buckets[$key] = ['label' => date('g A', $ts), 'amount' => 0.0, 'count' => 0];
+            }
+            $buckets[$key]['amount'] += (float) $p['amount_paid'];
+            $buckets[$key]['count']++;
+        }
+        ksort($buckets);
+
+        return ['hourly' => $hourly, 'buckets' => array_values($buckets)];
+    }
+
+    /** Appointments, registrations and diagnostic requests handled in the window. */
+    private function frontDeskActivity(string $from, string $to): array
+    {
+        $db  = db_connect();
+        $out = ['appointments' => [], 'patients' => ['online' => 0, 'walkin' => 0, 'total' => 0], 'requests' => []];
+
+        try {
+            foreach ($db->query(
+                'SELECT status, COUNT(*) AS n FROM appointments WHERE appointment_date BETWEEN ? AND ? GROUP BY status',
+                [$from, $to]
+            )->getResultArray() as $r) {
+                $out['appointments'][strtolower((string) $r['status'])] = (int) $r['n'];
+            }
+
+            $row = $db->query("
+                SELECT COUNT(*) AS total,
+                       SUM(LOWER(source) LIKE 'online%') AS online,
+                       SUM(LOWER(source) LIKE 'walk%') AS walkin
+                FROM patients WHERE DATE(created_at) BETWEEN ? AND ?
+            ", [$from, $to])->getRowArray();
+            $out['patients'] = [
+                'total'  => (int) ($row['total'] ?? 0),
+                'online' => (int) ($row['online'] ?? 0),
+                'walkin' => (int) ($row['walkin'] ?? 0),
+            ];
+
+            foreach ($db->query(
+                'SELECT type, status, COUNT(*) AS n FROM diagnostic_requests WHERE request_date BETWEEN ? AND ? GROUP BY type, status',
+                [$from, $to]
+            )->getResultArray() as $r) {
+                $out['requests'][$r['type']][$r['status']] = (int) $r['n'];
+            }
+        } catch (\Throwable $e) {
+            log_message('warning', 'Receptionist::frontDeskActivity query failed: ' . $e->getMessage());
+        }
+
+        return $out;
+    }
+
+    /** Open invoices (unpaid / partial) with their age in days, oldest first. */
+    private function unpaidInvoices(): array
+    {
+        $rows = (new InvoiceModel())
+            ->whereIn('status', [InvoiceModel::STATUS_UNPAID, InvoiceModel::STATUS_PARTIAL])
+            ->where('balance >', 0)
+            ->orderBy('created_at', 'ASC')
+            ->findAll();
+
+        $aging = ['0-7' => 0.0, '8-30' => 0.0, '31+' => 0.0];
+        $total = 0.0;
+        foreach ($rows as &$r) {
+            $r['age'] = (int) floor((strtotime(date('Y-m-d')) - strtotime(date('Y-m-d', strtotime((string) $r['created_at'])))) / 86400);
+            $bal      = (float) $r['balance'];
+            $total   += $bal;
+            if ($r['age'] <= 7)      $aging['0-7']  += $bal;
+            elseif ($r['age'] <= 30) $aging['8-30'] += $bal;
+            else                     $aging['31+']  += $bal;
+        }
+        unset($r);
+
+        return ['rows' => $rows, 'total' => $total, 'aging' => $aging];
+    }
+
+    /** Transaction log for the window as a CSV download. */
+    private function reportCsv(array $payments, string $from, string $to)
+    {
+        $fh = fopen('php://temp', 'r+');
+        fwrite($fh, "\xEF\xBB\xBF"); // BOM so Excel reads ₱ / ñ correctly
+        fputcsv($fh, ['Date', 'Time', 'Reference', 'Patient Code', 'Patient', 'Department', 'Services', 'Billed', 'Amount Paid', 'Change', 'Method', 'Status', 'Received By', 'Void Reason']);
+
+        foreach ($payments as $p) {
+            $decoded  = json_decode((string) ($p['services'] ?? '[]'), true);
+            $services = [];
+            foreach (is_array($decoded) ? $decoded : [] as $item) {
+                $services[] = is_array($item) ? ($item['name'] ?? $item['service_name'] ?? '') : (string) $item;
+            }
+            $ts = strtotime((string) $p['payment_date']);
+            fputcsv($fh, [
+                date('Y-m-d', $ts),
+                date('H:i', $ts),
+                ($p['reference_number'] ?? '') ?: ($p['reference_no'] ?? ''),
+                $p['patient_code'] ?? '',
+                $p['patient_name'] ?? '',
+                strtoupper((string) ($p['request_type'] ?? '')),
+                implode('; ', array_filter($services)),
+                number_format((float) ($p['total_amount'] ?? 0), 2, '.', ''),
+                number_format((float) ($p['amount_paid'] ?? 0), 2, '.', ''),
+                number_format((float) ($p['change_amount'] ?? 0), 2, '.', ''),
+                ucfirst((string) ($p['payment_method'] ?? '')),
+                ucfirst((string) ($p['payment_status'] ?? '')),
+                $p['received_by'] ?? '',
+                $p['void_reason'] ?? '',
+            ]);
+        }
+
+        rewind($fh);
+        $csv = stream_get_contents($fh);
+        fclose($fh);
+
+        $name = 'collection-report_' . $from . ($from !== $to ? '_to_' . $to : '') . '.csv';
+
+        return $this->response
+            ->setHeader('Content-Type', 'text/csv; charset=UTF-8')
+            ->setHeader('Content-Disposition', 'attachment; filename="' . $name . '"')
+            ->setBody($csv);
     }
 
     public function diagnosticRequests()
@@ -533,6 +846,9 @@ class Receptionist extends BaseController
 
         $data['labServices'] = $serviceModel->getServicesByCategory('laboratory');
         $data['xrayServices'] = $serviceModel->getServicesByCategory('xray');
+
+        // Suggestions for the "Referring physician" field.
+        $data['referringStaff'] = (new UserModel())->getReferringStaff();
 
         return view('Receptionist/diagnostic_requests', $data);
     }
@@ -596,19 +912,21 @@ class Receptionist extends BaseController
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
 
-        $requestType = $this->request->getPost('request_type');
+        // 'lab', 'xray' or 'both' (one request per department).
+        $requestType = (string) $this->request->getPost('request_type');
+        $types       = $this->walkInTypes($requestType);
         $patientName = trim((string) $this->request->getPost('patient_name'));
         $age = $this->request->getPost('age');
         $gender = $this->request->getPost('gender');
         $priority = $this->request->getPost('priority') === 'stat' ? 'stat' : 'routine';
-        $priority = $this->request->getPost('priority') ?? 'routine';
-        $doctorName = trim($this->request->getPost('doctor_name') ?? '');
+        $doctors = $this->walkInDoctors($this->request->getPost('doctor_name'), $this->request->getPost('doctor_by_type'), $types);
         $email = trim($this->request->getPost('email') ?? '');
         $phone = trim($this->request->getPost('phone') ?? '');
+        $servicesByType = $this->walkInServices($this->request->getPost('services'), $types);
 
         $errors = [];
-        if (!in_array($requestType, ['lab', 'xray'], true)) {
-            $errors[] = 'Select Laboratory or X-Ray as the request type';
+        if ($types === []) {
+            $errors[] = 'Select Laboratory, X-Ray or Lab + X-Ray as the request type';
         }
         if (empty($patientName)) {
             $errors[] = 'Patient name is required';
@@ -619,9 +937,7 @@ class Receptionist extends BaseController
         if (!in_array($gender, ['Male', 'Female'], true)) {
             $errors[] = 'Sex must be Male or Female';
         }
-        if (empty($services) || !is_array($services) || count(array_filter($services)) === 0) {
-            $errors[] = 'Please select at least one service';
-        }
+        $errors = array_merge($errors, $this->walkInServiceErrors($servicesByType));
 
         if (!empty($errors)) {
             return redirect()->back()
@@ -629,10 +945,6 @@ class Receptionist extends BaseController
                             ->with('error', 'Please fix the errors below')
                             ->withInput();
         }
-
-        $cleanedServices = array_map(function($service) {
-            return trim($service);
-        }, array_filter($services));
 
         $patientModel = new PatientModel();
         $patient = null;
@@ -761,49 +1073,39 @@ class Receptionist extends BaseController
                                  . 'Please try again, or create the patient from the Patients page first.');
         }
 
-        if ($requestType === 'lab' || $requestType === 'xray') {
-            $model = new DiagnosticRequestModel();
+        try {
+            $created = $this->insertWalkInRequests($servicesByType, [
+                'name'   => $patientName,
+                'code'   => $patientCode,
+                'age'    => $age,
+                'gender' => $gender,
+                'email'  => $email,
+                'phone'  => $phone,
+            ], $doctors, $priority);
+        } catch (\Throwable $e) {
+            log_message('error', 'Create diagnostic request error: ' . $e->getMessage());
+            return redirect()->back()->withInput()->with('error', 'Could not create the request. Please try again.');
+        }
 
-            $prefix = $requestType === 'xray' ? 'XR' : 'LAB';
-
-            $model->insert([
-                'reference_number' => $prefix . '-' . date('y') . '-' . strtoupper(bin2hex(random_bytes(3))),
-                'type'             => $requestType,
-                'appointment_id'   => null,
-                'patient_name'     => $patientName,
-                'patient_code'     => $patientCode,
-                'age'              => $age,
-                'gender'           => $gender,
-                'email'            => $email ?: null,
-                'phone'            => $phone ?: null,
-                'services'         => implode(', ', $cleanedServices),
-                'request_date'     => date('Y-m-d'),
-                'doctor_name'      => $doctorName,
-                'priority'         => $requestType === 'xray'
-                                        ? ($priority === 'stat' ? 'STAT' : 'Routine')
-                                        : $priority,
-                'status'           => DiagnosticRequestModel::STATUS_PENDING,
-            ]);
-
-            $requestId = $model->getInsertID();
-
+        $labels = ['lab' => 'Lab', 'xray' => 'X-Ray'];
+        foreach ($created as $type => $row) {
             NotificationModel::dispatch(
-                $requestType,
-                $requestType === 'lab' ? 'New Lab Request (Walk-in)' : 'New X-Ray Request (Walk-in)',
-                'New ' . ($requestType === 'lab' ? 'lab' : 'X-Ray') . ' request for walk-in patient ' . $patientName,
-                (int) $requestId,
+                $type,
+                $type === 'lab' ? 'New Lab Request (Walk-in)' : 'New X-Ray Request (Walk-in)',
+                'New ' . ($type === 'lab' ? 'lab' : 'X-Ray') . ' request for walk-in patient ' . $patientName,
+                $row['id'],
                 null,
                 true,
                 $gender
             );
-
-            $label = $requestType === 'lab' ? 'Lab' : 'X-Ray';
-
-            return redirect()->to(base_url('receptionist/diagnostic-requests'))
-                            ->with('success', $label . ' request created successfully for ' . $patientName . '! Patient Code: ' . $patientCode);
         }
 
-        return redirect()->back()->with('error', 'Invalid request type');
+        $what = count($created) > 1
+            ? 'Lab and X-Ray requests (' . implode(', ', array_column($created, 'reference')) . ') created'
+            : $labels[array_key_first($created)] . ' request created';
+
+        return redirect()->to(base_url('receptionist/diagnostic-requests'))
+                        ->with('success', $what . ' successfully for ' . $patientName . '! Patient Code: ' . $patientCode);
     }
 
     public function updateDiagnosticStatus($id, $type, $status)

@@ -22,6 +22,131 @@ use App\Models\UserModel;
 trait HandlesDiagnosticRequests
 {
     /* ---------------------------------------------------------
+       WALK-IN REQUESTS (New diagnostic request form)
+       --------------------------------------------------------- */
+
+    /** Request types a form "Type" choice stands for: lab, xray, or both. */
+    protected function walkInTypes(?string $choice): array
+    {
+        return match ($choice) {
+            DiagnosticRequestModel::TYPE_LAB, DiagnosticRequestModel::TYPE_XRAY => [$choice],
+            'both'  => [DiagnosticRequestModel::TYPE_LAB, DiagnosticRequestModel::TYPE_XRAY],
+            default => [],
+        };
+    }
+
+    /**
+     * Posted services grouped by request type, for the chosen types only.
+     * The form posts services[lab][] / services[xray][]; a flat services[]
+     * list (older form) belongs to the single chosen type.
+     *
+     * @return array<string, string[]>
+     */
+    protected function walkInServices($posted, array $types): array
+    {
+        $posted  = is_array($posted) ? $posted : [];
+        $grouped = isset($posted[DiagnosticRequestModel::TYPE_LAB]) || isset($posted[DiagnosticRequestModel::TYPE_XRAY]);
+
+        $out = [];
+        foreach ($types as $type) {
+            $list = $grouped ? ($posted[$type] ?? []) : (count($types) === 1 ? $posted : []);
+            $list = array_map(static fn($s) => trim((string) $s), is_array($list) ? $list : []);
+            $out[$type] = array_values(array_unique(array_filter($list, static fn($s) => $s !== '')));
+        }
+        return $out;
+    }
+
+    /**
+     * Referring physician per request type. Lab + X-Ray posts one per
+     * request (doctor_by_type[lab] / [xray]); otherwise the single
+     * doctor_name field applies.
+     *
+     * @return array<string, string>
+     */
+    protected function walkInDoctors($single, $byType, array $types): array
+    {
+        $byType = is_array($byType) ? $byType : [];
+
+        $out = [];
+        foreach ($types as $type) {
+            $name = array_key_exists($type, $byType) ? $byType[$type] : $single;
+            $out[$type] = trim((string) $name);
+        }
+        return $out;
+    }
+
+    /** Validation messages for services missing from any chosen type. */
+    protected function walkInServiceErrors(array $servicesByType): array
+    {
+        if ($servicesByType === []) {
+            return [];
+        }
+        $labels = [DiagnosticRequestModel::TYPE_LAB => 'Laboratory', DiagnosticRequestModel::TYPE_XRAY => 'X-Ray'];
+
+        $missing = array_keys(array_filter($servicesByType, static fn(array $list) => $list === []));
+        if ($missing === []) {
+            return [];
+        }
+        if (count($servicesByType) === 1) {
+            return ['Select at least one service.'];
+        }
+        return array_map(static fn($t) => 'Select at least one ' . $labels[$t] . ' service, or change the request type.', $missing);
+    }
+
+    /**
+     * Insert one pending request per type for a walk-in patient — all or
+     * nothing, so a Lab + X-Ray order never ends up half-created.
+     *
+     * @param array<string, string[]> $servicesByType
+     * @param array{name: string, code: string, age: int|string, gender: string, email: string, phone: string} $patient
+     * @param array<string, string> $doctors Referring physician per type
+     * @return array<string, array{id: int, reference: string}>
+     */
+    protected function insertWalkInRequests(array $servicesByType, array $patient, array $doctors, string $priority): array
+    {
+        $model   = new DiagnosticRequestModel();
+        $db      = db_connect();
+        $created = [];
+
+        $db->transBegin();
+        try {
+            foreach ($servicesByType as $type => $services) {
+                $isXray    = $type === DiagnosticRequestModel::TYPE_XRAY;
+                $reference = ($isXray ? 'XR' : 'LAB') . '-' . date('y') . '-' . strtoupper(bin2hex(random_bytes(3)));
+
+                $ok = $model->insert([
+                    'reference_number' => $reference,
+                    'type'             => $type,
+                    'appointment_id'   => null,
+                    'patient_name'     => $patient['name'],
+                    'patient_code'     => $patient['code'],
+                    'age'              => $patient['age'],
+                    'gender'           => $patient['gender'],
+                    'email'            => $patient['email'] !== '' ? $patient['email'] : null,
+                    'phone'            => $patient['phone'] !== '' ? $patient['phone'] : null,
+                    'services'         => implode(', ', $services),
+                    'request_date'     => date('Y-m-d'),
+                    'doctor_name'      => $doctors[$type] ?? '',
+                    // X-ray rows store the label, lab rows the key (existing convention).
+                    'priority'         => $isXray ? ($priority === 'stat' ? 'STAT' : 'Routine') : $priority,
+                    'status'           => DiagnosticRequestModel::STATUS_PENDING,
+                ]);
+
+                if (!$ok) {
+                    throw new \RuntimeException('Insert failed for ' . $type . ' request: ' . implode('; ', $model->errors()));
+                }
+                $created[$type] = ['id' => (int) $model->getInsertID(), 'reference' => $reference];
+            }
+            $db->transCommit();
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            throw $e;
+        }
+
+        return $created;
+    }
+
+    /* ---------------------------------------------------------
        APPROVAL -> DIAGNOSTIC REQUESTS
        --------------------------------------------------------- */
 

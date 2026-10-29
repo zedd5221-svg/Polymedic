@@ -8,116 +8,80 @@
 /* ------------------------------------------------------------------
    MedTech Dashboard
 
-   KPI cards match the Admin KPI row, including 14-day sparklines.
+   KPI board is the shared Admin design (partials/kpi_board).
    Two compact specimen intake charts (Today / This month).
    Volume by Section chart, plus a scrollable "Available services"
    card listing every active laboratory service.
    Turnaround Time panel with bars calibrated to the worst performer.
    ------------------------------------------------------------------ */
 
-$statCards = [
-    [
-        'key'   => 'total',
-        'icon'  => 'people-blue.png',
-        'tone'  => 'icon-cyan',
-        'label' => 'Total Requests',
-        'value' => number_format((int) ($counts['total'] ?? 0)),
-        'note'  => 'All specimens',
-        'link'  => base_url('medtech/requests'),
-    ],
-    [
-        'key'   => 'pending',
-        'icon'  => 'document.png',
-        'tone'  => 'icon-teal',
-        'label' => 'Pending',
-        'value' => number_format((int) ($counts['pending'] ?? 0)),
-        'note'  => 'Awaiting processing',
-        'link'  => base_url('medtech/requests?status=pending'),
-    ],
-    [
-        'key'   => 'in_progress',
-        'icon'  => 'file (1).png',
-        'tone'  => 'icon-orange',
-        'label' => 'In-Progress',
-        'value' => number_format((int) ($counts['in_progress'] ?? 0)),
-        'note'  => 'Currently running',
-        'link'  => base_url('medtech/requests?status=in_progress'),
-    ],
-    [
-        'key'   => 'draft',
-        'icon'  => 'file (1).png',
-        'tone'  => 'icon-yellow',
-        'label' => 'Drafts',
-        'value' => number_format((int) ($counts['draft'] ?? 0)),
-        'note'  => 'Saved, not submitted',
-        'link'  => base_url('medtech/requests?status=draft'),
-    ],
-    [
-        'key'   => 'completed',
-        'icon'  => 'people-check-blue.png',
-        'tone'  => 'icon-green',
-        'label' => 'Completed',
-        'value' => number_format((int) ($counts['completed'] ?? 0)),
-        'note'  => 'Results encoded',
-        'link'  => base_url('medtech/requests?status=completed'),
-    ],
-    [
-        'key'   => 'released',
-        'icon'  => 'clock (4).png',
-        'tone'  => 'icon-blue',
-        'label' => 'Released',
-        'value' => number_format((int) ($counts['released'] ?? 0)),
-        'note'  => 'Sent to doctor',
-        'link'  => base_url('medtech/requests?status=released'),
-    ],
-    [
-        'key'   => 'in_queue',
-        'icon'  => 'file (1).png',
-        'tone'  => 'icon-pink',
-        'label' => 'In Queue',
-        'value' => number_format((int) (($counts['total'] ?? 0) - ($counts['released'] ?? 0))),
-        'note'  => 'Waiting for processing',
-        'link'  => base_url('medtech/requests'),
-    ],
-];
-
 /* ------------------------------------------------------------------
-   SPARKLINES — same look and math as the Admin dashboard.
+   KPI BOARD (shared partial: partials/kpi_board, same as Admin)
    ------------------------------------------------------------------ */
-$kpiTrends = $kpiTrends ?? [];
+$mtCount = static fn($k) => (int) ($counts[$k] ?? 0);
+$mtActive = $mtCount('pending') + $mtCount('in_progress') + $mtCount('draft');
 
-$sparkMeta = [
-    'total'       => ['color' => '#0891B2', 'goodUp' => true,  'cumulative' => true,  'unit' => 'requests'],
-    'pending'     => ['color' => '#0D9488', 'goodUp' => false, 'cumulative' => false, 'unit' => 'pending'],
-    'in_progress' => ['color' => '#EA580C', 'goodUp' => false, 'cumulative' => false, 'unit' => 'in progress'],
-    'draft'       => ['color' => '#CA8A04', 'goodUp' => true,  'cumulative' => false, 'unit' => 'drafts'],
-    'completed'   => ['color' => '#16A34A', 'goodUp' => true,  'cumulative' => false, 'unit' => 'completed'],
-    'released'    => ['color' => '#2563EB', 'goodUp' => true,  'cumulative' => false, 'unit' => 'released'],
-    'in_queue'    => ['color' => '#DB2777', 'goodUp' => false, 'cumulative' => false, 'unit' => 'in queue'],
+$kpiBoard = [
+    'trends' => $kpiTrends ?? [],
+    'cards'  => [
+        [
+            'key'     => 'total',
+            'icon'    => 'people-blue.png',
+            'color'   => '#0891B2',
+            'label'   => 'Total Requests',
+            'value'   => $mtCount('total'),
+            'delta'   => 'window',
+            'context' => 'new in 14 days',
+            'unit'    => 'requests',
+            'link'    => base_url('medtech/requests'),
+        ],
+        [
+            'key'     => 'in_queue',
+            'icon'    => 'file (1).png',
+            'color'   => '#DB2777',
+            'label'   => 'In Queue',
+            'value'   => $mtCount('total') - $mtCount('released'),
+            'delta'   => null,
+            'context' => 'Not yet released',
+            'unit'    => 'queued',
+            'link'    => base_url('medtech/requests'),
+        ],
+        [
+            'key'     => 'completed',
+            'icon'    => 'people-check-blue.png',
+            'color'   => '#16A34A',
+            'label'   => 'Completed',
+            'value'   => $mtCount('completed'),
+            'delta'   => 'dod',
+            'context' => 'vs yesterday',
+            'unit'    => 'completed',
+            'link'    => base_url('medtech/requests?status=completed'),
+        ],
+        [
+            'key'     => 'released',
+            'icon'    => 'clock (4).png',
+            'color'   => '#2563EB',
+            'label'   => 'Released',
+            'value'   => $mtCount('released'),
+            'delta'   => 'dod',
+            'context' => 'vs yesterday',
+            'unit'    => 'released',
+            'link'    => base_url('medtech/requests?status=released'),
+        ],
+    ],
+    /* Pending, in-progress and draft are mutually exclusive statuses. */
+    'pipeline' => [
+        'title'  => 'Work in Progress',
+        'sub'    => number_format($mtActive) . ' specimens being handled',
+        'link'   => base_url('medtech/requests'),
+        'split'  => true,
+        'stages' => [
+            ['key' => 'pending',     'color' => '#f59e0b', 'label' => 'Pending',     'hint' => 'Awaiting processing',  'count' => $mtCount('pending'),     'today' => 'new today', 'link' => base_url('medtech/requests?status=pending')],
+            ['key' => 'in_progress', 'color' => '#3b82f6', 'label' => 'In-Progress', 'hint' => 'Currently running',    'count' => $mtCount('in_progress'), 'today' => 'new today', 'link' => base_url('medtech/requests?status=in_progress')],
+            ['key' => 'draft',       'color' => '#8b5cf6', 'label' => 'Drafts',      'hint' => 'Saved, not submitted', 'count' => $mtCount('draft'),       'today' => 'new today', 'link' => base_url('medtech/requests?status=draft')],
+        ],
+    ],
 ];
-
-/* Returns [svgPath, lastX%, lastY%] for a value series. */
-$sparkGeometry = static function (array $vals): array {
-    $n = count($vals);
-    if ($n < 2) { return ['', 100, 50]; }
-    $min = min($vals);
-    $max = max($vals);
-    $rng = $max - $min;
-    $w = 100; $h = 32; $pad = 3;
-    $pts = [];
-    foreach (array_values($vals) as $i => $v) {
-        $x = $i / ($n - 1) * $w;
-        $y = $rng > 0 ? $h - $pad - (($v - $min) / $rng) * ($h - 2 * $pad) : $h / 2;
-        $pts[] = [round($x, 2), round($y, 2)];
-    }
-    $line = 'M' . $pts[0][0] . ',' . $pts[0][1];
-    for ($i = 1; $i < $n; $i++) {
-        $cx = round(($pts[$i - 1][0] + $pts[$i][0]) / 2, 2);
-        $line .= ' C' . $cx . ',' . $pts[$i - 1][1] . ' ' . $cx . ',' . $pts[$i][1] . ' ' . $pts[$i][0] . ',' . $pts[$i][1];
-    }
-    $last = end($pts);
-    return [$line, $last[0], round($last[1] / $h * 100, 2)];
-};
 
 /* Turnaround Time — calibrated bars. */
 $tatRows = $turnaroundData ?? [];
@@ -154,69 +118,8 @@ $catalog = $serviceCatalog ?? [
 
 <div class="dashboard-wrapper">
 
-    <!-- ===== TOP STATS ROW ===== -->
-    <div class="stats-row">
-        <?php foreach ($statCards as $card): ?>
-            <?php
-                $tag  = !empty($card['link']) ? 'a' : 'div';
-                $href = !empty($card['link']) ? ' href="' . esc($card['link'], 'attr') . '"' : '';
-                $icon = (string) ($card['icon'] ?? '');
-
-                $meta   = $sparkMeta[$card['key']] ?? null;
-                $vals   = $meta ? array_map('floatval', $kpiTrends[$card['key']] ?? []) : [];
-                $hasSpk = $meta && count($vals) >= 2;
-
-                if ($hasSpk) {
-                    [$spkLine, $spkX, $spkY] = $sparkGeometry($vals);
-                    $dates = $kpiTrends['dates'] ?? [];
-                    $fmt   = static fn($v) => number_format($v);
-                    $spkTitle = $meta['unit'] . ': ' . $fmt(end($vals))
-                        . ' on ' . (isset($dates[count($vals) - 1]) ? date('M j', strtotime($dates[count($vals) - 1])) : 'today')
-                        . ' · 14-day peak ' . $fmt(max($vals));
-                }
-            ?>
-            <<?= $tag ?> class="stat-card"<?= $href ?><?= $hasSpk ? ' style="--spark:' . esc($meta['color'], 'attr') . '"' : '' ?>>
-
-                <div class="stat-top">
-                    <div class="stat-icon <?= esc($card['tone'], 'attr') ?>">
-                        <?php if ($icon !== ''): ?>
-                            <img src="<?= esc(base_url('assets/images/' . $icon), 'attr') ?>"
-                                 alt=""
-                                 class="stat-img"
-                                 loading="lazy"
-                                 decoding="async">
-                        <?php endif; ?>
-                    </div>
-
-                    <?php if (!empty($card['link'])): ?>
-                        <svg class="stat-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"
-                             stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                             stroke-linejoin="round" aria-hidden="true">
-                            <polyline points="9 18 15 12 9 6"></polyline>
-                        </svg>
-                    <?php endif; ?>
-                </div>
-
-                <div class="stat-value-row">
-                    <div class="stat-value"><?= esc($card['value']) ?></div>
-                    <?php if ($hasSpk): ?>
-                        <div class="spark spark-inline" role="img"
-                             aria-label="<?= esc($spkTitle, 'attr') ?>"
-                             title="<?= esc($spkTitle, 'attr') ?>">
-                            <svg viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true">
-                                <path d="<?= $spkLine ?>" class="spark-line" fill="none" vector-effect="non-scaling-stroke"/>
-                            </svg>
-                        </div>
-                    <?php endif; ?>
-                </div>
-
-                <div class="stat-label"><?= esc($card['label']) ?></div>
-
-                <div class="stat-sub"><?= esc($card['note']) ?></div>
-
-            </<?= $tag ?>>
-        <?php endforeach; ?>
-    </div>
+    <!-- ===== KPI OVERVIEW ===== -->
+    <?= view('partials/kpi_board', $kpiBoard) ?>
 
     <!-- ===== SPECIMEN INTAKE — TWO COMPACT CHARTS ===== -->
     <div class="intake-row">
@@ -490,148 +393,6 @@ $catalog = $serviceCatalog ?? [
     outline: 2px solid var(--db-accent);
     outline-offset: 2px;
     border-radius: var(--db-radius-xs);
-}
-
-/* ===== STATS ROW ===== */
-
-.stats-row {
-    display: grid;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: 16px;
-    margin-bottom: var(--db-gap);
-}
-
-.stat-card {
-    position: relative;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    background: linear-gradient(180deg, #FFFFFF 0%, #FCFDFE 100%);
-    border: 1px solid rgba(226, 232, 240, 0.9);
-    border-radius: var(--db-radius);
-    padding: 16px;
-    box-shadow: var(--db-shadow);
-    text-decoration: none;
-    color: inherit;
-    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-    min-width: 0;
-    width: 100%;
-    box-sizing: border-box;
-}
-
-.stat-card:hover,
-.stat-card:focus-visible {
-    transform: translateY(-3px);
-    border-color: color-mix(in srgb, var(--spark, #CBD5E1) 35%, #E2E8F0);
-    box-shadow: var(--db-shadow-hover);
-    text-decoration: none;
-    color: inherit;
-}
-
-.stat-card:hover .stat-arrow { color: var(--db-text-soft); }
-
-.stat-top {
-    display: grid;
-    grid-template-columns: 40px 1fr 16px;
-    align-items: center;
-    margin-bottom: 12px;
-    width: 100%;
-}
-
-.stat-top > .stat-icon  { grid-column: 1; }
-.stat-top > .stat-arrow { grid-column: 3; justify-self: end; }
-
-.stat-top:not(:has(.stat-arrow)) { grid-template-columns: 40px 1fr; }
-
-.stat-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: var(--db-radius-sm);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    background: transparent;
-}
-
-.stat-img {
-    width: 25px;
-    height: 25px;
-    object-fit: contain;
-    display: block;
-}
-
-.stat-arrow {
-    color: #CBD5E1;
-    flex-shrink: 0;
-    transition: color 0.18s ease;
-    justify-self: end;
-}
-
-.icon-cyan,
-.icon-teal,
-.icon-orange,
-.icon-green,
-.icon-blue,
-.icon-yellow,
-.icon-pink { background: transparent; }
-
-/* ===== VALUE ROW + INLINE SPARKLINE ===== */
-
-.stat-value-row {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 10px;
-    margin-bottom: 6px;
-    min-width: 0;
-}
-
-.stat-value {
-    font-size: 1.35rem;
-    font-weight: 680;
-    color: var(--db-text);
-    line-height: 1.1;
-    letter-spacing: -0.02em;
-    font-variant-numeric: tabular-nums;
-    min-width: 0;
-}
-
-.stat-value-money { font-size: 1.0rem; overflow-wrap: anywhere; }
-
-.spark-inline {
-    flex-shrink: 0;
-    width: 56px;
-    height: 20px;
-    position: relative;
-}
-
-.spark-inline svg {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    display: block;
-    overflow: visible;
-}
-
-.spark-line {
-    stroke: var(--spark);
-    stroke-width: 1.8;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
-
-.stat-label {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--db-text-soft);
-    margin-bottom: 3px;
-}
-
-.stat-sub {
-    font-size: 0.775rem;
-    color: var(--db-text-muted);
 }
 
 /* ===== INTAKE ROW ===== */
@@ -1092,30 +853,20 @@ $catalog = $serviceCatalog ?? [
    RESPONSIVE
    ============================================ */
 
-@media (max-width: 1500px) {
-    .stats-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-}
-
 @media (max-width: 1200px) {
-    .stats-row  { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .charts-row,
     .lower-row  { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (max-width: 992px) {
     .dashboard-wrapper { padding: 16px; }
-    .stats-row  { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .intake-row { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (max-width: 768px) {
-    .stat-card         { padding: 16px; }
     .chart-card,
     .queue-card,
     .tat-card          { padding: 16px; }
-    .stat-value        { font-size: 1.2rem; }
-    .stat-value-money  { font-size: 1.05rem; }
-    .spark-inline      { width: 44px; height: 16px; }
 
     .queue-header {
         flex-direction: column;
@@ -1129,7 +880,6 @@ $catalog = $serviceCatalog ?? [
 
 @media (max-width: 576px) {
     .dashboard-wrapper { padding: 12px; }
-    .stats-row  { grid-template-columns: minmax(0, 1fr); gap: 12px; }
     .charts-row,
     .lower-row,
     .intake-row { gap: 12px; }

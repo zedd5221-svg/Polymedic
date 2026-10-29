@@ -513,7 +513,13 @@ $filterTabs = [
                                            id="requestTypeXray" value="xray"
                                            <?= old('request_type') === 'xray' ? 'checked' : '' ?>>
                                     <label class="dx-seg-btn" for="requestTypeXray">X-Ray</label>
+
+                                    <input type="radio" class="dx-seg-input" name="request_type"
+                                           id="requestTypeBoth" value="both"
+                                           <?= old('request_type') === 'both' ? 'checked' : '' ?>>
+                                    <label class="dx-seg-btn" for="requestTypeBoth">Lab + X-Ray</label>
                                 </div>
+                                <p class="dx-help" id="typeHelp" hidden>Creates two requests — one for the lab, one for radiology — each billed and released separately.</p>
                             </div>
 
                             <div class="dx-span-6">
@@ -574,11 +580,51 @@ $filterTabs = [
                                        value="<?= old('email') ?>" autocomplete="off">
                             </div>
 
-                            <div class="dx-span-12">
-                                <label class="dx-label" for="fDoctor">Referring physician <span class="dx-opt">Optional</span></label>
-                                <input type="text" class="dx-input" id="fDoctor" name="doctor_name"
-                                       value="<?= old('doctor_name') ?>" autocomplete="off">
-                            </div>
+                            <?php
+                            // Referring physician: one field for Laboratory / X-Ray; Lab + X-Ray
+                            // swaps it for one per request (med techs for lab, radiologists for x-ray).
+                            $staffRoleShort = ['radiologist' => 'Radiologist', 'med_tech' => 'Med Tech'];
+                            $referringStaff = $referringStaff ?? [];
+                            $staffFor = static fn(string $dept): array => array_values(array_filter($referringStaff, static fn($s) => $s['dept'] === $dept));
+                            $doctorFields = [
+                                ['id' => 'fDoctor', 'span' => 'dx-span-12', 'name' => 'doctor_name', 'old' => 'doctor_name', 'split' => false,
+                                 'label' => 'Referring physician', 'pick' => 'Clinic staff', 'staff' => $referringStaff,
+                                 'placeholder' => 'Pick clinic staff below or type a name'],
+                                ['id' => 'fDoctorLab', 'span' => 'dx-span-6', 'name' => 'doctor_by_type[lab]', 'old' => 'doctor_by_type.lab', 'split' => true,
+                                 'label' => 'Lab request · referring', 'pick' => 'Med Techs', 'staff' => $staffFor('lab'),
+                                 'placeholder' => 'Pick a med tech or type a name'],
+                                ['id' => 'fDoctorXray', 'span' => 'dx-span-6', 'name' => 'doctor_by_type[xray]', 'old' => 'doctor_by_type.xray', 'split' => true,
+                                 'label' => 'X-Ray request · referring', 'pick' => 'Radiologists', 'staff' => $staffFor('xray'),
+                                 'placeholder' => 'Pick a radiologist or type a name'],
+                            ];
+                            ?>
+                            <?php foreach ($doctorFields as $df): ?>
+                                <div class="<?= $df['span'] ?> dx-doctor"<?= $df['split'] ? ' hidden' : '' ?>>
+                                    <label class="dx-label" for="<?= $df['id'] ?>"><?= esc($df['label']) ?> <span class="dx-opt">Optional</span></label>
+                                    <input type="text" class="dx-input" id="<?= $df['id'] ?>" name="<?= $df['name'] ?>"
+                                           value="<?= old($df['old']) ?>" autocomplete="off"
+                                           list="<?= $df['id'] ?>List" placeholder="<?= esc($df['placeholder'], 'attr') ?>"<?= $df['split'] ? ' disabled' : '' ?>>
+                                    <?php if (!empty($df['staff'])): ?>
+                                        <datalist id="<?= $df['id'] ?>List">
+                                            <?php foreach ($df['staff'] as $staff): ?>
+                                                <option value="<?= esc($staff['name'], 'attr') ?>" label="<?= esc($staff['role_label'], 'attr') ?>" data-dept="<?= esc($staff['dept'], 'attr') ?>"></option>
+                                            <?php endforeach; ?>
+                                        </datalist>
+                                        <div class="dx-staff" role="group" aria-label="<?= esc($df['pick'], 'attr') ?>">
+                                            <span class="dx-staff-label" data-default="<?= esc($df['pick'], 'attr') ?>"><?= esc($df['pick']) ?></span>
+                                            <?php foreach ($df['staff'] as $staff): ?>
+                                                <button type="button" class="dx-staff-chip" aria-pressed="false"
+                                                        data-name="<?= esc($staff['name'], 'attr') ?>"
+                                                        data-dept="<?= esc($staff['dept'], 'attr') ?>"
+                                                        title="<?= esc($staff['role_label'] . ($staff['prc_license'] !== '' ? ' · PRC ' . $staff['prc_license'] : ''), 'attr') ?>">
+                                                    <?= esc($staff['name']) ?>
+                                                    <span class="dx-staff-role dx-staff-role--<?= esc($staff['role'], 'attr') ?>"><?= $staffRoleShort[$staff['role']] ?? esc($staff['role_label']) ?></span>
+                                                </button>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endforeach; ?>
                         </div>
                     </section>
 
@@ -616,11 +662,12 @@ $filterTabs = [
                                            data-name="<?= esc(strtolower($name), 'attr') ?>">
                                         <input type="checkbox"
                                                id="<?= esc($inputId, 'attr') ?>"
-                                               name="services[]"
+                                               name="services[<?= $category ?>][]"
                                                value="<?= esc($name, 'attr') ?>"
                                                data-charge="<?= esc((string) $charge, 'attr') ?>"
-                                               <?= in_array($name, $oldServices, true) ? 'checked' : '' ?>>
+                                               <?= in_array($name, (array) ($oldServices[$category] ?? []), true) ? 'checked' : '' ?>>
                                         <span class="dx-svc-name"><?= esc($name) ?></span>
+                                        <span class="dx-svc-cat dx-svc-cat--<?= $category ?>"><?= $category === 'xray' ? 'X-Ray' : 'Lab' ?></span>
                                         <span class="dx-svc-price">&#8369;<?= number_format($charge, 2) ?></span>
                                     </label>
                                 <?php endforeach; ?>
@@ -1569,6 +1616,40 @@ $filterTabs = [
 
 .dx-help { margin: 0.4rem 0 0; font-size: 0.75rem; color: var(--dx-muted); }
 
+/* Referring physician — clinic staff quick picks */
+.dx-staff { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin-top: 0.5rem; }
+.dx-staff-label { margin-right: 0.15rem; font-size: 0.72rem; font-weight: 600; color: var(--dx-faint); }
+.dx-staff-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    height: 28px;
+    padding: 0 0.35rem 0 0.65rem;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--dx-text);
+    background: var(--dx-surface);
+    border: 1px solid var(--dx-line);
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.dx-staff-chip:hover { border-color: var(--dx-accent); color: var(--dx-ink); }
+.dx-staff-chip:focus-visible { outline: none; box-shadow: var(--dx-ring); }
+.dx-staff-chip[aria-pressed="true"] { background: #dbeafe; border-color: var(--dx-accent); color: var(--dx-accent-dark); font-weight: 600; box-shadow: inset 0 0 0 1px var(--dx-accent); }
+.dx-staff-chip[aria-pressed="true"]::before { content: "\2713"; margin-right: -0.1rem; font-weight: 700; }
+.dx-staff-role {
+    padding: 0.05rem 0.45rem;
+    font-size: 0.66rem;
+    font-weight: 700;
+    border-radius: 999px;
+    background: var(--dx-line-soft);
+    color: var(--dx-muted);
+}
+.dx-staff-role--radiologist { background: #f3e8ff; color: #6d28d9; }
+.dx-staff-role--med_tech    { background: #e6f6f4; color: #0f766e; }
+.dx-doctor[hidden], .dx-staff[hidden], .dx-staff-chip[hidden] { display: none; }
+
 .dx-seg {
     position: relative;
     display: grid;
@@ -1634,6 +1715,12 @@ $filterTabs = [
 
 .dx-svc:hover { background: var(--dx-subtle); }
 .dx-svc.is-checked { background: #f5f9fe; }
+
+/* Lab + X-Ray: tag each service with its department */
+.dx-svc-cat { display: none; flex-shrink: 0; padding: 0.05rem 0.45rem; font-size: 0.66rem; font-weight: 700; border-radius: 999px; }
+.dx-svc-list.is-both .dx-svc-cat { display: inline-block; }
+.dx-svc-cat--lab  { background: #e6f6f4; color: #0f766e; }
+.dx-svc-cat--xray { background: #f3e8ff; color: #6d28d9; }
 
 .dx-svc input {
     flex-shrink: 0;
@@ -2526,6 +2613,117 @@ $filterTabs = [
 
 
     /* =====================================================
+       REFERRING PHYSICIAN — clinic staff quick picks
+       Clicking a chip fills its field (again clears it);
+       the chips follow whatever is typed.
+       Laboratory -> med techs, X-Ray -> radiologists.
+       Lab + X-Ray swaps the single field for one per
+       request: lab (med techs) and x-ray (radiologists).
+       ===================================================== */
+
+    (function () {
+        var single = byId('fDoctor');
+        if (!single || !single.form) { return; }
+
+        var reqForm  = single.form;
+        var deptName = { lab: 'Med Techs', xray: 'Radiologists' };
+
+        // One text field plus the staff chips / suggestions under it.
+        var picker = function (input) {
+            var wrap    = input.closest('.dx-doctor');
+            var chips   = Array.prototype.slice.call(wrap.querySelectorAll('.dx-staff-chip'));
+            var options = Array.prototype.slice.call(wrap.querySelectorAll('datalist option'));
+            var box     = wrap.querySelector('.dx-staff');
+            var label   = wrap.querySelector('.dx-staff-label');
+
+            var sync = function () {
+                var value = input.value.trim().toLowerCase();
+                chips.forEach(function (chip) {
+                    chip.setAttribute('aria-pressed', !chip.hidden && chip.dataset.name.toLowerCase() === value ? 'true' : 'false');
+                });
+            };
+
+            chips.forEach(function (chip) {
+                chip.addEventListener('click', function () {
+                    input.value = chip.getAttribute('aria-pressed') === 'true' ? '' : chip.dataset.name;
+                    sync();
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                });
+            });
+            input.addEventListener('input', sync);
+
+            return {
+                input: input,
+                sync: sync,
+                // Offer only one department's staff.
+                scope: function (dept) {
+                    var value = input.value.trim().toLowerCase();
+                    var shown = 0;
+                    chips.forEach(function (chip) {
+                        var on = chip.dataset.dept === dept;
+                        chip.hidden = !on;
+                        if (on) { shown++; }
+                        // A staff member from the other department is dropped.
+                        if (!on && chip.dataset.name.toLowerCase() === value) { input.value = ''; }
+                    });
+                    options.forEach(function (opt) { opt.disabled = opt.dataset.dept !== dept; });
+                    if (box)   { box.hidden = shown === 0; }
+                    if (label) { label.textContent = deptName[dept] || label.dataset.default; }
+                    sync();
+                },
+                // Department of the staff member in the field, if any.
+                deptOf: function () {
+                    var value = input.value.trim().toLowerCase();
+                    var hit = chips.filter(function (c) { return c.dataset.name.toLowerCase() === value; })[0];
+                    return hit ? hit.dataset.dept : '';
+                },
+                // Hidden fields are disabled too, so they are not posted.
+                show: function (on) { wrap.hidden = !on; input.disabled = !on; }
+            };
+        };
+
+        var main  = picker(single);
+        var split = {
+            lab:  byId('fDoctorLab')  ? picker(byId('fDoctorLab'))  : null,
+            xray: byId('fDoctorXray') ? picker(byId('fDoctorXray')) : null
+        };
+        var lastType = null;
+
+        var applyType = function () {
+            var checked = reqForm.querySelector('input[name="request_type"]:checked');
+            var type    = checked ? checked.value : 'lab';
+            var both    = type === 'both' && !!split.lab && !!split.xray;
+
+            // Carry a name across when switching between one field and two.
+            if (both && lastType !== null && lastType !== 'both' && main.input.value.trim() !== '') {
+                var dept = main.deptOf();
+                ['lab', 'xray'].forEach(function (t) {
+                    if (split[t].input.value.trim() === '' && (!dept || dept === t)) { split[t].input.value = main.input.value; }
+                });
+                main.input.value = '';
+                main.sync();
+            } else if (!both && lastType === 'both' && split[type] && main.input.value.trim() === '') {
+                main.input.value = split[type].input.value;
+            }
+
+            main.show(!both);
+            if (split.lab)  { split.lab.show(both);  split.lab.sync(); }
+            if (split.xray) { split.xray.show(both); split.xray.sync(); }
+            if (!both) { main.scope(type === 'both' ? 'lab' : type); }
+            lastType = type;
+        };
+
+        // Deferred so the services script has finished reacting first.
+        var later = function () { setTimeout(applyType, 0); };
+        reqForm.querySelectorAll('input[name="request_type"]').forEach(function (radio) {
+            radio.addEventListener('change', later);
+        });
+        reqForm.addEventListener('reset', function () { lastType = null; later(); });
+        applyType();
+    })();
+
+
+    /* =====================================================
        CREATE REQUEST FORM
        ===================================================== */
 
@@ -2552,11 +2750,15 @@ $filterTabs = [
             var any = false;
 
             svcItems.forEach(function (item) {
-                var show = item.dataset.category === type &&
+                var show = (type === 'both' || item.dataset.category === type) &&
                            (term === '' || item.dataset.name.indexOf(term) !== -1);
                 item.hidden = !show;
                 if (show) { any = true; }
             });
+
+            svcList.classList.toggle('is-both', type === 'both');
+            var typeHelp = byId('typeHelp');
+            if (typeHelp) { typeHelp.hidden = type !== 'both'; }
 
             svcEmpty.hidden = any;
             svcEmpty.textContent = term ? 'No services match your search.' : 'No services are set up for this request type.';
@@ -2565,32 +2767,47 @@ $filterTabs = [
         var updateSummary = function () {
             var count = 0;
             var total = 0;
+            var byCat = { lab: 0, xray: 0 };
 
             svcItems.forEach(function (item) {
                 var input = item.querySelector('input');
                 item.classList.toggle('is-checked', input.checked);
                 if (input.checked) {
                     count++;
+                    byCat[item.dataset.category]++;
                     total += parseFloat(input.dataset.charge) || 0;
                 }
             });
 
             summary.innerHTML = count
                 ? '<strong>' + count + '</strong> service' + (count === 1 ? '' : 's') +
+                  (currentType() === 'both' ? ' (' + byCat.lab + ' Lab · ' + byCat.xray + ' X-Ray)' : '') +
                   ' selected · <strong>' + money(total) + '</strong>'
                 : 'No services selected';
 
-            if (count) {
+            if (!svcError.hidden && !missingServices()) {
                 svcList.classList.remove('has-error');
                 svcError.hidden = true;
             }
+        };
+
+        // Lab + X-Ray needs at least one service from each department.
+        var missingServices = function () {
+            var has = function (cat) { return !!form.querySelector('.dx-svc[data-category="' + cat + '"] input:checked'); };
+            if (currentType() !== 'both') {
+                return form.querySelector('.dx-svc input:checked') ? '' : 'Select at least one service.';
+            }
+            if (!has('lab') && !has('xray')) { return 'Select at least one Laboratory and one X-Ray service.'; }
+            if (!has('lab'))  { return 'Select at least one Laboratory service, or change the type to X-Ray.'; }
+            if (!has('xray')) { return 'Select at least one X-Ray service, or change the type to Laboratory.'; }
+            return '';
         };
 
         form.querySelectorAll('input[name="request_type"]').forEach(function (radio) {
             radio.addEventListener('change', function () {
                 var type = currentType();
                 svcItems.forEach(function (item) {
-                    if (item.dataset.category !== type) { item.querySelector('input').checked = false; }
+                    if (type !== 'both' && item.dataset.category !== type) { item.querySelector('input').checked = false; }
                 });
                 filterServices();
                 updateSummary();
@@ -2613,8 +2830,10 @@ $filterTabs = [
         });
 
         form.addEventListener('submit', function (e) {
-            if (!form.querySelector('.dx-svc input:checked')) {
+            var missing = missingServices();
+            if (missing) {
                 e.preventDefault();
+                svcError.textContent = missing;
                 svcList.classList.add('has-error');
                 svcError.hidden = false;
                 svcList.scrollIntoView({ block: 'nearest', behavior: 'smooth' });

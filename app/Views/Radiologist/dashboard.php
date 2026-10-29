@@ -69,183 +69,78 @@ foreach ($pendingExaminations as $exam) {
     $statusCounts[$st] = ($statusCounts[$st] ?? 0) + 1;
 }
 
-$statCards = [
-    [
-        'key'   => 'pending',
-        'icon'  => 'time.png',
-        'tone'  => 'icon-orange',
-        'label' => 'Pending Read',
-        'value' => number_format($pending),
-        'note'  => 'Awaiting interpretation',
-        'link'  => base_url('radiologist/examinations'),
-    ],
-    [
-        'key'   => 'processing',
-        'icon'  => 'file (1).png',
-        'tone'  => 'icon-blue',
-        'label' => 'In Reading',
-        'value' => number_format($processing),
-        'note'  => 'Currently open',
-        'link'  => base_url('radiologist/examinations'),
-    ],
-    [
-        'key'   => 'completed',
-        'icon'  => 'people-check-blue.png',
-        'tone'  => 'icon-green',
-        'label' => 'Completed',
-        'value' => number_format($completed),
-        'note'  => 'Report signed',
-        'link'  => base_url('radiologist/examinations'),
-    ],
-    [
-        'key'   => 'released',
-        'icon'  => 'check.png',
-        'tone'  => 'icon-teal',
-        'label' => 'Released',
-        'value' => number_format($released),
-        'note'  => 'Sent to reception',
-        'link'  => base_url('radiologist/examinations'),
-    ],
-    [
-        'key'   => 'total',
-        'icon'  => 'analysis.png',
-        'tone'  => 'icon-cyan',
-        'label' => 'Total Studies',
-        'value' => number_format($total),
-        'note'  => 'All X-ray examinations',
-        'link'  => null,
-    ],
-    [
-        'key'   => 'revenue_today',
-        'icon'  => 'money-yellow.png',
-        'tone'  => 'icon-cyan',
-        'label' => 'Revenue Today',
-        'value' => $peso($todayRevenue),
-        'note'  => 'Paid X-ray studies today',
-        'raw'   => true,
-        'link'  => null,
-    ],
-    [
-        'key'   => 'revenue_month',
-        'icon'  => 'money-yellow.png',
-        'tone'  => 'icon-cyan',
-        'label' => 'Revenue This Month',
-        'value' => $peso($monthlyRevenue),
-        'note'  => 'Paid X-ray studies month to date',
-        'raw'   => true,
-        'link'  => null,
-    ],
-];
-
 /* ------------------------------------------------------------------
-   SPARKLINES — same look and math as the Admin dashboard.
+   KPI BOARD (shared partial: partials/kpi_board, same as Admin)
    ------------------------------------------------------------------ */
-$kpiTrends = $kpiTrends ?? [];
-
-$sparkMeta = [
-    'pending'       => ['color' => '#EA580C', 'goodUp' => false, 'cumulative' => false, 'unit' => 'pending'],
-    'processing'    => ['color' => '#2563EB', 'goodUp' => false, 'cumulative' => false, 'unit' => 'in reading'],
-    'completed'     => ['color' => '#16A34A', 'goodUp' => true,  'cumulative' => false, 'unit' => 'completed'],
-    'released'      => ['color' => '#0D9488', 'goodUp' => true,  'cumulative' => false, 'unit' => 'released'],
-    'total'         => ['color' => '#0891B2', 'goodUp' => true,  'cumulative' => true,  'unit' => 'studies'],
-    'revenue_today' => ['color' => '#CA8A04', 'goodUp' => true,  'cumulative' => false, 'unit' => 'revenue', 'money' => true],
-    'revenue_month' => ['color' => '#DB2777', 'goodUp' => true,  'cumulative' => true,  'unit' => 'revenue', 'money' => true],
+$kpiBoard = [
+    'trends' => $kpiTrends ?? [],
+    'cards'  => [
+        [
+            'key'     => 'total',
+            'icon'    => 'analysis.png',
+            'color'   => '#0891B2',
+            'label'   => 'Total Studies',
+            'value'   => $total,
+            'delta'   => 'window',
+            'context' => 'new in 14 days',
+            'unit'    => 'studies',
+            'link'    => null,
+        ],
+        [
+            'key'     => 'pending',
+            'icon'    => 'time.png',
+            'color'   => '#EA580C',
+            'label'   => 'Pending Read',
+            'value'   => $pending,
+            'delta'   => null,
+            'context' => 'Awaiting interpretation',
+            'unit'    => 'new pending',
+            'link'    => base_url('radiologist/examinations'),
+        ],
+        [
+            'key'     => 'revenue_today',
+            'icon'    => 'money-yellow.png',
+            'color'   => '#059669',
+            'label'   => 'Revenue Today',
+            'value'   => $todayRevenue,
+            'money'   => true,
+            'delta'   => 'dod',
+            'context' => 'vs yesterday',
+            'unit'    => 'X-ray revenue',
+            'link'    => null,
+        ],
+        [
+            'key'     => 'revenue_month',
+            'icon'    => 'money-yellow.png',
+            'color'   => '#7c3aed',
+            'label'   => 'Revenue This Month',
+            'value'   => $monthlyRevenue,
+            'money'   => true,
+            'delta'   => null,
+            'context' => '≈ ₱' . number_format($monthlyRevenue / max(1, (int) date('j')), 2) . '/day · ' . date('F'),
+            'unit'    => 'month-to-date',
+            'link'    => null,
+        ],
+    ],
+    /* In reading, completed and released are mutually exclusive statuses. */
+    'pipeline' => [
+        'title'  => 'Reading Workflow',
+        'sub'    => number_format($processing + $completed + $released) . ' studies past intake',
+        'link'   => base_url('radiologist/examinations'),
+        'split'  => true,
+        'stages' => [
+            ['key' => 'processing', 'color' => '#3b82f6', 'label' => 'In Reading', 'hint' => 'Currently open',    'count' => $processing, 'today' => 'new today',       'link' => base_url('radiologist/examinations')],
+            ['key' => 'completed',  'color' => '#10b981', 'label' => 'Completed',  'hint' => 'Report signed',     'count' => $completed,  'today' => 'completed today', 'link' => base_url('radiologist/examinations')],
+            ['key' => 'released',   'color' => '#0D9488', 'label' => 'Released',   'hint' => 'Sent to reception', 'count' => $released,   'today' => 'released today',  'link' => base_url('radiologist/examinations')],
+        ],
+    ],
 ];
-
-/* Returns [svgPath, lastX%, lastY%] for a value series. */
-$sparkGeometry = static function (array $vals): array {
-    $n = count($vals);
-    if ($n < 2) { return ['', 100, 50]; }
-    $min = min($vals);
-    $max = max($vals);
-    $rng = $max - $min;
-    $w = 100; $h = 32; $pad = 3;
-    $pts = [];
-    foreach (array_values($vals) as $i => $v) {
-        $x = $i / ($n - 1) * $w;
-        $y = $rng > 0 ? $h - $pad - (($v - $min) / $rng) * ($h - 2 * $pad) : $h / 2;
-        $pts[] = [round($x, 2), round($y, 2)];
-    }
-    $line = 'M' . $pts[0][0] . ',' . $pts[0][1];
-    for ($i = 1; $i < $n; $i++) {
-        $cx = round(($pts[$i - 1][0] + $pts[$i][0]) / 2, 2);
-        $line .= ' C' . $cx . ',' . $pts[$i - 1][1] . ' ' . $cx . ',' . $pts[$i][1] . ' ' . $pts[$i][0] . ',' . $pts[$i][1];
-    }
-    $last = end($pts);
-    return [$line, $last[0], round($last[1] / $h * 100, 2)];
-};
 ?>
 
 <div class="dashboard-container">
 
-    <!-- ===== STATS ROW ===== -->
-    <div class="stats-row">
-        <?php foreach ($statCards as $card): ?>
-            <?php
-                $tag  = !empty($card['link']) ? 'a' : 'div';
-                $href = !empty($card['link']) ? ' href="' . esc($card['link'], 'attr') . '"' : '';
-                $icon = (string) ($card['icon'] ?? '');
-                $isMoney = !empty($card['raw']);
-
-                $meta   = $sparkMeta[$card['key']] ?? null;
-                $vals   = $meta ? array_map('floatval', $kpiTrends[$card['key']] ?? []) : [];
-                $hasSpk = $meta && count($vals) >= 2;
-
-                if ($hasSpk) {
-                    [$spkLine, $spkX, $spkY] = $sparkGeometry($vals);
-                    $dates = $kpiTrends['dates'] ?? [];
-                    $fmt   = !empty($meta['money'])
-                        ? static fn($v) => $peso($v)
-                        : static fn($v) => number_format($v);
-                    $spkTitle = $meta['unit'] . ': ' . $fmt(end($vals))
-                        . ' on ' . (isset($dates[count($vals) - 1]) ? date('M j', strtotime($dates[count($vals) - 1])) : 'today')
-                        . ' · 14-day peak ' . $fmt(max($vals));
-                }
-            ?>
-            <<?= $tag ?> class="stat-card<?= $isMoney ? ' stat-card--revenue' : '' ?>"<?= $href ?><?= $hasSpk ? ' style="--spark:' . esc($meta['color'], 'attr') . '"' : '' ?>>
-
-                <div class="stat-top">
-                    <div class="stat-icon <?= esc($card['tone'], 'attr') ?>">
-                        <?php if ($icon !== ''): ?>
-                            <img src="<?= esc(base_url('assets/images/' . $icon), 'attr') ?>"
-                                 alt=""
-                                 class="stat-img"
-                                 loading="lazy"
-                                 decoding="async">
-                        <?php endif; ?>
-                    </div>
-
-                    <?php if (!empty($card['link'])): ?>
-                        <svg class="stat-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"
-                             stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                             stroke-linejoin="round" aria-hidden="true">
-                            <polyline points="9 18 15 12 9 6"></polyline>
-                        </svg>
-                    <?php endif; ?>
-                </div>
-
-                <div class="stat-value-row">
-                    <div class="stat-value<?= $isMoney ? ' stat-value-money' : '' ?>">
-                        <?= esc($card['value']) ?>
-                    </div>
-                    <?php if ($hasSpk): ?>
-                        <div class="spark spark-inline" role="img"
-                             aria-label="<?= esc($spkTitle, 'attr') ?>"
-                             title="<?= esc($spkTitle, 'attr') ?>">
-                            <svg viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true">
-                                <path d="<?= $spkLine ?>" class="spark-line" fill="none" vector-effect="non-scaling-stroke"/>
-                            </svg>
-                        </div>
-                    <?php endif; ?>
-                </div>
-
-                <div class="stat-label"><?= esc($card['label']) ?></div>
-
-                <div class="stat-sub"><?= esc($card['note']) ?></div>
-
-            </<?= $tag ?>>
-        <?php endforeach; ?>
-    </div>
+    <!-- ===== KPI OVERVIEW ===== -->
+    <?= view('partials/kpi_board', $kpiBoard) ?>
 
 
     <!-- ===== TOP ROW: Weekly Volume + Available X-ray Services ===== -->
@@ -635,160 +530,6 @@ $sparkGeometry = static function (array $vals): array {
 }
 
 .dashboard-container .muted { color: var(--db-ink-faint); }
-
-/* =========================================================
-   STATS ROW
-   ========================================================= */
-
-.dashboard-container .stats-row {
-    display: grid;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: 16px;
-    margin-bottom: 20px;
-}
-
-.dashboard-container .stat-card {
-    display: block;
-    background: #FFFFFF;
-    border: 1px solid #E2E8F0;
-    border-radius: 12px;
-    padding: 18px;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-    text-decoration: none;
-    color: inherit;
-    transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
-    min-width: 0;
-    width: 100%;
-    box-sizing: border-box;
-}
-
-.dashboard-container a.stat-card:hover,
-.dashboard-container a.stat-card:focus-visible {
-    border-color: #CBD5E1;
-    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.07);
-    text-decoration: none;
-    color: inherit;
-}
-
-.dashboard-container .stat-card:hover .stat-arrow { color: #475569; }
-
-.dashboard-container .stat-top {
-    display: grid;
-    grid-template-columns: 40px 1fr 16px;
-    align-items: center;
-    margin-bottom: 14px;
-    width: 100%;
-}
-
-.dashboard-container .stat-top > .stat-icon  { grid-column: 1; }
-.dashboard-container .stat-top > .stat-arrow { grid-column: 3; justify-self: end; }
-
-.dashboard-container .stat-top:not(:has(.stat-arrow)) {
-    grid-template-columns: 40px 1fr;
-}
-
-.dashboard-container .stat-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-}
-
-.dashboard-container .stat-img {
-    width: 25px;
-    height: 25px;
-    object-fit: contain;
-    display: block;
-}
-
-.dashboard-container .stat-arrow {
-    color: #CBD5E1;
-    flex-shrink: 0;
-    transition: color 0.18s ease;
-    justify-self: end;
-}
-
-.dashboard-container .icon-cyan,
-.dashboard-container .icon-teal,
-.dashboard-container .icon-orange,
-.dashboard-container .icon-green,
-.dashboard-container .icon-blue,
-.dashboard-container .icon-yellow,
-.dashboard-container .icon-pink {
-    background: transparent;
-}
-
-/* ===== VALUE ROW + INLINE SPARKLINE ===== */
-
-.dashboard-container .stat-value-row {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 10px;
-    margin-bottom: 6px;
-    min-width: 0;
-}
-
-.dashboard-container .stat-value {
-    font-size: 1.35rem;
-    font-weight: 680;
-    color: #0F172A;
-    line-height: 1.1;
-    letter-spacing: -0.02em;
-    font-variant-numeric: tabular-nums;
-    min-width: 0;
-    margin-bottom: 0;
-}
-
-.dashboard-container .stat-value-money {
-    font-size: 1.0rem;
-    overflow-wrap: anywhere;
-}
-
-.dashboard-container .spark-inline {
-    flex-shrink: 0;
-    width: 56px;
-    height: 20px;
-    position: relative;
-}
-
-.dashboard-container .spark-inline svg {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    display: block;
-    overflow: visible;
-}
-
-.dashboard-container .spark-line {
-    stroke: var(--spark);
-    stroke-width: 1.8;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
-
-.dashboard-container .stat-card--revenue {
-    border-color: #d7e3fb;
-    background: linear-gradient(180deg, #fbfdff 0%, #ffffff 100%);
-}
-
-.dashboard-container .stat-card--revenue .stat-label { color: #1e3a8a; }
-
-.dashboard-container .stat-label {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #475569;
-    margin-bottom: 3px;
-}
-
-.dashboard-container .stat-sub {
-    font-size: 0.775rem;
-    color: #94A3B8;
-}
 
 /* =========================================================
    CHART ROWS
@@ -1376,14 +1117,6 @@ $sparkGeometry = static function (array $vals): array {
    RESPONSIVE
    ========================================================= */
 
-@media (max-width: 1500px) {
-    .dashboard-container .stats-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-}
-
-@media (max-width: 1200px) {
-    .dashboard-container .stats-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-
 @media (max-width: 1100px) {
     .dashboard-container .charts-row--top,
     .dashboard-container .charts-row--donuts {
@@ -1407,16 +1140,11 @@ $sparkGeometry = static function (array $vals): array {
 
 @media (max-width: 992px) {
     .dashboard-container { padding: 1rem; }
-    .dashboard-container .stats-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 768px) {
     .dashboard-container { padding: 0.9rem; }
 
-    .dashboard-container .stat-card { padding: 16px; }
-    .dashboard-container .stat-value { font-size: 1.2rem; }
-    .dashboard-container .stat-value-money { font-size: 1.05rem; }
-    .dashboard-container .spark-inline { width: 44px; height: 16px; }
 
     .dashboard-container .chart-card { padding: 1rem; }
     .dashboard-container .chart-body { height: 240px; }
@@ -1471,9 +1199,6 @@ $sparkGeometry = static function (array $vals): array {
 
 @media (max-width: 576px) {
     .dashboard-container { padding: 0.75rem; }
-    .dashboard-container .stats-row { grid-template-columns: minmax(0, 1fr); gap: 12px; }
-    .dashboard-container .stat-value { font-size: 1.15rem; }
-    .dashboard-container .stat-value-money { font-size: 1.0rem; }
     .dashboard-container .card-header-custom { flex-direction: column; align-items: stretch; }
     .dashboard-container .header-right-group { justify-content: space-between; }
 
@@ -1493,7 +1218,6 @@ $sparkGeometry = static function (array $vals): array {
     .dashboard-container .action-cell,
     .dashboard-container .table-filter-footer,
     .dashboard-container .btn-view-all { display: none !important; }
-    .dashboard-container .stat-card,
     .dashboard-container .appointments-card { box-shadow: none; break-inside: avoid; }
 }
 </style>

@@ -39,184 +39,81 @@ $safeColor = static function ($color, $fallback = '#1976d2') {
 $jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
 
 /* ------------------------------------------------------------------
-   STAT CARDS
+   KPI BOARD (shared partial: partials/kpi_board)
    ------------------------------------------------------------------ */
-$statCards = [
-    [
-        'key'   => 'patients',
-        'icon'  => 'people-blue.png',
-        'tone'  => 'icon-cyan',
-        'label' => 'Total Patients',
-        'value' => number_format((int) ($totalPatients ?? 0)),
-        'note'  => 'All registered patients',
-        'link'  => base_url('admin/patients'),
+$pendingRequests   = (int) ($pendingRequests ?? 0);
+$completedRequests = (int) ($completedRequests ?? 0);
+$releasedResults   = (int) ($releasedResults ?? 0);
+
+$kpiBoard = [
+    'trends' => $kpiTrends ?? [],
+    'cards'  => [
+        [
+            'key'     => 'patients',
+            'icon'    => 'people-blue.png',
+            'color'   => '#1976d2',
+            'label'   => 'Total Patients',
+            'value'   => (int) ($totalPatients ?? 0),
+            'delta'   => 'window',
+            'context' => 'new in 14 days',
+            'unit'    => 'patients',
+            'link'    => base_url('admin/patients'),
+        ],
+        [
+            'key'     => 'today',
+            'icon'    => 'document.png',
+            'color'   => '#0891b2',
+            'label'   => "Today's Patients",
+            'value'   => (int) ($todayPatients ?? 0),
+            'delta'   => 'dod',
+            'context' => 'vs yesterday',
+            'unit'    => 'appointments',
+            'link'    => base_url('admin/appointments'),
+        ],
+        [
+            'key'     => 'revenue_today',
+            'icon'    => 'money-yellow.png',
+            'color'   => '#059669',
+            'label'   => "Today's Revenue",
+            'value'   => (float) ($todayRevenue ?? 0),
+            'money'   => true,
+            'delta'   => 'dod',
+            'context' => 'vs yesterday',
+            'unit'    => 'collected',
+            'link'    => base_url('admin/payments'),
+        ],
+        [
+            'key'     => 'revenue_month',
+            'icon'    => 'money-yellow.png',
+            'color'   => '#7c3aed',
+            'label'   => 'Monthly Revenue',
+            'value'   => $monthlyRevenueVal,
+            'money'   => true,
+            'delta'   => null,
+            'context' => '≈ ₱' . number_format($monthlyRevenueVal / max(1, (int) date('j')), 2) . '/day · ' . date('F'),
+            'unit'    => 'month-to-date',
+            'link'    => base_url('admin/billing/reports'),
+        ],
     ],
-    [
-        'key'   => 'today',
-        'icon'  => 'document.png',
-        'tone'  => 'icon-teal',
-        'label' => "Today's Patients",
-        'value' => number_format((int) ($todayPatients ?? 0)),
-        'note'  => 'Checked in today',
-        'link'  => base_url('admin/appointments'),
-    ],
-    [
-        'key'   => 'pending',
-        'icon'  => 'file (1).png',
-        'tone'  => 'icon-orange',
-        'label' => 'Pending Requests',
-        'value' => number_format((int) ($pendingRequests ?? 0)),
-        'note'  => 'Awaiting processing',
-        'link'  => base_url('admin/diagnostic-requests'),
-    ],
-    [
-        'key'   => 'completed',
-        'icon'  => 'people-check-blue.png',
-        'tone'  => 'icon-green',
-        'label' => 'Completed Requests',
-        'value' => number_format((int) ($completedRequests ?? 0)),
-        'note'  => 'Results encoded',
-        'link'  => base_url('admin/diagnostic-requests'),
-    ],
-    [
-        'key'   => 'released',
-        'icon'  => 'clock (4).png',
-        'tone'  => 'icon-blue',
-        'label' => 'Released Results',
-        'value' => number_format((int) ($releasedResults ?? 0)),
-        'note'  => 'Sent to doctors',
-        'link'  => base_url('admin/diagnostic-requests'),
-    ],
-    [
-        'key'   => 'revenue_today',
-        'icon'  => 'money-yellow.png',
-        'tone'  => 'icon-yellow',
-        'label' => "Today's Revenue",
-        'value' => '&#8369;' . number_format((float) ($todayRevenue ?? 0), 2),
-        'note'  => 'Collected today',
-        'raw'   => true,
-        'link'  => base_url('admin/payments'),
-    ],
-    [
-        'key'   => 'revenue_month',
-        'icon'  => 'money-yellow.png',
-        'tone'  => 'icon-pink',
-        'label' => 'Monthly Revenue',
-        'value' => '&#8369;' . number_format($monthlyRevenueVal, 2),
-        'note'  => date('F Y'),
-        'raw'   => true,
-        'link'  => base_url('admin/billing/reports'),
+    /* Request statuses are mutually exclusive, so the share bar is valid. */
+    'pipeline' => [
+        'title'  => 'Diagnostic Pipeline',
+        'sub'    => number_format($pendingRequests + $completedRequests + $releasedResults) . ' requests in the workflow',
+        'link'   => base_url('admin/diagnostic-requests'),
+        'split'  => true,
+        'stages' => [
+            ['key' => 'pending',   'color' => '#f59e0b', 'label' => 'Pending',   'hint' => 'Awaiting processing', 'count' => $pendingRequests,   'today' => 'received today',  'link' => base_url('admin/diagnostic-requests')],
+            ['key' => 'completed', 'color' => '#10b981', 'label' => 'Completed', 'hint' => 'Results encoded',     'count' => $completedRequests, 'today' => 'completed today', 'link' => base_url('admin/diagnostic-requests')],
+            ['key' => 'released',  'color' => '#3b82f6', 'label' => 'Released',  'hint' => 'Sent to doctors',     'count' => $releasedResults,   'today' => 'released today',  'link' => base_url('admin/diagnostic-requests')],
+        ],
     ],
 ];
-
-/* ------------------------------------------------------------------
-   SPARKLINES
-   ------------------------------------------------------------------ */
-$kpiTrends = $kpiTrends ?? [];
-$sparkMeta = [
-    'patients'      => ['color' => '#1976d2', 'goodUp' => true,  'cumulative' => true,  'unit' => 'patients'],
-    'today'         => ['color' => '#1565c0', 'goodUp' => true,  'cumulative' => false, 'unit' => 'appointments'],
-    'pending'       => ['color' => '#ea580c', 'goodUp' => false, 'cumulative' => false, 'unit' => 'requests received'],
-    'completed'     => ['color' => '#16a34a', 'goodUp' => true,  'cumulative' => false, 'unit' => 'completed'],
-    'released'      => ['color' => '#2563eb', 'goodUp' => true,  'cumulative' => false, 'unit' => 'released'],
-    'revenue_today' => ['color' => '#ca8a04', 'goodUp' => true,  'cumulative' => false, 'unit' => 'revenue', 'money' => true],
-    'revenue_month' => ['color' => '#db2777', 'goodUp' => true,  'cumulative' => true,  'unit' => 'revenue', 'money' => true],
-];
-
-/* Returns [svgPath, lastX%, lastY%] for a value series. */
-$sparkGeometry = static function (array $vals): array {
-    $n = count($vals);
-    if ($n < 2) { return ['', 100, 50]; }
-    $min = min($vals);
-    $max = max($vals);
-    $rng = $max - $min;
-    $w = 100; $h = 32; $pad = 3;
-    $pts = [];
-    foreach (array_values($vals) as $i => $v) {
-        $x = $i / ($n - 1) * $w;
-        $y = $rng > 0 ? $h - $pad - (($v - $min) / $rng) * ($h - 2 * $pad) : $h / 2;
-        $pts[] = [round($x, 2), round($y, 2)];
-    }
-    $line = 'M' . $pts[0][0] . ',' . $pts[0][1];
-    for ($i = 1; $i < $n; $i++) {
-        $cx = round(($pts[$i - 1][0] + $pts[$i][0]) / 2, 2);
-        $line .= ' C' . $cx . ',' . $pts[$i - 1][1] . ' ' . $cx . ',' . $pts[$i][1] . ' ' . $pts[$i][0] . ',' . $pts[$i][1];
-    }
-    $last = end($pts);
-    return [$line, $last[0], round($last[1] / $h * 100, 2)];
-};
 ?>
 
 <div class="dashboard-wrapper">
 
-    <!-- ===== TOP STATS ROW (7 Cards) ===== -->
-    <div class="stats-row">
-        <?php foreach ($statCards as $card): ?>
-            <?php
-                $tag  = !empty($card['link']) ? 'a' : 'div';
-                $href = !empty($card['link']) ? ' href="' . esc($card['link'], 'attr') . '"' : '';
-                $icon = (string) ($card['icon'] ?? '');
-
-                $meta   = $sparkMeta[$card['key']] ?? null;
-                $vals   = $meta ? array_map('floatval', $kpiTrends[$card['key']] ?? []) : [];
-                $hasSpk = $meta && count($vals) >= 2;
-                if ($hasSpk) {
-                    [$spkLine, $spkX, $spkY] = $sparkGeometry($vals);
-                    $dates = $kpiTrends['dates'] ?? [];
-                    $fmt   = !empty($meta['money'])
-                        ? static fn($v) => '₱' . number_format($v, 2)
-                        : static fn($v) => number_format($v);
-                    $spkTitle = $meta['unit'] . ': ' . $fmt(end($vals))
-                        . ' on ' . (isset($dates[count($vals) - 1]) ? date('M j', strtotime($dates[count($vals) - 1])) : 'today')
-                        . ' · 14-day peak ' . $fmt(max($vals));
-                }
-            ?>
-            <<?= $tag ?> class="stat-card"<?= $href ?><?= $hasSpk ? ' style="--spark:' . esc($meta['color'], 'attr') . '"' : '' ?>>
-
-                <div class="stat-top">
-
-                    <div class="stat-icon <?= esc($card['tone'], 'attr') ?>">
-                        <?php if ($icon !== ''): ?>
-                            <img src="<?= esc(base_url('assets/images/' . $icon), 'attr') ?>"
-                                 alt=""
-                                 class="stat-img"
-                                 loading="lazy"
-                                 decoding="async">
-                        <?php endif; ?>
-                    </div>
-
-                    <?php if (!empty($card['link'])): ?>
-                        <svg class="stat-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"
-                             stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                             stroke-linejoin="round" aria-hidden="true">
-                            <polyline points="9 18 15 12 9 6"></polyline>
-                        </svg>
-                    <?php endif; ?>
-
-                </div>
-
-                <div class="stat-value-row">
-                    <div class="stat-value<?= !empty($card['raw']) ? ' stat-value-money' : '' ?>">
-                        <?= !empty($card['raw']) ? $card['value'] : esc($card['value']) ?>
-                    </div>
-                    <?php if ($hasSpk): ?>
-                        <div class="spark spark-inline" role="img" aria-label="<?= esc($spkTitle, 'attr') ?>" title="<?= esc($spkTitle, 'attr') ?>">
-                            <svg viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true">
-                                <path d="<?= $spkLine ?>" class="spark-line" fill="none" vector-effect="non-scaling-stroke"/>
-                            </svg>
-                        </div>
-                    <?php endif; ?>
-                </div>
-
-                <div class="stat-label"><?= esc($card['label']) ?></div>
-
-                <div class="stat-foot">
-                    <div class="stat-sub"><?= esc($card['note']) ?></div>
-                </div>
-
-            </<?= $tag ?>>
-        <?php endforeach; ?>
-    </div>
+    <!-- ===== KPI OVERVIEW ===== -->
+    <?= view('partials/kpi_board', $kpiBoard) ?>
 
     <!-- ===== MAIN ROW: Revenue Chart + Pending Appointments ===== -->
     <div class="main-row">
@@ -527,169 +424,6 @@ $sparkGeometry = static function (array $vals): array {
     outline: 2px solid var(--db-accent);
     outline-offset: 2px;
     border-radius: var(--db-radius-xs);
-}
-
-/* ===== STATS ROW ===== */
-
-.stats-row {
-    display: grid;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: 16px;
-    margin-bottom: var(--db-gap);
-}
-
-.stat-card {
-    display: block;
-    background: var(--db-surface);
-    border-radius: var(--db-radius);
-    padding: 18px;
-    box-shadow: var(--db-shadow);
-    border: 1px solid var(--db-border);
-    text-decoration: none;
-    color: inherit;
-    transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
-    min-width: 0;
-    width: 100%;
-    box-sizing: border-box;
-}
-
-.stat-card:hover,
-.stat-card:focus-visible {
-    border-color: var(--db-border-strong);
-    box-shadow: var(--db-shadow-hover);
-    text-decoration: none;
-    color: inherit;
-}
-
-.stat-card:hover .stat-arrow {
-    color: var(--db-text-soft);
-}
-
-.stat-top {
-    display: grid;
-    grid-template-columns: 40px 1fr 16px;
-    align-items: center;
-    margin-bottom: 14px;
-    width: 100%;
-}
-
-.stat-top > .stat-icon  { grid-column: 1; }
-.stat-top > .stat-arrow { grid-column: 3; justify-self: end; }
-
-.stat-top:not(:has(.stat-arrow)) {
-    grid-template-columns: 40px 1fr;
-}
-
-.stat-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: var(--db-radius-sm);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    background: transparent;
-}
-
-.stat-img {
-    width: 25px;
-    height: 25px;
-    object-fit: contain;
-    display: block;
-}
-
-.stat-arrow {
-    color: #CBD5E1;
-    flex-shrink: 0;
-    transition: color 0.18s ease;
-    justify-self: end;
-}
-
-.icon-cyan,
-.icon-teal,
-.icon-orange,
-.icon-green,
-.icon-blue,
-.icon-yellow,
-.icon-pink {
-    background: transparent;
-}
-
-.stat-value-row {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 10px;
-    margin-bottom: 6px;
-    min-width: 0;
-}
-
-/* Smaller KPI number to match the reference design. */
-.stat-value {
-    font-size: 1.35rem;
-    font-weight: 680;
-    color: var(--db-text);
-    line-height: 1.1;
-    letter-spacing: -0.02em;
-    font-variant-numeric: tabular-nums;
-    min-width: 0;
-}
-
-.stat-value-money {
-    font-size: 1.0rem;
-    overflow-wrap: anywhere;
-}
-
-/* Small inline sparkline, sits to the right of the value. */
-.spark-inline {
-    flex-shrink: 0;
-    width: 56px;
-    height: 20px;
-    position: relative;
-}
-
-.spark-inline svg {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    display: block;
-    overflow: visible;
-}
-
-.spark-line {
-    stroke: var(--spark);
-    stroke-width: 1.8;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
-
-.stat-label {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--db-text-soft);
-    margin-bottom: 3px;
-}
-
-.stat-sub {
-    font-size: 0.775rem;
-    color: var(--db-text-muted);
-}
-
-.stat-foot {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    margin-top: 4px;
-    min-width: 0;
-}
-
-.stat-foot .stat-sub {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
 /* ===== LAYOUT ROWS ===== */
@@ -1181,35 +915,24 @@ $sparkGeometry = static function (array $vals): array {
    RESPONSIVE
    ============================================ */
 
-@media (max-width: 1500px) {
-    .stats-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-}
-
 @media (max-width: 1200px) {
-    .stats-row  { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .main-row   { grid-template-columns: minmax(0, 1fr); }
     .bottom-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 992px) {
     .dashboard-wrapper { padding: 16px; }
-    .stats-row  { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .bottom-row { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (max-width: 768px) {
-    .stat-card         { padding: 16px; }
     .chart-card        { padding: 16px; }
-    .stat-value        { font-size: 1.2rem; }
-    .stat-value-money  { font-size: 1.05rem; }
-    .spark-inline      { width: 44px; height: 16px; }
     .chart-container,
     .empty-state-chart { height: 240px; }
 }
 
 @media (max-width: 576px) {
     .dashboard-wrapper { padding: 12px; }
-    .stats-row  { grid-template-columns: minmax(0, 1fr); gap: 12px; }
     .main-row,
     .bottom-row { gap: 12px; }
     .card-header { flex-direction: column; align-items: flex-start; }
@@ -1267,31 +990,6 @@ $sparkGeometry = static function (array $vals): array {
     font-size: 0.83rem;
     color: var(--db-text-muted);
 }
-
-.stat-card {
-    position: relative;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    background: linear-gradient(180deg, #FFFFFF 0%, #FCFDFE 100%);
-    border: 1px solid rgba(226, 232, 240, 0.9);
-    padding: 16px;
-    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-}
-
-.stat-card:hover,
-.stat-card:focus-visible {
-    transform: translateY(-3px);
-    border-color: color-mix(in srgb, var(--spark, #CBD5E1) 35%, #E2E8F0);
-    box-shadow: var(--db-shadow-hover);
-}
-
-.stat-top { margin-bottom: 12px; }
-
-.stat-icon { background: transparent; border-radius: 0; }
-
-.stat-value { font-size: 1.35rem; margin-bottom: 0; }
-.stat-label { margin-bottom: 0; }
 
 .chart-card {
     border-color: rgba(226, 232, 240, 0.9);
@@ -1353,7 +1051,6 @@ $sparkGeometry = static function (array $vals): array {
 /* ===== PRINT ===== */
 @media print {
     .dashboard-wrapper { background: #FFFFFF; padding: 0; min-height: 0; }
-    .stat-card,
     .chart-card { box-shadow: none; break-inside: avoid; page-break-inside: avoid; }
     .btn-refresh,
     .pending-card,
@@ -1565,7 +1262,6 @@ function dbAnimateOnView(chart, canvasId) {
     }, { threshold: 0.25 });
     observer.observe(canvas);
 }
-
 
 // ============================================
 // 1. REVENUE CHART

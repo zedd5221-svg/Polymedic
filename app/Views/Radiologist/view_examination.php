@@ -154,9 +154,21 @@
 
                 <?php if ($imageCount > 0): ?>
 
-                    <div class="xv-viewer"
+                    <div class="xv-viewer xv-viewer--images"
                          id="xvViewer"
+                         tabindex="0"
+                         aria-label="X-ray image viewer"
                          data-count="<?= $imageCount ?>">
+
+                        <div class="xv-tools" role="toolbar" aria-label="Image tools">
+                            <button type="button" class="xv-tool" data-tool="out" title="Zoom out (−)" aria-label="Zoom out"><i class="bi bi-zoom-out" aria-hidden="true"></i></button>
+                            <button type="button" class="xv-tool xv-tool--zoom" data-tool="fit" id="xvZoomLabel" title="Reset to default size (0)" aria-label="Reset to default size">100%</button>
+                            <button type="button" class="xv-tool" data-tool="in" title="Zoom in (+)" aria-label="Zoom in"><i class="bi bi-zoom-in" aria-hidden="true"></i></button>
+                            <span class="xv-tool-sep" aria-hidden="true"></span>
+                            <button type="button" class="xv-tool" data-tool="invert" title="Invert / negative (I)" aria-label="Invert image" aria-pressed="false"><i class="bi bi-circle-half" aria-hidden="true"></i></button>
+                            <button type="button" class="xv-tool" data-tool="full" title="Full screen (F)" aria-label="Full screen"><i class="bi bi-arrows-fullscreen" aria-hidden="true"></i></button>
+                        </div>
+                        <span class="xv-hint-keys">Ctrl + scroll to zoom · drag to pan · 0 = reset to 100%</span>
 
                         <?php foreach ($imagePaths as $i => $path): ?>
                             <img src="<?= base_url($path) ?>"
@@ -660,22 +672,101 @@
     gap: 0.4rem;
 }
 
+/* Properly sized viewer so the image has room to grow */
 .xv-viewer {
     position: relative;
-    display: grid;
-    place-items: center;
-    min-height: 380px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 550px;
     padding: 1rem;
     background: #0f172a;
     overflow: hidden;
 }
 
+/* With images: original holder size, plus the reading tools. */
+.xv-viewer--images {
+    padding: 3rem 1rem 2.5rem;
+    user-select: none;
+    touch-action: none;
+}
+
+/* Let the image take up space naturally before JS scales it */
 .xv-image {
-    max-width: 100%;
-    max-height: 520px;
+    max-width: 90%;
+    max-height: 550px;
     display: block;
     border-radius: 6px;
 }
+.xv-viewer--images .xv-image {
+    transform-origin: center center;
+    transition: filter .15s ease;
+    will-change: transform;
+}
+.xv-viewer--images.is-zoomed            { cursor: grab; }
+.xv-viewer--images.is-zoomed.is-panning { cursor: grabbing; }
+.xv-viewer--images.is-inverted .xv-image { filter: invert(1); }
+
+/* Fullscreen: the image fills the screen */
+.xv-viewer--images:fullscreen { height: 100vh; width: 100vw; padding: 0; background: #05080f; }
+.xv-viewer--images:fullscreen .xv-image {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    object-fit: contain;
+    border-radius: 0;
+}
+
+/* Reading tools, top-left over the image */
+.xv-tools {
+    position: absolute;
+    top: .75rem;
+    left: .75rem;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px;
+    background: rgba(15, 23, 42, .72);
+    border: 1px solid rgba(226, 232, 240, .14);
+    border-radius: 10px;
+    backdrop-filter: blur(4px);
+}
+.xv-tool {
+    min-width: 32px;
+    height: 30px;
+    padding: 0 .45rem;
+    display: inline-grid;
+    place-items: center;
+    color: #e2e8f0;
+    background: transparent;
+    border: 0;
+    border-radius: 7px;
+    font-size: .8rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+}
+.xv-tool:hover { background: rgba(226, 232, 240, .12); }
+.xv-tool:focus-visible { outline: 2px solid #60a5fa; outline-offset: 1px; }
+.xv-tool[aria-pressed="true"] { background: rgba(96, 165, 250, .25); color: #fff; }
+.xv-tool-sep { width: 1px; height: 18px; margin: 0 2px; background: rgba(226, 232, 240, .18); }
+.xv-tool--zoom { min-width: 52px; }
+
+.xv-hint-keys {
+    position: absolute;
+    left: .75rem;
+    bottom: .75rem;
+    z-index: 2;
+    padding: .2rem .55rem;
+    font-size: .7rem;
+    color: #cbd5e1;
+    background: rgba(15, 23, 42, .6);
+    border-radius: 999px;
+    pointer-events: none;
+}
+.xv-nav, .xv-counter { z-index: 2; }
 
 .xv-image[hidden] { display: none; }
 
@@ -1018,6 +1109,7 @@
 
 @media (max-width: 640px) {
     .xv-viewer { min-height: 240px; }
+    .xv-hint-keys { display: none; }
 
     .xv-nav { width: 30px; height: 30px; }
     .xv-nav--prev { left: 0.5rem; }
@@ -1088,6 +1180,32 @@
     }
 
     /* =====================================================
+       Keep the report text across image uploads / removals.
+       Those are separate forms that reload the page, so the
+       current Findings / Impression go along with them and
+       the server saves them as a draft first.
+       ===================================================== */
+
+    var findingsInput       = document.getElementById('findingsInput');
+    var interpretationInput = document.getElementById('interpretationInput');
+
+    document.querySelectorAll('form.xv-upload, form.xv-thumb-form').forEach(function (form) {
+        form.addEventListener('submit', function () {
+            [['findings', findingsInput], ['interpretation', interpretationInput]].forEach(function (pair) {
+                if (!pair[1]) { return; }
+                var hidden = form.querySelector('input[type="hidden"][name="' + pair[0] + '"]');
+                if (!hidden) {
+                    hidden = document.createElement('input');
+                    hidden.type = 'hidden';
+                    hidden.name = pair[0];
+                    form.appendChild(hidden);
+                }
+                hidden.value = pair[1].value;
+            });
+        });
+    });
+
+    /* =====================================================
        Image viewer.
        ===================================================== */
 
@@ -1097,6 +1215,127 @@
     var counter = document.getElementById('xvCounter');
     var prevBtn = document.getElementById('xvPrev');
     var nextBtn = document.getElementById('xvNext');
+
+    /* ---- Reading tools ---- */
+    // BASE is the default size: twice the fitted size, shown as "100%".
+    // Reset ('0' or the % button) returns to it.
+    var BASE = 2;
+    var zoom = BASE, panX = 0, panY = 0;
+    var zoomLabel = document.getElementById('xvZoomLabel');
+    var ZOOM_MIN = 1, ZOOM_MAX = BASE * 4;   // 50% .. 400%
+
+    function activeImage() {
+        return images.filter(function (img) { return !img.hidden; })[0] || images[0];
+    }
+
+    function applyView() {
+        var img = activeImage();
+        if (!img) { return; }
+        if (zoom <= 1) { zoom = 1; panX = 0; panY = 0; }
+        // keep the image from being dragged completely out of view
+        var maxX = viewer.clientWidth  * (zoom - 1) / 2;
+        var maxY = viewer.clientHeight * (zoom - 1) / 2;
+        panX = Math.max(-maxX, Math.min(maxX, panX));
+        panY = Math.max(-maxY, Math.min(maxY, panY));
+        img.style.transform = 'translate(' + panX + 'px,' + panY + 'px) scale(' + zoom + ')';
+        viewer.classList.toggle('is-zoomed', zoom > 1);
+        
+        // This calculates the label correctly based on the 2x BASE
+        if (zoomLabel) { zoomLabel.textContent = Math.round(zoom / BASE * 100) + '%'; }
+    }
+
+    function setZoom(z) {
+        zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
+        applyView();
+    }
+
+    function resetView() {
+        images.forEach(function (img) { img.style.transform = ''; });
+        zoom = BASE; panX = 0; panY = 0;
+        applyView();
+    }
+
+    function defaultView() {
+        resetView();
+    }
+
+    function toggleInvert() {
+        var on = viewer.classList.toggle('is-inverted');
+        var btn = viewer.querySelector('[data-tool="invert"]');
+        if (btn) { btn.setAttribute('aria-pressed', on ? 'true' : 'false'); }
+    }
+
+    function toggleFullscreen() {
+        if (document.fullscreenElement) {
+            document.exitFullscreen();
+        } else if (viewer.requestFullscreen) {
+            viewer.requestFullscreen().catch(function () {});
+        }
+    }
+
+    if (viewer && images.length) {
+        viewer.querySelectorAll('[data-tool]').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                switch (btn.dataset.tool) {
+                    case 'in':     setZoom(zoom * 1.25); break;
+                    case 'out':    setZoom(zoom / 1.25); break;
+                    case 'fit':    resetView(); break;
+                    case 'invert': toggleInvert(); break;
+                    case 'full':   toggleFullscreen(); break;
+                }
+            });
+        });
+
+        // Ctrl / ⌘ + wheel zooms; plain wheel keeps scrolling the page
+        viewer.addEventListener('wheel', function (e) {
+            if (!e.ctrlKey && !e.metaKey) { return; }
+            e.preventDefault();
+            setZoom(zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15));
+        }, { passive: false });
+
+        viewer.addEventListener('dblclick', function (e) {
+            if (e.target.closest('.xv-tools, .xv-nav')) { return; }
+            if (zoom !== BASE) { resetView(); } else { setZoom(BASE * 2); }
+        });
+
+        // drag to pan while zoomed
+        var drag = null;
+        viewer.addEventListener('pointerdown', function (e) {
+            if (zoom <= 1 || e.target.closest('.xv-tools, .xv-nav')) { return; }
+            drag = { x: e.clientX - panX, y: e.clientY - panY };
+            viewer.classList.add('is-panning');
+            viewer.setPointerCapture(e.pointerId);
+        });
+        viewer.addEventListener('pointermove', function (e) {
+            if (!drag) { return; }
+            panX = e.clientX - drag.x;
+            panY = e.clientY - drag.y;
+            applyView();
+        });
+        ['pointerup', 'pointercancel'].forEach(function (type) {
+            viewer.addEventListener(type, function () {
+                drag = null;
+                viewer.classList.remove('is-panning');
+            });
+        });
+
+        document.addEventListener('keydown', function (e) {
+            if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)) {
+                return;
+            }
+            if (e.ctrlKey || e.metaKey || e.altKey) { return; }
+            if (e.key === '+' || e.key === '=') { setZoom(zoom * 1.25); }
+            else if (e.key === '-' || e.key === '_') { setZoom(zoom / 1.25); }
+            else if (e.key === '0') { resetView(); }
+            else if (e.key === 'i' || e.key === 'I') { toggleInvert(); }
+            else if (e.key === 'f' || e.key === 'F') { toggleFullscreen(); }
+        });
+
+        window.addEventListener('resize', applyView);
+        document.addEventListener('fullscreenchange', applyView);
+        defaultView();
+    }
 
     if (images.length > 1) {
         var current = 0;
@@ -1121,6 +1360,8 @@
             if (counter) {
                 counter.textContent = (current + 1) + ' / ' + images.length;
             }
+
+            defaultView();
         };
 
         thumbs.forEach(function (btn) {

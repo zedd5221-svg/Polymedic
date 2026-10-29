@@ -1174,19 +1174,7 @@ class Admin extends BaseController
             $requests[] = $this->buildDiagnosticRow($row, $row['type'] ?? 'lab');
         }
 
-        $counts = [
-            'total'       => count($requests),
-            'pending'     => 0,
-            'processing'  => 0,
-            'completed'   => 0,
-            'released'    => 0,
-            'cancelled'   => 0,
-        ];
-        foreach ($requests as $r) {
-            $s = $r['status'] ?? 'pending';
-            if ($s === 'in_progress') { $s = 'processing'; }
-            if (isset($counts[$s])) { $counts[$s]++; }
-        }
+        $counts = $this->monitoringCounts($requests);
 
         $data = [
             'requests'     => $requests,
@@ -1240,6 +1228,7 @@ class Admin extends BaseController
             'findings'       => $row['findings'] ?? '',
             'interpretation' => $row['interpretation'] ?? '',
             'remarks'        => $row['remarks'] ?? '',
+            'monitor'        => DiagnosticRequestModel::monitorStage($row),
         ];
     }
 
@@ -1506,6 +1495,7 @@ class Admin extends BaseController
                 'interpretation' => $row['interpretation'] ?? '',
                 'remarks'        => $row['remarks'] ?? '',
                 'patient_code'   => $row['patient_code'] ?? null,
+                'monitor'        => DiagnosticRequestModel::monitorStage($row),
             ];
 
             return $this->response->setJSON(['success' => true, 'data' => $data]);

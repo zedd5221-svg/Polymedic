@@ -45,7 +45,9 @@ $requestTotal = static function (array $services) use ($priceBook): array {
 
 $statusMeta = [
     'pending'     => ['label' => 'Pending',     'tone' => 'pending'],
+    'queued'      => ['label' => 'Waiting',     'tone' => 'queued'],
     'in_progress' => ['label' => 'In progress', 'tone' => 'progress'],
+    'draft'       => ['label' => 'Draft',       'tone' => 'draft'],
     'completed'   => ['label' => 'Completed',   'tone' => 'completed'],
     'released'    => ['label' => 'Released',    'tone' => 'released'],
     'cancelled'   => ['label' => 'Cancelled',   'tone' => 'cancelled'],
@@ -69,7 +71,8 @@ $initialsOf = static function ($name) {
 $filterTabs = [
     'all'         => ['label' => 'All',         'count' => $counts['total']      ?? count($requests)],
     'pending'     => ['label' => 'Pending',     'count' => $counts['pending']    ?? 0],
-    'in_progress' => ['label' => 'In progress', 'count' => $counts['processing'] ?? 0],
+    'queued'      => ['label' => 'Waiting',     'count' => $counts['queued']     ?? 0],
+    'in_progress' => ['label' => 'In progress', 'count' => $counts['in_progress'] ?? $counts['processing'] ?? 0],
     'completed'   => ['label' => 'Completed',   'count' => $counts['completed']  ?? 0],
     'released'    => ['label' => 'Released',    'count' => $counts['released']   ?? 0],
     'cancelled'   => ['label' => 'Cancelled',   'count' => $counts['cancelled']  ?? 0],
@@ -164,6 +167,7 @@ $filterTabs = [
                     $source    = trim((string) ($request['source'] ?? ''));
                     $status    = (string) ($request['status'] ?? 'pending');
                     $meta      = $statusMeta[$status] ?? $statusMeta['pending'];
+                    $monitor   = $request['monitor'] ?? ['tags' => [$status], 'badges' => [['key' => $status] + $meta], 'short' => '', 'note' => ''];
                     $isStat    = ($request['priority'] ?? '') === 'stat';
                     $doctor    = trim((string) ($request['doctor_name'] ?? ''));
                     $phone     = trim((string) ($request['phone'] ?? ''));
@@ -226,6 +230,7 @@ $filterTabs = [
                              data-id="<?= esc($id, 'attr') ?>"
                              data-type="<?= esc($type, 'attr') ?>"
                              data-status="<?= esc($status, 'attr') ?>"
+                             data-statuses="<?= esc(implode(' ', $monitor['tags']), 'attr') ?>"
                              data-reference="<?= esc($reference, 'attr') ?>"
                              data-patient="<?= esc($patient, 'attr') ?>"
                              data-kind="<?= esc($kind, 'attr') ?>"
@@ -255,7 +260,9 @@ $filterTabs = [
                                 <?php if ($isStat): ?>
                                     <span class="dx-tag-stat" title="Urgent">STAT</span>
                                 <?php endif; ?>
-                                <span class="dx-status dx-status--<?= $meta['tone'] ?>"><?= esc($meta['label']) ?></span>
+                                <?php foreach ($monitor['badges'] as $badge): ?>
+                                    <span class="dx-status dx-status--<?= esc($badge['tone'], 'attr') ?>" title="<?= esc($monitor['note'], 'attr') ?>"><?= esc($badge['label']) ?></span>
+                                <?php endforeach; ?>
                             </div>
                         </header>
 
@@ -363,15 +370,10 @@ $filterTabs = [
                                         data-status="pending">
                                     Restore
                                 </button>
-                            <?php elseif ($status === 'in_progress'): ?>
-                                <span class="dx-waiting dx-waiting--sm">
-                                    <i class="bi bi-hourglass-split" aria-hidden="true"></i>
-                                    With lab / x-ray
-                                </span>
-                            <?php elseif ($status === 'completed'): ?>
-                                <span class="dx-waiting dx-waiting--sm">
-                                    <i class="bi bi-hourglass-split" aria-hidden="true"></i>
-                                    Awaiting release
+                            <?php elseif (in_array($status, ['in_progress', 'draft', 'completed'], true)): ?>
+                                <span class="dx-waiting dx-waiting--sm dx-waiting--<?= esc($monitor['stage'] ?? $status, 'attr') ?>" title="<?= esc($monitor['note'], 'attr') ?>">
+                                    <i class="bi <?= ($monitor['stage'] ?? '') === 'queued' ? 'bi-inbox' : (($monitor['stage'] ?? '') === 'completed' ? 'bi-clipboard-check' : 'bi-hourglass-split') ?>" aria-hidden="true"></i>
+                                    <?= esc($monitor['short'] ?: 'With lab / x-ray') ?>
                                 </span>
                             <?php endif; ?>
 
@@ -1316,6 +1318,10 @@ $filterTabs = [
 .dx-status--completed { --tone-bg: #ecfdf5; --tone-fg: #047857; --tone-dot: #10b981; }
 .dx-status--released  { --tone-bg: #f0fdfa; --tone-fg: #0f766e; --tone-dot: #14b8a6; }
 .dx-status--cancelled { --tone-bg: #f1f5f9; --tone-fg: #64748b; --tone-dot: #94a3b8; }
+.dx-status--queued    { --tone-bg: #f5f3ff; --tone-fg: #6d28d9; --tone-dot: #8b5cf6; }
+.dx-status--draft     { --tone-bg: #f8fafc; --tone-fg: #475569; --tone-dot: #94a3b8; }
+.dx-waiting--queued    { color: #6d28d9; }
+.dx-waiting--completed { color: #047857; }
 
 .dx-menu {
     min-width: 11rem;
@@ -1826,7 +1832,9 @@ $filterTabs = [
 
     var STATUS = {
         pending:     { label: 'Pending',     tone: 'pending' },
+        queued:      { label: 'Waiting',     tone: 'queued' },
         in_progress: { label: 'In progress', tone: 'progress' },
+        draft:       { label: 'Draft',       tone: 'draft' },
         completed:   { label: 'Completed',   tone: 'completed' },
         released:    { label: 'Released',    tone: 'released' },
         cancelled:   { label: 'Cancelled',   tone: 'cancelled' }
@@ -1941,7 +1949,8 @@ $filterTabs = [
 
     function applyFilters(keepPage) {
         matches = cards.filter(function (card) {
-            return (state.status === 'all' || card.dataset.status === state.status) &&
+            var tags = ' ' + (card.dataset.statuses || card.dataset.status || '') + ' ';
+            return (state.status === 'all' || tags.indexOf(' ' + state.status + ' ') !== -1) &&
                    (state.type === 'all' || card.dataset.type === state.type) &&
                    (state.term === '' || (card.dataset.search || '').indexOf(state.term) !== -1);
         });
@@ -2030,8 +2039,9 @@ $filterTabs = [
         var counts = { all: cards.length };
 
         cards.forEach(function (card) {
-            var s = card.dataset.status;
-            counts[s] = (counts[s] || 0) + 1;
+            (card.dataset.statuses || card.dataset.status || '').split(' ').forEach(function (s) {
+                if (s) { counts[s] = (counts[s] || 0) + 1; }
+            });
         });
 
         document.querySelectorAll('.dx-tab').forEach(function (tab) {
@@ -2290,8 +2300,10 @@ $filterTabs = [
         var isStat = String(d.priority || '').toLowerCase() === 'stat';
 
         byId('viewRequestModalLabel').textContent = d.patient_name || ctx.patient;
-        byId('viewRequestStatus').innerHTML =
-            '<span class="dx-status dx-status--' + meta.tone + '">' + esc(meta.label) + '</span>';
+        var badges = (d.monitor && d.monitor.badges && d.monitor.badges.length) ? d.monitor.badges : [meta];
+        byId('viewRequestStatus').innerHTML = badges.map(function (b) {
+            return '<span class="dx-status dx-status--' + esc(b.tone) + '">' + esc(b.label) + '</span>';
+        }).join(' ');
         byId('viewRequestSubtitle').innerHTML = subtitleHtml(ctx.reference, ctx.kind, d.source, isStat);
 
         var age = parseInt(d.age, 10);
@@ -2386,9 +2398,9 @@ $filterTabs = [
                        '<i class="bi bi-send" aria-hidden="true"></i> Send to lab / x-ray</button>';
         } else {
             buttons += '<span class="dx-waiting"><i class="bi bi-hourglass-split" aria-hidden="true"></i> ' +
-                       (status === 'in_progress'
-                           ? 'With the diagnostic staff'
-                           : 'Awaiting release by staff') +
+                       esc((d.monitor && d.monitor.note) || (status === 'completed'
+                           ? 'Awaiting release by staff'
+                           : 'With the diagnostic staff')) +
                        '</span>';
         }
 

@@ -248,6 +248,8 @@ html, body {
     width: auto;
     height: auto;
     object-fit: contain;
+    transform: scale(1.2); /* Makes it 20% bigger */
+    transform-origin: center center;
 }
 
 .plate-caption {

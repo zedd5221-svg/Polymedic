@@ -484,6 +484,43 @@ class Radiologist extends BaseController
         return view('Radiologist/print_result', $data);
     }
 
+    /**
+     * Save the Findings / Impression text that came along with an image
+     * upload or removal, as a draft. Same rules as saveDraft(): the status
+     * is never moved backwards and the radiologist is credited on first save.
+     * Does nothing if the form did not send the text or it is unchanged.
+     */
+    private function keepTypedReport(array $examination): void
+    {
+        $findings       = $this->request->getPost('findings');
+        $interpretation = $this->request->getPost('interpretation');
+
+        if ($findings === null && $interpretation === null) {
+            return;
+        }
+
+        $update = [];
+        if ($findings !== null && (string) $findings !== (string) ($examination['findings'] ?? '')) {
+            $update['findings'] = (string) $findings;
+        }
+        if ($interpretation !== null && (string) $interpretation !== (string) ($examination['interpretation'] ?? '')) {
+            $update['interpretation'] = (string) $interpretation;
+        }
+        if ($update === []) {
+            return;
+        }
+
+        if (($examination['status'] ?? '') === DiagnosticRequestModel::STATUS_PENDING) {
+            $update['status'] = DiagnosticRequestModel::STATUS_IN_PROGRESS;
+        }
+        if (empty($examination['radiologist_name'])) {
+            $update['radiologist_name'] = PaymentModel::currentCashierName();
+            $update['radiologist_id']   = PaymentModel::currentStaffId();
+        }
+
+        (new DiagnosticRequestModel())->update((int) $examination['id'], $update);
+    }
+
     public function uploadImage($id)
     {
         $redirect = $this->checkAuth();
@@ -505,6 +542,10 @@ class Radiologist extends BaseController
         if (($examination['status'] ?? '') === 'released') {
             return redirect()->back()->with('error', 'This report has already been released. Images can no longer be changed.');
         }
+
+        // Uploading / removing an image reloads the page; keep whatever
+        // was typed in Findings / Impression instead of losing it.
+        $this->keepTypedReport($examination);
 
         $files = $this->request->getFileMultiple('xray_images');
 
@@ -619,6 +660,10 @@ class Radiologist extends BaseController
         if (($examination['status'] ?? '') === 'released') {
             return redirect()->back()->with('error', 'This report has already been released. Images can no longer be changed.');
         }
+
+        // Uploading / removing an image reloads the page; keep whatever
+        // was typed in Findings / Impression instead of losing it.
+        $this->keepTypedReport($examination);
 
         $paths = [];
         if (!empty($examination['image_paths'])) {

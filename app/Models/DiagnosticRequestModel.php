@@ -177,6 +177,75 @@ class DiagnosticRequestModel extends Model
     }
 
     /**
+     * Where a request stands, for the people monitoring it from the front
+     * desk. Uses the same rules as the lab / x-ray worklists:
+     *
+     *   pending      not started at the front desk (unpaid)
+     *   queued       paid and sent, no med tech / radiologist has started
+     *   in_progress  being processed / read (a draft counts here too)
+     *   draft        lab results saved as a draft (also "in progress")
+     *   completed    finished, waiting for the department to release it
+     *   released     result released, ready to print
+     *   cancelled
+     *
+     * Returns the stage, the tags it is listed/counted under, the badges
+     * to show, who is handling it, and short / long notes.
+     */
+    public static function monitorStage(array $row): array
+    {
+        $type   = ($row['type'] ?? '') === self::TYPE_XRAY ? self::TYPE_XRAY : self::TYPE_LAB;
+        $isXray = $type === self::TYPE_XRAY;
+        $status = (string) ($row['db_status'] ?? $row['status'] ?? self::STATUS_PENDING);
+        $cols   = self::STAFF_COLUMNS[$type];
+        $staff  = trim((string) ($row[$cols['name']] ?? ''));
+        $role   = $isXray ? 'radiologist' : 'med tech';
+        $dept   = $isXray ? 'X-ray' : 'lab';
+
+        $stage = $status;
+        if ($status === self::STATUS_IN_PROGRESS && self::isUntouched(['type' => $type, 'status' => $status] + $row)) {
+            $stage = 'queued';
+        }
+
+        $labels = [
+            'pending'     => ['Pending', 'pending'],
+            'queued'      => ['Waiting for ' . $dept, 'queued'],
+            'in_progress' => [$isXray ? 'In reading' : 'In progress', 'progress'],
+            'draft'       => ['Draft', 'draft'],
+            'completed'   => ['Completed', 'completed'],
+            'released'    => ['Released', 'released'],
+            'cancelled'   => ['Cancelled', 'cancelled'],
+        ];
+
+        $tags   = $stage === self::STATUS_DRAFT ? [self::STATUS_IN_PROGRESS, self::STATUS_DRAFT] : [$stage];
+        $badges = [];
+        foreach ($tags as $t) {
+            [$label, $tone] = $labels[$t] ?? [ucfirst(str_replace('_', ' ', $t)), 'pending'];
+            $badges[] = ['key' => $t, 'label' => $label, 'tone' => $tone];
+        }
+
+        $by = $staff !== '' ? $staff : 'the ' . $role;
+        [$short, $note] = match ($stage) {
+            'pending'     => ['Not started', 'Not started yet. Start it to record the payment and send it to the ' . $dept . '.'],
+            'queued'      => ['Waiting for ' . $role, 'Paid and sent. No ' . $role . ' has started on it yet.'],
+            'in_progress' => [($isXray ? 'Reading: ' : 'Processing: ') . $by, ($isXray ? 'Being read by ' : 'Being processed by ') . $by . '.'],
+            'draft'       => ['Draft · ' . $by, 'Results saved as a draft by ' . $by . '. Still in progress.'],
+            'completed'   => ['Awaiting release · ' . $by, 'Completed by ' . $by . '. Waiting for the ' . $role . ' to release it.'],
+            'released'    => ['Released', 'Released' . ($staff !== '' ? ' by ' . $staff : '') . '. Ready to print.'],
+            'cancelled'   => ['Cancelled', 'This request was cancelled.'],
+            default       => [ucfirst($stage), ''],
+        };
+
+        return [
+            'stage'  => $stage,
+            'tags'   => $tags,
+            'badges' => $badges,
+            'staff'  => $staff,
+            'short'  => $short,
+            'note'   => $note,
+        ];
+    }
+
+    /**
      * Every status a row should be listed under in the department views.
      * A draft is listed under both "draft" and "in_progress".
      */

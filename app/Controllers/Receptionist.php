@@ -529,14 +529,7 @@ class Receptionist extends BaseController
 
         $data['requests'] = $this->getCombinedRequests($diagnosticModel);
 
-        $data['counts'] = [
-            'total' => count($data['requests']),
-            'pending' => $this->countRequestsByStatus($data['requests'], 'pending'),
-            'processing' => $this->countRequestsByStatus($data['requests'], 'in_progress'),
-            'completed' => $this->countRequestsByStatus($data['requests'], 'completed'),
-            'released' => $this->countRequestsByStatus($data['requests'], 'released'),
-            'cancelled' => $this->countRequestsByStatus($data['requests'], 'cancelled')
-        ];
+        $data['counts'] = $this->monitoringCounts($data['requests']);
 
         $data['labServices'] = $serviceModel->getServicesByCategory('laboratory');
         $data['xrayServices'] = $serviceModel->getServicesByCategory('xray');
@@ -586,6 +579,7 @@ class Receptionist extends BaseController
                 'created_at' => $row['created_at'],
                 'request_type' => $type === 'xray' ? 'X-Ray' : 'Laboratory',
                 'source' => !empty($row['appointment_id']) ? 'Online' : 'Walk-in',
+                'monitor' => DiagnosticRequestModel::monitorStage($row),
             ];
         }
 
@@ -596,16 +590,6 @@ class Receptionist extends BaseController
         return $combined;
     }
 
-    private function countRequestsByStatus($requests, $status)
-    {
-        $count = 0;
-        foreach ($requests as $request) {
-            if ($request['status'] === $status) {
-                $count++;
-            }
-        }
-        return $count;
-    }
 
     public function createDiagnosticRequest()
     {
@@ -927,7 +911,8 @@ class Receptionist extends BaseController
                     'interpretation' => $request['interpretation'] ?? null,
                     'image_path' => $request['image_path'] ?? null,
                     'exam_date' => $request['request_date'] ?? null,
-                    'request_date' => $request['request_date'] ?? null
+                    'request_date' => $request['request_date'] ?? null,
+                    'monitor' => DiagnosticRequestModel::monitorStage($request),
                 ]
             ]);
 

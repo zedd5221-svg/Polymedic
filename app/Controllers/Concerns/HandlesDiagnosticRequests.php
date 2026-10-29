@@ -482,6 +482,26 @@ trait HandlesDiagnosticRequests
         unset($p);
     }
 
+    /**
+     * Diagnostic-request tab counts from each row's monitoring stage
+     * (row['monitor']['tags']). A draft is counted under both
+     * "in_progress" and "draft"; "total" counts every row once.
+     */
+    protected function monitoringCounts(array $requests): array
+    {
+        $counts = array_fill_keys(['pending', 'queued', 'in_progress', 'draft', 'completed', 'released', 'cancelled'], 0);
+        foreach ($requests as $r) {
+            foreach ($r['monitor']['tags'] ?? [$r['status'] ?? 'pending'] as $tag) {
+                if (isset($counts[$tag])) {
+                    $counts[$tag]++;
+                }
+            }
+        }
+        $counts['total']      = count($requests);
+        $counts['processing'] = $counts['in_progress'];   // legacy key
+        return $counts;
+    }
+
     /** Appointment totals per status in one grouped query. */
     protected function appointmentStatusCounts(): array
     {

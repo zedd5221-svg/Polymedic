@@ -20,7 +20,7 @@ if ($cMax > 0):
         $cTop = ceil($cMax / $mag * 2) / 2 * $mag;           // next 0.5 step of the magnitude
         if (!empty($chart['integer'])) $cTop = (float) (ceil($cTop / 2) * 2);
     }
-    $cw = 680; $ch = 150; $padL = 46; $padB = 20; $padT = 8;
+    $cw = 680; $ch = 120; $padL = 46; $padB = 20; $padT = 8;
     $plotW = $cw - $padL; $plotH = $ch - $padB - $padT;
     $n     = max(1, count($cRows));
     $slot  = $plotW / $n;

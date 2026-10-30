@@ -703,10 +703,34 @@ class Billing extends BaseController
         $clinic = config('Clinic')->toArray();
 
         return view('Billing/receipt', [
-            'payment' => $payment,
-            'items'   => $items,
-            'clinic'  => $clinic,
+            'payment'      => $payment,
+            'items'        => $items,
+            'clinic'       => $clinic,
+            'patientEmail' => $this->receiptEmail($payment),
         ]);
+    }
+
+    /** The patient's email for "Email PDF": from the paid request, else the patient record. */
+    private function receiptEmail(array $payment): string
+    {
+        $db = db_connect();
+
+        if (!empty($payment['request_id'])) {
+            $row = $db->table('diagnostic_requests')->select('email')->where('id', (int) $payment['request_id'])->get()->getRow();
+            if (!empty($row->email)) {
+                return (string) $row->email;
+            }
+        }
+
+        $code = trim((string) ($payment['patient_code'] ?? ''));
+        if ($code !== '' && strtoupper($code) !== 'N/A') {
+            $row = $db->table('patients')->select('email')->where('patient_code', $code)->get()->getRow();
+            if (!empty($row->email)) {
+                return (string) $row->email;
+            }
+        }
+
+        return '';
     }
 
     // =============================================================

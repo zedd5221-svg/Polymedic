@@ -12,9 +12,10 @@
         <div class="signs">
             <?php foreach ($paper['signs'] as [$name, $role, $title]): ?>
                 <div class="sign">
-                    <b><?= $name !== '' ? esc($name) : '&nbsp;' ?></b>
-                    <span><?= esc($role) ?></span><?= esc($title) ?>
-                    <i>Date: ____________</i>
+                    <div class="sign-name"><?= $name !== '' ? esc($name) : '&nbsp;' ?></div>
+                    <div class="sign-role"><?= esc($role) ?></div>
+                    <div><?= esc($title) ?></div>
+                    <div class="sign-date">Date <span></span></div>
                 </div>
             <?php endforeach; ?>
         </div>

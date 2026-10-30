@@ -406,6 +406,14 @@ table.result tr.group-head td {
         <?= esc($backLabel ?? 'Back to report') ?>
     </a>
     <button type="button" onclick="window.print()">Print</button>
+    <?php $pdfRef = 'LAB-' . date('Y', strtotime($request['request_date'])) . '-' . str_pad((string) $request['id'], 4, '0', STR_PAD_LEFT); ?>
+    <?= view('partials/pdf_tools', ['pdf' => [
+        'target'   => '.sheet',
+        'filename' => $pdfRef . ' ' . ($request['patient_name'] ?? ''),
+        'label'    => 'laboratory result',
+        'emailTo'  => (string) ($request['email'] ?? ''),
+        'subject'  => 'Laboratory result ' . $pdfRef . ' · ' . config('Clinic')->name,
+    ]]) ?>
 </div>
 
 <?php

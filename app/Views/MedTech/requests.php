@@ -82,6 +82,9 @@ $filterTabs = [
     </header>
 
 
+    <!-- PATIENT HANDOFF -->
+    <?= view('partials/transfer_panel', ['transfer' => $transfer ?? []]) ?>
+
     <!-- WORKLIST -->
     <section class="dx-panel" aria-label="Laboratory request worklist">
 

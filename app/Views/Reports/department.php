@@ -104,17 +104,9 @@
         'caption' => 'Figure 1. ' . ucfirst($caseMany) . ' received per ' . $unitWord . ', ' . $periodLabel . '. Values in the table below.',
     ];
 
-    // Over a month, list only days with activity (the chart still shows every day).
-    $tableBuckets = $buckets;
-    $omitted      = 0;
-    if (!$daily['hourly'] && count($buckets) > 31) {
-        $tableBuckets = array_values(array_filter($buckets, static fn($b) => $b['received'] || $b['released']));
-        $omitted      = count($buckets) - count($tableBuckets);
-    }
-
     $priorityLabels = ['stat' => 'STAT', 'urgent' => 'Urgent', 'routine' => 'Routine'];
-    $topItems = array_slice($s['top'], 0, 10, true);
-    $oldest   = array_slice($backlog['rows'], 0, 10);   // backlog() is oldest first
+    $topItems = $s['top'];
+    $oldest   = $backlog['rows'];   // backlog() is oldest first
 ?>
 
     <!-- ===== 1. SUMMARY ===== -->
@@ -292,18 +284,17 @@
 
     <!-- ===== 5. SCHEDULE ===== -->
     <section class="long">
-        <h2><span class="num">5</span> Volume Schedule <small><?= ucfirst($caseMany) ?> received and results released per <?= $unitWord ?></small></h2>
+        <div class="keep">
+            <h2><span class="num">5</span> Volume Schedule <small><?= ucfirst($caseMany) ?> received and results released per <?= $unitWord ?></small></h2>
 
-        <?php include __DIR__ . '/_paper_chart.php'; ?>
+            <?php include __DIR__ . '/_paper_chart.php'; ?>
+        </div>
 
         <div class="scroll">
-        <table class="<?= count($tableBuckets) > 14 ? 'dense' : '' ?>">
+        <table class="<?= count($buckets) > 14 ? 'dense' : '' ?>">
             <thead><tr><th><?= $daily['hourly'] ? 'Hour' : 'Date' ?></th><th class="r">Received</th><th class="r">Released</th><th class="r">Net change in queue</th></tr></thead>
             <tbody>
-                <?php if (!$tableBuckets): ?>
-                    <tr><td colspan="4" class="muted">No activity in this period.</td></tr>
-                <?php endif; ?>
-                <?php foreach ($tableBuckets as $b): $empty = !$b['received'] && !$b['released']; ?>
+                <?php foreach ($buckets as $b): $empty = !$b['received'] && !$b['released']; ?>
                     <tr class="<?= $empty ? 'muted' : '' ?>">
                         <td><?= esc(isset($b['date']) ? date('D, M j', strtotime($b['date'])) : $b['label']) ?></td>
                         <td class="r"><?= $num($b['received']) ?></td>
@@ -322,11 +313,11 @@
             </tfoot>
         </table>
         </div>
-        <p class="note">Received counts <?= $caseMany ?> by <?= $daily['hourly'] ? 'time paid' : 'request date' ?>; released counts results by release date, whatever their request date. A positive net change means the queue grew.<?= $omitted ? ' ' . $omitted . ' day' . ($omitted === 1 ? '' : 's') . ' with no activity are omitted from the table.' : '' ?></p>
+        <p class="note">Received counts <?= $caseMany ?> by <?= $daily['hourly'] ? 'time paid' : 'request date' ?>; released counts results by release date, whatever their request date. A positive net change means the queue grew.</p>
     </section>
 
     <!-- ===== 6. TOP ITEMS (+ SECTIONS) ===== -->
-    <section>
+    <section class="<?= count($topItems) > 25 ? "long" : "" ?>">
         <h2><span class="num">6</span> <?= $d['sections'] ? ucfirst($itemMany) . ' by Section and Volume' : 'Top ' . ucfirst($itemMany) ?></h2>
         <div class="<?= $d['sections'] ? 'two' : '' ?>">
             <table>
@@ -366,13 +357,10 @@
                 </table>
             <?php endif; ?>
         </div>
-        <?php if (count($s['top']) > count($topItems)): ?>
-            <p class="note">Showing the <?= count($topItems) ?> most-ordered of <?= count($s['top']) ?> <?= $itemMany ?>.</p>
-        <?php endif; ?>
     </section>
 
     <!-- ===== 7. BACKLOG ===== -->
-    <section>
+    <section class="long">
         <h2><span class="num">7</span> Unreleased Backlog <small>As of <?= esc(date('F j, Y · g:i A')) ?></small></h2>
         <table>
             <thead><tr><th>Waiting since payment</th><th class="r">Under 24 h</th><th class="r">1–3 days</th><th class="r">Over 3 days</th><th class="r">Total</th><th class="r">Past target</th></tr></thead>
@@ -405,9 +393,7 @@
                 </tbody>
             </table>
             <p class="note">
-                <?= count($backlog['rows']) > count($oldest)
-                    ? 'Showing the ' . count($oldest) . ' longest-waiting of ' . count($backlog['rows']) . ' unreleased ' . $caseMany . '.'
-                    : 'All unreleased ' . $caseMany . ', longest-waiting first.' ?>
+                All unreleased <?= $caseMany ?>, longest-waiting first.
                 Red marks <?= $caseMany ?> waiting longer than their priority's target. The backlog is not limited to the reporting period.
             </p>
         <?php else: ?>

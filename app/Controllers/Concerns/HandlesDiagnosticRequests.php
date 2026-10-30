@@ -238,9 +238,10 @@ trait HandlesDiagnosticRequests
 
     /**
      * Apply a status change requested from the diagnostic-requests page.
-     * Returns the JSON payload for the AJAX caller.
+     * Returns the JSON payload for the AJAX caller. Starting a request
+     * (in_progress) needs the user it is assigned to.
      */
-    protected function changeDiagnosticStatus(int $id, string $type, string $status): array
+    protected function changeDiagnosticStatus(int $id, string $type, string $status, ?int $assigneeId = null): array
     {
         $type   = strtolower($type);
         $status = strtolower($status);
@@ -260,76 +261,276 @@ trait HandlesDiagnosticRequests
         }
 
         if ($status === DiagnosticRequestModel::STATUS_IN_PROGRESS) {
-            return $this->startProcessing($row, $type);
+            if (! $assigneeId) {
+                return ['success' => false, 'message' => 'Choose who will handle this request before starting it.'];
+            }
+            return $this->startProcessing($row, $type, $assigneeId);
         }
 
         $update = ['status' => $status];
         if ($status === DiagnosticRequestModel::STATUS_RELEASED) {
             $update['released_at'] = date('Y-m-d H:i:s');
         }
+        if ($status === DiagnosticRequestModel::STATUS_PENDING) {
+            // Restored requests are assigned afresh when started again.
+            $update += ['assigned_to_id' => null, 'assigned_to_name' => null, 'assigned_at' => null];
+        }
         $model->update($id, $update);
 
         return ['success' => true, 'message' => 'Status updated.', 'payment_recorded' => false];
     }
 
+    /* ---------------------------------------------------------
+       ASSIGNMENT (the Start modal)
+       ---------------------------------------------------------
+       Start assigns a request to one available med tech / radiologist.
+       A patient is handled by one user at a time, across lab and x-ray:
+       while one of their requests is active, the others stay locked.
+       The modal's list is only a convenience; startProcessing() checks
+       everything again on the server under a per-patient lock.
+       --------------------------------------------------------- */
+
     /**
-     * Move a request to in_progress, recording its payment first.
+     * What the Start modal shows for a request: the users it can be
+     * assigned to with their active workload, or why it is locked.
+     */
+    protected function assignmentOptionsFor(int $id, string $type): array
+    {
+        $type = strtolower($type);
+        if (! isset(DiagnosticRequestModel::ASSIGNABLE_ROLES[$type])) {
+            return ['success' => false, 'message' => 'Unknown request type.'];
+        }
+
+        $model = new DiagnosticRequestModel();
+        $row   = $model->where('id', $id)->where('type', $type)->first();
+        if (! $row) {
+            return ['success' => false, 'message' => 'Request not found.'];
+        }
+
+        $lock = $this->startLock($model, $row);
+        if ($lock !== null) {
+            return ['success' => true, 'locked' => true, 'message' => $lock];
+        }
+
+        $staff = $this->assignableStaff($type);
+        $load  = $model->activeWorkload(array_column($staff, 'id'));
+        foreach ($staff as &$user) {
+            $user['workload'] = $load[$user['id']] ?? 0;
+        }
+        unset($user);
+
+        // Least busy first, so the obvious choice is at the top.
+        usort($staff, static fn ($a, $b) => [$a['workload'], $a['name']] <=> [$b['workload'], $b['name']]);
+
+        return [
+            'success' => true,
+            'locked'  => false,
+            'role'    => $type === DiagnosticRequestModel::TYPE_XRAY ? 'radiologist' : 'med tech',
+            'staff'   => $staff,
+        ];
+    }
+
+    /**
+     * Pending requests whose Start is locked because the same patient is
+     * already with someone on another request: id => message. Works on
+     * the rows already loaded for the page, so it costs no queries.
+     *
+     * @return array<int, string>
+     */
+    protected function startLocks(array $rows): array
+    {
+        $busy = [];
+        foreach ($rows as $r) {
+            if (in_array($r['status'] ?? '', DiagnosticRequestModel::ACTIVE_STATUSES, true)) {
+                foreach (DiagnosticRequestModel::patientKeys($r) as $key) {
+                    $busy[$key] ??= $r;
+                }
+            }
+        }
+
+        $locks = [];
+        foreach ($rows as $r) {
+            if (! in_array($r['status'] ?? '', DiagnosticRequestModel::STARTABLE_STATUSES, true)) {
+                continue;
+            }
+            foreach (DiagnosticRequestModel::patientKeys($r) as $key) {
+                if (isset($busy[$key]) && (int) $busy[$key]['id'] !== (int) $r['id']) {
+                    $locks[(int) $r['id']] = $this->handledByMessage($busy[$key]);
+                    break;
+                }
+            }
+        }
+        return $locks;
+    }
+
+    /** Why a request can't be started right now, or null when it can. */
+    private function startLock(DiagnosticRequestModel $model, array $row): ?string
+    {
+        $status = (string) ($row['status'] ?? '');
+
+        if (! in_array($status, DiagnosticRequestModel::STARTABLE_STATUSES, true)) {
+            return in_array($status, DiagnosticRequestModel::ACTIVE_STATUSES, true)
+                ? $this->handledByMessage($row)
+                : 'This request is already ' . str_replace('_', ' ', $status) . '.';
+        }
+
+        $other = $model->activeRequestForPatient($row);
+        return $other ? $this->handledByMessage($other) : null;
+    }
+
+    private function handledByMessage(array $row): string
+    {
+        $who = DiagnosticRequestModel::handlerName($row);
+        if ($who === '') {
+            $who = ($row['type'] ?? '') === DiagnosticRequestModel::TYPE_XRAY ? 'the X-ray department' : 'the laboratory';
+        }
+        $ref = trim((string) ($row['reference_number'] ?? ''));
+
+        return 'This patient is already being handled by ' . $who . ($ref !== '' ? ' (' . $ref . ')' : '') . '.';
+    }
+
+    /**
+     * Active users of the role that reads this request type.
+     *
+     * @return list<array{id: int, name: string, role_label: string}>
+     */
+    private function assignableStaff(string $type, ?int $onlyId = null): array
+    {
+        $users = (new UserModel())
+            ->select('id, full_name, role')
+            ->whereIn('role', DiagnosticRequestModel::ASSIGNABLE_ROLES[$type])
+            ->where('status', 'active')
+            ->where('full_name IS NOT NULL')
+            ->where('full_name <>', '');
+        if ($onlyId !== null) {
+            $users->where('id', $onlyId);
+        }
+
+        return array_map(static fn (array $u): array => [
+            'id'         => (int) $u['id'],
+            'name'       => trim((string) $u['full_name']),
+            'role_label' => UserModel::roleLabel($u['role'] === 'technologist' ? 'med_tech' : $u['role']),
+        ], $users->orderBy('full_name', 'ASC')->findAll());
+    }
+
+    /**
+     * Assign a request and move it to in_progress, recording its payment.
      * The payment is the gate MedTech/Radiologist check before any
      * result can be entered, so the status never advances without it.
+     *
+     * Two front-desk users pressing Start for the same patient are
+     * serialised by a per-patient lock; the second one re-checks and
+     * gets a conflict. The claim itself is a compare-and-set update, so
+     * a request can never end up assigned twice.
      */
-    private function startProcessing(array $row, string $type): array
+    private function startProcessing(array $row, string $type, int $assigneeId): array
     {
-        $id           = (int) $row['id'];
+        $db   = db_connect();
+        $lock = DiagnosticRequestModel::patientLockName($row);
+
+        if ((int) ($db->query('SELECT GET_LOCK(?, 5) AS ok', [$lock])->getRow()->ok ?? 0) !== 1) {
+            return ['success' => false, 'conflict' => true, 'message' => 'Someone else is starting a request for this patient. Please try again.'];
+        }
+
+        try {
+            return $this->assignAndStart((int) $row['id'], $type, $assigneeId);
+        } finally {
+            $db->query('SELECT RELEASE_LOCK(?)', [$lock]);
+        }
+    }
+
+    private function assignAndStart(int $id, string $type, int $assigneeId): array
+    {
         $model        = new DiagnosticRequestModel();
         $paymentModel = new PaymentModel();
-        $current      = (string) ($row['status'] ?? '');
+        $db           = db_connect();
 
-        // Never drag a request that is already further along back to in_progress.
-        if (! in_array($current, [DiagnosticRequestModel::STATUS_PENDING, DiagnosticRequestModel::STATUS_CANCELLED, DiagnosticRequestModel::STATUS_IN_PROGRESS], true)) {
-            return ['success' => false, 'message' => 'This request is already ' . str_replace('_', ' ', $current) . '.'];
+        // Re-read under the lock: what the modal showed may be stale.
+        $row = $model->where('id', $id)->where('type', $type)->first();
+        if (! $row) {
+            return ['success' => false, 'message' => 'Request not found.'];
         }
 
-        $existing = $paymentModel->getByRequest($id, $type);
-        if ($existing) {
-            $model->update($id, ['status' => DiagnosticRequestModel::STATUS_IN_PROGRESS]);
-            return [
-                'success'          => true,
-                'message'          => 'Status updated. Payment already recorded.',
-                'payment_recorded' => true,
-                'payment_id'       => $existing['id'],
-                'amount'           => (float) $existing['total_amount'],
-            ];
+        $lock = $this->startLock($model, $row);
+        if ($lock !== null) {
+            return ['success' => false, 'conflict' => true, 'message' => $lock];
         }
 
-        [$servicesList, $totalAmount] = $this->priceServices((string) ($row['services'] ?? ''), $id, $type);
-        $patientCode = $this->resolvePatientCode($row);
-
-        $paymentId = $paymentModel->recordPayment([
-            'request_id'     => $id,
-            'request_type'   => $type,
-            'patient_name'   => (string) $row['patient_name'],
-            'patient_code'   => $patientCode,
-            'appointment_id' => $row['appointment_id'] ?? null,
-            'services'       => json_encode($servicesList),
-            'total_amount'   => $totalAmount,
-            'amount_paid'    => $totalAmount,
-            'payment_method' => PaymentModel::METHOD_CASH,
-            'notes'          => 'Payment recorded when starting processing',
-        ]);
-
-        if (! $paymentId) {
-            log_message('error', "Failed to record payment for diagnostic request #{$id} ({$type}). Status left at {$current}.");
-            return [
-                'success' => false,
-                'message' => 'Could not record the payment. The status was not changed. Please try again or record the payment manually.',
-            ];
+        $assignee = $this->assignableStaff($type, $assigneeId)[0] ?? null;
+        if ($assignee === null) {
+            return ['success' => false, 'conflict' => true, 'message' => 'The selected staff member is no longer available. Please choose someone else.'];
         }
 
-        $model->update($id, ['status' => DiagnosticRequestModel::STATUS_IN_PROGRESS]);
+        $current = (string) $row['status'];
+        $now     = date('Y-m-d H:i:s');
+
+        $db->transBegin();
+        try {
+            $db->table('diagnostic_requests')
+               ->where('id', $id)
+               ->whereIn('status', DiagnosticRequestModel::STARTABLE_STATUSES)
+               ->update([
+                   'status'           => DiagnosticRequestModel::STATUS_IN_PROGRESS,
+                   'assigned_to_id'   => $assignee['id'],
+                   'assigned_to_name' => $assignee['name'],
+                   'assigned_at'      => $now,
+                   'updated_at'       => $now,
+               ]);
+
+            if ($db->affectedRows() !== 1) {
+                $db->transRollback();
+                $fresh = $model->find($id) ?? $row;
+                return ['success' => false, 'conflict' => true, 'message' => $this->handledByMessage($fresh)];
+            }
+
+            $payment = $paymentModel->getByRequest($id, $type);
+            if ($payment) {
+                $db->transCommit();
+                return [
+                    'success'          => true,
+                    'message'          => 'Assigned to ' . $assignee['name'] . '. Payment already recorded.',
+                    'assigned_to'      => $assignee['name'],
+                    'payment_recorded' => true,
+                    'payment_id'       => $payment['id'],
+                    'amount'           => (float) $payment['total_amount'],
+                ];
+            }
+
+            [$servicesList, $totalAmount] = $this->priceServices((string) ($row['services'] ?? ''), $id, $type);
+            $patientCode = $this->resolvePatientCode($row);
+
+            $paymentId = $paymentModel->recordPayment([
+                'request_id'     => $id,
+                'request_type'   => $type,
+                'patient_name'   => (string) $row['patient_name'],
+                'patient_code'   => $patientCode,
+                'appointment_id' => $row['appointment_id'] ?? null,
+                'services'       => json_encode($servicesList),
+                'total_amount'   => $totalAmount,
+                'amount_paid'    => $totalAmount,
+                'payment_method' => PaymentModel::METHOD_CASH,
+                'notes'          => 'Payment recorded when starting processing',
+            ]);
+
+            if (! $paymentId) {
+                $db->transRollback();
+                log_message('error', "Failed to record payment for diagnostic request #{$id} ({$type}). Status left at {$current}.");
+                return [
+                    'success' => false,
+                    'message' => 'Could not record the payment. The request was not started. Please try again or record the payment manually.',
+                ];
+            }
+
+            $db->transCommit();
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            throw $e;
+        }
 
         return [
             'success'          => true,
-            'message'          => 'Status updated to in progress. Payment recorded: ₱' . number_format($totalAmount, 2),
+            'message'          => 'Assigned to ' . $assignee['name'] . '. Payment recorded: ₱' . number_format($totalAmount, 2),
+            'assigned_to'      => $assignee['name'],
             'payment_recorded' => true,
             'payment_id'       => $paymentId,
             'amount'           => $totalAmount,

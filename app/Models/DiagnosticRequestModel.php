@@ -68,6 +68,7 @@ class DiagnosticRequestModel extends Model
         'patient_name', 'patient_code', 'age', 'gender',
         'email', 'phone',
         'services', 'request_date', 'doctor_name', 'priority', 'status',
+        'assigned_to_id', 'assigned_to_name', 'assigned_at',
         'med_tech_name', 'med_tech_id', 'remarks',
         'radiologist_name', 'radiologist_id', 'interpretation',
         'image_path', 'image_paths',
@@ -220,6 +221,121 @@ class DiagnosticRequestModel extends Model
         return $c;
     }
 
+    // ----------------------------------------------------------------
+    // Assignment — who the front desk sent the request to
+    // ----------------------------------------------------------------
+    // Start assigns a request to exactly one med tech / radiologist. A
+    // patient is handled by one user at a time: while any of their
+    // requests (lab or x-ray) is active, no other one can be started.
+
+    /** Statuses in which a request is with the user handling it. */
+    const ACTIVE_STATUSES = [self::STATUS_IN_PROGRESS, self::STATUS_DRAFT];
+
+    /** Statuses Start may move to in_progress. */
+    const STARTABLE_STATUSES = [self::STATUS_PENDING, self::STATUS_CANCELLED];
+
+    /** Roles that may be assigned each request type. */
+    const ASSIGNABLE_ROLES = [
+        self::TYPE_LAB  => ['med_tech', 'technologist'],
+        self::TYPE_XRAY => ['radiologist'],
+    ];
+
+    /** Who has a request: the assignee, else (older rows) whoever worked it. */
+    const HANDLER_ID_SQL = "COALESCE(assigned_to_id, CASE type WHEN 'xray' THEN radiologist_id ELSE med_tech_id END)";
+
+    /** Name of who has the request: the assignee, else whoever worked it. */
+    public static function handlerName(array $row): string
+    {
+        $name = trim((string) ($row['assigned_to_name'] ?? ''));
+        $cols = self::STAFF_COLUMNS[$row['type'] ?? ''] ?? null;
+        if ($name === '' && $cols !== null) {
+            $name = trim((string) ($row[$cols['name']] ?? ''));
+        }
+        return $name;
+    }
+
+    /** Assignee's name when the request is assigned to someone other than $userId. */
+    public static function assignedToOther(array $row, ?int $userId): ?string
+    {
+        $assigned = (int) ($row['assigned_to_id'] ?? 0);
+        if ($assigned <= 0 || $assigned === (int) $userId) {
+            return null;
+        }
+        return trim((string) ($row['assigned_to_name'] ?? '')) ?: 'another staff member';
+    }
+
+    /**
+     * Keys that identify a request's patient: name + age + sex, and the
+     * patient code when there is one. Two rows sharing any key are the
+     * same patient.
+     */
+    public static function patientKeys(array $row): array
+    {
+        $keys = ['n:' . self::patientNameKey($row)];
+        $code = trim((string) ($row['patient_code'] ?? ''));
+        if ($code !== '' && strtoupper($code) !== 'N/A') {
+            $keys[] = 'c:' . strtolower($code);
+        }
+        return $keys;
+    }
+
+    /** MySQL GET_LOCK name that serialises Start for one patient. */
+    public static function patientLockName(array $row): string
+    {
+        return 'dx_patient_' . md5(self::patientNameKey($row));
+    }
+
+    private static function patientNameKey(array $row): string
+    {
+        return mb_strtolower(trim((string) ($row['patient_name'] ?? ''))) . '|'
+            . trim((string) ($row['age'] ?? '')) . '|'
+            . mb_strtolower(trim((string) ($row['gender'] ?? '')));
+    }
+
+    /** Another active request (any type) for the same patient, if any. */
+    public function activeRequestForPatient(array $row): ?array
+    {
+        $builder = $this->db->table($this->table)
+            ->whereIn('status', self::ACTIVE_STATUSES)
+            ->where('id !=', (int) $row['id'])
+            ->groupStart()
+                ->groupStart()
+                    ->where('patient_name', (string) $row['patient_name'])
+                    ->where('age', $row['age'] ?? null)
+                    ->where('gender', $row['gender'] ?? null)
+                ->groupEnd();
+
+        $code = trim((string) ($row['patient_code'] ?? ''));
+        if ($code !== '' && strtoupper($code) !== 'N/A') {
+            $builder->orWhere('patient_code', $code);
+        }
+
+        return $builder->groupEnd()->orderBy('updated_at', 'DESC')->get()->getRowArray() ?: null;
+    }
+
+    /**
+     * Active requests per user id — the workload shown in the Start
+     * modal — in one grouped query.
+     *
+     * @param int[] $userIds
+     * @return array<int, int>
+     */
+    public function activeWorkload(array $userIds): array
+    {
+        if ($userIds === []) {
+            return [];
+        }
+
+        $rows = $this->db->table($this->table)
+            ->select(self::HANDLER_ID_SQL . ' AS uid, COUNT(*) AS n', false)
+            ->whereIn('status', self::ACTIVE_STATUSES)
+            ->where(self::HANDLER_ID_SQL . ' IN (' . implode(',', array_map('intval', $userIds)) . ')', null, false)
+            ->groupBy('uid')
+            ->get()->getResultArray();
+
+        return array_map('intval', array_column($rows, 'n', 'uid'));
+    }
+
     /**
      * Where a request stands, for the people monitoring it from the front
      * desk. Uses the same rules as the lab / x-ray worklists:
@@ -240,9 +356,10 @@ class DiagnosticRequestModel extends Model
         $type   = ($row['type'] ?? '') === self::TYPE_XRAY ? self::TYPE_XRAY : self::TYPE_LAB;
         $isXray = $type === self::TYPE_XRAY;
         $status = (string) ($row['db_status'] ?? $row['status'] ?? self::STATUS_PENDING);
-        $cols   = self::STAFF_COLUMNS[$type];
-        $staff  = trim((string) ($row[$cols['name']] ?? ''));
-        $role   = $isXray ? 'radiologist' : 'med tech';
+        $cols     = self::STAFF_COLUMNS[$type];
+        $assignee = trim((string) ($row['assigned_to_name'] ?? ''));
+        $staff    = trim((string) ($row[$cols['name']] ?? '')) ?: $assignee;
+        $role     = $isXray ? 'radiologist' : 'med tech';
         $dept   = $isXray ? 'X-ray' : 'lab';
 
         $stage = $status;
@@ -270,7 +387,9 @@ class DiagnosticRequestModel extends Model
         $by = $staff !== '' ? $staff : 'the ' . $role;
         [$short, $note] = match ($stage) {
             'pending'     => ['Not started', 'Not started yet. Start it to record the payment and send it to the ' . $dept . '.'],
-            'queued'      => ['Waiting for ' . $role, 'Paid and sent. No ' . $role . ' has started on it yet.'],
+            'queued'      => $assignee !== ''
+                ? ['Assigned · ' . $assignee, 'Paid and assigned to ' . $assignee . ', who has not started on it yet.']
+                : ['Waiting for ' . $role, 'Paid and sent. No ' . $role . ' has started on it yet.'],
             'in_progress' => [($isXray ? 'Reading: ' : 'Processing: ') . $by, ($isXray ? 'Being read by ' : 'Being processed by ') . $by . '.'],
             'draft'       => ['Draft · ' . $by, 'Results saved as a draft by ' . $by . '. Still in progress.'],
             'completed'   => ['Awaiting release · ' . $by, 'Completed by ' . $by . '. Waiting for the ' . $role . ' to release it.'],
@@ -283,7 +402,8 @@ class DiagnosticRequestModel extends Model
             'stage'  => $stage,
             'tags'   => $tags,
             'badges' => $badges,
-            'staff'  => $staff,
+            'staff'    => $staff,
+            'assignee' => $assignee,
             'short'  => $short,
             'note'   => $note,
         ];
@@ -691,8 +811,11 @@ class DiagnosticRequestModel extends Model
     // ================================================================
 
     /**
-     * Weekly volume by modality. Replaces the equivalent method on
-     * the old XrayExaminationModel.
+     * This week's (Mon–Sun) x-ray studies per day, stacked by modality,
+     * for the radiologist dashboard. Counts the studies the department
+     * has (paid: in progress, completed, released), like the rest of the
+     * dashboard. No studies => empty datasets, so the card shows its
+     * empty state instead of a row of zero bars.
      */
     public function getWeeklyVolumeData()
     {
@@ -701,6 +824,7 @@ class DiagnosticRequestModel extends Model
 
         $rows = $this->resetQuery()
                      ->where('type', self::TYPE_XRAY)
+                     ->whereIn('status', self::DEPARTMENT_STATUSES)
                      ->where('request_date >=', $weekStart)
                      ->where('request_date <=', $weekEnd)
                      ->orderBy('request_date', 'ASC')
@@ -728,22 +852,16 @@ class DiagnosticRequestModel extends Model
             'Other'       => '#94A3B8',
         ];
 
+        // Stable stacking / legend order, whatever order the rows came in.
         $datasets = [];
-        foreach ($modalities as $modality => $data) {
+        foreach (array_keys($colors) as $modality) {
+            if (!isset($modalities[$modality])) {
+                continue;
+            }
             $datasets[] = [
                 'label'           => $modality,
-                'data'            => $data,
-                'backgroundColor' => $colors[$modality] ?? '#94A3B8',
-                'borderRadius'    => 4,
-                'barPercentage'   => 0.6,
-            ];
-        }
-
-        if (empty($datasets)) {
-            $datasets[] = [
-                'label'           => 'X-Ray',
-                'data'            => [0, 0, 0, 0, 0, 0, 0],
-                'backgroundColor' => '#1D4ED8',
+                'data'            => $modalities[$modality],
+                'backgroundColor' => $colors[$modality],
                 'borderRadius'    => 4,
                 'barPercentage'   => 0.6,
             ];
@@ -754,30 +872,25 @@ class DiagnosticRequestModel extends Model
 
     /**
      * Classify an exam-type string into one of the known modalities.
-     * Same logic as the old XrayExaminationModel::determineModality().
+     * Keywords match whole words only, so "ct" doesn't fire inside
+     * "Fracture". Anything else is a plain radiograph — every study in
+     * this department's catalogue (Finger, Wrist AP / APL, ...) is one.
      */
     public function determineModality($examType): string
     {
-        if (empty($examType)) {
+        $s = strtolower(trim((string) $examType));
+        if ($s === '') {
             return 'Other';
         }
 
-        $s = strtolower((string) $examType);
+        $has = static fn (string $words) => preg_match('/(?<![a-z0-9])(?:' . $words . ')(?![a-z0-9])/', $s) === 1;
 
-        if (str_contains($s, 'ct') || str_contains($s, 'cat scan')) { return 'CT'; }
-        if (str_contains($s, 'mri'))                                  { return 'MRI'; }
-        if (str_contains($s, 'ultrasound')
-            || str_contains($s, 'sono'))                              { return 'Ultrasound'; }
-        if (str_contains($s, 'mammo'))                                { return 'Mammography'; }
-        if (str_contains($s, 'x-ray')
-            || str_contains($s, 'xray')
-            || str_contains($s, 'chest'))                             { return 'X-Ray'; }
+        if ($has('ct|ct scan|cat scan|computed tomography')) { return 'CT'; }
+        if ($has('mri|magnetic resonance'))                   { return 'MRI'; }
+        if ($has('ultrasound|ultrasonography|sono\w*|uts'))   { return 'Ultrasound'; }
+        if ($has('mammo\w*'))                                 { return 'Mammography'; }
 
-        foreach (['chest','abdomen','spine','extremity','skull','bone','joint'] as $kw) {
-            if (str_contains($s, $kw)) { return 'X-Ray'; }
-        }
-
-        return 'Other';
+        return 'X-Ray';
     }
 
     // ================================================================

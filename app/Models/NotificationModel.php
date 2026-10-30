@@ -21,6 +21,7 @@ class NotificationModel extends Model
         'reference_gender',
         'link',
         'user_role',
+        'user_id',
         'can_open',
         'is_read',
         'created_at',
@@ -64,10 +65,12 @@ class NotificationModel extends Model
             'payment'     => 'receptionist/payments',
         ],
         'radiologist' => [
-            'xray' => 'radiologist/examination/view/{id}',
+            'xray'     => 'radiologist/examination/view/{id}',
+            'transfer' => 'radiologist/examinations#transfers',
         ],
         'med_tech' => [
-            'lab' => 'medtech/request/view/{id}',
+            'lab'      => 'medtech/request/view/{id}',
+            'transfer' => 'medtech/requests#transfers',
         ],
     ];
 
@@ -122,7 +125,8 @@ class NotificationModel extends Model
                     'reference_gender' => ['type' => 'VARCHAR', 'constraint' => 10, 'null' => true],
                     'link'             => ['type' => 'VARCHAR', 'constraint' => 255, 'null' => true],
                     'user_role'        => ['type' => 'VARCHAR', 'constraint' => 30, 'default' => 'admin'],
-                    'can_open'         => ['type' => 'TINYINT', 'constraint' => 1, 'default' => 1],
+                    'user_id'          => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'null' => true],
+                    'can_open'        => ['type' => 'TINYINT', 'constraint' => 1, 'default' => 1],
                     'is_read'          => ['type' => 'TINYINT', 'constraint' => 1, 'default' => 0],
                     'created_at'       => ['type' => 'DATETIME', 'null' => true],
                     'updated_at'       => ['type' => 'DATETIME', 'null' => true],
@@ -187,6 +191,51 @@ class NotificationModel extends Model
     public function currentRole(): string
     {
         return (string) (session()->get('role') ?? '');
+    }
+
+    public function currentUserId(): int
+    {
+        return (int) (session()->get('user_id') ?? 0);
+    }
+
+    /**
+     * Limit the next query to rows the current user may see: the ones
+     * sent to their whole role (user_id NULL) plus the ones sent to them.
+     */
+    private function visibleToCurrentUser(): self
+    {
+        $this->groupStart()
+                 ->where('user_id', null)
+                 ->orWhere('user_id', $this->currentUserId())
+             ->groupEnd();
+        return $this;
+    }
+
+    /**
+     * Send a notification to one user rather than to every user of a role.
+     * $role is the user's role, so the row shows up on their pages.
+     */
+    public static function dispatchToUser(string $type, string $title, string $message, $referenceId, int $userId, string $role): bool
+    {
+        try {
+            $model   = new self();
+            $canOpen = $model->hasRoute($role, $type) ? 1 : 0;
+
+            return (bool) $model->insert([
+                'type'         => $type,
+                'title'        => $title,
+                'message'      => $message,
+                'reference_id' => $referenceId !== null ? (string) $referenceId : null,
+                'link'         => $canOpen ? $model->pathFor($role, $type, $referenceId) : null,
+                'user_role'    => $role,
+                'user_id'      => $userId,
+                'can_open'     => $canOpen,
+                'is_read'      => 0,
+            ]);
+        } catch (\Exception $e) {
+            log_message('error', 'Failed to notify user #' . $userId . ': ' . $e->getMessage());
+            return false;
+        }
     }
 
     public function hasRoute(string $role, string $type): bool
@@ -340,6 +389,7 @@ class NotificationModel extends Model
         }
 
         return $this->where('user_role', $role)
+                    ->visibleToCurrentUser()
                     ->where('is_read', 0)
                     ->countAllResults();
     }
@@ -352,6 +402,7 @@ class NotificationModel extends Model
         }
 
         $rows = $this->where('user_role', $role)
+                     ->visibleToCurrentUser()
                      ->orderBy('created_at', 'DESC')
                      ->orderBy('id', 'DESC')
                      ->findAll();
@@ -367,6 +418,7 @@ class NotificationModel extends Model
         }
 
         $rows = $this->where('user_role', $role)
+                     ->visibleToCurrentUser()
                      ->orderBy('created_at', 'DESC')
                      ->orderBy('id', 'DESC')
                      ->findAll($limit);
@@ -382,6 +434,9 @@ class NotificationModel extends Model
         if (!$row || ($row['user_role'] ?? null) !== $role) {
             return null;
         }
+        if ($row['user_id'] !== null && (int) $row['user_id'] !== $this->currentUserId()) {
+            return null;
+        }
 
         return $row;
     }
@@ -390,7 +445,19 @@ class NotificationModel extends Model
     {
         $role = $role ?? $this->currentRole();
 
+        // Transfer requests the current user still has to answer.
+        $transferIds = [];
+        foreach ($rows as $row) {
+            if (($row['type'] ?? '') === 'transfer' && !empty($row['reference_id'])) {
+                $transferIds[] = (int) $row['reference_id'];
+            }
+        }
+        $awaiting = array_flip((new PatientTransferModel())->awaitingAnswerFrom($this->currentUserId(), $transferIds));
+
         foreach ($rows as &$row) {
+            $row['transfer_pending'] = ($row['type'] ?? '') === 'transfer'
+                && isset($awaiting[(int) ($row['reference_id'] ?? 0)]);
+
             $target            = $this->resolveLink($row, $role);
             $row['full_link']  = $target;
             $row['can_open']   = $target !== null;
@@ -428,6 +495,7 @@ class NotificationModel extends Model
         }
 
         return (bool) $this->where('user_role', $role)
+                           ->visibleToCurrentUser()
                            ->where('is_read', 0)
                            ->set(['is_read' => 1])
                            ->update();
@@ -512,6 +580,7 @@ class NotificationModel extends Model
             'lab'         => 'bi-flask',
             'billing'     => 'bi-receipt',
             'payment'     => 'bi-credit-card',
+            'transfer'    => 'bi-arrow-left-right',
             'system'      => 'bi-bell-fill',
         ];
         return $icons[$type] ?? 'bi-bell-fill';
@@ -521,6 +590,47 @@ class NotificationModel extends Model
     {
         $colors = ['appointment', 'xray', 'lab', 'billing', 'payment', 'system'];
         return in_array($type, $colors, true) ? $type : 'system';
+    }
+
+    /** Types that show the patient's avatar, per role (default: appointments only). */
+    private const AVATAR_TYPES = [
+        'med_tech'    => ['appointment', 'lab'],
+        'radiologist' => ['appointment', 'xray'],
+    ];
+
+    /**
+     * The leading picture for a notification in the bell dropdown — the
+     * same rules the notifications pages use: the patient's avatar when
+     * the sex is known, initials for other appointments, the lab / x-ray
+     * PNG, else the type's icon tile.
+     *
+     * @return array{kind: string, src?: string, avatar?: bool, text?: string, icon?: string, color?: string}
+     */
+    public function leadFor(array $row, string $role): array
+    {
+        $type   = (string) ($row['type'] ?? 'system');
+        $gender = strtolower((string) ($row['reference_gender'] ?? ''));
+
+        if (in_array($gender, ['male', 'female'], true) && in_array($type, self::AVATAR_TYPES[$role] ?? ['appointment'], true)) {
+            return ['kind' => 'img', 'avatar' => true, 'src' => base_url('assets/images/' . ($gender === 'female' ? 'woman-avatar.png' : 'man-avatar.png'))];
+        }
+
+        if ($type === 'appointment') {
+            $name  = trim((string) preg_replace(
+                '/^(Pending Appointment|New Appointment Request|New Appointment|Appointment|New Lab Request|New X-Ray Request|X-Ray Examination|Laboratory Request):\s*/i',
+                '',
+                (string) ($row['title'] ?? '')
+            ));
+            $parts = preg_split('/\s+/', $name);
+            $text  = mb_strtoupper(mb_substr($parts[0] ?? '', 0, 1) . (count($parts) > 1 ? mb_substr(end($parts), 0, 1) : ''));
+            return ['kind' => 'initials', 'text' => $text !== '' ? $text : '?'];
+        }
+
+        if ($type === 'lab' || $type === 'xray') {
+            return ['kind' => 'img', 'avatar' => false, 'src' => base_url('assets/images/' . ($type === 'lab' ? 'microscope-icon.png' : 'bones.png'))];
+        }
+
+        return ['kind' => 'icon', 'icon' => $this->getTypeIcon($type), 'color' => $this->getTypeColor($type)];
     }
 
     public function getNotificationsForJson($limit = 6, ?string $role = null): array
@@ -539,6 +649,10 @@ class NotificationModel extends Model
                 'is_read'    => (int) $item['is_read'],
                 'time_ago'   => $item['time_ago'],
                 'created_at' => $item['created_at'],
+                'lead'       => $this->leadFor($item, (string) $role),
+                // A transfer request waiting for this user's Accept / Decline.
+                'transfer_pending' => $item['transfer_pending'],
+                'reference_id'     => $item['reference_id'],
             ];
         }
 

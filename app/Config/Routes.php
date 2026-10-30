@@ -41,6 +41,7 @@ $routes->group('admin', ['filter' => 'auth:admin'], function ($routes) {
     $routes->get('diagnostic-requests', 'Admin::diagnosticRequests');
     $routes->post('create-diagnostic-request', 'Admin::createDiagnosticRequest');
     $routes->post('update-diagnostic-status/(:num)/(:any)/(:any)', 'Admin::updateDiagnosticStatus/$1/$2/$3');
+    $routes->get('assignment-options/(:num)/(:any)', 'Admin::assignmentOptions/$1/$2');
     $routes->delete('delete-diagnostic-request/(:num)/(:any)', 'Admin::deleteDiagnosticRequest/$1/$2');
     $routes->get('get-request-details/(:num)/(:any)', 'Admin::getRequestDetails/$1/$2');
     $routes->get('print-request/(:num)/(:any)', 'Admin::printRequest/$1/$2');
@@ -112,6 +113,7 @@ $routes->group('receptionist', ['filter' => 'auth:receptionist'], function ($rou
     $routes->get('diagnostic-requests', 'Receptionist::diagnosticRequests');
     $routes->post('create-diagnostic-request', 'Receptionist::createDiagnosticRequest');
     $routes->post('update-diagnostic-status/(:num)/(:any)/(:any)', 'Receptionist::updateDiagnosticStatus/$1/$2/$3');
+    $routes->get('assignment-options/(:num)/(:any)', 'Receptionist::assignmentOptions/$1/$2');
     $routes->delete('delete-diagnostic-request/(:num)/(:any)', 'Receptionist::deleteDiagnosticRequest/$1/$2');
     $routes->get('get-request-details/(:num)/(:any)', 'Receptionist::getRequestDetails/$1/$2');
     $routes->get('print-request/(:num)/(:any)', 'Receptionist::printRequest/$1/$2');
@@ -144,6 +146,11 @@ $routes->group('radiologist', ['filter' => 'auth:radiologist'], function ($route
     $routes->post('examination/release/(:num)', 'Radiologist::releaseResult/$1');
     $routes->get('examination/print/(:num)', 'Radiologist::printResult/$1');
 
+    // Patient transfers (radiologist to radiologist)
+    $routes->post('transfer/create', 'Radiologist::createTransfer');
+    $routes->post('transfer/respond/(:num)', 'Radiologist::respondTransfer/$1');
+    $routes->post('transfer/cancel/(:num)', 'Radiologist::cancelTransfer/$1');
+
     // Notifications
     $routes->get('notifications', 'NotificationController::radiologistIndex');
     $routes->get('notifications/fetch', 'NotificationController::radiologistFetch');
@@ -172,6 +179,11 @@ $routes->group('medtech', ['filter' => 'auth:med_tech'], function ($routes) {
     $routes->get('request/print/(:num)', 'MedTech::printResult/$1');
     $routes->get('template/(:any)', 'MedTech::getTemplate/$1');
 
+    // Patient transfers (med tech to med tech)
+    $routes->post('transfer/create', 'MedTech::createTransfer');
+    $routes->post('transfer/respond/(:num)', 'MedTech::respondTransfer/$1');
+    $routes->post('transfer/cancel/(:num)', 'MedTech::cancelTransfer/$1');
+
     // Notifications
     $routes->get('notifications', 'NotificationController::medtechIndex');
     $routes->get('notifications/fetch', 'NotificationController::medtechFetch');
@@ -180,6 +192,12 @@ $routes->group('medtech', ['filter' => 'auth:med_tech'], function ($routes) {
     $routes->get('notifications/delete/(:num)', 'NotificationController::medtechDelete/$1');
     $routes->post('notifications/delete-batch', 'NotificationController::deleteBatch');
 });
+
+
+// ============================================================
+// REPORT PDF EMAIL — any logged-in staff role (checked in the controller)
+// ============================================================
+$routes->post('report/email-pdf', 'ReportMail::send');
 
 
 // ============================================================

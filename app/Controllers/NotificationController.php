@@ -217,6 +217,10 @@ class NotificationController extends BaseController
             $this->notificationModel
                  ->whereIn('id', $clean)
                  ->where('user_role', $role)
+                 ->groupStart()
+                     ->where('user_id', null)
+                     ->orWhere('user_id', $this->notificationModel->currentUserId())
+                 ->groupEnd()
                  ->delete();
         } catch (\Exception $e) {
             log_message('error', 'Bulk notification delete failed: ' . $e->getMessage());

@@ -1170,8 +1170,10 @@ class Admin extends BaseController
             ->findAll();
 
         $requests = [];
+        $locks    = $this->startLocks($rows);
         foreach ($rows as $row) {
-            $requests[] = $this->buildDiagnosticRow($row, $row['type'] ?? 'lab');
+            $requests[] = $this->buildDiagnosticRow($row, $row['type'] ?? 'lab')
+                + ['start_lock' => $locks[(int) $row['id']] ?? null];
         }
 
         $counts = $this->monitoringCounts($requests);
@@ -1404,10 +1406,25 @@ class Admin extends BaseController
         if ($redirect) return $redirect;
 
         try {
-            return $this->response->setJSON($this->changeDiagnosticStatus((int) $id, (string) $type, (string) $status));
+            $assignee = (int) $this->request->getPost('assigned_to');
+            return $this->response->setJSON($this->changeDiagnosticStatus((int) $id, (string) $type, (string) $status, $assignee ?: null));
         } catch (\Throwable $e) {
             log_message('error', 'Update diagnostic status error: ' . $e->getMessage());
             return $this->response->setJSON(['success' => false, 'message' => 'Could not update the status.']);
+        }
+    }
+
+    /** Staff (with workload) the Start modal can assign a request to. */
+    public function assignmentOptions($id, $type)
+    {
+        $redirect = $this->checkAuth();
+        if ($redirect) return $redirect;
+
+        try {
+            return $this->response->setJSON($this->assignmentOptionsFor((int) $id, (string) $type));
+        } catch (\Throwable $e) {
+            log_message('error', 'Assignment options error: ' . $e->getMessage());
+            return $this->response->setJSON(['success' => false, 'message' => 'Could not load the available staff. Please try again.']);
         }
     }
 

@@ -83,6 +83,12 @@
 .nc-btn--danger:hover { background: #b91c1c; border-color: #b91c1c; }
 .nc-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
+.nc-inline-form { display: inline-flex; margin: 0; }
+.nc-btn--accept,
+.nc-btn--accept:hover { color: #ffffff; }
+.nc-btn--accept { background: #1976d2; border-color: #1976d2; }
+.nc-btn--accept:hover { background: #1565c0; border-color: #1565c0; }
+
 /* =========================================================
    Bulk delete review modal
    ========================================================= */
@@ -596,7 +602,25 @@ arsort($typeCounts);
                             <p class="nc-card-message"><?= esc($message) ?></p>
 
                             <footer class="nc-body-foot">
-                                <?php if (!empty($notif['can_open'])): ?>
+                                <?php if (!empty($notif['transfer_pending'])):
+                                    // e.g. 'medtech/notifications' -> 'medtech/transfer/respond/{id}'
+                                    $respondUrl = base_url(explode('/', $notifBase)[0] . '/transfer/respond/' . (int) $notif['reference_id']); ?>
+                                    <form method="post" action="<?= esc($respondUrl, 'attr') ?>" class="nc-inline-form">
+                                        <?= csrf_field() ?>
+                                        <input type="hidden" name="action" value="accept">
+                                        <button type="submit" class="nc-btn nc-btn--sm nc-btn--accept">
+                                            <i class="bi bi-check2" aria-hidden="true"></i>
+                                            <span>Accept</span>
+                                        </button>
+                                    </form>
+                                    <form method="post" action="<?= esc($respondUrl, 'attr') ?>" class="nc-inline-form">
+                                        <?= csrf_field() ?>
+                                        <input type="hidden" name="action" value="decline">
+                                        <button type="submit" class="nc-btn nc-btn--sm">
+                                            <span>Decline</span>
+                                        </button>
+                                    </form>
+                                <?php elseif (!empty($notif['can_open'])): ?>
                                     <a href="<?= base_url($notifBase . '/mark-read/' . $notif['id']) ?>"
                                        class="nc-btn nc-btn--sm">
                                         <i class="bi bi-arrow-right" aria-hidden="true"></i>

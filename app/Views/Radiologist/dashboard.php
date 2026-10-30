@@ -26,6 +26,7 @@ $weeklyLabels   = (isset($weeklyData['labels'])   && is_array($weeklyData['label
 $weeklyDatasets = (isset($weeklyData['datasets']) && is_array($weeklyData['datasets'])) ? $weeklyData['datasets'] : [];
 
 $hasWeeklyChart = !empty($weeklyLabels) && !empty($weeklyDatasets);
+$weeklyTotal    = array_sum(array_map(static fn ($ds) => array_sum($ds['data'] ?? []), $weeklyDatasets));
 
 $servicesCatalog = (isset($servicesCatalog) && is_array($servicesCatalog)) ? $servicesCatalog : [
     'services'       => [],
@@ -155,7 +156,7 @@ $kpiBoard = [
                 <?php if ($hasWeeklyChart): ?>
                     <span class="chart-pill">
                         <span class="pill-dot" style="background: #2450d8;"></span>
-                        <?= number_format(count($weeklyLabels)) ?> days
+                        <?= number_format($weeklyTotal) ?> <?= $weeklyTotal === 1 ? 'study' : 'studies' ?> this week
                     </span>
                 <?php endif; ?>
             </div>
@@ -1264,9 +1265,26 @@ $kpiBoard = [
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    // One tooltip per day listing every modality that has studies.
+                    interaction: { mode: 'index', intersect: false },
                     plugins: {
-                        legend: { display: false },
-                        tooltip: Object.assign({}, TOOLTIP)
+                        // Stacked by modality: name the colours once there is more than one.
+                        legend: {
+                            display: weeklyDatasets.length > 1,
+                            position: 'bottom',
+                            labels: { boxWidth: 10, boxHeight: 10, color: '#414e63', font: { size: 11 } }
+                        },
+                        tooltip: Object.assign({}, TOOLTIP, {
+                            displayColors: weeklyDatasets.length > 1,
+                            filter: function (item) { return item.parsed.y > 0; },
+                            callbacks: {
+                                label: function (ctx) {
+                                    var n = ctx.parsed.y;
+                                    return (weeklyDatasets.length > 1 ? ctx.dataset.label + ': ' : '') +
+                                           n + (n === 1 ? ' study' : ' studies');
+                                }
+                            }
+                        })
                     },
                     scales: {
                         x: {

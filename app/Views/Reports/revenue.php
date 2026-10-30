@@ -102,8 +102,8 @@
         'caption' => 'Figure 1. Net revenue per ' . $unitWord . ', ' . $periodLabel . '. Values in the table below.',
     ];
 
-    $topServices  = array_slice($s['services'], 0, 10, true);
-    $oldestUnpaid = array_slice($unpaid['rows'], 0, 10);   // unpaidInvoices() is oldest first
+    $topServices  = $s['services'];
+    $oldestUnpaid = $unpaid['rows'];   // unpaidInvoices() is oldest first
 ?>
 
     <!-- ===== 1. SUMMARY ===== -->
@@ -245,9 +245,11 @@
 
     <!-- ===== 4. SCHEDULE ===== -->
     <section class="long">
-        <h2><span class="num">4</span> Revenue Schedule <small>Net revenue per <?= $unitWord ?></small></h2>
+        <div class="keep">
+            <h2><span class="num">4</span> Revenue Schedule <small>Net revenue per <?= $unitWord ?></small></h2>
 
-        <?php include __DIR__ . '/_paper_chart.php'; ?>
+            <?php include __DIR__ . '/_paper_chart.php'; ?>
+        </div>
 
         <div class="scroll">
         <table class="<?= count($rows) > 14 ? 'dense' : '' ?>">
@@ -293,7 +295,7 @@
 
     <!-- ===== 5. SERVICES + 6. CASHIERS ===== -->
     <div class="two">
-        <section>
+        <section class="<?= count($topServices) > 25 ? "long" : "" ?>">
             <h2><span class="num">5</span> Top Services</h2>
             <table>
                 <thead><tr><th>#</th><th>Service</th><th class="r">Qty</th><th class="r">Billed</th></tr></thead>
@@ -337,7 +339,7 @@
     </div>
 
     <!-- ===== 7. RECEIVABLES ===== -->
-    <section>
+    <section class="long">
         <h2><span class="num">7</span> Accounts Receivable Aging <small>As of <?= esc(date('F j, Y')) ?></small></h2>
         <table>
             <thead><tr><th>Age of balance</th><th class="r">0–7 days</th><th class="r">8–30 days</th><th class="r">Over 30 days</th><th class="r">Total outstanding</th></tr></thead>
@@ -375,9 +377,7 @@
                 </tbody>
             </table>
             <p class="note">
-                <?= count($unpaid['rows']) > count($oldestUnpaid)
-                    ? 'Showing the ' . count($oldestUnpaid) . ' oldest of ' . count($unpaid['rows']) . ' open invoices.'
-                    : 'All open invoices, oldest first.' ?>
+                All open invoices, oldest first.
                 Receivables cover every cashier and are a snapshot at the time of printing.
             </p>
         <?php else: ?>

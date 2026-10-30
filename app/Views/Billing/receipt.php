@@ -311,6 +311,13 @@ $amountInWords = function ($amount) {
     <button type="button" onclick="window.print()">
         <i class="bi bi-printer" aria-hidden="true"></i> Print receipt
     </button>
+    <?= view('partials/pdf_tools', ['pdf' => [
+        'target'   => '.pm-receipt',
+        'filename' => 'Receipt ' . ($payment['reference_number'] ?? '') . ' ' . ($payment['patient_name'] ?? ''),
+        'label'    => 'official receipt',
+        'emailTo'  => (string) ($patientEmail ?? ''),
+        'subject'  => 'Official receipt ' . ($payment['reference_number'] ?? '') . ' · ' . $clinic['name'],
+    ]]) ?>
 </div>
 
 <script>window.addEventListener('load', function () { setTimeout(function(){ window.print(); }, 250); });</script>

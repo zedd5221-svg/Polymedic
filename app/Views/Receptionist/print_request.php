@@ -101,6 +101,14 @@ $clinic   = $clinic ?? config('Clinic')->toArray();
         <a href="<?= esc($backUrl, 'attr') ?>"><?= esc($backLabel ?? 'Back') ?></a>
     <?php endif; ?>
     <button type="button" onclick="window.print()">Print</button>
+    <?php $pdfRef = (string) ($request['reference_number'] ?? ('#' . (int) ($request['id'] ?? 0))); ?>
+    <?= view('partials/pdf_tools', ['pdf' => [
+        'target'   => '.slip',
+        'filename' => $pdfRef . ' ' . ($request['patient_name'] ?? ''),
+        'label'    => ($isXray ? 'X-ray' : 'laboratory') . ' request slip',
+        'emailTo'  => (string) ($request['email'] ?? ''),
+        'subject'  => ($isXray ? 'X-ray' : 'Laboratory') . ' request ' . $pdfRef . ' · ' . $clinic['name'],
+    ]]) ?>
 </div>
 </body>
 </html>

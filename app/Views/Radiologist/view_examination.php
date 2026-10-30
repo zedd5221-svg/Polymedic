@@ -371,6 +371,16 @@
                     </div>
                 <?php endif; ?>
 
+                <?php if (!empty($assignedTo)): ?>
+                    <div class="xv-alert xv-alert--error" role="alert" style="margin:1rem 1.25rem 0;">
+                        <i class="bi bi-person-lock" aria-hidden="true"></i>
+                        <span>
+                            <strong>Assigned to <?= esc($assignedTo) ?>.</strong>
+                            The front desk sent this patient to another radiologist. You can view the study, but saving is refused.
+                        </span>
+                    </div>
+                <?php endif; ?>
+
                 <form action="<?= base_url('radiologist/examination/save/' . (int) $examination['id']) ?>"
                       method="POST"
                       id="xvReportForm"

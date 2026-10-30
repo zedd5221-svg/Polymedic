@@ -63,6 +63,9 @@ $shorten = static function ($text, $max = 46) {
     </header>
 
 
+    <!-- PATIENT HANDOFF -->
+    <?= view('partials/transfer_panel', ['transfer' => $transfer ?? []]) ?>
+
     <!-- WORKLIST -->
     <section class="dx-panel" aria-label="X-Ray examinations">
 

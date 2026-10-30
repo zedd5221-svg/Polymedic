@@ -196,6 +196,7 @@ $filterTabs = [
                     $doctor    = trim((string) ($request['doctor_name'] ?? ''));
                     $phone     = trim((string) ($request['phone'] ?? ''));
                     $email     = trim((string) ($request['email'] ?? ''));
+                    $startLock = trim((string) ($request['start_lock'] ?? ''));
 
                     $age     = $request['patient_age'] ?? '';
                     $ageText = is_numeric($age) ? ((int) $age) . ' y' : '';
@@ -249,6 +250,7 @@ $filterTabs = [
                              data-patient="<?= esc($patient, 'attr') ?>"
                              data-kind="<?= esc($kind, 'attr') ?>"
                              data-amount="<?= $amount !== null ? esc(number_format($amount, 2, '.', ''), 'attr') : '' ?>"
+                             data-start-lock="<?= esc($startLock, 'attr') ?>"
                              data-search="<?= esc(strtolower(implode(' ', [$patient, $reference, $doctor, $kind, $phone, implode(' ', $services)])), 'attr') ?>">
 
                         <header class="dx-card-head">
@@ -355,10 +357,14 @@ $filterTabs = [
                         </dl>
 
                         <footer class="dx-card-foot">
-                            <?php if ($status === 'pending'): ?>
+                            <?php if ($status === 'pending' && $startLock !== ''): ?>
+                                <span class="dx-waiting dx-waiting--sm dx-waiting--locked" title="<?= esc($startLock, 'attr') ?>">
+                                    <i class="bi bi-person-lock" aria-hidden="true"></i>
+                                    Locked · patient busy
+                                </span>
+                            <?php elseif ($status === 'pending'): ?>
                                 <button type="button" class="dx-btn dx-btn--sm dx-btn--primary"
-                                        data-action="status"
-                                        data-status="in_progress">
+                                        data-action="start">
                                     Start
                                 </button>
                             <?php elseif ($status === 'released'): ?>
@@ -752,6 +758,41 @@ $filterTabs = [
             <div class="modal-footer dx-footer-end">
                 <button type="button" class="dx-btn" id="dxConfirmDismiss" data-bs-dismiss="modal">Go back</button>
                 <button type="button" class="dx-btn dx-btn--primary" id="dxConfirmOk">Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- =========================================================
+     ASSIGN MODAL (Start = assign to one med tech / radiologist)
+     ========================================================= -->
+<div class="modal fade dx-modal"
+     id="dxAssignModal"
+     tabindex="-1"
+     aria-labelledby="dxAssignTitle"
+     aria-hidden="true">
+
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable dx-dialog-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="dx-modal-heading">
+                    <h2 class="dx-modal-title" id="dxAssignTitle">Assign and start</h2>
+                    <p class="dx-modal-sub" id="dxAssignSub"></p>
+                </div>
+                <button type="button" class="dx-close" data-bs-dismiss="modal" aria-label="Close">
+                    <i class="bi bi-x-lg" aria-hidden="true"></i>
+                </button>
+            </div>
+
+            <div class="modal-body">
+                <p class="dx-assign-intro" id="dxAssignIntro"></p>
+                <p class="dx-confirm-error" id="dxAssignError" role="alert" hidden></p>
+                <div id="dxAssignBody" aria-live="polite"></div>
+            </div>
+
+            <div class="modal-footer dx-footer-end">
+                <button type="button" class="dx-btn" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="dx-btn dx-btn--primary" id="dxAssignOk" disabled>Confirm</button>
             </div>
         </div>
     </div>
@@ -1924,6 +1965,55 @@ $filterTabs = [
     .dx-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .dx-card.is-hidden { display: flex; }
 }
+/* ---------- Assign modal ---------- */
+
+.dx-assign-intro { margin: 0 0 0.85rem; font-size: 0.8125rem; line-height: 1.55; color: var(--dx-text); }
+.dx-assign-intro strong { color: var(--dx-ink); font-weight: 600; }
+#dxAssignError { margin: 0 0 0.85rem; }
+
+.dx-assign-list { display: flex; flex-direction: column; gap: 0.4rem; margin: 0; padding: 0; list-style: none; }
+
+.dx-assign-opt {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.6rem 0.75rem;
+    background: var(--dx-surface);
+    border: 1px solid var(--dx-line);
+    border-radius: var(--dx-radius-sm);
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+.dx-assign-opt:hover { border-color: var(--dx-faint); }
+.dx-assign-opt:has(input:checked) { border-color: var(--dx-accent); background: var(--dx-accent-soft); }
+.dx-assign-opt:has(input:focus-visible) { box-shadow: var(--dx-ring); }
+.dx-assign-opt input { flex: none; margin: 0; accent-color: var(--dx-accent); }
+
+.dx-assign-who { flex: 1; min-width: 0; }
+.dx-assign-name { display: block; font-size: 0.8125rem; font-weight: 600; color: var(--dx-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dx-assign-role { display: block; font-size: 0.72rem; color: var(--dx-muted); }
+
+.dx-assign-load {
+    flex: none;
+    padding: 0.15rem 0.5rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--dx-muted);
+    background: var(--dx-subtle);
+    border: 1px solid var(--dx-line);
+    border-radius: 999px;
+    white-space: nowrap;
+}
+.dx-assign-load.is-free { color: #166534; background: #f0fdf4; border-color: #bbf7d0; }
+.dx-assign-load.is-busy { color: #92400e; background: #fffbeb; border-color: #fde68a; }
+
+.dx-assign-state { padding: 1.25rem 0.5rem; text-align: center; font-size: 0.8125rem; color: var(--dx-muted); }
+.dx-assign-state i { display: block; margin-bottom: 0.4rem; font-size: 1.5rem; color: var(--dx-faint); }
+.dx-assign-state strong { display: block; margin-bottom: 0.2rem; color: var(--dx-ink); }
+.dx-assign-state .dx-btn { margin-top: 0.75rem; }
+
+.dx-waiting--locked { color: #92400e; background: #fffbeb; border-color: #fde68a; }
 </style>
 
 
@@ -1957,11 +2047,6 @@ $filterTabs = [
      * asks for those, STEPS[to] is undefined and askStatus() bails.
      */
     var STEPS = {
-        in_progress: {
-            title: 'Send to laboratory or x-ray?',
-            verb:  'Send patient',
-            done:  'Patient sent to the diagnostic department'
-        },
         cancelled: {
             title: 'Cancel this request?',
             verb:  'Cancel request',
@@ -2039,7 +2124,8 @@ $filterTabs = [
             reference: d.reference || 'this request',
             patient: d.patient || 'Unknown patient',
             kind: d.kind || '',
-            amount: d.amount || ''
+            amount: d.amount || '',
+            startLock: d.startLock || ''
         };
     }
 
@@ -2253,6 +2339,7 @@ $filterTabs = [
 
         switch (el.dataset.action) {
             case 'view':   openDetails(ctx); break;
+            case 'start':  openAssign(ctx); break;
             case 'status': askStatus(ctx, el.dataset.status); break;
             case 'delete': askDelete(ctx); break;
         }
@@ -2324,13 +2411,8 @@ $filterTabs = [
         if (!step) { return; }
 
         var who  = '<strong>' + esc(ctx.patient) + '</strong> (' + esc(ctx.reference) + ')';
-        var dept = ctx.type === 'xray' ? 'the X-ray department' : 'the laboratory';
 
         var body = {
-            in_progress: 'Send ' + who + ' to ' + dept + '? This records the cash payment of <strong>' +
-                         (ctx.amount ? esc(money(ctx.amount)) : 'the amount due') +
-                         '</strong> and moves the request into the diagnostic queue. ' +
-                         'You will be able to print the result once it has been released.',
             cancelled:   'Cancel ' + who + '? You can restore it to pending later.',
             pending:     'Restore ' + who + ' to pending?'
         }[to];
@@ -2356,6 +2438,162 @@ $filterTabs = [
             }
         });
     }
+
+
+    /* =====================================================
+       ASSIGN + START
+       Start never sends a request on its own: it opens this modal,
+       and the request starts only once one user is chosen. The
+       server re-checks everything on confirm; a conflict reloads
+       the list so the modal always shows the current state.
+       ===================================================== */
+
+    var assignCtx = null;
+    var assignToken = 0;
+
+    function assignError(message) {
+        var el = byId('dxAssignError');
+        el.textContent = message || '';
+        el.hidden = !message;
+    }
+
+    function assignReady(ready) {
+        var ok = byId('dxAssignOk');
+        ok.disabled = !ready;
+        ok.textContent = 'Confirm';
+    }
+
+    function openAssign(ctx) {
+        if (ctx.startLock) { toast(ctx.startLock, 'error'); return; }
+
+        assignCtx = ctx;
+        var dept = ctx.type === 'xray' ? 'the X-ray department' : 'the laboratory';
+
+        byId('dxAssignSub').innerHTML = subtitleHtml(ctx.reference, ctx.kind, '', false);
+        byId('dxAssignIntro').innerHTML =
+            'Choose who will handle <strong>' + esc(ctx.patient) + '</strong> in ' + dept + '. ' +
+            'Starting records the cash payment of <strong>' +
+            (ctx.amount ? esc(money(ctx.amount)) : 'the amount due') + '</strong>.';
+
+        var show = function () {
+            modal(byId('dxAssignModal')).show();
+            loadAssign('');
+        };
+
+        var viewEl = byId('viewRequestModal');
+        if (viewEl && viewEl.classList.contains('show')) {
+            viewEl.addEventListener('hidden.bs.modal', show, { once: true });
+            modal(viewEl).hide();
+        } else {
+            show();
+        }
+    }
+
+    function loadAssign(notice) {
+        var ctx = assignCtx;
+        var body = byId('dxAssignBody');
+        var token = ++assignToken;
+
+        assignError(notice);
+        assignReady(false);
+        body.innerHTML = '<div class="dx-assign-state"><div class="spinner-border spinner-border-sm" role="status"></div>' +
+                         '<div>Loading available staff…</div></div>';
+
+        fetch(
+            API + 'assignment-options/' + encodeURIComponent(ctx.id) + '/' + encodeURIComponent(ctx.type),
+            { headers: { 'X-Requested-With': 'XMLHttpRequest' } }
+        )
+        .then(parseJson)
+        .then(function (data) {
+            if (token !== assignToken) { return; }
+            if (!data.success) { throw data.message || 'The available staff could not be loaded.'; }
+
+            if (data.locked) {
+                assignError('');
+                body.innerHTML = '<div class="dx-assign-state"><i class="bi bi-person-lock" aria-hidden="true"></i>' +
+                                 '<strong>Already in progress</strong>' + esc(data.message) + '</div>';
+                return;
+            }
+
+            var staff = data.staff || [];
+            if (!staff.length) {
+                body.innerHTML = '<div class="dx-assign-state"><i class="bi bi-people" aria-hidden="true"></i>' +
+                                 '<strong>No available ' + esc(data.role || 'staff') + '</strong>' +
+                                 'There is no active ' + esc(data.role || 'staff member') + ' to assign. ' +
+                                 'Ask an administrator to activate one, then try again.' +
+                                 '<br><button type="button" class="dx-btn dx-btn--sm" data-assign-retry>Refresh</button></div>';
+                return;
+            }
+
+            body.innerHTML = '<ul class="dx-assign-list" role="radiogroup" aria-label="Assign to">' +
+                staff.map(function (u) {
+                    var n = Number(u.workload) || 0;
+                    var tone = n === 0 ? ' is-free' : (n >= 3 ? ' is-busy' : '');
+                    return '<li><label class="dx-assign-opt">' +
+                        '<input type="radio" name="dxAssignee" value="' + esc(u.id) + '" data-name="' + esc(u.name) + '">' +
+                        '<span class="dx-assign-who"><span class="dx-assign-name">' + esc(u.name) + '</span>' +
+                        '<span class="dx-assign-role">' + esc(u.role_label) + '</span></span>' +
+                        '<span class="dx-assign-load' + tone + '">' + (n === 0 ? 'Free' : n + ' active') + '</span>' +
+                        '</label></li>';
+                }).join('') + '</ul>';
+        })
+        .catch(function (err) {
+            if (token !== assignToken) { return; }
+            body.innerHTML = '<div class="dx-assign-state"><i class="bi bi-exclamation-circle" aria-hidden="true"></i>' +
+                             '<strong>Could not load staff</strong>' + esc(messageOf(err)) +
+                             '<br><button type="button" class="dx-btn dx-btn--sm" data-assign-retry>Try again</button></div>';
+        });
+    }
+
+    byId('dxAssignBody').addEventListener('change', function (e) {
+        if (e.target.name === 'dxAssignee') { assignReady(true); }
+    });
+
+    byId('dxAssignBody').addEventListener('click', function (e) {
+        if (e.target.closest('[data-assign-retry]')) { loadAssign(''); }
+    });
+
+    byId('dxAssignOk').addEventListener('click', function () {
+        var picked = document.querySelector('input[name="dxAssignee"]:checked');
+        if (!picked || !assignCtx) { assignError('Choose who will handle this patient.'); return; }
+
+        var ok = this;
+        var ctx = assignCtx;
+        var form = new FormData();
+        form.append('assigned_to', picked.value);
+
+        ok.disabled = true;
+        ok.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Starting…';
+        assignError('');
+
+        fetch(
+            API + 'update-diagnostic-status/' + encodeURIComponent(ctx.id) + '/' +
+                encodeURIComponent(ctx.type) + '/in_progress',
+            { method: 'POST', body: form, headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '<?= csrf_hash() ?>' } }
+        )
+        .then(parseJson)
+        .then(function (data) {
+            if (data.success) {
+                queueToast('Assigned to ' + (data.assigned_to || picked.dataset.name) + ' · ' + ctx.reference);
+                location.reload();
+                return;
+            }
+            if (data.conflict) {
+                loadAssign(data.message || 'Someone else changed this request. The list has been refreshed.');
+                return;
+            }
+            throw data.message || 'The request could not be started.';
+        })
+        .catch(function (err) {
+            assignError(messageOf(err));
+            assignReady(true);
+        });
+    });
+
+    byId('dxAssignModal').addEventListener('hidden.bs.modal', function () {
+        assignToken++;
+        assignCtx = null;
+    });
 
 
     function askDelete(ctx) {
@@ -2414,7 +2652,7 @@ $filterTabs = [
         byId('viewRequestSubtitle').innerHTML = subtitleHtml(ctx.reference, ctx.kind, '', false);
         byId('viewRequestStatus').innerHTML = '';
 
-        ['id', 'type', 'status', 'reference', 'patient', 'kind', 'amount'].forEach(function (k) {
+        ['id', 'type', 'status', 'reference', 'patient', 'kind', 'amount', 'startLock'].forEach(function (k) {
             actions.dataset[k] = ctx[k] || '';
         });
         actions.innerHTML = '';
@@ -2552,8 +2790,11 @@ $filterTabs = [
                        '"><i class="bi bi-printer" aria-hidden="true"></i> Print result</a>';
         } else if (status === 'cancelled') {
             buttons += '<button type="button" class="dx-btn" data-action="status" data-status="pending">Restore</button>';
+        } else if (status === 'pending' && ctx.startLock) {
+            buttons += '<span class="dx-waiting dx-waiting--locked"><i class="bi bi-person-lock" aria-hidden="true"></i> ' +
+                       esc(ctx.startLock) + '</span>';
         } else if (status === 'pending') {
-            buttons += '<button type="button" class="dx-btn dx-btn--primary" data-action="status" data-status="in_progress">' +
+            buttons += '<button type="button" class="dx-btn dx-btn--primary" data-action="start">' +
                        '<i class="bi bi-send" aria-hidden="true"></i> Send to lab / x-ray</button>';
         } else {
             buttons += '<span class="dx-waiting"><i class="bi bi-hourglass-split" aria-hidden="true"></i> ' +

@@ -10,10 +10,16 @@ use App\Models\PaymentModel;
 use App\Models\ServiceModel;
 use App\Models\UserModel;
 use App\Controllers\Concerns\HandlesDepartmentReports;
+use App\Controllers\Concerns\HandlesPatientTransfers;
 
 class MedTech extends BaseController
 {
     use HandlesDepartmentReports;
+    use HandlesPatientTransfers;
+
+    protected function transferType(): string { return DiagnosticRequestModel::TYPE_LAB; }
+    protected function transferBase(): string { return 'medtech'; }
+    protected function transferHome(): string { return 'medtech/requests'; }
 
     private function checkAuth()
     {
@@ -45,6 +51,17 @@ class MedTech extends BaseController
             $update['med_tech_id']   = PaymentModel::currentStaffId();
         }
         return $update;
+    }
+
+    /** Refuse the write when the front desk assigned this request to another med tech. */
+    private function assignedElsewhere(array $request)
+    {
+        $owner = DiagnosticRequestModel::assignedToOther($request, PaymentModel::currentStaffId());
+        if ($owner === null) {
+            return null;
+        }
+        return redirect()->to(base_url('medtech/request/view/' . (int) $request['id']))
+                        ->with('error', 'This request is assigned to ' . $owner . '. Only they can work on it.');
     }
 
     private function departmentStatuses(): array
@@ -444,6 +461,7 @@ class MedTech extends BaseController
         }
         $data['currentStatus'] = $status;
         $data['counts']        = $labRequestModel->getDepartmentCounts($type);
+        $data['transfer']      = $this->transferPanelData();
 
         return view('MedTech/requests', $data);
     }
@@ -491,6 +509,9 @@ class MedTech extends BaseController
         // time typing results they cannot save.
         $data['isPaid'] = $this->requestIsPaid((int) $id, DiagnosticRequestModel::TYPE_LAB);
 
+        // Set when another med tech has this request; saving is refused.
+        $data['assignedTo'] = DiagnosticRequestModel::assignedToOther($request, PaymentModel::currentStaffId());
+
         return view('MedTech/view_request', $data);
     }
 
@@ -535,6 +556,8 @@ class MedTech extends BaseController
                             ->with('error', 'This request has not been paid yet. '
                                 . 'The receptionist must click Start before results can be entered.');
         }
+
+        if ($blocked = $this->assignedElsewhere($request)) return $blocked;
 
         $testNames = $this->request->getPost('test_name') ?? [];
         $results   = $this->request->getPost('result') ?? [];
@@ -594,6 +617,8 @@ class MedTech extends BaseController
                                 . 'The receptionist must click Start before findings can be saved.');
         }
 
+        if ($blocked = $this->assignedElsewhere($request)) return $blocked;
+
         $findings = $this->request->getPost('findings');
         $remarks  = $this->request->getPost('remarks');
         $action   = $this->request->getPost('action') ?? 'save';
@@ -640,6 +665,8 @@ class MedTech extends BaseController
                             ->with('error', 'This request has not been paid yet.');
         }
 
+        if ($blocked = $this->assignedElsewhere($request)) return $blocked;
+
         $results = $labResultModel->getByRequest($id);
         if (empty($results)) {
             return redirect()->back()->with('error', 'Please enter test results first');
@@ -685,6 +712,8 @@ class MedTech extends BaseController
                             ->with('error', 'This request has not been paid yet. '
                                 . 'The receptionist must click Start before results can be released.');
         }
+
+        if ($blocked = $this->assignedElsewhere($request)) return $blocked;
 
         $action = (string) ($this->request->getPost('submit_action') ?? 'save');
         if (!in_array($action, ['save', 'complete', 'release'], true)) {

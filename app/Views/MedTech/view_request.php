@@ -121,6 +121,19 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
         </div>
     <?php endif; ?>
 
+    <?php if (!empty($assignedTo) && !$isReleased): ?>
+        <div class="lab-msg lab-msg--err" role="alert">
+            <i class="bi bi-person-lock" aria-hidden="true"></i>
+            <div>
+                <strong>Assigned to <?= esc($assignedTo) ?>.</strong>
+                <p style="margin:.35rem 0 0;font-size:.8rem;">
+                    The front desk sent this patient to another med tech.
+                    You can still view the request but saving will be refused.
+                </p>
+            </div>
+        </div>
+    <?php endif; ?>
+
 
     <!-- ============================================================
          HERO

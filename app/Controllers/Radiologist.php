@@ -9,10 +9,16 @@ use App\Models\PaymentModel;
 use App\Models\ServiceModel;
 use App\Models\UserModel;
 use App\Controllers\Concerns\HandlesDepartmentReports;
+use App\Controllers\Concerns\HandlesPatientTransfers;
 
 class Radiologist extends BaseController
 {
     use HandlesDepartmentReports;
+    use HandlesPatientTransfers;
+
+    protected function transferType(): string { return DiagnosticRequestModel::TYPE_XRAY; }
+    protected function transferBase(): string { return 'radiologist'; }
+    protected function transferHome(): string { return 'radiologist/examinations'; }
 
     private function checkAuth()
     {
@@ -34,6 +40,17 @@ class Radiologist extends BaseController
             ->where('id', (int) $id)
             ->where('type', DiagnosticRequestModel::TYPE_XRAY)
             ->first();
+    }
+
+    /** Refuse the write when the front desk assigned this study to another radiologist. */
+    private function assignedElsewhere(array $examination)
+    {
+        $owner = DiagnosticRequestModel::assignedToOther($examination, PaymentModel::currentStaffId());
+        if ($owner === null) {
+            return null;
+        }
+        return redirect()->to(base_url('radiologist/examination/view/' . (int) $examination['id']))
+                        ->with('error', 'This study is assigned to ' . $owner . '. Only they can work on it.');
     }
 
     private function departmentStatuses(): array
@@ -167,6 +184,10 @@ class Radiologist extends BaseController
 
         $data['servicesCatalog'] = $this->getAvailableXrayServices();
 
+        // "Weekly Study Volume" card: this week's studies per day by modality.
+        $model->resetQuery();
+        $data['weekly_data'] = $model->getWeeklyVolumeData();
+
         $data['kpiTrends'] = $this->getKpiTrends(14, (int) $data['total']);
 
         return view('Radiologist/dashboard', $data);
@@ -284,6 +305,7 @@ class Radiologist extends BaseController
 
         $data['examinations'] = DiagnosticRequestModel::withDepartmentStatus($data['examinations']);
         $data['counts']       = $this->departmentCounts();
+        $data['transfer']     = $this->transferPanelData();
 
         return view('Radiologist/examinations', $data);
     }
@@ -307,6 +329,9 @@ class Radiologist extends BaseController
         // Pass the payment state to the view so it can disable the
         // report form when the study has not been paid yet.
         $data['isPaid'] = $this->requestIsPaid((int) $id, DiagnosticRequestModel::TYPE_XRAY);
+
+        // Set when another radiologist has this study; saving is refused.
+        $data['assignedTo'] = DiagnosticRequestModel::assignedToOther($data['examination'], PaymentModel::currentStaffId());
 
         return view('Radiologist/view_examination', $data);
     }
@@ -334,6 +359,8 @@ class Radiologist extends BaseController
                                 ->with('error', 'This study has not been paid yet. '
                                     . 'The receptionist must click Start before the report can be written.');
             }
+
+            if ($blocked = $this->assignedElsewhere($examination)) return $blocked;
 
             if ($examination['status'] === 'released') {
                 return redirect()->to(base_url('radiologist/examination/view/' . $id))
@@ -391,6 +418,8 @@ class Radiologist extends BaseController
                                 ->with('error', 'This study has not been paid yet. '
                                     . 'The receptionist must click Start before the report can be saved.');
             }
+
+            if ($blocked = $this->assignedElsewhere($examination)) return $blocked;
 
             if ($examination['status'] === 'released') {
                 return redirect()->to(base_url('radiologist/examination/view/' . $id))
@@ -573,6 +602,8 @@ class Radiologist extends BaseController
             return redirect()->back()->with('error', 'This study has not been paid yet.');
         }
 
+        if ($blocked = $this->assignedElsewhere($examination)) return $blocked;
+
         if (($examination['status'] ?? '') === 'released') {
             return redirect()->back()->with('error', 'This report has already been released. Images can no longer be changed.');
         }
@@ -691,6 +722,8 @@ class Radiologist extends BaseController
             return redirect()->back()->with('error', 'This study has not been paid yet.');
         }
 
+        if ($blocked = $this->assignedElsewhere($examination)) return $blocked;
+
         if (($examination['status'] ?? '') === 'released') {
             return redirect()->back()->with('error', 'This report has already been released. Images can no longer be changed.');
         }
@@ -751,6 +784,8 @@ class Radiologist extends BaseController
                 return redirect()->to(base_url('radiologist/examinations'))
                                 ->with('error', 'This study has not been paid yet.');
             }
+
+            if ($blocked = $this->assignedElsewhere($examination)) return $blocked;
 
             if ($examination['status'] === 'released') {
                 return redirect()->to(base_url('radiologist/examination/view/' . $id))

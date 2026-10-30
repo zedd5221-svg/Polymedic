@@ -146,34 +146,42 @@ $generatedAt = date('F j, Y · g:i A');
     .tick { font:9px var(--sans); fill:var(--muted); }
 
     /* Certification + signatures */
-    .signoff { break-inside:avoid; }
+    .signoff { break-inside:avoid; page-break-inside:avoid; }
     .cert { margin-top:22px; padding:10px 12px; background:var(--band); font:9.5pt/1.55 var(--serif); color:var(--ink-2); }
     .cert b { font-family:var(--sans); }
-    .signs { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:26px; margin-top:34px; }
-    .sign { text-align:center; font-size:8pt; color:var(--muted); }
-    .sign b { display:block; min-height:15px; padding-bottom:3px; border-bottom:1px solid var(--ink); margin-bottom:4px; font-size:9.5pt; color:var(--ink); }
-    .sign span { display:block; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-2); }
-    .sign i { display:block; margin-top:8px; font-style:normal; }
+    /* Three equal fluid columns on any paper. The columns share one set of rows
+       (subgrid), so if any name or title wraps, every line and date stays level. */
+    .signs { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); grid-template-rows:repeat(4, auto); column-gap:5%; margin-top:1.2em; font-size:8pt; line-height:1.35; }
+    .sign { display:grid; grid-row:span 4; grid-template-rows:subgrid; min-width:0; color:var(--muted); text-align:center; overflow-wrap:anywhere; }
+    @supports not (grid-template-rows:subgrid) {
+        .sign { grid-template-rows:3.2em auto 2.8em 2em; }
+    }
+    .sign-name { display:flex; align-items:flex-end; justify-content:center; min-height:3.2em; padding-bottom:.25em; border-bottom:1px solid var(--ink); font-size:9.5pt; font-weight:700; color:var(--ink); }
+    .sign-role { margin-top:.35em; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-2); }
+    .sign-date { display:flex; align-items:flex-end; gap:.5em; min-height:2em; text-align:left; }
+    .sign-date span { flex:1; min-width:0; border-bottom:1px solid var(--ink-2); }
 
     .endnote { margin-top:16px; padding-top:6px; border-top:1px solid var(--rule); display:flex; justify-content:space-between; gap:12px; font-size:7.5pt; color:var(--muted); }
     .annex { break-before:page; }
     .annex.is-off { display:none; }
     .tag { display:inline-block; padding:0 5px; border:1px solid currentColor; border-radius:3px; font-size:7pt; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
 
-    @media (max-width: 720px) {
+    /* Screen only: narrow paper must not pick up the phone layout when printing. */
+    @media screen and (max-width: 720px) {
         .sheet { padding:20px 16px; }
         .lh { flex-wrap:wrap; }
         .lh-doc { text-align:left; width:100%; }
         .meta, .figs { grid-template-columns:repeat(2, minmax(0,1fr)); }
         .fig:nth-child(3) { border-left:0; padding-left:0; }
-        .two, .signs { grid-template-columns:1fr; }
+        .two { grid-template-columns:1fr; }
         .scroll { overflow-x:auto; }
     }
 
-    /* ---- Print: A4, real margins, running footer with page numbers ---- */
+    /* ---- Print: portrait on the paper chosen in the print dialog, real margins,
+            running footer with page numbers ---- */
     @page {
-        size: A4 portrait;
-        margin: 14mm 13mm 16mm;
+        size: portrait;
+        margin: 12mm 13mm 15mm;
         @bottom-left  { content: "<?= esc($clinic['name'], 'css') ?> · <?= esc($paper['title'], 'css') ?> <?= esc($paper['no'], 'css') ?>"; font: 7pt "Segoe UI", Arial, sans-serif; color: #6b7280; }
         @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 7pt "Segoe UI", Arial, sans-serif; color: #6b7280; }
     }
@@ -182,8 +190,36 @@ $generatedAt = date('F j, Y · g:i A');
         .toolbar { display:none; }
         .sheet { max-width:none; padding:0; box-shadow:none; }
         * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-        section, .two > *, figure, .box { break-inside:avoid; }
-        section.long { break-inside:auto; }
+
+        /* Tighter than the screen preview, so sections fit instead of jumping a page. */
+        section { margin-top:12px; }
+        h2 { margin-bottom:5px; padding-bottom:3px; }
+        p.lead { font-size:10pt; line-height:1.45; }
+        .figs { margin-top:8px; }
+        .fig { padding-top:5px; padding-bottom:5px; }
+        th, td { padding-top:3px; padding-bottom:3px; }
+        table.dense td { padding-top:1px; padding-bottom:1px; line-height:1.25; }
+        tr.group td { padding-top:5px; }
+        figure { margin-bottom:6px; }
+        .cert { margin-top:14px; padding:7px 10px; font-size:9pt; line-height:1.45; }
+        .endnote { margin-top:10px; }
+
+        /* Pagination: small blocks stay whole, long tables flow across pages. */
+        section, .two > *, figure, .box, .figs, .signoff, .keep { break-inside:avoid; }
+        section.long, .long .two > * { break-inside:auto; }
+        p, li { orphans:3; widows:3; }
+
+        /* Headers repeat on each page; rows never split. */
+        thead { display:table-header-group; break-inside:avoid; }
+        tr, td, th { break-inside:avoid; }
+
+        /* No heading or header row alone at a page bottom, no total alone at a page top. */
+        h2, thead, tbody tr:first-child { break-after:avoid; }
+        tfoot, tfoot tr { break-before:avoid; break-inside:avoid; }
+        tbody tr:nth-last-child(2) { break-after:avoid; }
+
+        /* The annex always starts on its own sheet. */
+        .annex { break-before:page; margin-top:0; }
     }
 </style>
 </head>
@@ -195,7 +231,15 @@ $generatedAt = date('F j, Y · g:i A');
     <?php if (isset($paper['annex'])): ?>
         <label><input type="checkbox" id="annexToggle" <?= $paper['annex'] ? 'checked' : '' ?>> <?= esc($paper['annexLabel'] ?? 'Include annex') ?></label>
     <?php endif; ?>
-    <button type="button" class="primary" onclick="window.print()">Print / Save as PDF</button>
+    <button type="button" class="primary" onclick="window.print()">Print</button>
+    <?= view('partials/pdf_tools', ['pdf' => [
+        // Internal report: no default recipient.
+        'target'   => '.sheet',
+        'filename' => $paper['title'] . ' ' . $paper['no'],
+        'label'    => strtolower($paper['title']),
+        'subject'  => $paper['title'] . ' ' . $paper['no'] . ' · ' . $clinic['name'],
+        'message'  => "Good day,\n\nAttached is the " . $paper['title'] . ' (No. ' . $paper['no'] . ").\n\nThank you.",
+    ]]) ?>
 </div>
 
 <main class="sheet">

@@ -1111,6 +1111,25 @@
         border-radius: 50%;
     }
 
+    /* Leading pictures, matched to the notifications page tiles */
+    .notif-dropdown-menu .notif-icon-box.is-avatar,
+    .notif-dropdown-menu .notif-icon-box.is-initials { border-radius: 50%; overflow: hidden; }
+    .notif-dropdown-menu .notif-icon-box.is-avatar { background: #eaf2fe !important; }
+    .notif-dropdown-menu .notif-icon-box.is-png { background: transparent !important; }
+    .notif-dropdown-menu .notif-icon-box img { width: 100%; height: 100%; display: block; }
+    .notif-dropdown-menu .notif-icon-box.is-avatar img { object-fit: cover; }
+    .notif-dropdown-menu .notif-icon-box.is-png img { object-fit: contain; }
+    .notif-dropdown-menu .notif-icon-box.is-initials {
+        background: #f1f5f9 !important; color: #334155 !important;
+        font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em;
+    }
+    .notif-dropdown-menu .notif-icon-box.appointment { background: #ccfbf1 !important; color: #0d9488 !important; }
+    .notif-dropdown-menu .notif-icon-box.xray        { background: #ede9fe !important; color: #6d28d9 !important; }
+    .notif-dropdown-menu .notif-icon-box.lab         { background: #dcfce7 !important; color: #15803d !important; }
+    .notif-dropdown-menu .notif-icon-box.billing,
+    .notif-dropdown-menu .notif-icon-box.payment     { background: #ffe4e6 !important; color: #be123c !important; }
+    .notif-dropdown-menu .notif-icon-box.system      { background: #fef3c7 !important; color: #b45309 !important; }
+
     .notif-icon-box {
         width: 34px;
         height: 34px;
@@ -1940,6 +1959,22 @@
         }
     }
 
+    // Leading picture, the same one the notifications page shows
+    // (NotificationModel::leadFor): patient avatar, initials, lab /
+    // x-ray PNG, or the type's icon tile.
+    function notifLeadHtml(item, iconClass, colorClass) {
+        var lead = item.lead || {};
+        if (lead.kind === 'img') {
+            return '<div class="notif-icon-box ' + (lead.avatar ? 'is-avatar' : 'is-png') + '">' +
+                   '<img src="' + escapeHtml(lead.src) + '" alt="" loading="lazy" decoding="async"></div>';
+        }
+        if (lead.kind === 'initials') {
+            return '<div class="notif-icon-box is-initials">' + escapeHtml(lead.text) + '</div>';
+        }
+        return '<div class="notif-icon-box ' + escapeHtml(lead.color || colorClass) + '">' +
+               '<i class="bi ' + escapeHtml(lead.icon || iconClass) + '"></i></div>';
+    }
+
     function renderNotificationDropdown(notifications) {
         var listContainer = document.getElementById('notifDropdownList');
         if (!listContainer) return;
@@ -1983,9 +2018,7 @@
 
             html += `
                 <a href="${link}" class="notif-item ${unreadClass}" onclick="markNotificationRead(${item.id}, event)">
-                    <div class="notif-icon-box ${colorClass}">
-                        <i class="bi ${iconClass}"></i>
-                    </div>
+                    ${notifLeadHtml(item, iconClass, colorClass)}
                     <div class="notif-content">
                         <div class="notif-title">${escapeHtml(item.title)}</div>
                         <div class="notif-msg">${escapeHtml(item.message)}</div>

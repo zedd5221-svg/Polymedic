@@ -376,6 +376,14 @@ html, body {
     .patient-cell:nth-child(odd) { border-right: 0; }
     .plate-frame { height: 120mm; }
 }
+
+/* PDF soft copy (partials/pdf_tools): each image sheet is already its
+   own page, so the plate must not break away from its heading, and the
+   image has to stay inside the frame to fit one A4 page. */
+html.pdfx-rendering .sheet { padding: 12mm; max-width: 210mm; }
+html.pdfx-rendering .plate { page-break-before: auto; margin-top: 2mm; }
+html.pdfx-rendering .plate-frame { height: 225mm; }
+html.pdfx-rendering .plate-img { transform: none; }
 </style>
 </head>
 <body>
@@ -386,6 +394,15 @@ html, body {
         <?= esc($backLabel ?? 'Back to report') ?>
     </a>
     <button type="button" onclick="window.print()">Print</button>
+    <?php $pdfRef = 'XR-' . date('Y', strtotime($examination['exam_date'])) . '-' . str_pad((string) $examination['id'], 4, '0', STR_PAD_LEFT); ?>
+    <?= view('partials/pdf_tools', ['pdf' => [
+        // The report sheet plus one sheet per image plate.
+        'target'   => '.sheet',
+        'filename' => $pdfRef . ' ' . ($examination['patient_name'] ?? ''),
+        'label'    => 'X-ray result',
+        'emailTo'  => (string) ($examination['email'] ?? ''),
+        'subject'  => 'X-ray result ' . $pdfRef . ' · ' . config('Clinic')->name,
+    ]]) ?>
     <button type="button" class="secondary" onclick="window.close()">Close</button>
 </div>
 

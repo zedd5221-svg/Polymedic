@@ -988,6 +988,18 @@
        NOTIFICATION DROPDOWN
        ========================================================= */
 
+    .notif-actions { display: flex; gap: 6px; margin-top: 8px; }
+    .notif-act {
+        height: 28px; padding: 0 12px; font-size: 0.72rem; font-weight: 600;
+        color: #334155; background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer;
+    }
+    .notif-act:hover { background: #f8fafc; }
+    .notif-act--primary { color: #fff; background: #1976d2; border-color: #1976d2; }
+    .notif-act--primary:hover { background: #1565c0; }
+    .notif-act:disabled { opacity: 0.6; cursor: wait; }
+    .notif-actions-msg { font-size: 0.72rem; color: #166534; }
+    .notif-actions-msg.is-error { color: #b91c1c; }
+
     .notif-dropdown-menu {
         width: 340px;
         max-width: 90vw;
@@ -1037,6 +1049,25 @@
         background: var(--active-blue) !important;
         border-radius: 50%;
     }
+
+    /* Leading pictures, matched to the notifications page tiles */
+    .notif-dropdown-menu .notif-icon-box.is-avatar,
+    .notif-dropdown-menu .notif-icon-box.is-initials { border-radius: 50%; overflow: hidden; }
+    .notif-dropdown-menu .notif-icon-box.is-avatar { background: #eaf2fe !important; }
+    .notif-dropdown-menu .notif-icon-box.is-png { background: transparent !important; }
+    .notif-dropdown-menu .notif-icon-box img { width: 100%; height: 100%; display: block; }
+    .notif-dropdown-menu .notif-icon-box.is-avatar img { object-fit: cover; }
+    .notif-dropdown-menu .notif-icon-box.is-png img { object-fit: contain; }
+    .notif-dropdown-menu .notif-icon-box.is-initials {
+        background: #f1f5f9 !important; color: #334155 !important;
+        font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em;
+    }
+    .notif-dropdown-menu .notif-icon-box.appointment { background: #ccfbf1 !important; color: #0d9488 !important; }
+    .notif-dropdown-menu .notif-icon-box.xray        { background: #ede9fe !important; color: #6d28d9 !important; }
+    .notif-dropdown-menu .notif-icon-box.lab         { background: #dcfce7 !important; color: #15803d !important; }
+    .notif-dropdown-menu .notif-icon-box.billing,
+    .notif-dropdown-menu .notif-icon-box.payment     { background: #ffe4e6 !important; color: #be123c !important; }
+    .notif-dropdown-menu .notif-icon-box.system      { background: #fef3c7 !important; color: #b45309 !important; }
 
     .notif-icon-box {
         width: 34px;
@@ -1736,6 +1767,22 @@
         }
     }
 
+    // Leading picture, the same one the notifications page shows
+    // (NotificationModel::leadFor): patient avatar, initials, lab /
+    // x-ray PNG, or the type's icon tile.
+    function notifLeadHtml(item, iconClass, colorClass) {
+        var lead = item.lead || {};
+        if (lead.kind === 'img') {
+            return '<div class="notif-icon-box ' + (lead.avatar ? 'is-avatar' : 'is-png') + '">' +
+                   '<img src="' + escapeHtml(lead.src) + '" alt="" loading="lazy" decoding="async"></div>';
+        }
+        if (lead.kind === 'initials') {
+            return '<div class="notif-icon-box is-initials">' + escapeHtml(lead.text) + '</div>';
+        }
+        return '<div class="notif-icon-box ' + escapeHtml(lead.color || colorClass) + '">' +
+               '<i class="bi ' + escapeHtml(lead.icon || iconClass) + '"></i></div>';
+    }
+
     function renderNotificationDropdown(notifications) {
         var listContainer = document.getElementById('notifDropdownList');
         if (!listContainer) return;
@@ -1775,13 +1822,32 @@
                 colorClass = 'payment';
             }
 
+            if (item.type === 'transfer') { iconClass = 'bi-arrow-left-right'; colorClass = 'system'; }
+
             var link = item.link || '#';
+
+            // A transfer request still waiting for this user's answer:
+            // answer it from here, so no link wrapping the buttons.
+            if (item.transfer_pending) {
+                html +=
+                    '<div class="notif-item unread">' +
+                        notifLeadHtml(item, iconClass, colorClass) +
+                        '<div class="notif-content">' +
+                            '<div class="notif-title">' + escapeHtml(item.title) + '</div>' +
+                            '<div class="notif-msg">' + escapeHtml(item.message) + '</div>' +
+                            '<div class="notif-time"><i class="bi bi-clock me-1"></i>' + item.time_ago + '</div>' +
+                            '<div class="notif-actions">' +
+                                '<button type="button" class="notif-act" onclick="respondTransfer(' + Number(item.reference_id) + ', \'decline\', this, event)">Decline</button>' +
+                                '<button type="button" class="notif-act notif-act--primary" onclick="respondTransfer(' + Number(item.reference_id) + ', \'accept\', this, event)">Accept</button>' +
+                            '</div>' +
+                        '</div>' +
+                    '</div>';
+                return;
+            }
 
             html += `
                 <a href="${link}" class="notif-item ${unreadClass}" onclick="markNotificationRead(${item.id}, event)">
-                    <div class="notif-icon-box ${colorClass}">
-                        <i class="bi ${iconClass}"></i>
-                    </div>
+                    ${notifLeadHtml(item, iconClass, colorClass)}
                     <div class="notif-content">
                         <div class="notif-title">${escapeHtml(item.title)}</div>
                         <div class="notif-msg">${escapeHtml(item.message)}</div>
@@ -1793,6 +1859,32 @@
 
         listContainer.innerHTML = html;
     }
+
+    window.respondTransfer = function(id, action, btn, event) {
+        if (event) event.stopPropagation();
+
+        var box = btn.closest('.notif-actions');
+        box.querySelectorAll('button').forEach(function(b) { b.disabled = true; });
+
+        var body = new FormData();
+        body.append('action', action);
+
+        fetch('<?= base_url() ?>radiologist/transfer/respond/' + id, {
+            method: 'POST',
+            body: body,
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '<?= csrf_hash() ?>' }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            box.innerHTML = '<span class="notif-actions-msg' + (data.success ? '' : ' is-error') + '">' +
+                            escapeHtml(data.message || 'Something went wrong.') + '</span>';
+            // The worklist and the patients both change hands; reload to show it.
+            if (data.success) setTimeout(function() { window.location.reload(); }, 1500);
+        })
+        .catch(function() {
+            box.innerHTML = '<span class="notif-actions-msg is-error">Could not reach the server. Try again.</span>';
+        });
+    };
 
     window.markNotificationRead = function(id, event) {
         fetch('<?= base_url() ?>radiologist/notifications/mark-read/' + id, {

@@ -98,6 +98,7 @@ $routes->group('receptionist', ['filter' => 'auth:receptionist'], function ($rou
 
     $routes->get('payments', 'Receptionist::payments');
     $routes->get('reports', 'Receptionist::reports');
+    $routes->get('reports/revenue', 'Receptionist::revenueReport');
 
     // Notifications
     $routes->get('notifications', 'NotificationController::receptionistIndex');
@@ -131,6 +132,7 @@ $routes->group('receptionist', ['filter' => 'auth:receptionist'], function ($rou
 $routes->group('radiologist', ['filter' => 'auth:radiologist'], function ($routes) {
     $routes->get('dashboard', 'Radiologist::dashboard');
     $routes->get('reports', 'Radiologist::reports');
+    $routes->get('reports/print', 'Radiologist::reportPaper');
 
     // Examinations
     $routes->get('examinations', 'Radiologist::examinations');
@@ -158,6 +160,7 @@ $routes->group('radiologist', ['filter' => 'auth:radiologist'], function ($route
 $routes->group('medtech', ['filter' => 'auth:med_tech'], function ($routes) {
     $routes->get('dashboard', 'MedTech::dashboard');
     $routes->get('reports', 'MedTech::reports');
+    $routes->get('reports/print', 'MedTech::reportPaper');
 
     // Requests
     $routes->get('requests', 'MedTech::requests');
@@ -239,6 +242,7 @@ $routes->group('admin/billing', ['filter' => 'auth:admin'], function ($routes) {
     $routes->post('sync-request/(:num)', 'Billing::syncRequest/$1');   // ← NEW
     $routes->get('receipt/(:num)', 'Billing::receipt/$1');
     $routes->get('reports',        'Billing::reports');
+    $routes->get('reports/revenue', 'Billing::revenueReport');
 });
 
 $routes->group('receptionist/billing', ['filter' => 'auth:receptionist'], function ($routes) {

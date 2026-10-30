@@ -149,6 +149,13 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
                 <i class="bi bi-download"></i>
                 <span>Export CSV</span>
             </button>
+            <?php if (!empty($isAdminUser)): ?>
+                <a class="bl-btn bl-btn--primary" target="_blank" rel="noopener"
+                   href="<?= base_url('admin/billing/reports/revenue') . '?' . http_build_query(['range' => 'custom', 'from' => $from, 'to' => $to]) ?>">
+                    <i class="bi bi-file-earmark-text"></i>
+                    <span>Revenue report</span>
+                </a>
+            <?php endif; ?>
             <a class="bl-btn" href="<?= base_url($routeBase) ?>">
                 <i class="bi bi-arrow-left"></i>
                 <span>Back to billing</span>

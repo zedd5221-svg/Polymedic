@@ -316,8 +316,14 @@ class PaymentModel extends Model
 
     public function getXrayRevenueBetween(string $from, string $to): float
     {
+        return $this->getRevenueBetween('xray', $from, $to);
+    }
+
+    /** Paid collections for one department (lab | xray) in a date window. */
+    public function getRevenueBetween(string $type, string $from, string $to): float
+    {
         $row = $this->selectSum('amount_paid', 'revenue')
-                    ->where('request_type', 'xray')
+                    ->where('request_type', $type)
                     ->where('payment_status', self::STATUS_PAID)
                     ->where('payment_date >=', $from . ' 00:00:00')
                     ->where('payment_date <=', $to   . ' 23:59:59')

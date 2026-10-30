@@ -11,11 +11,13 @@ use App\Models\PaymentModel;
 use App\Models\AvailabilityModel;
 use App\Models\InvoiceModel;
 use App\Models\UserModel;
+use App\Controllers\Concerns\BuildsRevenueReport;
 use App\Controllers\Concerns\HandlesDiagnosticRequests;
 
 class Receptionist extends BaseController
 {
     use HandlesDiagnosticRequests;
+    use BuildsRevenueReport;
 
     // The 'auth:receptionist' route filter is the real guard; this is
     // a second check in case a route is ever registered without it.
@@ -531,10 +533,7 @@ class Receptionist extends BaseController
         [$range, $from, $to] = $this->reportRange();
         $cashier = trim((string) ($this->request->getGet('cashier') ?? ''));
 
-        // Same-length window just before this one, for the deltas.
-        $days     = (int) ((strtotime($to) - strtotime($from)) / 86400) + 1;
-        $prevTo   = date('Y-m-d', strtotime($from . ' -1 day'));
-        $prevFrom = date('Y-m-d', strtotime($prevTo . ' -' . ($days - 1) . ' days'));
+        [$days, $prevFrom, $prevTo] = $this->previousWindow($from, $to);
 
         $payments = $this->reportPayments($from, $to, $cashier);
 
@@ -575,122 +574,19 @@ class Receptionist extends BaseController
         ]);
     }
 
-    /** Resolve the report window from the GET params. Returns [range, from, to]. */
-    private function reportRange(): array
+    /* ============================================================
+       REVENUE REPORT — printable A4 business report
+       Same filters and figures as reports(), laid out as a paper
+       report: statement vs previous period and year-to-date,
+       collections, schedule, receivables, certification.
+       GET: range, from, to, cashier (as reports()), annex=0
+       ============================================================ */
+    public function revenueReport()
     {
-        $range = (string) ($this->request->getGet('range') ?? 'today');
-        $today = date('Y-m-d');
+        $redirect = $this->checkAuth();
+        if ($redirect) return $redirect;
 
-        switch ($range) {
-            case 'yesterday':
-                $d = date('Y-m-d', strtotime('-1 day'));
-                return [$range, $d, $d];
-            case 'week':
-                return [$range, date('Y-m-d', strtotime('monday this week')), $today];
-            case 'month':
-                return [$range, date('Y-m-01'), $today];
-            case 'last_month':
-                return [$range, date('Y-m-01', strtotime('first day of last month')), date('Y-m-t', strtotime('last day of last month'))];
-            case 'custom':
-                $from = (string) $this->request->getGet('from');
-                $to   = (string) $this->request->getGet('to');
-                if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from)) $from = $today;
-                if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $to))   $to   = $today;
-                if ($from > $to) [$from, $to] = [$to, $from];
-                // Keep the transaction log a sane size.
-                if ((strtotime($to) - strtotime($from)) / 86400 > 366) {
-                    $from = date('Y-m-d', strtotime($to . ' -366 days'));
-                }
-                return [$range, $from, $to];
-            default:
-                return ['today', $today, $today];
-        }
-    }
-
-    /** Paid + refunded payments in the window, newest first. */
-    private function reportPayments(string $from, string $to, string $cashier = ''): array
-    {
-        $builder = (new PaymentModel())
-            ->whereIn('payment_status', [PaymentModel::STATUS_PAID, PaymentModel::STATUS_REFUNDED])
-            ->where('payment_date >=', $from . ' 00:00:00')
-            ->where('payment_date <=', $to . ' 23:59:59');
-
-        if ($cashier !== '') {
-            $builder->where('received_by', $cashier);
-        }
-
-        return $builder->orderBy('payment_date', 'DESC')->findAll();
-    }
-
-    /** Totals and breakdowns for a set of payment rows. */
-    private function summarisePayments(array $payments): array
-    {
-        $s = [
-            'gross' => 0.0, 'refunds' => 0.0, 'net' => 0.0,
-            'count' => 0, 'refund_count' => 0, 'patients' => 0, 'avg' => 0.0,
-            'cash' => 0.0, 'noncash' => 0.0, 'change' => 0.0,
-            'methods' => [], 'types' => [], 'cashiers' => [], 'services' => [],
-        ];
-        $patients = [];
-
-        foreach ($payments as $p) {
-            $amount = (float) ($p['amount_paid'] ?? 0);
-            $s['gross'] += $amount;
-
-            if (($p['payment_status'] ?? '') === PaymentModel::STATUS_REFUNDED) {
-                $s['refunds'] += $amount;
-                $s['refund_count']++;
-                continue;
-            }
-
-            $s['count']++;
-            $s['change'] += (float) ($p['change_amount'] ?? 0);
-
-            $method = strtolower((string) ($p['payment_method'] ?? '')) ?: 'other';
-            $s['methods'][$method]['count']  = ($s['methods'][$method]['count'] ?? 0) + 1;
-            $s['methods'][$method]['amount'] = ($s['methods'][$method]['amount'] ?? 0) + $amount;
-            if ($method === PaymentModel::METHOD_CASH) {
-                $s['cash'] += $amount;
-            } else {
-                $s['noncash'] += $amount;
-            }
-
-            $type = strtolower((string) ($p['request_type'] ?? '')) ?: 'other';
-            $s['types'][$type]['count']  = ($s['types'][$type]['count'] ?? 0) + 1;
-            $s['types'][$type]['amount'] = ($s['types'][$type]['amount'] ?? 0) + $amount;
-
-            $who = trim((string) ($p['received_by'] ?? '')) ?: 'Unassigned';
-            $s['cashiers'][$who]['count']  = ($s['cashiers'][$who]['count'] ?? 0) + 1;
-            $s['cashiers'][$who]['amount'] = ($s['cashiers'][$who]['amount'] ?? 0) + $amount;
-
-            $key = trim((string) ($p['patient_code'] ?? ''));
-            if ($key === '' || strtoupper($key) === 'N/A') {
-                $key = strtolower(trim((string) ($p['patient_name'] ?? '')));
-            }
-            if ($key !== '') $patients[$key] = true;
-
-            // Line items are billed charges, not money received
-            // (a partial payment still lists every service).
-            $decoded = json_decode((string) ($p['services'] ?? '[]'), true);
-            foreach (is_array($decoded) ? $decoded : [] as $item) {
-                $name   = trim((string) (is_array($item) ? ($item['name'] ?? $item['service_name'] ?? '') : $item));
-                $charge = is_array($item) ? (float) ($item['price'] ?? $item['charge'] ?? $item['amount'] ?? 0) : 0.0;
-                if ($name === '') continue;
-                $s['services'][$name]['count']  = ($s['services'][$name]['count'] ?? 0) + 1;
-                $s['services'][$name]['charge'] = ($s['services'][$name]['charge'] ?? 0) + $charge;
-                $s['services'][$name]['type']   = $type;
-            }
-        }
-
-        $s['net']      = $s['gross'] - $s['refunds'];
-        $s['patients'] = count($patients);
-        $s['avg']      = $s['count'] > 0 ? $s['net'] / $s['count'] : 0.0;
-
-        uasort($s['methods'], fn($a, $b) => $b['amount'] <=> $a['amount']);
-        uasort($s['cashiers'], fn($a, $b) => $b['amount'] <=> $a['amount']);
-        uasort($s['services'], fn($a, $b) => [$b['count'], $b['charge']] <=> [$a['count'], $a['charge']]);
-
-        return $s;
+        return view('Reports/revenue', $this->revenueReportData(base_url('receptionist/reports'), 'Front Desk / Cashier'));
     }
 
     /** Net collected per day across the window (zero-filled), or per hour for a single day. */
@@ -762,30 +658,6 @@ class Receptionist extends BaseController
         }
 
         return $out;
-    }
-
-    /** Open invoices (unpaid / partial) with their age in days, oldest first. */
-    private function unpaidInvoices(): array
-    {
-        $rows = (new InvoiceModel())
-            ->whereIn('status', [InvoiceModel::STATUS_UNPAID, InvoiceModel::STATUS_PARTIAL])
-            ->where('balance >', 0)
-            ->orderBy('created_at', 'ASC')
-            ->findAll();
-
-        $aging = ['0-7' => 0.0, '8-30' => 0.0, '31+' => 0.0];
-        $total = 0.0;
-        foreach ($rows as &$r) {
-            $r['age'] = (int) floor((strtotime(date('Y-m-d')) - strtotime(date('Y-m-d', strtotime((string) $r['created_at'])))) / 86400);
-            $bal      = (float) $r['balance'];
-            $total   += $bal;
-            if ($r['age'] <= 7)      $aging['0-7']  += $bal;
-            elseif ($r['age'] <= 30) $aging['8-30'] += $bal;
-            else                     $aging['31+']  += $bal;
-        }
-        unset($r);
-
-        return ['rows' => $rows, 'total' => $total, 'aging' => $aging];
     }
 
     /** Transaction log for the window as a CSV download. */

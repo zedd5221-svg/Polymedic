@@ -9,9 +9,12 @@ use App\Models\NotificationModel;
 use App\Models\PaymentModel;
 use App\Models\ServiceModel;
 use App\Models\UserModel;
+use App\Controllers\Concerns\HandlesDepartmentReports;
 
 class MedTech extends BaseController
 {
+    use HandlesDepartmentReports;
+
     private function checkAuth()
     {
         if (!session()->get('is_logged_in')) {
@@ -287,110 +290,23 @@ class MedTech extends BaseController
         ];
     }
 
+    /** Tests requested today per laboratory section (DiagnosticRequestModel::LAB_SECTIONS). */
     private function getSectionBreakdown($labRequestModel)
     {
-        $today = date('Y-m-d');
-        $type  = DiagnosticRequestModel::TYPE_LAB;
-
         $labRequestModel->resetQuery();
         $requests = $labRequestModel
-            ->where('type', $type)
-            ->where('DATE(created_at)', $today)
+            ->select('services')
+            ->where('type', DiagnosticRequestModel::TYPE_LAB)
+            ->where('DATE(created_at)', date('Y-m-d'))
             ->findAll();
 
-        $sectionMap = [
-            'Hematology' => [
-                'complete blood count', 'cbc',
-                'platelet count', 'platelet',
-                'esr',
-                'hemoglobin', 'hgb',
-                'hematocrit', 'hct',
-                'blood typing',
-                'rbc', 'wbc',
-                'mcv', 'mch', 'mchc', 'rdw',
-                'neutrophils', 'lymphocytes', 'monocytes',
-                'eosinophils', 'basophils',
-            ],
-            'Chemistry' => [
-                'glucose', 'rbs', 'fbs',
-                'hba1c',
-                'cholesterol', 'triglycerides',
-                'hdl', 'ldl', 'vldl',
-                'creatinine', 'blood uric acid', 'uric acid',
-                'blood urea nitrogen', 'bun',
-                'sgpt', 'alt', 'sgot', 'ast',
-                'sodium', 'potassium', 'chloride', 'calcium',
-                'electrolytes', 'albumin', 'bilirubin',
-                'alkaline phosphatase', 'protein',
-                'bicarbonate', 'magnesium', 'phosphorus',
-                'lipid profile', 'lipid',
-            ],
-            'Urinalysis' => [
-                'urinalysis', 'urine',
-                'specific gravity', 'ketones', 'urobilinogen',
-                'nitrite', 'leukocyte esterase',
-            ],
-            'Microscopy' => [
-                'fecalysis', 'fecal',
-                'semenanalysis', 'semen',
-            ],
-            'Serology' => [
-                'hbsag', 'hepatitis', 'anti-hbs',
-                'anti-hcv', 'hcv',
-                'hiv', 'anti-hiv',
-                'salmonella', 'typhi',
-                'syphilis', 't. pallidum',
-                'vdrl', 'rpr',
-                'dengue', 'igg', 'igm',
-                'rheumatoid factor', 'aso',
-                'antibody', 'antigen',
-            ],
-            'Thyroid' => [
-                'thyroid', 'thyroid panel', 'thyroid function',
-                't3 uptake', 'free t3', 'ft3',
-                'free t4', 'ft4',
-                'tsh', 't3', 't4',
-            ],
-            'Microbiology' => [
-                'culture', 'sensitivity', 'gram stain',
-                'blood culture', 'urine culture',
-                'sputum culture', 'stool culture',
-                'afb', 'fungal culture', 'bacterial culture',
-            ],
-            'Coagulation' => [
-                'coagulation',
-                'prothrombin time', 'pt',
-                'partial thromboplastin time', 'aptt',
-                'inr', 'bleeding time', 'clotting time',
-            ],
-        ];
-
         $sectionCounts = [];
-        foreach ($sectionMap as $section => $keywords) {
-            $sectionCounts[$section] = 0;
-        }
-        $sectionCounts['Other'] = 0;
-
         foreach ($requests as $request) {
-            $labServices = strtolower($request['lab_services'] ?? '');
-            $matched     = false;
-
-            foreach ($sectionMap as $section => $keywords) {
-                foreach ($keywords as $keyword) {
-                    if (strpos($labServices, $keyword) !== false) {
-                        $sectionCounts[$section]++;
-                        $matched = true;
-                        break 2;
-                    }
-                }
-            }
-
-            if (!$matched) {
-                $sectionCounts['Other']++;
+            foreach (array_filter(array_map('trim', explode(',', (string) ($request['services'] ?? '')))) as $test) {
+                $section = DiagnosticRequestModel::labSection($test);
+                $sectionCounts[$section] = ($sectionCounts[$section] ?? 0) + 1;
             }
         }
-
-        $sectionCounts = array_filter($sectionCounts);
         arsort($sectionCounts);
 
         return [
@@ -916,150 +832,55 @@ class MedTech extends BaseController
         return view('MedTech/print_result', $data);
     }
 
-    // =============================================
-    // REPORTS
-    // =============================================
+    /* ============================================================
+       LABORATORY REPORT — workload / turnaround for the lab.
+       Logic lives in HandlesDepartmentReports; this is the config.
+       GET: range, from, to, medtech, export=csv (page), annex=0 (paper)
+       ============================================================ */
+    protected function reportDepartment(): array
+    {
+        return [
+            'type'         => DiagnosticRequestModel::TYPE_LAB,
+            'base'         => 'medtech',
+            'view'         => 'MedTech/reports',
+            'staffParam'   => 'medtech',
+            'tat'          => ['stat' => 1, 'urgent' => 4, 'routine' => 24],   // hours, by priority
+            'name'         => 'Laboratory',
+            'unitName'     => 'Clinical Laboratory',
+            'title'        => 'Laboratory Workload & Turnaround Report',
+            'paperTitle'   => 'Laboratory Report',
+            'prefix'       => 'LB',
+            'case'         => ['request', 'requests'],
+            'item'         => ['test', 'tests'],
+            'staff'        => ['Medical Technologist', 'medical technologists'],
+            'status'       => [
+                'pending' => 'Awaiting processing', 'in_progress' => 'Processing', 'draft' => 'Draft saved',
+                'completed' => 'Awaiting release', 'released' => 'Released',
+            ],
+            'revenueLabel' => 'Lab revenue',
+            'worklist'     => 'medtech/requests',
+            'open'         => 'medtech/request/view/',
+            'print'        => 'medtech/request/print/',
+            'images'       => false,
+            'sections'     => true,
+            'signs'        => [['Prepared by', 'Medical Technologist'], ['Reviewed by', 'Chief Medical Technologist'], ['Noted by', 'Pathologist']],
+        ];
+    }
+
     public function reports()
     {
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
 
-        try {
-            $labRequestModel  = new DiagnosticRequestModel();
-            $appointmentModel = new AppointmentModel();
-            $type             = DiagnosticRequestModel::TYPE_LAB;
+        return $this->departmentReportPage();
+    }
 
-            $counts    = $labRequestModel->getDepartmentCounts($type);
-            $data['counts'] = [
-                'pending'     => $counts['pending']     ?? 0,
-                'in_progress' => $counts['in_progress'] ?? 0,
-                'draft'       => $counts['draft']       ?? 0,
-                'completed'   => $counts['completed']   ?? 0,
-                'released'    => $counts['released']    ?? 0,
-                'total'       => $counts['total']       ?? 0,
-            ];
+    /** Printable A4 laboratory report for the same filters as reports(). */
+    public function reportPaper()
+    {
+        $redirect = $this->checkAuth();
+        if ($redirect) return $redirect;
 
-            $data['counts']['in_progress_only'] = $counts['in_progress_only'] ?? 0;
-
-            $totalCount = $data['counts']['total'];
-            $data['totalCount'] = $totalCount > 0 ? $totalCount : 1;
-
-            $labRequestModel->resetQuery();
-            $data['requests'] = $labRequestModel
-                ->where('type', $type)
-                ->whereIn('status', $this->departmentStatuses())
-                ->orderBy('request_date', 'DESC')
-                ->orderBy('created_at', 'DESC')
-                ->findAll();
-            $data['requests'] = DiagnosticRequestModel::withDepartmentStatus($data['requests']);
-
-            $labRequestModel->resetQuery();
-            $monthlyStats = $labRequestModel
-                ->where('type', $type)
-                ->select("DATE_FORMAT(created_at, '%Y-%m') AS month, COUNT(*) AS total,
-                          CASE WHEN " . DiagnosticRequestModel::untouchedSql($type) . " THEN 'pending' ELSE status END AS dstatus", false)
-                ->whereIn('status', $this->departmentStatuses())
-                ->groupBy(['month', 'dstatus'])
-                ->orderBy('month', 'DESC')
-                ->findAll();
-
-            $monthlyData = [];
-            if (!empty($monthlyStats)) {
-                foreach ($monthlyStats as $stat) {
-                    $month = $stat['month'] ?? date('Y-m');
-                    if (!isset($monthlyData[$month])) {
-                        $monthlyData[$month] = [
-                            'pending'     => 0,
-                            'in_progress' => 0,
-                            'draft'       => 0,
-                            'completed'   => 0,
-                            'released'    => 0,
-                            'total'       => 0,
-                        ];
-                    }
-                    $status = $stat['dstatus'] ?? 'pending';
-                    $count  = (int) ($stat['total'] ?? 0);
-
-                    if (isset($monthlyData[$month][$status])) {
-                        $monthlyData[$month][$status] = $count;
-                        $monthlyData[$month]['total'] += $count;
-                    }
-                }
-                krsort($monthlyData);
-            }
-            $data['monthlyStats'] = $monthlyData;
-
-            $data['totalLabAppointments'] = $appointmentModel
-                ->where('lab_services IS NOT NULL')
-                ->where('lab_services !=', '[]')
-                ->where('lab_services !=', 'null')
-                ->countAllResults();
-
-            $labRequestModel->resetQuery();
-            $recentReports = $labRequestModel
-                ->where('type', $type)
-                ->whereIn('status', $this->departmentStatuses())
-                ->orderBy('created_at', 'DESC')
-                ->limit(10)
-                ->findAll();
-
-            $formattedReports = [];
-            if (!empty($recentReports)) {
-                foreach ($recentReports as $report) {
-                    $testNames = array_values(array_filter(array_map('trim', explode(',', (string) ($report['services'] ?? '')))));
-
-                    $testDisplay = !empty($testNames)
-                        ? implode(', ', array_slice($testNames, 0, 3))
-                          . (count($testNames) > 3 ? ' +' . (count($testNames) - 3) . ' more' : '')
-                        : 'Lab Test';
-
-                    $formattedReports[] = [
-                        'id'           => $report['id'] ?? 0,
-                        'patient_name' => $report['patient_name'] ?? 'Unknown',
-                        'age'          => $report['age'] ?? 'N/A',
-                        'test_name'    => $testDisplay,
-                        'status'       => DiagnosticRequestModel::departmentStatus($report),
-                        'requested_at' => $report['created_at'] ?? date('Y-m-d H:i:s'),
-                        'released_at'  => $report['released_at'] ?? null,
-                        'technologist' => ($report['med_tech_name'] ?? '') ?: (session()->get('full_name') ?? ''),
-                    ];
-                }
-            }
-            $data['recentReports'] = $formattedReports;
-
-            $statusLabels = ['Pending', 'In Progress', 'Draft', 'Completed', 'Released'];
-            $statusData   = [
-                $data['counts']['pending'],
-                $data['counts']['in_progress'],
-                $data['counts']['draft'],
-                $data['counts']['completed'],
-                $data['counts']['released'],
-            ];
-            $statusColors = ['#C2410C', '#1D4ED8', '#6c757d', '#15803D', '#0d9488'];
-
-            $data['statusLabels'] = json_encode($statusLabels);
-            $data['statusData']   = json_encode($statusData);
-            $data['statusColors'] = json_encode($statusColors);
-
-            return view('MedTech/reports', $data);
-
-        } catch (\Exception $e) {
-            log_message('error', 'MedTech reports error: ' . $e->getMessage());
-            log_message('error', 'File: ' . $e->getFile() . ' Line: ' . $e->getLine());
-
-            $data = [
-                'counts'               => ['pending' => 0, 'in_progress' => 0, 'draft' => 0, 'completed' => 0, 'released' => 0, 'total' => 0],
-                'totalCount'           => 1,
-                'requests'             => [],
-                'monthlyStats'         => [],
-                'totalLabAppointments' => 0,
-                'recentReports'        => [],
-                'statusLabels'         => json_encode(['Pending', 'In Progress', 'Draft', 'Completed', 'Released']),
-                'statusData'           => json_encode([0, 0, 0, 0, 0]),
-                'statusColors'         => json_encode(['#C2410C', '#1D4ED8', '#6c757d', '#15803D', '#0d9488']),
-            ];
-
-            return view('MedTech/reports', $data);
-        }
+        return $this->departmentReportPaper();
     }
 }

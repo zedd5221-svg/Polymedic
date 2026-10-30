@@ -114,6 +114,50 @@ class DiagnosticRequestModel extends Model
         self::TYPE_XRAY => ['id' => 'radiologist_id', 'name' => 'radiologist_name'],
     ];
 
+    /**
+     * Laboratory sections and the test-name keywords that place a test in
+     * one (matched as whole words, case-insensitive, first section wins).
+     */
+    const LAB_SECTIONS = [
+        'Hematology'   => ['complete blood count', 'cbc', 'platelet count', 'platelet', 'esr', 'hemoglobin', 'hgb',
+                           'hematocrit', 'hct', 'blood typing', 'rbc', 'wbc', 'mcv', 'mch', 'mchc', 'rdw',
+                           'neutrophils', 'lymphocytes', 'monocytes', 'eosinophils', 'basophils'],
+        'Chemistry'    => ['glucose', 'rbs', 'fbs', 'hba1c', 'cholesterol', 'triglycerides', 'hdl', 'ldl', 'vldl',
+                           'creatinine', 'blood uric acid', 'uric acid', 'blood urea nitrogen', 'bun', 'sgpt', 'alt',
+                           'sgot', 'ast', 'sodium', 'potassium', 'chloride', 'calcium', 'electrolytes', 'albumin',
+                           'bilirubin', 'alkaline phosphatase', 'protein', 'bicarbonate', 'magnesium', 'phosphorus',
+                           'lipid profile', 'lipid'],
+        'Urinalysis'   => ['urinalysis', 'urine', 'specific gravity', 'ketones', 'urobilinogen', 'nitrite', 'leukocyte esterase'],
+        'Microscopy'   => ['fecalysis', 'fecal', 'semenanalysis', 'semen'],
+        'Serology'     => ['hbsag', 'hepatitis', 'anti-hbs', 'anti-hcv', 'hcv', 'hiv', 'anti-hiv', 'salmonella', 'typhi',
+                           'syphilis', 't. pallidum', 'vdrl', 'rpr', 'dengue', 'igg', 'igm', 'rheumatoid factor', 'aso',
+                           'antibody', 'antigen'],
+        'Thyroid'      => ['thyroid', 'thyroid panel', 'thyroid function', 't3 uptake', 'free t3', 'ft3', 'free t4', 'ft4',
+                           'tsh', 't3', 't4'],
+        'Microbiology' => ['culture', 'sensitivity', 'gram stain', 'blood culture', 'urine culture', 'sputum culture',
+                           'stool culture', 'afb', 'fungal culture', 'bacterial culture'],
+        'Coagulation'  => ['coagulation', 'prothrombin time', 'pt', 'partial thromboplastin time', 'aptt', 'inr',
+                           'bleeding time', 'clotting time'],
+    ];
+
+    /** Section a lab test belongs to (LAB_SECTIONS), or 'Other'. */
+    public static function labSection(string $test): string
+    {
+        static $patterns = null;
+        if ($patterns === null) {
+            foreach (self::LAB_SECTIONS as $section => $keywords) {
+                $alts = implode('|', array_map(fn($k) => preg_quote($k, '/'), $keywords));
+                // Whole words only, so "pt" / "alt" / "ast" don't match inside other names.
+                $patterns[$section] = '/(?<![a-z0-9])(?:' . $alts . ')(?![a-z0-9])/i';
+            }
+        }
+
+        foreach ($patterns as $section => $pattern) {
+            if (preg_match($pattern, $test)) return $section;
+        }
+        return 'Other';
+    }
+
     /** Statuses a department works with (unpaid 'pending' rows excluded). */
     const DEPARTMENT_STATUSES = [
         self::STATUS_IN_PROGRESS, self::STATUS_DRAFT, self::STATUS_COMPLETED, self::STATUS_RELEASED,

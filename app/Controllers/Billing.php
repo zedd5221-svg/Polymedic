@@ -8,9 +8,12 @@ use App\Models\PaymentModel;
 use App\Models\PatientModel;
 use App\Models\DiagnosticRequestModel;
 use App\Models\ServiceModel;
+use App\Controllers\Concerns\BuildsRevenueReport;
 
 class Billing extends BaseController
 {
+    use BuildsRevenueReport;
+
     // =============================================================
     // AUTH + ROLE
     // =============================================================
@@ -789,5 +792,17 @@ class Billing extends BaseController
             'outstanding'    => (float) ($outstanding->total ?? 0),
             'aging'          => $aging,
         ]));
+    }
+
+    // =============================================================
+    // REVENUE REPORT (admin) — printable A4, same paper as the
+    // receptionist's, clinic-wide. GET: range, from, to, cashier, annex=0
+    // =============================================================
+    public function revenueReport()
+    {
+        $redirect = $this->checkAuth(['admin']);
+        if ($redirect) return $redirect;
+
+        return view('Reports/revenue', $this->revenueReportData(base_url('admin/billing/reports'), 'Administrator', 'month'));
     }
 }

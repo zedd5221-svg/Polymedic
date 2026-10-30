@@ -128,9 +128,12 @@
             <a class="rp-btn" href="<?= base_url('receptionist/reports') . '?' . $query(['export' => 'csv']) ?>">
                 <i class="bi bi-filetype-csv" aria-hidden="true"></i> Export CSV
             </a>
-            <button type="button" class="rp-btn rp-btn--primary" onclick="window.print()">
-                <i class="bi bi-printer" aria-hidden="true"></i> Print report
+            <button type="button" class="rp-btn" onclick="window.print()">
+                <i class="bi bi-printer" aria-hidden="true"></i> Print page
             </button>
+            <a class="rp-btn rp-btn--primary" href="<?= base_url('receptionist/reports/revenue') . '?' . $query() ?>" target="_blank" rel="noopener">
+                <i class="bi bi-file-earmark-text" aria-hidden="true"></i> Revenue report
+            </a>
         </div>
     </div>
 

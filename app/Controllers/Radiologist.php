@@ -8,9 +8,12 @@ use App\Models\NotificationModel;
 use App\Models\PaymentModel;
 use App\Models\ServiceModel;
 use App\Models\UserModel;
+use App\Controllers\Concerns\HandlesDepartmentReports;
 
 class Radiologist extends BaseController
 {
+    use HandlesDepartmentReports;
+
     private function checkAuth()
     {
         if (!session()->get('is_logged_in')) {
@@ -426,366 +429,55 @@ class Radiologist extends BaseController
     }
 
     /* ============================================================
-       RADIOLOGY REPORT
-       ============================================================
-       Period workload / turnaround report for the x-ray room.
-       - Studies received: paid x-ray requests whose exam date
-         (request_date) falls in the window.
-       - Reports released: released_at in the window.
-       - Turnaround (TAT): first payment -> release, the time the
-         study actually spent with the department.
-       - Backlog: every unreleased study, as of now.
-       GET: range (today|yesterday|week|month|last_month|custom),
-            from, to, radiologist, export=csv
+       RADIOLOGY REPORT — workload / turnaround for the x-ray room.
+       Logic lives in HandlesDepartmentReports; this is the config.
+       GET: range, from, to, radiologist, export=csv (page), annex=0 (paper)
        ============================================================ */
-
-    /** TAT targets in hours, by priority. */
-    private const TAT_TARGETS = ['stat' => 2, 'urgent' => 4, 'routine' => 24];
+    protected function reportDepartment(): array
+    {
+        return [
+            'type'         => DiagnosticRequestModel::TYPE_XRAY,
+            'base'         => 'radiologist',
+            'view'         => 'Radiologist/reports',
+            'staffParam'   => 'radiologist',
+            'tat'          => ['stat' => 2, 'urgent' => 4, 'routine' => 24],   // hours, by priority
+            'name'         => 'Radiology',
+            'unitName'     => 'Department of Radiology',
+            'title'        => 'Radiology Workload & Turnaround Report',
+            'paperTitle'   => 'Radiology Report',
+            'prefix'       => 'XR',
+            'case'         => ['study', 'studies'],
+            'item'         => ['exam', 'exams'],
+            'staff'        => ['Radiologist', 'radiologists'],
+            'status'       => [
+                'pending' => 'Awaiting reading', 'in_progress' => 'Reading', 'draft' => 'Draft saved',
+                'completed' => 'Awaiting release', 'released' => 'Released',
+            ],
+            'revenueLabel' => 'X-ray revenue',
+            'worklist'     => 'radiologist/examinations',
+            'open'         => 'radiologist/examination/view/',
+            'print'        => 'radiologist/examination/print/',
+            'images'       => true,
+            'sections'     => false,
+            'signs'        => [['Prepared by', 'Radiologist'], ['Reviewed by', 'Chief Radiologist'], ['Noted by', 'Medical Director']],
+        ];
+    }
 
     public function reports()
     {
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
 
-        [$range, $from, $to] = $this->reportRange();
-        $reader = trim((string) ($this->request->getGet('radiologist') ?? ''));
-
-        $days     = (int) ((strtotime($to) - strtotime($from)) / 86400) + 1;
-        $prevTo   = date('Y-m-d', strtotime($from . ' -1 day'));
-        $prevFrom = date('Y-m-d', strtotime($prevTo . ' -' . ($days - 1) . ' days'));
-
-        $studies  = $this->reportStudies($from, $to, $reader);
-        $released = $this->releasedStudies($from, $to, $reader);
-
-        if ($this->request->getGet('export') === 'csv') {
-            return $this->reportCsv($studies, $from, $to);
-        }
-
-        $prevReleased = $this->releasedStudies($prevFrom, $prevTo, $reader);
-
-        $readers = array_column(
-            db_connect()->table('diagnostic_requests')
-                ->select('radiologist_name')->distinct()
-                ->where('type', DiagnosticRequestModel::TYPE_XRAY)
-                ->where('radiologist_name IS NOT NULL')->where('radiologist_name <>', '')
-                ->orderBy('radiologist_name')->get()->getResultArray(),
-            'radiologist_name'
-        );
-
-        $paymentModel = new PaymentModel();
-
-        return view('Radiologist/reports', [
-            'range'       => $range,
-            'from'        => $from,
-            'to'          => $to,
-            'prevFrom'    => $prevFrom,
-            'prevTo'      => $prevTo,
-            'reader'      => $reader,
-            'readers'     => $readers,
-            'studies'     => $studies,
-            'released'    => $released,
-            'summary'     => $this->summariseStudies($studies, $released),
-            'prev'        => $this->summariseStudies($this->reportStudies($prevFrom, $prevTo, $reader), $prevReleased),
-            'revenue'     => $paymentModel->getXrayRevenueBetween($from, $to),
-            'prevRevenue' => $paymentModel->getXrayRevenueBetween($prevFrom, $prevTo),
-            'daily'       => $this->dailyVolume($studies, $released, $from, $to),
-            'backlog'     => $this->backlog($reader),
-            'targets'     => self::TAT_TARGETS,
-            'clinic'      => config('Clinic')->toArray(),
-            'preparedBy'  => PaymentModel::currentCashierName(),
-        ]);
+        return $this->departmentReportPage();
     }
 
-    /** Resolve the report window from the GET params. Returns [range, from, to]. */
-    private function reportRange(): array
+    /** Printable A4 radiology report for the same filters as reports(). */
+    public function reportPaper()
     {
-        $range = (string) ($this->request->getGet('range') ?? 'month');
-        $today = date('Y-m-d');
+        $redirect = $this->checkAuth();
+        if ($redirect) return $redirect;
 
-        switch ($range) {
-            case 'today':
-                return [$range, $today, $today];
-            case 'yesterday':
-                $d = date('Y-m-d', strtotime('-1 day'));
-                return [$range, $d, $d];
-            case 'week':
-                return [$range, date('Y-m-d', strtotime('monday this week')), $today];
-            case 'last_month':
-                return [$range, date('Y-m-01', strtotime('first day of last month')), date('Y-m-t', strtotime('last day of last month'))];
-            case 'custom':
-                $from = (string) $this->request->getGet('from');
-                $to   = (string) $this->request->getGet('to');
-                if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from)) $from = $today;
-                if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $to))   $to   = $today;
-                if ($from > $to) [$from, $to] = [$to, $from];
-                if ((strtotime($to) - strtotime($from)) / 86400 > 366) {
-                    $from = date('Y-m-d', strtotime($to . ' -366 days'));
-                }
-                return [$range, $from, $to];
-            default:
-                return ['month', date('Y-m-01'), $today];
-        }
-    }
-
-    /** Paid x-ray studies with an exam date in the window, decorated. */
-    private function reportStudies(string $from, string $to, string $reader = ''): array
-    {
-        $builder = (new DiagnosticRequestModel())
-            ->where('type', DiagnosticRequestModel::TYPE_XRAY)
-            ->whereIn('status', DiagnosticRequestModel::DEPARTMENT_STATUSES)
-            ->where('request_date >=', $from)
-            ->where('request_date <=', $to);
-
-        if ($reader !== '') {
-            $builder->where('radiologist_name', $reader);
-        }
-
-        return $this->decorateStudies($builder->orderBy('request_date', 'DESC')->orderBy('id', 'DESC')->findAll());
-    }
-
-    /** Studies released in the window (whatever their exam date), decorated. */
-    private function releasedStudies(string $from, string $to, string $reader = ''): array
-    {
-        $builder = (new DiagnosticRequestModel())
-            ->where('type', DiagnosticRequestModel::TYPE_XRAY)
-            ->where('status', DiagnosticRequestModel::STATUS_RELEASED)
-            ->where('released_at >=', $from . ' 00:00:00')
-            ->where('released_at <=', $to . ' 23:59:59');
-
-        if ($reader !== '') {
-            $builder->where('radiologist_name', $reader);
-        }
-
-        return $this->decorateStudies($builder->orderBy('released_at', 'DESC')->findAll());
-    }
-
-    /**
-     * Adds dept_status, exams[], image_count, paid_at, tat_hours,
-     * priority_key and within_target to each row.
-     */
-    private function decorateStudies(array $rows): array
-    {
-        if ($rows === []) return [];
-
-        $rows = DiagnosticRequestModel::withDepartmentStatus($rows);
-
-        // When the study reached the department = its first payment.
-        $paidAt = [];
-        foreach (db_connect()->table('payments')
-            ->select('request_id, MIN(payment_date) AS paid_at')
-            ->where('request_type', DiagnosticRequestModel::TYPE_XRAY)
-            ->whereIn('payment_status', [PaymentModel::STATUS_PAID, PaymentModel::STATUS_REFUNDED])
-            ->whereIn('request_id', array_column($rows, 'id'))
-            ->groupBy('request_id')->get()->getResultArray() as $p) {
-            $paidAt[(int) $p['request_id']] = $p['paid_at'];
-        }
-
-        foreach ($rows as &$r) {
-            $r['exams'] = array_values(array_filter(array_map('trim', explode(',', (string) ($r['services'] ?? '')))));
-
-            $images = json_decode((string) ($r['image_paths'] ?? ''), true);
-            $r['image_count'] = is_array($images) ? count($images) : (empty($r['image_path']) ? 0 : 1);
-
-            $r['paid_at'] = $paidAt[(int) $r['id']] ?? $r['created_at'];
-
-            $p = strtolower(trim((string) ($r['priority'] ?? '')));
-            $r['priority_key'] = isset(self::TAT_TARGETS[$p]) ? $p : 'routine';
-
-            $r['tat_hours']     = null;
-            $r['within_target'] = null;
-            if (!empty($r['released_at']) && !empty($r['paid_at'])) {
-                $r['tat_hours']     = max(0, (strtotime($r['released_at']) - strtotime($r['paid_at'])) / 3600);
-                $r['within_target'] = $r['tat_hours'] <= self::TAT_TARGETS[$r['priority_key']];
-            }
-        }
-        unset($r);
-
-        return $rows;
-    }
-
-    /** Totals and breakdowns for a window. */
-    private function summariseStudies(array $studies, array $released): array
-    {
-        $s = [
-            'received' => count($studies), 'released' => count($released),
-            'exposures' => 0, 'patients' => 0, 'stat' => 0,
-            'status' => ['pending' => 0, 'in_progress' => 0, 'draft' => 0, 'completed' => 0, 'released' => 0],
-            'tat_median' => null, 'tat_avg' => null, 'within_target' => null,
-            'tat_buckets' => ['< 2 h' => 0, '2–8 h' => 0, '8–24 h' => 0, '1–3 days' => 0, '> 3 days' => 0],
-            'exams' => [], 'readers' => [], 'release_rate' => null,
-        ];
-
-        $patients = [];
-        foreach ($studies as $r) {
-            $st = $r['status'];
-            if (isset($s['status'][$st])) $s['status'][$st]++;
-            if ($r['priority_key'] !== 'routine') $s['stat']++;
-            $s['exposures'] += count($r['exams']);
-            foreach ($r['exams'] as $e) {
-                $s['exams'][$e] = ($s['exams'][$e] ?? 0) + 1;
-            }
-            $key = trim((string) ($r['patient_code'] ?? '')) ?: strtolower(trim((string) $r['patient_name']));
-            if ($key !== '') $patients[$key] = true;
-        }
-        $s['patients'] = count($patients);
-        if ($s['received'] > 0) {
-            $s['release_rate'] = $s['status']['released'] / $s['received'] * 100;
-        }
-        arsort($s['exams']);
-
-        $tats = [];
-        $hits = 0;
-        foreach ($released as $r) {
-            $who = trim((string) ($r['radiologist_name'] ?? '')) ?: 'Unassigned';
-            $s['readers'][$who]['count'] = ($s['readers'][$who]['count'] ?? 0) + 1;
-            $s['readers'][$who]['exams'] = ($s['readers'][$who]['exams'] ?? 0) + count($r['exams']);
-            if ($r['tat_hours'] === null) continue;
-
-            $h = $r['tat_hours'];
-            $tats[] = $h;
-            $s['readers'][$who]['tat'][] = $h;
-            if ($r['within_target']) $hits++;
-
-            if ($h < 2)       $s['tat_buckets']['< 2 h']++;
-            elseif ($h < 8)   $s['tat_buckets']['2–8 h']++;
-            elseif ($h < 24)  $s['tat_buckets']['8–24 h']++;
-            elseif ($h < 72)  $s['tat_buckets']['1–3 days']++;
-            else              $s['tat_buckets']['> 3 days']++;
-        }
-
-        if ($tats) {
-            sort($tats);
-            $n = count($tats);
-            $s['tat_median']    = $n % 2 ? $tats[intdiv($n, 2)] : ($tats[$n / 2 - 1] + $tats[$n / 2]) / 2;
-            $s['tat_avg']       = array_sum($tats) / $n;
-            $s['within_target'] = $hits / $n * 100;
-        }
-
-        foreach ($s['readers'] as &$rd) {
-            $t = $rd['tat'] ?? [];
-            $rd['tat_avg'] = $t ? array_sum($t) / count($t) : null;
-            unset($rd['tat']);
-        }
-        unset($rd);
-        uasort($s['readers'], fn($a, $b) => $b['count'] <=> $a['count']);
-
-        return $s;
-    }
-
-    /** Received vs released per day (or per hour for a single day). */
-    private function dailyVolume(array $studies, array $released, string $from, string $to): array
-    {
-        $hourly  = $from === $to;
-        $buckets = [];
-
-        if ($hourly) {
-            for ($h = 7; $h <= 19; $h++) {
-                $buckets[sprintf('%02d', $h)] = ['label' => date('g A', mktime($h, 0, 0)), 'received' => 0, 'released' => 0];
-            }
-        } else {
-            for ($d = $from; $d <= $to; $d = date('Y-m-d', strtotime($d . ' +1 day'))) {
-                $buckets[$d] = ['label' => date('M j', strtotime($d)), 'received' => 0, 'released' => 0];
-            }
-        }
-
-        $add = function (string $when, string $field) use (&$buckets, $hourly) {
-            $ts  = strtotime($when);
-            $key = $hourly ? date('H', $ts) : date('Y-m-d', $ts);
-            if (!isset($buckets[$key])) {
-                if (!$hourly) return; // released row outside the window's days
-                $buckets[$key] = ['label' => date('g A', $ts), 'received' => 0, 'released' => 0];
-            }
-            $buckets[$key][$field]++;
-        };
-
-        // A single day has one exam date, so spread it by the time paid.
-        foreach ($studies as $r)  $add($hourly ? (string) $r['paid_at'] : (string) $r['request_date'], 'received');
-        foreach ($released as $r) $add((string) $r['released_at'], 'released');
-        ksort($buckets);
-
-        return ['hourly' => $hourly, 'buckets' => array_values($buckets)];
-    }
-
-    /** Every unreleased study as of now, oldest first, with its age in hours. */
-    private function backlog(string $reader = ''): array
-    {
-        $builder = (new DiagnosticRequestModel())
-            ->where('type', DiagnosticRequestModel::TYPE_XRAY)
-            ->whereIn('status', [
-                DiagnosticRequestModel::STATUS_IN_PROGRESS,
-                DiagnosticRequestModel::STATUS_DRAFT,
-                DiagnosticRequestModel::STATUS_COMPLETED,
-            ]);
-
-        if ($reader !== '') {
-            // Untouched studies have no reader yet but are everyone's queue.
-            $builder->groupStart()
-                    ->where('radiologist_name', $reader)
-                    ->orGroupStart()
-                        ->where('status', DiagnosticRequestModel::STATUS_IN_PROGRESS)
-                        ->where('radiologist_id', null)
-                        ->groupStart()->where('radiologist_name', null)->orWhere('radiologist_name', '')->groupEnd()
-                    ->groupEnd()
-                    ->groupEnd();
-        }
-
-        $rows  = $this->decorateStudies($builder->orderBy('created_at', 'ASC')->findAll());
-        $aging = ['< 24 h' => 0, '1–3 days' => 0, '> 3 days' => 0];
-        $over  = 0;
-
-        foreach ($rows as &$r) {
-            $r['age_hours'] = max(0, (time() - strtotime((string) $r['paid_at'])) / 3600);
-            $r['overdue']   = $r['age_hours'] > self::TAT_TARGETS[$r['priority_key']];
-            if ($r['overdue']) $over++;
-            if ($r['age_hours'] < 24)     $aging['< 24 h']++;
-            elseif ($r['age_hours'] < 72) $aging['1–3 days']++;
-            else                          $aging['> 3 days']++;
-        }
-        unset($r);
-        usort($rows, fn($a, $b) => $b['age_hours'] <=> $a['age_hours']);
-
-        return ['rows' => $rows, 'aging' => $aging, 'overdue' => $over];
-    }
-
-    /** Study log for the window as a CSV download. */
-    private function reportCsv(array $studies, string $from, string $to)
-    {
-        $fh = fopen('php://temp', 'r+');
-        fwrite($fh, "\xEF\xBB\xBF"); // BOM so Excel reads ñ correctly
-        fputcsv($fh, ['Exam Date', 'Reference', 'Patient Code', 'Patient', 'Age', 'Sex', 'Examinations', 'Exposures',
-                      'Priority', 'Status', 'Radiologist', 'Images', 'Received (paid)', 'Released', 'TAT (hours)', 'Within Target']);
-
-        foreach ($studies as $r) {
-            fputcsv($fh, [
-                $r['request_date'],
-                $r['reference_number'],
-                $r['patient_code'] ?? '',
-                $r['patient_name'],
-                $r['age'] ?? '',
-                $r['gender'] ?? '',
-                implode('; ', $r['exams']),
-                count($r['exams']),
-                ucfirst($r['priority_key']),
-                ucwords(str_replace('_', ' ', $r['status'])),
-                $r['radiologist_name'] ?? '',
-                $r['image_count'],
-                $r['paid_at'] ?? '',
-                $r['released_at'] ?? '',
-                $r['tat_hours'] === null ? '' : number_format($r['tat_hours'], 1, '.', ''),
-                $r['within_target'] === null ? '' : ($r['within_target'] ? 'Yes' : 'No'),
-            ]);
-        }
-
-        rewind($fh);
-        $csv = stream_get_contents($fh);
-        fclose($fh);
-
-        $name = 'radiology-report_' . $from . ($from !== $to ? '_to_' . $to : '') . '.csv';
-
-        return $this->response
-            ->setHeader('Content-Type', 'text/csv; charset=UTF-8')
-            ->setHeader('Content-Disposition', 'attachment; filename="' . $name . '"')
-            ->setBody($csv);
+        return $this->departmentReportPaper();
     }
 
     public function printResult($id)

@@ -25,7 +25,7 @@ $pendingPages           = (int) max(1, ceil($pendingTotal / $pendingPerPage));
 $hasRequestsChart = !empty($requestsDataArr['labels']) && !empty($requestsDataArr['requested']);
 
 $monthlyRevenueVal = (float) ($monthlyRevenue ?? 0);
-$avgMonthlyRevenue = $monthlyRevenueVal / max(1, (int) date('m'));
+$avgMonthlyRevenue = array_sum($revenueDataArr['values']) / max(1, count($revenueDataArr['values']));
 
 /* Only allow a colour value that is safe to place inside a style attribute. */
 $safeColor = static function ($color, $fallback = '#1976d2') {
@@ -41,7 +41,8 @@ $jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
 /* ------------------------------------------------------------------
    KPI BOARD (shared partial: partials/kpi_board)
    ------------------------------------------------------------------ */
-$pendingRequests   = (int) ($pendingRequests ?? 0);
+$pendingRequests    = (int) ($pendingRequests ?? 0);
+$inProgressRequests = (int) ($inProgressRequests ?? 0);
 $completedRequests = (int) ($completedRequests ?? 0);
 $releasedResults   = (int) ($releasedResults ?? 0);
 
@@ -98,13 +99,14 @@ $kpiBoard = [
     /* Request statuses are mutually exclusive, so the share bar is valid. */
     'pipeline' => [
         'title'  => 'Diagnostic Pipeline',
-        'sub'    => number_format($pendingRequests + $completedRequests + $releasedResults) . ' requests in the workflow',
+        'sub'    => number_format($pendingRequests + $inProgressRequests + $completedRequests + $releasedResults) . ' requests in the workflow',
         'link'   => base_url('admin/diagnostic-requests'),
         'split'  => true,
         'stages' => [
-            ['key' => 'pending',   'color' => '#f59e0b', 'label' => 'Pending',   'hint' => 'Awaiting processing', 'count' => $pendingRequests,   'today' => 'received today',  'link' => base_url('admin/diagnostic-requests')],
-            ['key' => 'completed', 'color' => '#10b981', 'label' => 'Completed', 'hint' => 'Results encoded',     'count' => $completedRequests, 'today' => 'completed today', 'link' => base_url('admin/diagnostic-requests')],
-            ['key' => 'released',  'color' => '#3b82f6', 'label' => 'Released',  'hint' => 'Sent to doctors',     'count' => $releasedResults,   'today' => 'released today',  'link' => base_url('admin/diagnostic-requests')],
+            ['key' => 'pending',     'color' => '#f59e0b', 'label' => 'Pending',     'hint' => 'Awaiting the front desk',       'count' => $pendingRequests,    'today' => 'new today',  'link' => base_url('admin/diagnostic-requests')],
+            ['key' => 'in_progress', 'color' => '#8b5cf6', 'label' => 'In Progress', 'hint' => 'Being processed, drafts included', 'count' => $inProgressRequests, 'today' => 'new today',  'link' => base_url('admin/diagnostic-requests')],
+            ['key' => 'completed',   'color' => '#10b981', 'label' => 'Completed',   'hint' => 'Results encoded',               'count' => $completedRequests,  'today' => 'done today', 'link' => base_url('admin/diagnostic-requests')],
+            ['key' => 'released',    'color' => '#3b82f6', 'label' => 'Released',    'hint' => 'Sent to doctors',               'count' => $releasedResults,    'today' => 'sent today', 'link' => base_url('admin/diagnostic-requests')],
         ],
     ],
 ];

@@ -323,12 +323,6 @@ $kpiBoard = [
                                 </td>
                                 <td data-label="Action" class="action-cell">
 
-                                    <a href="<?= base_url('receptionist/appointment/view/' . $apptId) ?>"
-                                       class="action-icon-btn view" title="View details"
-                                       aria-label="View details for <?= esc($fullName, 'attr') ?>">
-                                        <i class="bi bi-eye" aria-hidden="true"></i>
-                                    </a>
-
                                     <?php if ($statusKey === 'pending'): ?>
                                         <a data-post href="<?= base_url('receptionist/appointment/approve/' . $apptId) ?>"
                                            class="action-icon-btn approve" title="Approve"
@@ -336,23 +330,17 @@ $kpiBoard = [
                                            onclick="return confirm('Approve the <?= esc($apptTime, 'attr') ?> appointment for <?= esc($fullName, 'attr') ?>?')">
                                             <i class="bi bi-check2" aria-hidden="true"></i>
                                         </a>
-                                    <?php endif; ?>
-
-                                    <?php if ($statusKey === 'approved'): ?>
-                                        <a data-post href="<?= base_url('receptionist/appointment/complete/' . $apptId) ?>"
-                                           class="action-icon-btn complete" title="Complete"
-                                           aria-label="Mark complete for <?= esc($fullName, 'attr') ?>"
-                                           onclick="return confirm('Mark the <?= esc($apptTime, 'attr') ?> appointment for <?= esc($fullName, 'attr') ?> as completed?')">
-                                            <i class="bi bi-check-all" aria-hidden="true"></i>
-                                        </a>
-                                    <?php endif; ?>
-
-                                    <?php if ($statusKey === 'pending' || $statusKey === 'approved'): ?>
                                         <a data-post href="<?= base_url('receptionist/appointment/cancel/' . $apptId) ?>"
                                            class="action-icon-btn cancel" title="Cancel"
                                            aria-label="Cancel appointment for <?= esc($fullName, 'attr') ?>"
                                            onclick="return confirm('Cancel the <?= esc($apptTime, 'attr') ?> appointment for <?= esc($fullName, 'attr') ?>? This cannot be undone.')">
                                             <i class="bi bi-x" aria-hidden="true"></i>
+                                        </a>
+                                    <?php else: ?>
+                                        <a href="<?= base_url('receptionist/appointment/view/' . $apptId) ?>"
+                                           class="action-icon-btn view" title="View details"
+                                           aria-label="View details for <?= esc($fullName, 'attr') ?>">
+                                            <i class="bi bi-eye" aria-hidden="true"></i>
                                         </a>
                                     <?php endif; ?>
 
@@ -831,7 +819,6 @@ $kpiBoard = [
 
 .dashboard-container .action-icon-btn:hover          { background: var(--db-line-soft); color: var(--db-ink); }
 .dashboard-container .action-icon-btn.approve:hover  { background: var(--db-accent-soft); color: var(--db-accent); border-color: #d3e0fb; }
-.dashboard-container .action-icon-btn.complete:hover { background: #eefaf4; color: var(--db-green); border-color: #c6ebda; }
 .dashboard-container .action-icon-btn.cancel:hover   { background: #fdeef0; color: var(--db-red); border-color: #f4d2d5; }
 
 /* =========================================================

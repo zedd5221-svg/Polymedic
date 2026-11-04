@@ -57,6 +57,7 @@ class Admin extends BaseController
 
         $requestCounts     = $diagnosticModel->getCounts();
         $pendingRequests   = $requestCounts['pending'];
+        $inProgressRequests = $requestCounts['in_progress'] + $requestCounts['draft'];
         $completedRequests = $requestCounts['completed'];
         $releasedResults   = $requestCounts['released'];
 
@@ -83,6 +84,7 @@ class Admin extends BaseController
             'totalPatients' => $totalPatients,
             'todayPatients' => $todayPatients,
             'pendingRequests' => $pendingRequests,
+            'inProgressRequests' => $inProgressRequests,
             'completedRequests' => $completedRequests,
             'releasedResults' => $releasedResults,
             'todayRevenue' => $todayRevenue,
@@ -168,7 +170,8 @@ class Admin extends BaseController
             'dates'         => $dates,
             'patients'      => $patients,
             'today'         => $series('appointments', 'appointment_date', 'COUNT(*)'),
-            'pending'       => $series('diagnostic_requests', 'DATE(request_date)', 'COUNT(*)'),
+            'pending'       => $series('diagnostic_requests', 'DATE(request_date)', 'COUNT(*)', ['status' => 'pending']),
+            'in_progress'   => $series('diagnostic_requests', 'DATE(request_date)', 'COUNT(*)', [], ['status' => ['in_progress', 'draft']]),
             'completed'     => $series('diagnostic_requests', 'DATE(updated_at)', 'COUNT(*)', ["status" => "completed"]),
             'released'      => $series('diagnostic_requests', 'DATE(released_at)', 'COUNT(*)', ['status' => 'released']),
             'revenue_today' => $revenue,
@@ -377,7 +380,7 @@ class Admin extends BaseController
             ->where("{$dateColumn} >=", $start)
             ->where("{$dateColumn} <=", $end . ' 23:59:59');
         foreach ($where as $col => $val) {
-            $builder->where($col, $val);
+            is_array($val) ? $builder->whereIn($col, $val) : $builder->where($col, $val);
         }
         $counts = array_column($builder->groupBy('d')->get()->getResultArray(), 'n', 'd');
 
@@ -411,8 +414,9 @@ class Admin extends BaseController
     {
         return [
             'labels'    => ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-            'requested' => $this->weekSeries('appointments', 'appointment_date'),
-            'completed' => $this->weekSeries('appointments', 'appointment_date', ['status' => 'completed']),
+            'requested' => $this->weekSeries('diagnostic_requests', 'request_date'),
+            // Released requests were completed first, so they count here too.
+            'completed' => $this->weekSeries('diagnostic_requests', 'request_date', ['status' => ['completed', 'released']]),
         ];
     }
 

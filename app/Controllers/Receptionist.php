@@ -71,6 +71,8 @@ class Receptionist extends BaseController
         $data['total_patients'] = count($this->collectPatients());
 
         $data['weekly_appointments'] = $this->getWeeklyAppointmentData();
+        // Rolling 7 days ending today, so the labels cannot be a fixed Mon-Sun.
+        $data['weekly_labels'] = array_map(static fn($i) => date('D', strtotime("-$i days")), range(6, 0));
 
         $serviceData = $this->getServiceDistributionData();
         $data['service_labels'] = $serviceData['labels'];

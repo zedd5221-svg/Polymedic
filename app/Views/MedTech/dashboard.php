@@ -19,7 +19,8 @@
    KPI BOARD (shared partial: partials/kpi_board, same as Admin)
    ------------------------------------------------------------------ */
 $mtCount = static fn($k) => (int) ($counts[$k] ?? 0);
-$mtActive = $mtCount('pending') + $mtCount('in_progress') + $mtCount('draft');
+/* counts['in_progress'] already includes drafts; use the exclusive figure here. */
+$mtActive = $mtCount('pending') + $mtCount('in_progress_only') + $mtCount('draft');
 
 $kpiBoard = [
     'trends' => $kpiTrends ?? [],
@@ -77,7 +78,7 @@ $kpiBoard = [
         'split'  => true,
         'stages' => [
             ['key' => 'pending',     'color' => '#f59e0b', 'label' => 'Pending',     'hint' => 'Awaiting processing',  'count' => $mtCount('pending'),     'today' => 'new today', 'link' => base_url('medtech/requests?status=pending')],
-            ['key' => 'in_progress', 'color' => '#3b82f6', 'label' => 'In-Progress', 'hint' => 'Currently running',    'count' => $mtCount('in_progress'), 'today' => 'new today', 'link' => base_url('medtech/requests?status=in_progress')],
+            ['key' => 'in_progress', 'color' => '#3b82f6', 'label' => 'In-Progress', 'hint' => 'Currently running',    'count' => $mtCount('in_progress_only'), 'today' => 'new today', 'link' => base_url('medtech/requests?status=in_progress')],
             ['key' => 'draft',       'color' => '#8b5cf6', 'label' => 'Drafts',      'hint' => 'Saved, not submitted', 'count' => $mtCount('draft'),       'today' => 'new today', 'link' => base_url('medtech/requests?status=draft')],
         ],
     ],

@@ -249,7 +249,9 @@ class Radiologist extends BaseController
         if (empty($dates)) { return []; }
 
         $db    = db_connect();
-        $start = $dates[0];
+        $monthStart = date('Y-m-01');
+        // Month-to-date must include paid days from before the chart window.
+        $start = $cumulative ? min($dates[0], $monthStart) : $dates[0];
         $end   = end($dates);
 
         $rows = $db->table('payments')
@@ -273,9 +275,14 @@ class Radiologist extends BaseController
             return $series;
         }
 
-        $monthStart = date('Y-m-01');
-        $running    = 0;
-        $out        = [];
+        $running = 0;
+        foreach ($map as $d => $v) {
+            if ($d >= $monthStart && $d < $dates[0]) {
+                $running += $v;
+            }
+        }
+
+        $out = [];
         foreach ($dates as $i => $d) {
             if ($d < $monthStart) {
                 $out[] = 0;

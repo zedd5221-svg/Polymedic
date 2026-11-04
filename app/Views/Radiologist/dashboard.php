@@ -144,42 +144,183 @@ $kpiBoard = [
     <?= view('partials/kpi_board', $kpiBoard) ?>
 
 
-    <!-- ===== TOP ROW: Weekly Volume + Available X-ray Services ===== -->
+    <?php
+    /* ------------------------------------------------------------------
+       Chart data. All three charts read from real series:
+         - throughput : kpiTrends (requested per day, released per day)
+         - turnaround : controller getTurnaroundStats (request → release)
+         - regions    : services catalogue, ranked
+       ------------------------------------------------------------------ */
+    $trendDates  = is_array($kpiTrends['dates'] ?? null) ? $kpiTrends['dates'] : [];
+    $tpRequested = array_map('intval', $kpiTrends['requested'] ?? []);
+    $tpReleased  = array_map('intval', $kpiTrends['released'] ?? []);
+    $tpLabels    = array_map(static fn ($d) => date('M j', strtotime($d)), $trendDates);
+    $tpReqTotal  = array_sum($tpRequested);
+    $tpRelTotal  = array_sum($tpReleased);
+    $tpNet       = $tpReqTotal - $tpRelTotal;
+    $hasTp       = $trendDates && ($tpReqTotal + $tpRelTotal) > 0;
+
+    $tat        = is_array($turnaround ?? null) ? $turnaround : ['count' => 0, 'buckets' => [], 'days' => 14];
+    $tatCount   = (int) ($tat['count'] ?? 0);
+    $tatBuckets = is_array($tat['buckets'] ?? null) ? $tat['buckets'] : [];
+    $tatPeak    = $tatBuckets ? max($tatBuckets) : 0;
+
+    /* 45 → "45m", 200 → "3h 20m", 1700 → "1d 4h" */
+    $duration = static function (?float $minutes): string {
+        if ($minutes === null) { return '—'; }
+        $m = (int) round($minutes);
+        if ($m < 60)   { return $m . 'm'; }
+        if ($m < 1440) { return intdiv($m, 60) . 'h' . ($m % 60 ? ' ' . ($m % 60) . 'm' : ''); }
+        $d = intdiv($m, 1440);
+        $h = intdiv($m % 1440, 60);
+        return $d . 'd' . ($h ? ' ' . $h . 'h' : '');
+    };
+
+    $regions = array_filter($categoryCounts, static fn ($n) => (int) $n > 0);
+    arsort($regions);
+    $regionPeak  = $regions ? max($regions) : 0;
+    $regionTotal = array_sum($regions);
+    ?>
+
+    <!-- ===== TOP ROW: Throughput + Turnaround ===== -->
     <div class="charts-row charts-row--top">
 
-        <div class="chart-card">
+        <section class="chart-card" aria-labelledby="tpTitle">
             <div class="chart-header">
                 <div class="chart-heading">
-                    <h5>Weekly Study Volume</h5>
-                    <small>Stacked counts by modality</small>
+                    <h5 id="tpTitle">Throughput</h5>
+                    <small>Studies requested and reports released per day · last 14 days</small>
                 </div>
-                <?php if ($hasWeeklyChart): ?>
-                    <span class="chart-pill">
-                        <span class="pill-dot" style="background: #2450d8;"></span>
-                        <?= number_format($weeklyTotal) ?> <?= $weeklyTotal === 1 ? 'study' : 'studies' ?> this week
-                    </span>
+
+                <?php if ($hasTp): ?>
+                    <ul class="tp-legend" aria-label="Series">
+                        <li><span class="tp-key tp-key--req" aria-hidden="true"></span>Requested <strong><?= number_format($tpReqTotal) ?></strong></li>
+                        <li><span class="tp-key tp-key--rel" aria-hidden="true"></span>Released <strong><?= number_format($tpRelTotal) ?></strong></li>
+                    </ul>
                 <?php endif; ?>
             </div>
 
-            <?php if ($hasWeeklyChart): ?>
-                <div class="chart-body">
-                    <canvas id="weeklyVolumeChart"></canvas>
+            <?php if ($hasTp): ?>
+                <div class="chart-body chart-body--tp">
+                    <canvas id="throughputChart"
+                            role="img"
+                            aria-label="<?= esc('Last 14 days: ' . $tpReqTotal . ' studies requested, ' . $tpRelTotal . ' reports released', 'attr') ?>"></canvas>
                 </div>
+                <p class="tp-foot">
+                    <?php if ($tpNet > 0): ?>
+                        <i class="bi bi-arrow-up-right" aria-hidden="true"></i>
+                        Queue grew by <strong><?= number_format($tpNet) ?></strong> — more came in than was released.
+                    <?php elseif ($tpNet < 0): ?>
+                        <i class="bi bi-arrow-down-right" aria-hidden="true"></i>
+                        Queue shrank by <strong><?= number_format(abs($tpNet)) ?></strong> — releases outpaced new requests.
+                    <?php else: ?>
+                        <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                        Releases kept pace with new requests.
+                    <?php endif; ?>
+                </p>
+
+                <!-- Same numbers as a table, for screen readers -->
+                <table class="visually-hidden">
+                    <caption>Studies requested and reports released per day</caption>
+                    <thead><tr><th scope="col">Day</th><th scope="col">Requested</th><th scope="col">Released</th></tr></thead>
+                    <tbody>
+                        <?php foreach ($tpLabels as $i => $label): ?>
+                            <tr><th scope="row"><?= esc($label) ?></th><td><?= (int) ($tpRequested[$i] ?? 0) ?></td><td><?= (int) ($tpReleased[$i] ?? 0) ?></td></tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
             <?php else: ?>
                 <div class="chart-body chart-empty">
                     <i class="bi bi-bar-chart" aria-hidden="true"></i>
-                    <p>No volume data for this week</p>
-                    <small>Once examinations are scheduled, their counts appear here.</small>
+                    <p>No activity in the last 14 days</p>
+                    <small>Requests and released reports will be charted here.</small>
                 </div>
             <?php endif; ?>
-        </div>
+        </section>
 
-        <div class="chart-card chart-card--services">
+        <section class="chart-card tat-card" aria-labelledby="tatTitle">
             <div class="chart-header">
                 <div class="chart-heading">
-                    <h5>Available X-ray Services</h5>
-                    <small>Active catalogue (<?= number_format($xrayCount) ?>)</small>
+                    <h5 id="tatTitle">Turnaround</h5>
+                    <small>Request to released report · last <?= (int) ($tat['days'] ?? 14) ?> days</small>
                 </div>
+            </div>
+
+            <?php if ($tatCount > 0): ?>
+                <div class="tat-hero">
+                    <span class="tat-value"><?= esc($duration($tat['median'] ?? null)) ?></span>
+                    <span class="tat-label">median</span>
+                </div>
+                <p class="tat-sub">
+                    90% within <strong><?= esc($duration($tat['p90'] ?? null)) ?></strong>
+                    · <?= number_format($tatCount) ?> report<?= $tatCount === 1 ? '' : 's' ?>
+                </p>
+
+                <ul class="hbars" aria-label="Turnaround distribution">
+                    <?php foreach ($tatBuckets as $bucket => $n): ?>
+                        <?php $share = $tatCount > 0 ? round($n / $tatCount * 100) : 0; ?>
+                        <li class="hbar">
+                            <span class="hbar-label"><?= esc($bucket) ?></span>
+                            <span class="hbar-track" aria-hidden="true">
+                                <span class="hbar-fill hbar-fill--tat" style="width: <?= $tatPeak > 0 ? max(2, round($n / $tatPeak * 100, 1)) : 0 ?>%"></span>
+                            </span>
+                            <span class="hbar-value"><?= number_format($n) ?> <small><?= $share ?>%</small></span>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php else: ?>
+                <div class="chart-body chart-empty chart-empty--sm">
+                    <i class="bi bi-stopwatch" aria-hidden="true"></i>
+                    <p>No reports released yet</p>
+                    <small>Turnaround appears once reports are released.</small>
+                </div>
+            <?php endif; ?>
+        </section>
+    </div>
+
+
+    <!-- ===== SECOND ROW: Catalogue by region + Available services ===== -->
+    <div class="charts-row charts-row--bottom">
+
+        <section class="chart-card" aria-labelledby="rgTitle">
+            <div class="chart-header">
+                <div class="chart-heading">
+                    <h5 id="rgTitle">Catalogue by region</h5>
+                    <small>Active X-ray services per body region</small>
+                </div>
+                <?php if ($regionTotal > 0): ?>
+                    <span class="chart-count"><?= number_format($regionTotal) ?> services</span>
+                <?php endif; ?>
+            </div>
+
+            <?php if ($regions): ?>
+                <ul class="hbars" aria-label="Services per region">
+                    <?php foreach ($regions as $region => $n): ?>
+                        <li class="hbar">
+                            <span class="hbar-label" title="<?= esc($region, 'attr') ?>"><?= esc($region) ?></span>
+                            <span class="hbar-track" aria-hidden="true">
+                                <span class="hbar-fill" style="width: <?= $regionPeak > 0 ? round($n / $regionPeak * 100, 1) : 0 ?>%"></span>
+                            </span>
+                            <span class="hbar-value"><?= number_format($n) ?></span>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php else: ?>
+                <div class="chart-body chart-empty chart-empty--sm">
+                    <i class="bi bi-list-ul" aria-hidden="true"></i>
+                    <p>No services on file</p>
+                    <small>Add X-ray services to see their spread here.</small>
+                </div>
+            <?php endif; ?>
+        </section>
+
+        <section class="chart-card chart-card--services" aria-labelledby="svTitle">
+            <div class="chart-header">
+                <div class="chart-heading">
+                    <h5 id="svTitle">Available X-ray services</h5>
+                    <small>Active catalogue and prices</small>
+                </div>
+                <span class="chart-count"><?= number_format($xrayCount) ?></span>
             </div>
 
             <?php if (!empty($xrayServices)): ?>
@@ -196,129 +337,7 @@ $kpiBoard = [
             <?php else: ?>
                 <p class="service-list-empty">No X-ray services are currently active.</p>
             <?php endif; ?>
-        </div>
-    </div>
-
-
-    <!-- ===== MIDDLE ROW: Two donuts side by side ===== -->
-    <div class="charts-row charts-row--donuts">
-
-        <!-- Status breakdown -->
-        <div class="chart-card">
-            <div class="chart-header">
-                <div class="chart-heading">
-                    <h5>Status Breakdown</h5>
-                    <small>Current pipeline</small>
-                </div>
-            </div>
-
-            <?php if ($total > 0): ?>
-                <?php
-                $donutRaw = [
-                    'Pending'    => $pending,
-                    'In reading' => $processing,
-                    'Completed'  => $completed,
-                    'Released'   => $released,
-                ];
-                $donutData = array_filter($donutRaw, static fn ($n) => $n > 0);
-                arsort($donutData);
-                $donutTotal = array_sum($donutData);
-                $donutPalette = ['#2450d8', '#f0b429', '#0f9d76', '#0e7490', '#d9534f', '#7b8794'];
-                ?>
-
-                <?php if ($donutTotal > 0): ?>
-                    <div class="donut-wrap">
-                        <div class="donut-canvas">
-                            <canvas id="statusChart"></canvas>
-                            <div class="donut-center">
-                                <span class="donut-value"><?= number_format($donutTotal) ?></span>
-                                <span class="donut-label">Studies</span>
-                            </div>
-                        </div>
-
-                        <ul class="donut-legend">
-                            <?php $legendIndex = 0; ?>
-                            <?php foreach ($donutData as $label => $count): ?>
-                                <?php
-                                    $pct = $donutTotal > 0 ? ($count / $donutTotal) * 100 : 0;
-                                    $color = $donutPalette[$legendIndex % count($donutPalette)];
-                                    $legendIndex++;
-                                ?>
-                                <li class="legend-item">
-                                    <span class="legend-dot" style="background: <?= esc($color, 'attr') ?>;"></span>
-                                    <span class="legend-name"><?= esc($label) ?></span>
-                                    <span class="legend-pct"><?= number_format($pct, $pct < 10 ? 1 : 0) ?>%</span>
-                                    <span class="legend-count"><?= number_format($count) ?></span>
-                                </li>
-                            <?php endforeach; ?>
-                        </ul>
-                    </div>
-                <?php else: ?>
-                    <div class="chart-body chart-empty">
-                        <i class="bi bi-pie-chart" aria-hidden="true"></i>
-                        <p>No active studies</p>
-                        <small>The breakdown appears once examinations exist.</small>
-                    </div>
-                <?php endif; ?>
-            <?php else: ?>
-                <div class="chart-body chart-empty">
-                    <i class="bi bi-pie-chart" aria-hidden="true"></i>
-                    <p>No studies recorded</p>
-                    <small>Examination counts appear here once the pipeline has entries.</small>
-                </div>
-            <?php endif; ?>
-        </div>
-
-        <!-- Services breakdown by clinical region -->
-        <div class="chart-card">
-            <div class="chart-header">
-                <div class="chart-heading">
-                    <h5>Services by Region</h5>
-                    <small>Catalogue split across clinical areas</small>
-                </div>
-            </div>
-
-            <?php if (!empty($categoryCounts)): ?>
-                <?php
-                $svcData = $categoryCounts;
-                arsort($svcData);
-                $svcTotal = array_sum($svcData);
-                $svcPalette = ['#2450d8', '#0f9d76', '#f0b429', '#0e7490', '#d9534f', '#7b8794', '#6d28d9'];
-                ?>
-                <div class="donut-wrap">
-                    <div class="donut-canvas">
-                        <canvas id="servicesChart"></canvas>
-                        <div class="donut-center">
-                            <span class="donut-value"><?= number_format($svcTotal) ?></span>
-                            <span class="donut-label">Services</span>
-                        </div>
-                    </div>
-
-                    <ul class="donut-legend">
-                        <?php $si = 0; ?>
-                        <?php foreach ($svcData as $cat => $count): ?>
-                            <?php
-                                $pct = $svcTotal > 0 ? ($count / $svcTotal) * 100 : 0;
-                                $color = $svcPalette[$si % count($svcPalette)];
-                                $si++;
-                            ?>
-                            <li class="legend-item">
-                                <span class="legend-dot" style="background: <?= esc($color, 'attr') ?>;"></span>
-                                <span class="legend-name"><?= esc($cat) ?></span>
-                                <span class="legend-pct"><?= number_format($pct, $pct < 10 ? 1 : 0) ?>%</span>
-                                <span class="legend-count"><?= number_format($count) ?></span>
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
-                </div>
-            <?php else: ?>
-                <div class="chart-body chart-empty">
-                    <i class="bi bi-pie-chart" aria-hidden="true"></i>
-                    <p>No services on file</p>
-                    <small>Add X-ray services to see their distribution here.</small>
-                </div>
-            <?php endif; ?>
-        </div>
+        </section>
     </div>
 
 
@@ -489,37 +508,35 @@ $kpiBoard = [
    ========================================================= */
 
 .dashboard-container {
-    --db-accent:      #2450d8;
-    --db-accent-dark: #1b3fb0;
-    --db-accent-soft: #eef3ff;
+    --db-accent:      var(--pm-accent, #0B67B2);
+    --db-accent-dark: var(--pm-accent-hover, #08528F);
+    --db-accent-soft: var(--pm-accent-soft, #E8F1FA);
 
-    --db-ink:         #0b1220;
-    --db-ink-soft:    #414e63;
-    --db-ink-mute:    #6b7789;
-    --db-ink-faint:   #9aa5b5;
+    --db-ink:         var(--pm-text, #10202E);
+    --db-ink-soft:    var(--pm-text-soft, #3B4C5E);
+    --db-ink-mute:    var(--pm-text-muted, #5D6E80);
+    --db-ink-faint:   #8496A8;
 
-    --db-line:        #e4e8ef;
-    --db-line-soft:   #eef1f6;
+    --db-line:        var(--pm-line, #DDE4EC);
+    --db-line-soft:   #EBF0F5;
     --db-surface:     #ffffff;
-    --db-canvas:      #f4f6fa;
-    --db-rail:        #f7f9fc;
+    --db-canvas:      var(--pm-canvas, #F3F6F9);
+    --db-rail:        #F8FAFC;
 
     --db-amber:       #b45309;
     --db-green:       #067a55;
     --db-teal:        #0f766e;
-    --db-cyan:        #0e7490;
+    --db-cyan:        #0E8A7E;
     --db-red:         #c2323b;
 
-    --db-r-lg:        14px;
-    --db-r-md:        10px;
-    --db-r-sm:        7px;
+    --db-r-lg:        8px;
+    --db-r-md:        8px;
+    --db-r-sm:        6px;
     --db-r-xs:        5px;
 
-    --db-mono:        ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --db-mono:        var(--pm-mono), ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 
-    padding: 1.5rem;
-    background: var(--db-canvas);
-    min-height: 100vh;
+    padding: 0;
     color: var(--db-ink);
     -webkit-font-smoothing: antialiased;
 }
@@ -546,17 +563,13 @@ $kpiBoard = [
     grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
 }
 
-.dashboard-container .charts-row--donuts {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-}
 
 .dashboard-container .chart-card {
     background: var(--db-surface);
     border: 1px solid var(--db-line);
     border-radius: var(--db-r-lg);
     padding: 1.15rem 1.25rem 1.25rem;
-    box-shadow: 0 1px 2px rgba(11, 18, 32, 0.04),
-                0 12px 28px -20px rgba(11, 18, 32, 0.18);
+    box-shadow: none;
     min-width: 0;
 }
 
@@ -573,8 +586,8 @@ $kpiBoard = [
 
 .dashboard-container .chart-heading h5 {
     font-size: 0.94rem;
-    font-weight: 700;
-    letter-spacing: -0.015em;
+    font-weight: 600;
+    letter-spacing: -0.005em;
     color: var(--db-ink);
     margin: 0 0 0.15rem;
     display: flex;
@@ -582,7 +595,7 @@ $kpiBoard = [
     gap: 0.45rem;
 }
 
-.dashboard-container .chart-heading h5 i { color: var(--db-accent); font-size: 0.9rem; }
+.dashboard-container .chart-heading h5 i { color: var(--db-ink-mute); font-size: 0.9rem; }
 
 .dashboard-container .chart-heading small {
     font-size: 0.75rem;
@@ -705,111 +718,6 @@ $kpiBoard = [
 }
 
 /* =========================================================
-   DONUT + LEGEND
-   ========================================================= */
-
-.dashboard-container .charts-row--donuts .chart-card {
-    padding: 0.9rem 1rem 1rem;
-}
-
-.dashboard-container .charts-row--donuts .chart-header {
-    margin-bottom: 0.6rem;
-}
-
-.dashboard-container .donut-wrap {
-    display: grid;
-    grid-template-columns: 150px minmax(0, 1fr);
-    align-items: center;
-    gap: 1.1rem;
-}
-
-.dashboard-container .donut-canvas {
-    position: relative;
-    height: 140px;
-    flex-shrink: 0;
-}
-
-.dashboard-container .donut-center {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    pointer-events: none;
-    text-align: center;
-}
-
-.dashboard-container .donut-value {
-    font-size: 1.35rem;
-    font-weight: 800;
-    letter-spacing: -0.04em;
-    line-height: 1;
-    color: var(--db-ink);
-    font-variant-numeric: tabular-nums;
-}
-
-.dashboard-container .donut-label {
-    font-size: 0.62rem;
-    font-weight: 500;
-    color: var(--db-ink-mute);
-    margin-top: 0.1rem;
-}
-
-.dashboard-container .donut-legend {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-}
-
-.dashboard-container .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 0.45rem;
-    padding: 0.2rem 0.35rem;
-    border-radius: var(--db-r-sm);
-    font-size: 0.72rem;
-    transition: background-color 0.16s ease;
-}
-
-.dashboard-container .legend-item:hover { background: var(--db-rail); }
-
-.dashboard-container .legend-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-
-.dashboard-container .legend-name {
-    color: var(--db-ink-soft);
-    font-weight: 500;
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.dashboard-container .legend-pct {
-    font-weight: 700;
-    color: var(--db-ink);
-    font-variant-numeric: tabular-nums;
-    font-size: 0.72rem;
-}
-
-.dashboard-container .legend-count {
-    font-size: 0.68rem;
-    color: var(--db-ink-faint);
-    font-variant-numeric: tabular-nums;
-    min-width: 1.25rem;
-    text-align: right;
-}
-
-/* =========================================================
    WORKLIST CARD
    ========================================================= */
 
@@ -817,8 +725,7 @@ $kpiBoard = [
     background: var(--db-surface);
     border: 1px solid var(--db-line);
     border-radius: var(--db-r-lg);
-    box-shadow: 0 1px 2px rgba(11, 18, 32, 0.04),
-                0 12px 28px -20px rgba(11, 18, 32, 0.18);
+    box-shadow: none;
     overflow: hidden;
 }
 
@@ -863,7 +770,6 @@ $kpiBoard = [
     padding: 0.4rem 0.75rem;
     text-decoration: none;
     white-space: nowrap;
-    box-shadow: 0 1px 2px rgba(36, 80, 216, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.12);
     transition: background-color 0.16s ease, border-color 0.16s ease;
 }
 
@@ -1119,34 +1025,10 @@ $kpiBoard = [
    ========================================================= */
 
 @media (max-width: 1100px) {
-    .dashboard-container .charts-row--top,
-    .dashboard-container .charts-row--donuts {
-        grid-template-columns: minmax(0, 1fr);
-    }
-
-    .dashboard-container .donut-wrap {
-        grid-template-columns: minmax(0, 1fr);
-        gap: 0.65rem;
-        justify-items: center;
-    }
-
-    .dashboard-container .donut-canvas { height: 160px; }
-
-    .dashboard-container .donut-legend {
-        width: 100%;
-    }
-
     .dashboard-container .service-list { max-height: 240px; }
 }
 
-@media (max-width: 992px) {
-    .dashboard-container { padding: 1rem; }
-}
-
 @media (max-width: 768px) {
-    .dashboard-container { padding: 0.9rem; }
-
-
     .dashboard-container .chart-card { padding: 1rem; }
     .dashboard-container .chart-body { height: 240px; }
 
@@ -1221,182 +1103,300 @@ $kpiBoard = [
     .dashboard-container .btn-view-all { display: none !important; }
     .dashboard-container .appointments-card { box-shadow: none; break-inside: avoid; }
 }
+/* =========================================================
+   CHARTS — throughput, turnaround, catalogue
+   Series colours are validated as a pair (dataviz validator,
+   light surface): requested #0B67B2, released #009A85.
+   ========================================================= */
+
+.dashboard-container {
+    --tp-req: #0B67B2;
+    --tp-rel: #009A85;
+}
+
+.dashboard-container .charts-row--bottom {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.dashboard-container .chart-count {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--db-ink-mute);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.dashboard-container .chart-empty--sm { height: 180px; }
+
+/* ---- throughput ---- */
+
+.dashboard-container .tp-legend {
+    display: flex;
+    gap: 1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.dashboard-container .tp-legend li {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.78rem;
+    color: var(--db-ink-soft);
+    white-space: nowrap;
+}
+
+.dashboard-container .tp-legend strong {
+    font-weight: 600;
+    color: var(--db-ink);
+    font-variant-numeric: tabular-nums;
+}
+
+.dashboard-container .tp-key {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+}
+
+.dashboard-container .tp-key--req { background: var(--tp-req); }
+.dashboard-container .tp-key--rel { background: var(--tp-rel); }
+
+.dashboard-container .chart-body--tp { height: 260px; }
+
+.dashboard-container .tp-foot {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0.85rem 0 0;
+    padding-top: 0.75rem;
+    font-size: 0.78rem;
+    color: var(--db-ink-mute);
+    border-top: 1px solid var(--db-line-soft);
+}
+
+.dashboard-container .tp-foot strong { color: var(--db-ink); font-weight: 600; }
+.dashboard-container .tp-foot i { font-size: 0.85rem; color: var(--db-ink-faint); }
+
+/* ---- turnaround: one headline number, then its spread ---- */
+
+.dashboard-container .tat-card { display: flex; flex-direction: column; }
+
+.dashboard-container .tat-hero {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+}
+
+.dashboard-container .tat-value {
+    font-size: 2.25rem;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    color: var(--db-ink);
+    font-variant-numeric: tabular-nums;
+}
+
+.dashboard-container .tat-label {
+    font-size: 0.8rem;
+    color: var(--db-ink-mute);
+}
+
+.dashboard-container .tat-sub {
+    margin: 0.5rem 0 1.1rem;
+    font-size: 0.78rem;
+    color: var(--db-ink-mute);
+}
+
+.dashboard-container .tat-sub strong { color: var(--db-ink); font-weight: 600; }
+
+.dashboard-container .tat-card .hbars { margin-top: auto; }
+
+/* ---- horizontal bar list (turnaround spread, catalogue) ---- */
+
+.dashboard-container .hbars {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.dashboard-container .hbar {
+    display: grid;
+    grid-template-columns: minmax(84px, 9.5rem) minmax(0, 1fr) 3.75rem;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.8rem;
+}
+
+.dashboard-container .hbar-label {
+    color: var(--db-ink-soft);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dashboard-container .hbar-track {
+    height: 8px;
+    overflow: hidden;
+    background: var(--db-line-soft);
+    border-radius: 4px;
+}
+
+.dashboard-container .hbar-fill {
+    display: block;
+    height: 100%;
+    background: var(--tp-req);
+    border-radius: 4px;
+}
+
+.dashboard-container .hbar-fill--tat { background: var(--tp-rel); }
+
+.dashboard-container .hbar-value {
+    font-weight: 600;
+    color: var(--db-ink);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.dashboard-container .hbar-value small {
+    margin-left: 0.15rem;
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: var(--db-ink-faint);
+}
+
+@media (max-width: 1200px) {
+    .dashboard-container .charts-row--top,
+    .dashboard-container .charts-row--bottom { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 576px) {
+    .dashboard-container .tp-legend { width: 100%; }
+    .dashboard-container .hbar { grid-template-columns: 6.5rem minmax(0, 1fr) 3.25rem; }
+}
 </style>
 
-<!-- Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Chart.js (pinned so a new major version cannot silently break the chart) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
 <script>
 (function () {
     'use strict';
 
-    var weeklyLabels   = <?= json_encode($weeklyLabels,   JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-    var weeklyDatasets = <?= json_encode($weeklyDatasets, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    var tpLabels    = <?= json_encode($tpLabels ?? [],    JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    var tpRequested = <?= json_encode($tpRequested ?? [], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    var tpReleased  = <?= json_encode($tpReleased ?? [],  JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 
-    var statusLabels = <?= json_encode(array_keys($donutData ?? []),    JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-    var statusValues = <?= json_encode(array_map('intval', array_values($donutData ?? [])), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-    var donutPalette = <?= json_encode($donutPalette ?? [],             JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    var INK   = '#10202E';
+    var SOFT  = '#5D6E80';
+    var FAINT = '#8496A8';
+    var GRID  = '#EBF0F5';
 
-    var servicesLabels = <?= json_encode(array_keys($categoryCounts ?? []),              JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-    var servicesValues = <?= json_encode(array_map('intval', array_values($categoryCounts ?? [])), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-
-    var TOOLTIP = {
-        backgroundColor: '#ffffff',
-        titleColor: '#0b1220',
-        bodyColor: '#414e63',
-        borderColor: '#e4e8ef',
-        borderWidth: 1,
-        padding: 10,
-        cornerRadius: 8,
-        displayColors: false,
-        titleFont: { size: 12, weight: '600' },
-        bodyFont: { size: 12 }
-    };
+    function plural(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
 
     function buildCharts() {
         if (typeof Chart === 'undefined') { return; }
 
-        // ----- Weekly volume (stacked bar) -----
-        var weeklyCanvas = document.getElementById('weeklyVolumeChart');
-        if (weeklyCanvas && Array.isArray(weeklyDatasets) && weeklyDatasets.length) {
-            new Chart(weeklyCanvas.getContext('2d'), {
-                type: 'bar',
-                data: { labels: weeklyLabels, datasets: weeklyDatasets },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    // One tooltip per day listing every modality that has studies.
-                    interaction: { mode: 'index', intersect: false },
-                    plugins: {
-                        // Stacked by modality: name the colours once there is more than one.
-                        legend: {
-                            display: weeklyDatasets.length > 1,
-                            position: 'bottom',
-                            labels: { boxWidth: 10, boxHeight: 10, color: '#414e63', font: { size: 11 } }
-                        },
-                        tooltip: Object.assign({}, TOOLTIP, {
-                            displayColors: weeklyDatasets.length > 1,
-                            filter: function (item) { return item.parsed.y > 0; },
-                            callbacks: {
-                                label: function (ctx) {
-                                    var n = ctx.parsed.y;
-                                    return (weeklyDatasets.length > 1 ? ctx.dataset.label + ': ' : '') +
-                                           n + (n === 1 ? ' study' : ' studies');
-                                }
-                            }
-                        })
-                    },
-                    scales: {
-                        x: {
-                            stacked: true,
-                            grid: { display: false },
-                            border: { display: false },
-                            ticks: { color: '#9aa5b5', font: { size: 11 } }
-                        },
-                        y: {
-                            stacked: true,
-                            beginAtZero: true,
-                            grid: { color: '#eef1f6', drawBorder: false, drawTicks: false },
-                            border: { display: false },
-                            ticks: { color: '#9aa5b5', font: { size: 11 }, stepSize: 1, precision: 0 }
+        var canvas = document.getElementById('throughputChart');
+        if (!canvas || !tpLabels.length) { return; }
+
+        var existing = Chart.getChart ? Chart.getChart(canvas) : null;
+        if (existing) { existing.destroy(); }
+
+        var bar = {
+            borderRadius: { topLeft: 4, topRight: 4 },
+            borderSkipped: 'bottom',
+            /* 2px surface gap between neighbouring bars */
+            borderWidth: { left: 1, right: 1 },
+            borderColor: '#FFFFFF',
+            categoryPercentage: 0.72,
+            barPercentage: 0.92,
+            maxBarThickness: 18
+        };
+
+        new Chart(canvas.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: tpLabels,
+                datasets: [
+                    Object.assign({ label: 'Requested', data: tpRequested, backgroundColor: '#0B67B2', hoverBackgroundColor: '#08528F' }, bar),
+                    Object.assign({ label: 'Released',  data: tpReleased,  backgroundColor: '#009A85', hoverBackgroundColor: '#007D6C' }, bar)
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? false : { duration: 400 },
+                /* One tooltip per day, triggered anywhere in the day's column */
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#FFFFFF',
+                        titleColor: INK,
+                        bodyColor: SOFT,
+                        borderColor: '#DDE4EC',
+                        borderWidth: 1,
+                        padding: 10,
+                        cornerRadius: 6,
+                        boxWidth: 8,
+                        boxHeight: 8,
+                        boxPadding: 4,
+                        usePointStyle: true,
+                        titleFont: { size: 12, weight: '600' },
+                        bodyFont: { size: 12 },
+                        callbacks: {
+                            label: function (ctx) {
+                                var n = ctx.parsed.y;
+                                return ' ' + ctx.dataset.label + ': ' + (ctx.datasetIndex === 0 ? plural(n, 'study', 'studies') : plural(n, 'report', 'reports'));
+                            },
+                            labelPointStyle: function () { return { pointStyle: 'rectRounded', rotation: 0 }; }
                         }
                     }
-                }
-            });
-        }
-
-        // ----- Status donut -----
-        var statusCanvas = document.getElementById('statusChart');
-        if (statusCanvas && statusValues.length) {
-            new Chart(statusCanvas.getContext('2d'), {
-                type: 'doughnut',
-                data: {
-                    labels: statusLabels,
-                    datasets: [{
-                        data: statusValues,
-                        backgroundColor: statusLabels.map(function (_, i) {
-                            return donutPalette[i % donutPalette.length];
-                        }),
-                        borderWidth: 3,
-                        borderColor: '#ffffff',
-                        borderRadius: 6,
-                        spacing: 2,
-                        hoverOffset: 6
-                    }]
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    cutout: '72%',
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: Object.assign({}, TOOLTIP, {
-                            callbacks: {
-                                label: function (ctx) {
-                                    var total = statusValues.reduce(function (a, b) { return a + b; }, 0);
-                                    var pct = total ? Math.round((ctx.parsed / total) * 100) : 0;
-                                    return ctx.parsed + ' studies (' + pct + '%)';
-                                }
-                            }
-                        })
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        border: { color: '#DDE4EC' },
+                        ticks: {
+                            color: FAINT,
+                            font: { size: 11 },
+                            maxRotation: 0,
+                            autoSkip: true,
+                            autoSkipPadding: 12
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grace: '10%',
+                        grid: { color: GRID, drawTicks: false },
+                        border: { display: false },
+                        ticks: { color: FAINT, font: { size: 11 }, precision: 0, padding: 8, maxTicksLimit: 5 }
                     }
                 }
-            });
-        }
-
-        // ----- Services donut -----
-        var servicesCanvas = document.getElementById('servicesChart');
-        if (servicesCanvas && servicesValues.length) {
-            var svcPalette = ['#2450d8', '#0f9d76', '#f0b429', '#0e7490', '#d9534f', '#7b8794', '#6d28d9'];
-
-            new Chart(servicesCanvas.getContext('2d'), {
-                type: 'doughnut',
-                data: {
-                    labels: servicesLabels,
-                    datasets: [{
-                        data: servicesValues,
-                        backgroundColor: servicesLabels.map(function (_, i) {
-                            return svcPalette[i % svcPalette.length];
-                        }),
-                        borderWidth: 3,
-                        borderColor: '#ffffff',
-                        borderRadius: 6,
-                        spacing: 2,
-                        hoverOffset: 6
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    cutout: '72%',
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: Object.assign({}, TOOLTIP, {
-                            callbacks: {
-                                label: function (ctx) {
-                                    var total = servicesValues.reduce(function (a, b) { return a + b; }, 0);
-                                    var pct = total ? Math.round((ctx.parsed / total) * 100) : 0;
-                                    return ctx.parsed + ' services (' + pct + '%)';
-                                }
-                            }
-                        })
-                    }
-                }
-            });
-        }
+            }
+        });
     }
 
     function ensureCharts() {
         if (typeof Chart !== 'undefined') { buildCharts(); return; }
 
         var tag = document.createElement('script');
-        tag.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+        tag.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
         tag.onload = buildCharts;
-        tag.onerror = function () { /* the empty containers simply stay */ };
+        tag.onerror = function () { /* the summary text above the canvas still reads correctly */ };
         document.head.appendChild(tag);
     }
 
-    document.addEventListener('DOMContentLoaded', ensureCharts);
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', ensureCharts);
+    } else {
+        ensureCharts();
+    }
 })();
 
 

@@ -332,95 +332,63 @@ class MedTech extends BaseController
         ];
     }
 
-    private function getTurnaroundTimes($labRequestModel, $labResultModel)
+    /**
+     * Average request-to-release time per laboratory section over the last
+     * $days days. Tests are grouped with DiagnosticRequestModel::labSection(),
+     * the same whole-word map as "Volume by section", so both charts agree.
+     * A request with tests in two sections counts once toward each.
+     * Sections requested in the window but not yet released come back with avg 0.
+     */
+    private function getTurnaroundTimes($labRequestModel, $labResultModel, int $days = 30)
     {
-        $testTypes = [
-            'cbc'             => ['label' => 'CBC',             'target' => 60],
-            'urinalysis'      => ['label' => 'Urinalysis',      'target' => 60],
-            'blood_chemistry' => ['label' => 'Blood Chemistry', 'target' => 120],
-            'lipid_profile'   => ['label' => 'Lipid Profile',   'target' => 120],
-            'serology'        => ['label' => 'Serology',        'target' => 120],
-            'thyroid'         => ['label' => 'Thyroid',         'target' => 120],
-            'microbiology'    => ['label' => 'Microbiology',    'target' => 180],
+        /* Target minutes per section (routine, non-STAT) */
+        $targets = [
+            'Hematology'   => 60,
+            'Urinalysis'   => 60,
+            'Microscopy'   => 60,
+            'Coagulation'  => 90,
+            'Chemistry'    => 120,
+            'Serology'     => 120,
+            'Thyroid'      => 240,
+            'Microbiology' => 1440,
+            'Other'        => 120,
         ];
 
+        $since = date('Y-m-d 00:00:00', strtotime('-' . ($days - 1) . ' days'));
+        $rows  = db_connect()->table('diagnostic_requests')
+            ->select('services, status, created_at, released_at')
+            ->where('type', DiagnosticRequestModel::TYPE_LAB)
+            ->where('created_at >=', $since)
+            ->get()->getResultArray();
+
+        $minutes = [];   // section => [minutes, ...]
+        $seen    = [];   // section => true
+        foreach ($rows as $row) {
+            $sections = [];
+            foreach (array_filter(array_map('trim', explode(',', (string) ($row['services'] ?? '')))) as $test) {
+                $sections[DiagnosticRequestModel::labSection($test)] = true;
+            }
+
+            $released = ($row['status'] ?? '') === DiagnosticRequestModel::STATUS_RELEASED && !empty($row['released_at'])
+                ? strtotime($row['released_at']) - strtotime((string) $row['created_at'])
+                : null;
+
+            foreach (array_keys($sections) as $section) {
+                $seen[$section] = true;
+                if ($released !== null && $released > 0) {
+                    $minutes[$section][] = $released / 60;
+                }
+            }
+        }
+
         $result = [];
-        $type   = DiagnosticRequestModel::TYPE_LAB;
-
-        $labRequestModel->resetQuery();
-        $releasedRequests = $labRequestModel
-            ->where('type', $type)
-            ->where('status', DiagnosticRequestModel::STATUS_RELEASED)
-            ->where('released_at IS NOT NULL')
-            ->findAll();
-
-        foreach ($testTypes as $key => $testType) {
-            $totalMinutes = 0;
-            $count        = 0;
-
-            foreach ($releasedRequests as $request) {
-                $labServices = strtolower($request['lab_services'] ?? '');
-                $isMatch     = false;
-
-                $searchTerms = explode(' ', $testType['label']);
-                foreach ($searchTerms as $term) {
-                    if (strlen($term) > 2 && strpos($labServices, strtolower($term)) !== false) {
-                        $isMatch = true;
-                        break;
-                    }
-                }
-
-                $alternatives = [
-                    'CBC'             => ['cbc', 'complete blood count', 'complete blood'],
-                    'Urinalysis'      => ['urinalysis', 'urine', 'ua'],
-                    'Blood Chemistry' => ['blood chemistry', 'chemistry', 'glucose', 'creatinine', 'bun', 'blood urea nitrogen'],
-                    'Lipid Profile'   => ['lipid profile', 'lipid', 'cholesterol', 'triglycerides'],
-                    'Serology'        => ['serology', 'syphilis', 'hiv', 'hepatitis'],
-                    'Thyroid'         => ['thyroid', 't3', 't4', 'tsh'],
-                    'Microbiology'    => ['microbiology', 'culture', 'sensitivity'],
-                ];
-
-                if (!$isMatch && isset($alternatives[$testType['label']])) {
-                    foreach ($alternatives[$testType['label']] as $alt) {
-                        if (strpos($labServices, $alt) !== false) {
-                            $isMatch = true;
-                            break;
-                        }
-                    }
-                }
-
-                if ($isMatch) {
-                    if (!empty($request['created_at']) && !empty($request['released_at'])) {
-                        $created  = strtotime($request['created_at']);
-                        $released = strtotime($request['released_at']);
-
-                        if ($released > $created) {
-                            $minutes = round(($released - $created) / 60);
-                            $totalMinutes += $minutes;
-                            $count++;
-                        }
-                    }
-                }
-            }
-
-            $avgMinutes = $count > 0 ? round($totalMinutes / $count) : 0;
-            $target     = $testType['target'];
-
-            if ($avgMinutes === 0) {
-                $color = 'gray';
-            } elseif ($avgMinutes <= $target) {
-                $color = 'green';
-            } elseif ($avgMinutes <= $target * 1.3) {
-                $color = 'orange';
-            } else {
-                $color = 'red';
-            }
-
+        foreach (array_keys($seen) as $section) {
+            $list = $minutes[$section] ?? [];
             $result[] = [
-                'name'   => $testType['label'],
-                'avg'    => $avgMinutes,
-                'target' => $target,
-                'color'  => $color,
+                'name'   => $section,
+                'avg'    => $list ? (int) round(array_sum($list) / count($list)) : 0,
+                'count'  => count($list),
+                'target' => $targets[$section] ?? 120,
             ];
         }
 

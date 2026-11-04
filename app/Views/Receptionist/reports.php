@@ -49,8 +49,8 @@
         'pending'   => ['Pending',   'amber'],
         'approved'  => ['Approved',  'blue'],
         'completed' => ['Completed', 'green'],
-        'late'      => ['Late',      'violet'],
-        'cancelled' => ['Cancelled', 'red'],
+        'late'      => ['Late',      'red'],
+        'cancelled' => ['Cancelled', 'slate'],
     ];
 
     $reqTotals = [];
@@ -176,11 +176,8 @@
     <!-- ===== KPIs ===== -->
     <div class="rp-kpis">
         <?php foreach ($kpis as $k): ?>
-            <div class="rp-kpi rp-kpi--<?= $k['tone'] ?>">
-                <div class="rp-kpi-top">
-                    <span class="rp-kpi-icon"><i class="bi <?= $k['icon'] ?>" aria-hidden="true"></i></span>
-                    <span class="rp-kpi-label"><?= $k['label'] ?></span>
-                </div>
+            <div class="rp-kpi">
+                <span class="rp-kpi-label"><?= $k['label'] ?></span>
                 <div class="rp-kpi-value"><?= $k['value'] ?></div>
                 <div class="rp-kpi-foot">
                     <?php if ($k['delta'] !== null):
@@ -189,8 +186,7 @@
                     ?>
                         <span class="rp-delta <?= abs($k['delta']) < 0.05 ? '' : ($good ? 'is-good' : 'is-bad') ?>"
                               title="vs <?= esc($prevLabel) ?>">
-                            <i class="bi <?= $up ? 'bi-arrow-up-right' : 'bi-arrow-down-right' ?>" aria-hidden="true"></i>
-                            <?= number_format(abs($k['delta']), 1) ?>%
+                            <?= $up ? '▲' : '▼' ?> <?= number_format(abs($k['delta']), 1) ?>%
                         </span>
                     <?php endif; ?>
                     <span class="rp-kpi-sub"><?= esc($k['sub']) ?></span>
@@ -256,7 +252,7 @@
         <?php foreach ($breakdowns as [$title, $icon, $rows, $labels]): ?>
             <section class="rp-card">
                 <header class="rp-card-head">
-                    <div><h2><i class="bi <?= $icon ?>" aria-hidden="true"></i> <?= $title ?></h2></div>
+                    <div><h2><?= $title ?></h2></div>
                 </header>
                 <?php if ($rows): ?>
                     <ul class="rp-bars">
@@ -284,7 +280,7 @@
     <section class="rp-card">
         <header class="rp-card-head">
             <div>
-                <h2><i class="bi bi-clipboard2-pulse" aria-hidden="true"></i> Front-desk activity</h2>
+                <h2>Front-desk activity</h2>
                 <small>Appointments scheduled, patients registered and requests created in this period</small>
             </div>
         </header>
@@ -316,12 +312,12 @@
                 </div>
                 <?php $pt = max(1, $activity['patients']['total']); ?>
                 <div class="rp-stack" aria-hidden="true">
-                    <?php if ($activity['patients']['walkin']): ?><span class="tone-blue" style="flex: <?= $activity['patients']['walkin'] ?>"></span><?php endif; ?>
-                    <?php if ($activity['patients']['online']): ?><span class="tone-violet" style="flex: <?= $activity['patients']['online'] ?>"></span><?php endif; ?>
+                    <?php if ($activity['patients']['walkin']): ?><span class="tone-gold" style="flex: <?= $activity['patients']['walkin'] ?>"></span><?php endif; ?>
+                    <?php if ($activity['patients']['online']): ?><span class="tone-blue" style="flex: <?= $activity['patients']['online'] ?>"></span><?php endif; ?>
                 </div>
                 <ul class="rp-legend">
-                    <li><i class="tone-blue"></i>Walk-in<b><?= $activity['patients']['walkin'] ?></b></li>
-                    <li><i class="tone-violet"></i>Online<b><?= $activity['patients']['online'] ?></b></li>
+                    <li><i class="tone-gold"></i>Walk-in<b><?= $activity['patients']['walkin'] ?></b></li>
+                    <li><i class="tone-blue"></i>Online<b><?= $activity['patients']['online'] ?></b></li>
                 </ul>
                 <p class="rp-act-note">
                     <?= $activity['patients']['total'] > 0 ? number_format($activity['patients']['walkin'] / $pt * 100, 0) . '% registered at the counter' : 'No new registrations' ?>
@@ -335,13 +331,13 @@
                         <span><?= $label ?></span><strong><?= $r['total'] ?></strong>
                     </div>
                     <div class="rp-stack" aria-hidden="true">
-                        <?php if ($r['released']): ?><span class="tone-green" style="flex: <?= $r['released'] ?>"></span><?php endif; ?>
-                        <?php if ($r['total'] - $r['released'] - $r['open'] > 0): ?><span class="tone-blue" style="flex: <?= $r['total'] - $r['released'] - $r['open'] ?>"></span><?php endif; ?>
+                        <?php if ($r['released']): ?><span class="tone-teal" style="flex: <?= $r['released'] ?>"></span><?php endif; ?>
+                        <?php if ($r['total'] - $r['released'] - $r['open'] > 0): ?><span class="tone-green" style="flex: <?= $r['total'] - $r['released'] - $r['open'] ?>"></span><?php endif; ?>
                         <?php if ($r['open']): ?><span class="tone-amber" style="flex: <?= $r['open'] ?>"></span><?php endif; ?>
                     </div>
                     <ul class="rp-legend">
-                        <li><i class="tone-green"></i>Released<b><?= $r['released'] ?></b></li>
-                        <li><i class="tone-blue"></i>Completed / other<b><?= max(0, $r['total'] - $r['released'] - $r['open']) ?></b></li>
+                        <li><i class="tone-teal"></i>Released<b><?= $r['released'] ?></b></li>
+                        <li><i class="tone-green"></i>Completed / other<b><?= max(0, $r['total'] - $r['released'] - $r['open']) ?></b></li>
                         <li><i class="tone-amber"></i>In queue<b><?= $r['open'] ?></b></li>
                     </ul>
                     <p class="rp-act-note">
@@ -357,7 +353,7 @@
         <section class="rp-card">
             <header class="rp-card-head">
                 <div>
-                    <h2><i class="bi bi-list-check" aria-hidden="true"></i> Top services</h2>
+                    <h2>Top services</h2>
                     <small>Most-availed services · billed charges (not amount received)</small>
                 </div>
             </header>
@@ -385,10 +381,10 @@
         <section class="rp-card">
             <header class="rp-card-head">
                 <div>
-                    <h2><i class="bi bi-exclamation-diamond" aria-hidden="true"></i> Unpaid bills</h2>
+                    <h2>Unpaid bills</h2>
                     <small>Open balances as of <?= date('M j, Y g:i A') ?> — not limited to the period</small>
                 </div>
-                <a class="rp-link" href="<?= base_url('receptionist/billing?status=unpaid') ?>">Billing <i class="bi bi-arrow-right"></i></a>
+                <a class="rp-link" href="<?= base_url('receptionist/billing?status=unpaid') ?>">Billing →</a>
             </header>
             <div class="rp-aging">
                 <div><span>0–7 days</span><strong><?= $peso($unpaid['aging']['0-7']) ?></strong></div>
@@ -428,7 +424,7 @@
     <section class="rp-card rp-log">
         <header class="rp-card-head">
             <div>
-                <h2><i class="bi bi-journal-text" aria-hidden="true"></i> Transaction log</h2>
+                <h2>Transaction log</h2>
                 <small><?= count($payments) ?> entr<?= count($payments) === 1 ? 'y' : 'ies' ?> · voided entries are struck through and excluded from net</small>
             </div>
             <label class="rp-search">
@@ -512,7 +508,7 @@
         <section class="rp-card">
             <header class="rp-card-head">
                 <div>
-                    <h2><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Void &amp; refund records</h2>
+                    <h2>Void &amp; refund records</h2>
                     <small>Authorized by an administrator</small>
                 </div>
             </header>
@@ -551,16 +547,16 @@
    Namespaced under .rp — tokens match the Payments page (.pm).
    ========================================================= */
 .rp {
-    --rp-ink:#0f172a; --rp-text:#334155; --rp-muted:#64748b; --rp-faint:#94a3b8;
-    --rp-line:#e2e8f0; --rp-line-soft:#f1f5f9;
+    --rp-ink:var(--pm-text,#10202E); --rp-text:var(--pm-text-soft,#3B4C5E); --rp-muted:var(--pm-text-muted,#5D6E80); --rp-faint:#7A8B9D;
+    --rp-line:var(--pm-line,#DDE4EC); --rp-line-soft:#EBF0F5;
     --rp-surface:#ffffff; --rp-subtle:#f8fafc;
-    --rp-accent:#1976d2; --rp-accent-dark:#1565c0; --rp-accent-soft:#e3f2fd;
-    --rp-blue:#1d4ed8; --rp-blue-soft:#eaf2fe;
-    --rp-green:#047857; --rp-green-soft:#ecfdf5;
-    --rp-red:#b91c1c; --rp-red-soft:#fef2f2;
-    --rp-violet:#6d28d9; --rp-violet-soft:#f3e8ff;
-    --rp-amber:#b45309; --rp-amber-soft:#fff4e5;
-    --rp-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --rp-accent:#0B67B2; --rp-accent-dark:#08528F; --rp-accent-soft:#E8F1FA;
+    --rp-blue:#08528F; --rp-blue-soft:#E8F1FA;
+    --rp-green:#067647; --rp-green-soft:#ECFDF3;
+    --rp-red:#B42318; --rp-red-soft:#FEF3F2;
+    --rp-slate:#475467; --rp-slate-soft:#F2F4F7;
+    --rp-amber:#93370D; --rp-amber-soft:#FEF6E7;
+    --rp-mono: var(--pm-mono, ui-monospace, monospace);
     color:var(--rp-text); font-size:.875rem;
 }
 .rp *:focus-visible { outline:2px solid var(--rp-accent); outline-offset:2px; }
@@ -575,7 +571,7 @@
 .rp-head-actions { display:flex; gap:.5rem; flex-wrap:wrap; }
 .rp-btn { display:inline-flex; align-items:center; justify-content:center; gap:.4rem; height:36px; padding:0 .9rem;
     font-size:.8125rem; font-weight:600; line-height:1; color:var(--rp-text); background:var(--rp-surface);
-    border:1px solid var(--rp-line); border-radius:7px; box-shadow:0 1px 1px rgba(15,23,42,.03);
+    border:1px solid var(--rp-line); border-radius:6px;
     white-space:nowrap; cursor:pointer; text-decoration:none; transition:background .15s, border-color .15s, color .15s; }
 .rp-btn:hover { background:var(--rp-subtle); border-color:#cbd5e1; color:var(--rp-ink); }
 .rp-btn--primary { background:var(--rp-accent); border-color:var(--rp-accent); color:#fff; }
@@ -583,41 +579,32 @@
 
 /* Filters */
 .rp-filters { display:flex; justify-content:space-between; align-items:flex-end; gap:.75rem 1rem; flex-wrap:wrap;
-    padding:.75rem .9rem; margin-bottom:1.1rem; background:var(--rp-surface); border:1px solid var(--rp-line); border-radius:12px; }
+    padding:.75rem .9rem; margin-bottom:1.1rem; background:var(--rp-surface); border:1px solid var(--rp-line); border-radius:8px; }
 .rp-presets { display:inline-flex; padding:3px; background:var(--rp-line-soft); border-radius:9px; flex-wrap:wrap; }
 .rp-preset { height:30px; padding:0 .8rem; font-size:.78rem; font-weight:600; color:var(--rp-muted);
     background:transparent; border:0; border-radius:7px; cursor:pointer; transition:background .15s, color .15s; }
 .rp-preset:hover { color:var(--rp-ink); }
-.rp-preset.is-active { background:var(--rp-surface); color:var(--rp-accent); box-shadow:0 1px 2px rgba(15,23,42,.08); }
+.rp-preset.is-active { background:var(--rp-surface); color:var(--rp-ink); box-shadow:0 1px 2px rgba(15,23,42,.08); }
 .rp-filter-fields { display:flex; align-items:flex-end; gap:.6rem; flex-wrap:wrap; }
 .rp-field { display:flex; flex-direction:column; gap:.2rem; margin:0; }
 .rp-field span { font-size:.68rem; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--rp-faint); }
 .rp-field input, .rp-field select { height:36px; padding:0 .6rem; font-size:.8125rem; color:var(--rp-ink);
     background:var(--rp-surface); border:1px solid var(--rp-line); border-radius:7px; min-width:0; }
 .rp-field select { min-width:160px; }
-.rp-field input:focus, .rp-field select:focus { outline:none; border-color:var(--rp-accent); box-shadow:0 0 0 3px rgba(25,118,210,.18); }
+.rp-field input:focus, .rp-field select:focus { outline:none; border-color:var(--rp-accent); box-shadow:0 0 0 3px rgba(11,103,178,.18); }
 
 /* KPIs */
-.rp-kpis { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:.9rem; margin-bottom:1.1rem; }
-.rp-kpi { padding:1rem 1.1rem; background:var(--rp-surface); border:1px solid var(--rp-line); border-radius:12px;
-    box-shadow:0 1px 2px rgba(15,23,42,.04); min-width:0; }
-.rp-kpi--green  { --tone:#10b981; }
-.rp-kpi--blue   { --tone:#1976d2; }
-.rp-kpi--violet { --tone:#7c3aed; }
-.rp-kpi--red    { --tone:#dc2626; }
-.rp-kpi--amber  { --tone:#f59e0b; background:linear-gradient(180deg,#fffbeb,var(--rp-surface)); }
-.rp-kpi-top { display:flex; align-items:center; gap:.55rem; margin-bottom:.6rem; }
-.rp-kpi-icon { display:grid; place-items:center; width:30px; height:30px; border-radius:8px; font-size:.9rem;
-    color:var(--tone); background:color-mix(in srgb, var(--tone) 12%, transparent); flex-shrink:0; }
-.rp-kpi-label { font-size:.8rem; font-weight:600; color:var(--rp-text); }
-.rp-kpi-value { font-size:1.3rem; font-weight:700; letter-spacing:-.02em; color:var(--rp-ink);
+.rp-kpis { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); margin-bottom:1.1rem; overflow:hidden;
+    background:var(--rp-surface); border:1px solid var(--rp-line); border-radius:8px; }
+.rp-kpi { padding:.85rem 1.1rem; min-width:0; box-shadow:-1px -1px 0 0 var(--rp-line-soft); }
+.rp-kpi-label { display:block; margin:0 0 .3rem; font-size:.76rem; font-weight:500; color:var(--rp-muted); }
+.rp-kpi-value { font-size:1.35rem; font-weight:600; letter-spacing:-.02em; color:var(--rp-ink);
     font-variant-numeric:tabular-nums; overflow-wrap:anywhere; line-height:1.2; }
 .rp-kpi-foot { display:flex; align-items:center; gap:.45rem; margin-top:.35rem; flex-wrap:wrap; }
 .rp-kpi-sub { font-size:.72rem; color:var(--rp-muted); }
-.rp-delta { display:inline-flex; align-items:center; gap:.15rem; padding:.05rem .4rem; font-size:.68rem; font-weight:700;
-    border-radius:999px; color:var(--rp-muted); background:var(--rp-line-soft); font-variant-numeric:tabular-nums; }
-.rp-delta.is-good { color:#15803d; background:#dcfce7; }
-.rp-delta.is-bad  { color:#b91c1c; background:#fee2e2; }
+.rp-delta { font-size:.72rem; font-weight:600; color:var(--rp-muted); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.rp-delta.is-good { color:#067647; }
+.rp-delta.is-bad  { color:#B42318; }
 
 /* Cards & grids */
 .rp-grid { display:grid; gap:.9rem; margin-bottom:.9rem; }
@@ -625,11 +612,10 @@
 .rp-grid--3 { grid-template-columns:repeat(3,minmax(0,1fr)); }
 .rp-grid--2 { grid-template-columns:repeat(2,minmax(0,1fr)); }
 .rp-grid > .rp-card { margin-bottom:0; }
-.rp-card { background:var(--rp-surface); border:1px solid var(--rp-line); border-radius:12px; padding:1.1rem 1.2rem;
-    box-shadow:0 1px 2px rgba(15,23,42,.04); margin-bottom:.9rem; min-width:0; }
+.rp-card { background:var(--rp-surface); border:1px solid var(--rp-line); border-radius:8px; padding:1.1rem 1.2rem;
+    margin-bottom:.9rem; min-width:0; }
 .rp-card-head { display:flex; justify-content:space-between; align-items:flex-start; gap:.75rem; margin-bottom:.9rem; flex-wrap:wrap; }
-.rp-card-head h2 { margin:0; font-size:.95rem; font-weight:650; color:var(--rp-ink); }
-.rp-card-head h2 i { color:var(--rp-accent); margin-right:.3rem; }
+.rp-card-head h2 { margin:0; font-size:.95rem; font-weight:600; color:var(--rp-ink); }
 .rp-card-head small { display:block; margin-top:.15rem; font-size:.75rem; color:var(--rp-muted); }
 .rp-link { font-size:.78rem; font-weight:600; color:var(--rp-accent); text-decoration:none; white-space:nowrap; }
 .rp-link:hover { text-decoration:underline; }
@@ -643,7 +629,7 @@
 
 /* Remittance ledger */
 .rp-ledger { margin:0; }
-.rp-ledger > div { display:flex; justify-content:space-between; gap:1rem; padding:.45rem 0; border-bottom:1px dashed var(--rp-line); }
+.rp-ledger > div { display:flex; justify-content:space-between; gap:1rem; padding:.45rem 0; border-bottom:1px solid var(--rp-line-soft); }
 .rp-ledger dt { font-weight:500; color:var(--rp-text); }
 .rp-ledger dd { margin:0; font-weight:600; color:var(--rp-ink); font-variant-numeric:tabular-nums; white-space:nowrap; }
 .rp-ledger .is-minus dd { color:var(--rp-red); }
@@ -651,13 +637,13 @@
 .rp-ledger .is-total dt, .rp-ledger .is-total dd { font-weight:700; color:var(--rp-ink); }
 .rp-ledger .is-sep { margin-top:.35rem; }
 .rp-ledger .is-muted dt, .rp-ledger .is-muted dd { color:var(--rp-faint); font-weight:500; }
-.rp-ledger .is-drawer { margin-top:.5rem; padding:.6rem .75rem; border:0; border-radius:8px; background:var(--rp-green-soft); }
-.rp-ledger .is-drawer dt, .rp-ledger .is-drawer dd { color:var(--rp-green); font-weight:700; }
+.rp-ledger .is-drawer { margin-top:.5rem; padding:.6rem .75rem; border:1px solid var(--rp-line); border-radius:6px; background:var(--rp-subtle); }
+.rp-ledger .is-drawer dt, .rp-ledger .is-drawer dd { color:var(--rp-ink); font-weight:600; }
 .rp-count-line { display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-top:.75rem; font-weight:500; }
 .rp-count-line input { width:140px; height:34px; padding:0 .6rem; text-align:right; font-variant-numeric:tabular-nums;
     border:1px solid var(--rp-line); border-radius:7px; }
-.rp-count-line input:focus { outline:none; border-color:var(--rp-accent); box-shadow:0 0 0 3px rgba(25,118,210,.18); }
-.rp-variance { margin-top:.5rem; padding:.5rem .75rem; border-radius:8px; font-size:.8rem; font-weight:600; }
+.rp-count-line input:focus { outline:none; border-color:var(--rp-accent); box-shadow:0 0 0 3px rgba(11,103,178,.18); }
+.rp-variance { margin-top:.5rem; padding:.5rem .75rem; border-radius:6px; font-size:.8rem; font-weight:600; }
 .rp-variance.is-ok    { background:var(--rp-green-soft); color:var(--rp-green); }
 .rp-variance.is-short { background:var(--rp-red-soft);   color:var(--rp-red); }
 .rp-variance.is-over  { background:var(--rp-amber-soft); color:var(--rp-amber); }
@@ -667,8 +653,8 @@
 .rp-bar-row { display:flex; justify-content:space-between; gap:.5rem; font-size:.8125rem; }
 .rp-bar-name { font-weight:600; color:var(--rp-ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .rp-bar-amt { font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; }
-.rp-bar-track { height:6px; margin:.3rem 0 .2rem; border-radius:99px; background:var(--rp-line-soft); overflow:hidden; }
-.rp-bar-track span { display:block; height:100%; border-radius:99px; background:var(--rp-accent); }
+.rp-bar-track { height:6px; margin:.3rem 0 .2rem; border-radius:3px; background:var(--rp-line-soft); overflow:hidden; }
+.rp-bar-track span { display:block; height:100%; border-radius:3px; background:var(--rp-accent); }
 .rp-bar-meta { font-size:.7rem; color:var(--rp-faint); }
 
 /* Activity */
@@ -676,27 +662,27 @@
 .rp-act-block { min-width:0; }
 .rp-act-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:.45rem; }
 .rp-act-head span { font-size:.8rem; font-weight:600; color:var(--rp-text); }
-.rp-act-head strong { font-size:1.2rem; font-weight:700; color:var(--rp-ink); font-variant-numeric:tabular-nums; }
-.rp-stack { display:flex; gap:2px; height:8px; border-radius:99px; overflow:hidden; background:var(--rp-line-soft); }
+.rp-act-head strong { font-size:1.2rem; font-weight:600; color:var(--rp-ink); font-variant-numeric:tabular-nums; }
+.rp-stack { display:flex; gap:2px; height:8px; border-radius:4px; overflow:hidden; background:var(--rp-line-soft); }
 .rp-legend { list-style:none; margin:.6rem 0 0; padding:0; display:flex; flex-direction:column; gap:.25rem; }
 .rp-legend li { display:flex; align-items:center; gap:.45rem; font-size:.78rem; color:var(--rp-muted); }
 .rp-legend li i { width:8px; height:8px; border-radius:2px; flex-shrink:0; }
 .rp-legend li b { margin-left:auto; font-weight:600; color:var(--rp-ink); font-variant-numeric:tabular-nums; }
 .rp-act-note { margin:.55rem 0 0; font-size:.72rem; color:var(--rp-faint); }
-.tone-green  { background:#10b981; }
-.tone-blue   { background:#1976d2; }
-.tone-violet { background:#7c3aed; }
-.tone-amber  { background:#f59e0b; }
-.tone-red    { background:#dc2626; }
+.tone-amber { background:#DC6803; }
+.tone-blue  { background:#0B67B2; }
+.tone-green { background:#17B26A; }
+.tone-teal  { background:#009A85; }
+.tone-red   { background:#F04438; }
+.tone-slate { background:#98A2B3; }
+.tone-gold  { background:#D29A1E; }
 
 /* Aging */
 .rp-aging { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.5rem; margin-bottom:.8rem; }
 .rp-aging > div { padding:.55rem .7rem; border-radius:8px; background:var(--rp-subtle); border:1px solid var(--rp-line-soft); }
 .rp-aging span { display:block; font-size:.7rem; color:var(--rp-muted); }
 .rp-aging strong { font-size:.9rem; color:var(--rp-ink); font-variant-numeric:tabular-nums; }
-.rp-aging .is-warn { background:var(--rp-amber-soft); border-color:#fed7aa; }
 .rp-aging .is-warn strong { color:var(--rp-amber); }
-.rp-aging .is-bad  { background:var(--rp-red-soft); border-color:#fecaca; }
 .rp-aging .is-bad strong { color:var(--rp-red); }
 
 /* Tables */
@@ -712,29 +698,29 @@
 .rp-table--compact td { padding:.45rem .6rem; }
 .rp-table tfoot td { padding:.7rem .6rem; font-weight:700; color:var(--rp-ink); border-top:2px solid var(--rp-ink); background:var(--rp-subtle); }
 .rp-table tr.is-void .rp-amt { text-decoration:line-through; color:var(--rp-faint); }
-.rp-table tr.is-void td { background:#fffafa; }
+.rp-table tr.is-void td { background:var(--rp-subtle); }
 .rp-mono { font-family:var(--rp-mono); font-size:.75rem; color:var(--rp-ink); text-decoration:none; white-space:nowrap; }
 a.rp-mono { color:var(--rp-accent); }
 a.rp-mono:hover { text-decoration:underline; }
 .rp-strong { font-weight:600; color:var(--rp-ink); }
 .rp-faint { color:var(--rp-faint); }
 .rp-nowrap { white-space:nowrap; }
-.rp-pill { display:inline-block; margin-left:.3rem; padding:.1rem .45rem; font-size:.66rem; font-weight:700; border-radius:999px; vertical-align:middle; white-space:nowrap; }
+.rp-pill { display:inline-block; margin-left:.3rem; padding:.1rem .45rem; font-size:.68rem; font-weight:600; border-radius:4px; vertical-align:middle; white-space:nowrap; }
 td > .rp-pill:first-child { margin-left:0; }
 .rp-pill--blue   { background:var(--rp-blue-soft);   color:var(--rp-blue); }
-.rp-pill--violet { background:var(--rp-violet-soft); color:var(--rp-violet); }
+.rp-pill--slate  { background:var(--rp-slate-soft); color:var(--rp-slate); }
 .rp-pill--red    { background:var(--rp-red-soft);    color:var(--rp-red); }
-.rp-icon-btn { display:inline-grid; place-items:center; width:30px; height:30px; border-radius:7px; color:var(--rp-muted);
+.rp-icon-btn { display:inline-grid; place-items:center; width:30px; height:30px; border-radius:6px; color:var(--rp-muted);
     border:1px solid var(--rp-line); background:var(--rp-surface); text-decoration:none; }
 .rp-icon-btn:hover { color:var(--rp-accent); border-color:var(--rp-accent); }
 .rp-svc-name { display:block; color:var(--rp-ink); font-weight:500; }
-.rp-svc-bar { display:block; height:3px; margin-top:.25rem; border-radius:99px; background:var(--rp-line-soft); }
-.rp-svc-bar span { display:block; height:100%; border-radius:99px; background:#93c5fd; }
+.rp-svc-bar { display:block; height:4px; margin-top:.3rem; border-radius:2px; background:var(--rp-line-soft); }
+.rp-svc-bar span { display:block; height:100%; border-radius:2px; background:#3D8FD1; }
 .rp-search { position:relative; margin:0; }
 .rp-search i { position:absolute; left:.65rem; top:50%; transform:translateY(-50%); color:var(--rp-faint); font-size:.8rem; }
 .rp-search input { height:34px; width:240px; max-width:100%; padding:0 .6rem 0 1.9rem; font-size:.8125rem;
     border:1px solid var(--rp-line); border-radius:7px; }
-.rp-search input:focus { outline:none; border-color:var(--rp-accent); box-shadow:0 0 0 3px rgba(25,118,210,.18); }
+.rp-search input:focus { outline:none; border-color:var(--rp-accent); box-shadow:0 0 0 3px rgba(11,103,178,.18); }
 
 /* Responsive */
 @media (max-width: 1400px) {
@@ -841,9 +827,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 datasets: [{
                     label: 'Net collected',
                     data: buckets.map(function (b) { return b.amount; }),
-                    backgroundColor: '#1976d2',
-                    hoverBackgroundColor: '#1565c0',
-                    borderRadius: 4,
+                    backgroundColor: '#0B67B2',
+                    hoverBackgroundColor: '#08528F',
+                    borderRadius: { topLeft: 4, topRight: 4 },
+                    borderSkipped: 'bottom',
                     maxBarThickness: 36
                 }]
             },
@@ -854,6 +841,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 plugins: {
                     legend: { display: false },
                     tooltip: {
+                        backgroundColor: '#FFFFFF',
+                        titleColor: '#10202E',
+                        bodyColor: '#5D6E80',
+                        borderColor: '#DDE4EC',
+                        borderWidth: 1,
+                        padding: 10,
+                        cornerRadius: 6,
+                        displayColors: false,
                         callbacks: {
                             label: function (ctx) {
                                 var b = buckets[ctx.dataIndex];

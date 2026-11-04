@@ -29,17 +29,6 @@ $categoryMeta = [
     'xray'       => ['label' => 'X-Ray',      'tone' => 'xray', 'icon' => 'xray'],
 ];
 
-$categoryIcons = [
-    'laboratory' => 'flask (2).png',
-    'xray'       => 'bones (1).png',
-];
-
-$statIcons = [
-    'lab'   => 'flask (2).png',
-    'xray'  => 'bones (1).png',
-    'total' => 'paper.png',
-];
-
 $normaliseCategory = static function ($value): string {
     $v = strtolower(trim((string) $value));
     $v = str_replace([' ', '-', '_'], '', $v);
@@ -86,55 +75,18 @@ $tabUrl = static function (string $key): string {
     </header>
 
 
-    <!-- ===== STATS ===== -->
-    <div class="sv-stats">
-
-        <div class="sv-stat sv-stat--lab">
-            <div class="sv-stat-icon">
-                <img src="<?= esc(base_url('assets/images/' . $statIcons['lab']), 'attr') ?>"
-                     alt=""
-                     class="sv-stat-img"
-                     loading="lazy"
-                     decoding="async">
-            </div>
-            <div class="sv-stat-body">
-                <div class="sv-stat-value"><?= number_format($labCount) ?></div>
-                <div class="sv-stat-label">Laboratory</div>
-                <div class="sv-stat-sub">Blood, urine, chemistry tests</div>
-            </div>
-        </div>
-
-        <div class="sv-stat sv-stat--xray">
-            <div class="sv-stat-icon">
-                <img src="<?= esc(base_url('assets/images/' . $statIcons['xray']), 'attr') ?>"
-                     alt=""
-                     class="sv-stat-img"
-                     loading="lazy"
-                     decoding="async">
-            </div>
-            <div class="sv-stat-body">
-                <div class="sv-stat-value"><?= number_format($xrayCount) ?></div>
-                <div class="sv-stat-label">X-Ray &amp; imaging</div>
-                <div class="sv-stat-sub">Radiography and imaging</div>
-            </div>
-        </div>
-
-        <div class="sv-stat sv-stat--total">
-            <div class="sv-stat-icon">
-                <img src="<?= esc(base_url('assets/images/' . $statIcons['total']), 'attr') ?>"
-                     alt=""
-                     class="sv-stat-img"
-                     loading="lazy"
-                     decoding="async">
-            </div>
-            <div class="sv-stat-body">
-                <div class="sv-stat-value"><?= number_format($total) ?></div>
-                <div class="sv-stat-label">Total services</div>
-                <div class="sv-stat-sub">All categories</div>
-            </div>
-        </div>
-
-    </div>
+    <!-- ===== CATALOGUE SUMMARY ===== -->
+    <?php
+    $svShare = static fn(int $n): string => ($total > 0 ? (int) round($n / $total * 100) : 0) . '% of catalogue';
+    ?>
+    <?= view('partials/kpi_strip', [
+        'id'    => 'services',
+        'cards' => [
+            ['key' => 'total', 'label' => 'Total services',    'value' => $total,     'context' => 'all categories'],
+            ['key' => 'lab',   'label' => 'Laboratory',        'value' => $labCount,  'context' => $svShare($labCount)],
+            ['key' => 'xray',  'label' => 'X-Ray & imaging',   'value' => $xrayCount, 'context' => $svShare($xrayCount)],
+        ],
+    ]) ?>
 
 
     <!-- ===== PANEL ===== -->
@@ -169,11 +121,19 @@ $tabUrl = static function (string $key): string {
 
         <?php if ($total > 0): ?>
 
+            <div class="sv-list-head" aria-hidden="true">
+                <span>Service</span>
+                <span>Category</span>
+                <span>Price</span>
+                <span>Status</span>
+                <span>Added</span>
+                <span></span>
+            </div>
+
             <ul class="sv-list" id="svList" role="list">
                 <?php foreach ($serviceList as $service):
                     $category = $normaliseCategory($service['category'] ?? '');
                     $meta     = $categoryMeta[$category] ?? $categoryMeta['laboratory'];
-                    $png      = $categoryIcons[$category] ?? $categoryIcons['laboratory'];
 
                     $code     = (string) ($service['service_code'] ?? '');
                     $name     = (string) ($service['service_name'] ?? '');
@@ -194,16 +154,6 @@ $tabUrl = static function (string $key): string {
                         data-active="<?= $isActive ? '1' : '0' ?>"
                         data-search="<?= esc($haystack, 'attr') ?>">
 
-                        <div class="sv-row-icon">
-                            <span class="sv-cat-icon sv-cat-icon--<?= esc($meta['tone'], 'attr') ?>" aria-hidden="true">
-                                <img src="<?= esc(base_url('assets/images/' . $png), 'attr') ?>"
-                                     alt=""
-                                     class="sv-cat-img"
-                                     loading="lazy"
-                                     decoding="async">
-                            </span>
-                        </div>
-
                         <div class="sv-row-identity">
                             <div class="sv-row-name-line">
                                 <span class="sv-name"><?= esc($name) ?></span>
@@ -214,34 +164,26 @@ $tabUrl = static function (string $key): string {
                                 <?php if ($desc !== ''): ?>
                                     <?= esc($desc) ?>
                                 <?php else: ?>
-                                    <span class="sv-muted">No description provided.</span>
+                                    <span class="sv-muted">No description</span>
                                 <?php endif; ?>
                             </p>
                         </div>
 
                         <div class="sv-row-category">
-                            <span class="sv-cat-pill sv-cat-pill--<?= esc($meta['tone'], 'attr') ?>">
-                                <?= esc($meta['label']) ?>
-                            </span>
-                        </div>
-
-                        <div class="sv-row-status">
-                            <span class="sv-status sv-status--<?= $isActive ? 'active' : 'inactive' ?>">
-                                <?= $isActive ? 'Active' : 'Inactive' ?>
-                            </span>
+                            <span class="sv-cat sv-cat--<?= esc($meta['tone'], 'attr') ?>"><?= esc($meta['label']) ?></span>
                         </div>
 
                         <div class="sv-row-price">
                             <span class="sv-price">&#8369;<?= number_format($charge, 2) ?></span>
                         </div>
 
+                        <div class="sv-row-status">
+                            <span class="sv-status sv-status--<?= $isActive ? 'active' : 'inactive' ?>"><?= $isActive ? 'Active' : 'Inactive' ?></span>
+                        </div>
+
                         <div class="sv-row-created">
                             <?php if ($created): ?>
-                                <time datetime="<?= esc(date('c', $created), 'attr') ?>"
-                                      title="Added <?= esc(date('M j, Y', $created), 'attr') ?>">
-                                    <i class="bi bi-calendar3" aria-hidden="true"></i>
-                                    <?= esc(date('M j, Y', $created)) ?>
-                                </time>
+                                <time datetime="<?= esc(date('c', $created), 'attr') ?>"><?= esc(date('M j, Y', $created)) ?></time>
                             <?php else: ?>
                                 <span class="sv-muted">&mdash;</span>
                             <?php endif; ?>
@@ -249,31 +191,42 @@ $tabUrl = static function (string $key): string {
 
                         <div class="sv-row-actions">
                             <button type="button"
-                                    class="sv-row-btn edit-service"
+                                    class="sv-icon-btn edit-service"
                                     title="Edit"
                                     aria-label="Edit <?= esc($name, 'attr') ?>"
                                     data-bs-toggle="modal"
                                     data-bs-target="#editServiceModal">
                                 <i class="bi bi-pencil" aria-hidden="true"></i>
-                                <span>Edit</span>
                             </button>
 
-                            <a class="sv-row-btn"
-                               data-post href="<?= base_url('admin/services/toggle/' . (int) ($service['id'] ?? 0)) ?>"
-                               title="<?= $isActive ? 'Deactivate' : 'Activate' ?>"
-                               aria-label="<?= $isActive ? 'Deactivate' : 'Activate' ?> <?= esc($name, 'attr') ?>">
-                                <i class="bi bi-<?= $isActive ? 'toggle-on' : 'toggle-off' ?>" aria-hidden="true"></i>
-                                <span><?= $isActive ? 'Deactivate' : 'Activate' ?></span>
-                            </a>
-
-                            <a class="sv-row-btn sv-row-btn--danger"
-                               data-post href="<?= base_url('admin/services/delete/' . (int) ($service['id'] ?? 0)) ?>"
-                               title="Delete"
-                               aria-label="Delete <?= esc($name, 'attr') ?>"
-                               onclick="return confirm('Delete <?= esc(addslashes($name), 'attr') ?>? This cannot be undone.')">
-                                <i class="bi bi-trash3" aria-hidden="true"></i>
-                                <span>Delete</span>
-                            </a>
+                            <div class="dropdown">
+                                <button type="button"
+                                        class="sv-icon-btn"
+                                        data-bs-toggle="dropdown"
+                                        data-bs-popper-config='{"strategy":"fixed"}'
+                                        aria-expanded="false"
+                                        aria-label="More actions for <?= esc($name, 'attr') ?>">
+                                    <i class="bi bi-three-dots" aria-hidden="true"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end sv-menu">
+                                    <li>
+                                        <a class="dropdown-item"
+                                           data-post href="<?= base_url('admin/services/toggle/' . (int) ($service['id'] ?? 0)) ?>">
+                                            <i class="bi bi-<?= $isActive ? 'pause-circle' : 'play-circle' ?>" aria-hidden="true"></i>
+                                            <?= $isActive ? 'Deactivate' : 'Activate' ?>
+                                        </a>
+                                    </li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <a class="dropdown-item sv-menu-danger"
+                                           data-post href="<?= base_url('admin/services/delete/' . (int) ($service['id'] ?? 0)) ?>"
+                                           onclick="return confirm('Delete <?= esc(addslashes($name), 'attr') ?>? This cannot be undone.')">
+                                            <i class="bi bi-trash3" aria-hidden="true"></i>
+                                            Delete
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
                         </div>
 
                     </li>
@@ -623,33 +576,34 @@ $tabUrl = static function (string $key): string {
    ========================================================= */
 
 .sv {
-    --sv-ink:         #0f172a;
-    --sv-text:        #334155;
-    --sv-muted:       #64748b;
-    --sv-faint:       #94a3b8;
-    --sv-line:        #e2e8f0;
-    --sv-line-soft:   #f1f5f9;
+    --sv-ink:         var(--pm-text, #10202E);
+    --sv-text:        var(--pm-text-soft, #3B4C5E);
+    --sv-muted:       var(--pm-text-muted, #5D6E80);
+    --sv-faint:       #7A8B9D;
+    --sv-line:        var(--pm-line, #DDE4EC);
+    --sv-line-soft:   #EBF0F5;
     --sv-surface:     #ffffff;
     --sv-subtle:      #f8fafc;
 
     /* === Aligned with layout blue === */
-    --sv-accent:      #1976d2;
-    --sv-accent-dark: #1565c0;
-    --sv-accent-soft: #e3f2fd;
+    --sv-accent:      #0B67B2;
+    --sv-accent-dark: #08528F;
+    --sv-accent-soft: #E8F1FA;
 
-    --sv-lab:         #1976d2;
-    --sv-lab-soft:    #e3f2fd;
-    --sv-xray:        #6d28d9;
-    --sv-xray-soft:   #f3e8ff;
+    --sv-lab:         #0B67B2;
+    --sv-lab-soft:    #E8F1FA;
+    --sv-xray:         #0E8A7E;
+    --sv-xray-soft:    #E6F6F4;
+    --sv-row-hover:    #F5F8FB;
 
-    --sv-danger:      #dc2626;
-    --sv-danger-dark: #b91c1c;
+    --sv-danger:      #B42318;
+    --sv-danger-dark: #912018;
     --sv-danger-soft: #fef2f2;
 
-    --sv-radius:      12px;
+    --sv-radius:      8px;
     --sv-radius-sm:   8px;
     --sv-radius-xs:   6px;
-    --sv-mono:        ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --sv-mono:        var(--pm-mono, ui-monospace, monospace);
 
     color: var(--sv-text);
 }
@@ -704,7 +658,6 @@ $tabUrl = static function (string $key): string {
     background: var(--sv-surface);
     border: 1px solid var(--sv-line);
     border-radius: var(--sv-radius-xs);
-    box-shadow: 0 1px 1px rgba(15, 23, 42, 0.03);
     white-space: nowrap;
     text-decoration: none;
     cursor: pointer;
@@ -719,80 +672,12 @@ $tabUrl = static function (string $key): string {
 .sv-btn--primary { background: var(--sv-accent); border-color: var(--sv-accent); }
 .sv-btn--primary:hover { background: var(--sv-accent-dark); border-color: var(--sv-accent-dark); }
 
-/* ---------- Stats ---------- */
-
-.sv-stats {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.9rem;
-    margin-bottom: 1.25rem;
-}
-
-.sv-stat {
-    display: flex;
-    align-items: center;
-    gap: 0.85rem;
-    min-width: 0;
-    padding: 0.9rem 1rem;
-    background: var(--sv-surface);
-    border: 1px solid var(--sv-line);
-    border-radius: var(--sv-radius);
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-}
-
-.sv-stat-icon {
-    display: grid;
-    place-items: center;
-    flex-shrink: 0;
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
-}
-
-.sv-stat--lab   .sv-stat-icon { background: transparent; }
-.sv-stat--xray  .sv-stat-icon { background: transparent; }
-.sv-stat--total .sv-stat-icon { background: transparent; }
-
-.sv-stat-img {
-    width: 32px;
-    height: 32px;
-    object-fit: contain;
-    display: block;
-}
-
-.sv-stat-body { min-width: 0; }
-
-.sv-stat-value {
-    font-size: 1.35rem;
-    font-weight: 700;
-    line-height: 1.1;
-    letter-spacing: -0.02em;
-    color: var(--sv-ink);
-    font-variant-numeric: tabular-nums;
-}
-
-.sv-stat-label {
-    margin-top: 0.15rem;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    color: var(--sv-text);
-}
-
-.sv-stat-sub {
-    font-size: 0.72rem;
-    color: var(--sv-muted);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
 /* ---------- Panel ---------- */
 
 .sv-panel {
     background: var(--sv-surface);
     border: 1px solid var(--sv-line);
     border-radius: var(--sv-radius);
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
     overflow: hidden;
 }
 
@@ -850,7 +735,7 @@ $tabUrl = static function (string $key): string {
     text-align: center;
     color: var(--sv-muted);
     background: var(--sv-line-soft);
-    border-radius: 999px;
+    border-radius: 4px;
 }
 
 .sv-tab.is-active .sv-tab-count { color: var(--sv-accent); background: var(--sv-accent-soft); }
@@ -894,7 +779,7 @@ $tabUrl = static function (string $key): string {
 .sv-input:focus {
     outline: none;
     border-color: var(--sv-accent);
-    box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.14);
+    box-shadow: 0 0 0 3px rgba(11, 103, 178, 0.14);
 }
 
 .sv-search-clear {
@@ -917,139 +802,140 @@ $tabUrl = static function (string $key): string {
 
 /* ---------- List ---------- */
 
+.sv-list-head,
+.sv-row {
+    display: grid;
+    grid-template-columns:
+        minmax(0, 2.6fr)   /* service  */
+        120px              /* category */
+        110px              /* price    */
+        100px              /* status   */
+        110px              /* added    */
+        72px;              /* actions  */
+    align-items: center;
+    column-gap: 1rem;
+    padding: 0 1rem;
+}
+
+.sv-list-head {
+    height: 36px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--sv-muted);
+    background: var(--sv-subtle);
+    border-top: 1px solid var(--sv-line);
+    border-bottom: 1px solid var(--sv-line);
+}
+
+.sv-list-head > :nth-child(3) { text-align: right; }
+
 .sv-list {
-    list-style: none;
     margin: 0;
     padding: 0;
-    border-top: 1px solid var(--sv-line);
+    list-style: none;
 }
 
 .sv-row {
     position: relative;
-    display: grid;
-    grid-template-columns:
-        44px
-        minmax(0, 2.6fr)
-        minmax(0, 0.9fr)
-        minmax(0, 0.7fr)
-        minmax(0, 0.7fr)
-        minmax(0, 0.9fr)
-        auto;
-    align-items: center;
-    gap: 1rem;
-    padding: 0.85rem 1rem;
+    min-height: 60px;
+    padding-top: 0.65rem;
+    padding-bottom: 0.65rem;
     border-bottom: 1px solid var(--sv-line-soft);
     transition: background-color 0.12s ease;
 }
 
 .sv-row:last-child { border-bottom: 0; }
-.sv-row:hover { background: #fafbfd; }
+.sv-row:hover { background: var(--sv-row-hover); }
 
-.sv-row::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 3px;
-    background: var(--rail, transparent);
-}
-
-.sv-row--lab  { --rail: #1976d2; }
-.sv-row--xray { --rail: #6d28d9; }
-
-.sv-row.is-inactive { opacity: 0.72; }
 .sv-row.is-hidden { display: none; }
 
-.sv-row-icon { display: flex; align-items: center; justify-content: center; }
+/* Inactive services stay readable; the status column says why they look quieter */
+.sv-row.is-inactive .sv-name,
+.sv-row.is-inactive .sv-price { color: var(--sv-muted); }
 
-.sv-cat-icon {
-    display: grid;
-    place-items: center;
-    width: 44px;
-    height: 44px;
-    border-radius: 10px;
-    flex-shrink: 0;
-    overflow: hidden;
-    background: transparent;
-}
-
-.sv-cat-img {
-    width: 30px;
-    height: 30px;
-    object-fit: contain;
-    display: block;
-}
+/* ---- service ---- */
 
 .sv-row-identity { min-width: 0; }
 
 .sv-row-name-line {
     display: flex;
-    align-items: center;
-    gap: 0.55rem;
-    flex-wrap: wrap;
-    margin-bottom: 0.2rem;
+    align-items: baseline;
+    gap: 0.5rem;
     min-width: 0;
 }
 
 .sv-name {
-    font-size: 0.9rem;
+    min-width: 0;
+    font-size: 0.85rem;
     font-weight: 600;
     color: var(--sv-ink);
-    line-height: 1.3;
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
-    min-width: 0;
 }
 
 .sv-code {
-    padding: 0.1rem 0.45rem;
+    flex-shrink: 0;
     font-family: var(--sv-mono);
     font-size: 0.72rem;
-    font-weight: 600;
-    letter-spacing: 0.01em;
-    color: var(--sv-ink);
-    background: var(--sv-line-soft);
-    border-radius: 5px;
-    white-space: nowrap;
+    color: var(--sv-muted);
 }
 
 .sv-row-desc {
-    margin: 0;
-    font-size: 0.78rem;
+    margin: 0.1rem 0 0;
+    font-size: 0.76rem;
     color: var(--sv-muted);
-    line-height: 1.4;
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
-    min-width: 0;
 }
 
-.sv-row-category,
-.sv-row-status { display: flex; align-items: center; }
+/* ---- category: dot label ---- */
 
-.sv-cat-pill {
+.sv-cat {
     display: inline-flex;
     align-items: center;
-    padding: 0.15rem 0.55rem;
-    font-size: 0.72rem;
-    font-weight: 600;
-    border-radius: 999px;
+    gap: 0.4rem;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--sv-text);
     white-space: nowrap;
 }
 
-.sv-cat-pill--lab  { color: var(--sv-lab);  background: var(--sv-lab-soft);  }
-.sv-cat-pill--xray { color: var(--sv-xray); background: var(--sv-xray-soft); }
+.sv-cat::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 2px;
+    background: var(--cat, var(--sv-faint));
+}
+
+.sv-cat--lab  { --cat: #0B67B2; }
+.sv-cat--xray { --cat: #0E8A7E; }
+
+/* ---- price ---- */
+
+.sv-row-price { text-align: right; }
+
+.sv-price {
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: var(--sv-ink);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* ---- status: dot + text ---- */
 
 .sv-status {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    padding: 0.15rem 0.55rem;
-    font-size: 0.72rem;
-    font-weight: 600;
-    border-radius: 999px;
+    gap: 0.4rem;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--sv-text);
     white-space: nowrap;
 }
 
@@ -1058,79 +944,72 @@ $tabUrl = static function (string $key): string {
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: currentColor;
+    background: var(--dot, #98A2B3);
 }
 
-.sv-status--active   { color: #15803d; background: #e7f6ec; }
-.sv-status--inactive { color: #b91c1c; background: #fdeaea; }
+.sv-status--active   { --dot: #17B26A; }
+.sv-status--inactive { --dot: #98A2B3; color: var(--sv-muted); }
 
-.sv-row-price {
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-}
-
-.sv-price {
-    font-size: 0.875rem;
-    font-weight: 700;
-    color: var(--sv-ink);
-    white-space: nowrap;
-}
+/* ---- added ---- */
 
 .sv-row-created {
     font-size: 0.78rem;
     color: var(--sv-muted);
+    font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
 
-.sv-row-created time {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    font-variant-numeric: tabular-nums;
-}
-
-.sv-row-created i { color: var(--sv-faint); font-size: 0.85em; }
+/* ---- actions ---- */
 
 .sv-row-actions {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 0.3rem;
-    flex-wrap: nowrap;
+    gap: 0.15rem;
 }
 
-.sv-row-btn {
+.sv-icon-btn {
+    width: 30px;
+    height: 30px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.35rem;
-    height: 30px;
-    padding: 0 0.7rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    line-height: 1;
-    color: var(--sv-text);
-    background: var(--sv-surface);
-    border: 1px solid var(--sv-line);
-    border-radius: var(--sv-radius-xs);
-    text-decoration: none;
-    white-space: nowrap;
+    padding: 0;
+    color: var(--sv-muted);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
     cursor: pointer;
-    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.sv-row-btn:hover {
-    background: var(--sv-subtle);
-    border-color: #cbd5e1;
-    color: var(--sv-ink);
+.sv-icon-btn:hover,
+.sv-icon-btn[aria-expanded="true"] { background: var(--sv-line-soft); color: var(--sv-ink); }
+
+.sv-menu {
+    min-width: 11rem;
+    padding: 0.3rem;
+    font-size: 0.8125rem;
+    border: 1px solid var(--sv-line);
+    border-radius: 8px;
 }
 
-.sv-row-btn--danger { color: var(--sv-danger); }
-.sv-row-btn--danger:hover {
-    background: var(--sv-danger-soft);
-    border-color: #fecaca;
-    color: var(--sv-danger-dark);
+.sv-menu .dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.45rem 0.6rem;
+    color: var(--sv-text);
+    border-radius: 6px;
 }
+
+.sv-menu .dropdown-item i { font-size: 0.9rem; color: var(--sv-faint); }
+.sv-menu .dropdown-item:hover,
+.sv-menu .dropdown-item:focus { background: var(--sv-line-soft); color: var(--sv-ink); }
+.sv-menu .dropdown-divider { margin: 0.3rem 0; border-color: var(--sv-line-soft); }
+.sv-menu .sv-menu-danger,
+.sv-menu .sv-menu-danger i { color: var(--sv-danger); }
+.sv-menu .sv-menu-danger:hover { background: var(--sv-danger-soft); color: var(--sv-danger-dark); }
 
 /* ---------- Empty states ---------- */
 
@@ -1296,7 +1175,7 @@ $tabUrl = static function (string $key): string {
 .sv-modal .form-control:focus,
 .sv-modal .form-select:focus {
     border-color: var(--sv-accent);
-    box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.12);
+    box-shadow: 0 0 0 3px rgba(11, 103, 178, 0.12);
 }
 
 .field-hint {
@@ -1359,76 +1238,47 @@ $tabUrl = static function (string $key): string {
 /* ---------- Responsive ---------- */
 
 @media (max-width: 1200px) {
-    .sv-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .sv-list-head,
     .sv-row {
-        grid-template-columns:
-            44px
-            minmax(0, 1fr)
-            minmax(0, 0.7fr)
-            minmax(0, 0.7fr)
-            auto;
-        gap: 0.85rem;
+        grid-template-columns: minmax(0, 2.6fr) 120px 110px 100px 72px;
     }
-    .sv-row-created { display: none; }
-}
 
-@media (max-width: 992px) {
-    .sv-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .sv-row {
-        grid-template-columns:
-            44px
-            minmax(0, 1fr)
-            minmax(0, 0.7fr)
-            auto;
-    }
-    .sv-row-category { display: none; }
+    .sv-list-head > :nth-child(5),
+    .sv-row-created { display: none; }
 }
 
 @media (max-width: 768px) {
     .sv-head { flex-direction: column; align-items: stretch; }
     .sv-head-actions .sv-btn { flex: 1; }
 
-    .sv-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
     .sv-filters .sv-search { max-width: none; }
 
+    .sv-list-head { display: none; }
+
     .sv-row {
-        grid-template-columns: 44px minmax(0, 1fr);
-        padding: 0.9rem 1rem;
-        row-gap: 0.5rem;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "identity actions"
+            "category price"
+            "status   status";
+        row-gap: 0.45rem;
+        padding: 0.85rem 1rem;
     }
 
-    .sv-row-icon     { grid-column: 1; grid-row: 1; }
-    .sv-row-identity { grid-column: 2; grid-row: 1; }
+    .sv-row-identity { grid-area: identity; }
+    .sv-row-actions  { grid-area: actions; align-self: start; }
+    .sv-row-category { grid-area: category; }
+    .sv-row-price    { grid-area: price; }
+    .sv-row-status   { grid-area: status; }
 
-    .sv-row-status,
-    .sv-row-price {
-        grid-column: 1 / -1;
-        justify-content: flex-start;
-        text-align: left;
-    }
-
-    .sv-row-status { grid-row: 2; }
-    .sv-row-price  { grid-row: 3; }
-
-    .sv-row-actions {
-        grid-column: 1 / -1;
-        grid-row: 4;
-        justify-content: flex-start;
-        flex-wrap: wrap;
-    }
-
-    .sv-row-btn { flex: 1 1 auto; }
-
-    .sv-row-name-line { align-items: flex-start; }
-    .sv-name          { white-space: normal; }
-    .sv-row-desc      { white-space: normal; }
+    .sv-name     { white-space: normal; }
+    .sv-row-desc { white-space: normal; }
 
     .sv-foot { flex-direction: column; align-items: center; }
 }
 
 @media (max-width: 576px) {
-    .sv-stats { grid-template-columns: minmax(0, 1fr); gap: 0.6rem; }
 
     .sv-grid-2 { grid-template-columns: minmax(0, 1fr); }
     .sv-modal-head  { padding: 1rem; }

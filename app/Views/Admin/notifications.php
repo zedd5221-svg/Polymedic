@@ -48,14 +48,14 @@
 .nc-check input[type="checkbox"] {
     width: 16px;
     height: 16px;
-    accent-color: #1976d2;
+    accent-color: #0B67B2;
     cursor: pointer;
     display: block;
 }
 
 .nc-list.is-selecting .nc-card.is-selected {
     border-color: #bcd6f3;
-    box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.12);
+    box-shadow: 0 0 0 2px rgba(11, 103, 178, 0.12);
 }
 
 .nc-list.is-selecting .nc-card { cursor: pointer; }
@@ -204,7 +204,7 @@
     width: 16px;
     height: 16px;
     margin-top: 0.15rem;
-    accent-color: #1976d2;
+    accent-color: #0B67B2;
     cursor: pointer;
     flex-shrink: 0;
 }
@@ -550,7 +550,7 @@ arsort($typeCounts);
                                 </span>
 
                             <?php elseif ($type === 'lab'): ?>
-                                <span class="nc-tile nc-tile--png" aria-hidden="true">
+                                <span class="nc-tile nc-tile--png nc-tile--lab" aria-hidden="true">
                                     <img src="<?= esc(base_url('assets/images/' . $labIconPng), 'attr') ?>"
                                          alt=""
                                          class="nc-tile-img"
@@ -559,7 +559,7 @@ arsort($typeCounts);
                                 </span>
 
                             <?php elseif ($type === 'xray'): ?>
-                                <span class="nc-tile nc-tile--png" aria-hidden="true">
+                                <span class="nc-tile nc-tile--png nc-tile--xray" aria-hidden="true">
                                     <img src="<?= esc(base_url('assets/images/' . $xrayIconPng), 'attr') ?>"
                                          alt=""
                                          class="nc-tile-img"

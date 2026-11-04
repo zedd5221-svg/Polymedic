@@ -190,7 +190,7 @@ $when   = static fn ($ts) => $ts ? date('M j · g:i A', strtotime((string) $ts))
 .tx-bar-text span { font-size: 0.78rem; color: #64748b; }
 .tx-bar-icon {
     flex: none; display: grid; place-items: center; width: 34px; height: 34px;
-    border-radius: 8px; background: #e8f1fb; color: #1976d2;
+    border-radius: 8px; background: #e8f1fb; color: #0B67B2;
 }
 
 .tx-btn {
@@ -199,10 +199,10 @@ $when   = static fn ($ts) => $ts ? date('M j · g:i A', strtotime((string) $ts))
     border: 1px solid #e2e8f0; border-radius: 7px; cursor: pointer; white-space: nowrap;
 }
 .tx-btn:hover { background: #f8fafc; }
-.tx-btn--primary { color: #fff; background: #1976d2; border-color: #1976d2; }
-.tx-btn--primary:hover { background: #1565c0; }
+.tx-btn--primary { color: #fff; background: #0B67B2; border-color: #0B67B2; }
+.tx-btn--primary:hover { background: #08528F; }
 .tx-btn:disabled { opacity: 0.55; cursor: not-allowed; }
-.tx-btn:focus-visible, .tx-input:focus, .tx-opt:has(input:focus-visible) { outline: none; box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.2); }
+.tx-btn:focus-visible, .tx-input:focus, .tx-opt:has(input:focus-visible) { outline: none; box-shadow: 0 0 0 3px rgba(11, 103, 178, 0.2); }
 
 .tx-card { padding: 0.85rem 1rem; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; }
 .tx-card--in { border-color: #bcd6f3; background: #f7fbff; }
@@ -214,7 +214,7 @@ $when   = static fn ($ts) => $ts ? date('M j · g:i A', strtotime((string) $ts))
     flex: none; padding: 0.1rem 0.5rem; font-size: 0.68rem; font-weight: 600;
     color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 999px;
 }
-.tx-tag--in { color: #1565c0; background: #e8f1fb; border-color: #bcd6f3; }
+.tx-tag--in { color: #08528F; background: #e8f1fb; border-color: #bcd6f3; }
 .tx-tag--draft { color: #475569; background: #f1f5f9; border-color: #e2e8f0; }
 .tx-tag--pending { color: #475569; background: #fff; border-color: #cbd5e1; }
 
@@ -240,15 +240,15 @@ $when   = static fn ($ts) => $ts ? date('M j · g:i A', strtotime((string) $ts))
 .tx-field { margin: 0 0 1rem; padding: 0; border: 0; }
 .tx-field:last-child { margin-bottom: 0; }
 .tx-label { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-bottom: 0.4rem; font-size: 0.78rem; font-weight: 600; color: #334155; float: none; }
-.tx-link { padding: 0; font-size: 0.75rem; font-weight: 600; color: #1976d2; background: none; border: 0; cursor: pointer; }
+.tx-link { padding: 0; font-size: 0.75rem; font-weight: 600; color: #0B67B2; background: none; border: 0; cursor: pointer; }
 
 .tx-list { display: flex; flex-direction: column; gap: 0.35rem; max-height: 260px; overflow-y: auto; }
 .tx-opt {
     display: flex; align-items: center; gap: 0.65rem; padding: 0.55rem 0.7rem;
     border: 1px solid #e2e8f0; border-radius: 7px; cursor: pointer;
 }
-.tx-opt:has(input:checked) { border-color: #1976d2; background: #e8f1fb; }
-.tx-opt input { flex: none; margin: 0; width: 16px; height: 16px; accent-color: #1976d2; }
+.tx-opt:has(input:checked) { border-color: #0B67B2; background: #e8f1fb; }
+.tx-opt input { flex: none; margin: 0; width: 16px; height: 16px; accent-color: #0B67B2; }
 .tx-opt-main { flex: 1; min-width: 0; }
 .tx-opt-name { display: block; font-size: 0.82rem; font-weight: 600; color: #0f172a; }
 .tx-opt-meta { display: block; font-size: 0.72rem; color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

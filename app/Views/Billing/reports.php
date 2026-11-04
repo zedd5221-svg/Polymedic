@@ -575,10 +575,10 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
     --bl-line:#e2e8f0; --bl-line-soft:#f1f5f9; --bl-surface:#fff; --bl-subtle:#f8fafc;
 
     /* Accent — matched to the layout's --active-blue / --sb-active-* */
-    --bl-accent:#1976d2;
-    --bl-accent-dark:#1565c0;
-    --bl-accent-soft:#e3f2fd;
-    --bl-accent-glow:rgba(25,118,210,.45);
+    --bl-accent:#0B67B2;
+    --bl-accent-dark:#08528F;
+    --bl-accent-soft:#E8F1FA;
+    --bl-accent-glow:rgba(11,103,178,.45);
 
     --bl-warn:#b45309; --bl-warn-soft:#fff7ed;
     --bl-danger:#b91c1c; --bl-danger-soft:#fef2f2;
@@ -702,7 +702,7 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
     padding:1.3rem 1.4rem 1.1rem;
     border-radius:var(--bl-radius);
     /* Matches the sidebar gradient — navy → blue, same two-stop rhythm */
-    background:linear-gradient(145deg,#123566 0%,#1976d2 60%,#43a3f5 100%);
+    background:linear-gradient(145deg,#123566 0%,#0B67B2 60%,#3D8FD1 100%);
     color:#fff;
     box-shadow:0 10px 24px -14px var(--bl-accent-glow);
 }
@@ -758,7 +758,7 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
                       text-transform:uppercase; color:var(--bl-accent-dark); padding-top:.15rem; }
 
 .rep-insights ul { margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:.25rem; }
-.rep-insights li { font-size:.8125rem; color:#0d47a1; }
+.rep-insights li { font-size:.8125rem; color:#063F6E; }
 .rep-insights li strong { color:var(--bl-accent-dark); }
 .rep-insights li.is-warn { color:var(--bl-warn); }
 .rep-insights li.is-warn strong { color:#92400e; }
@@ -876,7 +876,7 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
 }
 .rep-share-bar > span {
     display:block; height:100%; border-radius:99px;
-    background:linear-gradient(90deg,#90caf9,var(--bl-accent));
+    background:linear-gradient(90deg,#9DC4E8,var(--bl-accent));
     transition:width .4s ease;
 }
 .rep-share-pct {
@@ -1024,10 +1024,10 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
     };
 
     /* Accent colour, matched to the layout's --active-blue */
-    var ACCENT       = '#1976d2';
-    var ACCENT_DARK  = '#1565c0';
-    var ACCENT_SOFT  = 'rgba(25,118,210,.28)';
-    var ACCENT_FADE  = 'rgba(25,118,210,0)';
+    var ACCENT       = '#0B67B2';
+    var ACCENT_DARK  = '#08528F';
+    var ACCENT_SOFT  = 'rgba(11,103,178,.28)';
+    var ACCENT_FADE  = 'rgba(11,103,178,0)';
     var BAR_MUTED    = 'rgba(148,163,184,.30)';
 
     var TOOLTIP = {
@@ -1154,8 +1154,8 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
         }
 
         /* Sequential blue shades, darkest = highest revenue. */
-        var shades = ['#0b3d91', '#1565c0', '#1976d2', '#2196f3',
-                      '#42a5f5', '#64b5f6', '#90caf9', '#bbdefb'];
+        var shades = ['#0b3d91', '#08528F', '#0B67B2', '#2196f3',
+                      '#3D8FD1', '#64b5f6', '#9DC4E8', '#C6DCF1'];
 
         new Chart(canvas.getContext('2d'), {
             type: 'bar',
@@ -1165,7 +1165,7 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
                     label: 'Revenue',
                     data: SVC_VALUES,
                     backgroundColor: SVC_LABELS.map(function (_, i) {
-                        return shades[i] || '#bbdefb';
+                        return shades[i] || '#C6DCF1';
                     }),
                     borderRadius: 6,
                     borderSkipped: false,

@@ -32,89 +32,9 @@
         return mb_strtoupper($first . $last);
     };
 
-    $maleAvatar   = 'man-avatar.png';
-    $femaleAvatar = 'woman-avatar.png';
 
-    /* ------------------------------------------------------------------
-       KPI CARDS + SPARKLINES
-       ------------------------------------------------------------------
-       Mirrors Billing/index and Admin/payments: each KPI card gets a
-       small inline line chart on the right and a delta badge under
-       the label. Icons are Bootstrap Icons chosen to fit the metric.
-       ------------------------------------------------------------------ */
     $kpiTrends = $kpiTrends ?? [];
 
-    /* Build a smooth SVG path from a numeric series (same math as
-       the Admin dashboard's sparkGeometry). */
-    $sparkGeometry = static function (array $vals): array {
-        $n = count($vals);
-        if ($n < 2) { return ['', 100, 50]; }
-
-        $min = min($vals);
-        $max = max($vals);
-        $rng = $max - $min;
-        $w = 100; $h = 32; $pad = 3;
-
-        $pts = [];
-        foreach (array_values($vals) as $i => $v) {
-            $x = $i / ($n - 1) * $w;
-            $y = $rng > 0
-                ? $h - $pad - (($v - $min) / $rng) * ($h - 2 * $pad)
-                : $h / 2;
-            $pts[] = [round($x, 2), round($y, 2)];
-        }
-
-        $line = 'M' . $pts[0][0] . ',' . $pts[0][1];
-        for ($i = 1; $i < $n; $i++) {
-            $cx = round(($pts[$i - 1][0] + $pts[$i][0]) / 2, 2);
-            $line .= ' C' . $cx . ',' . $pts[$i - 1][1]
-                   . ' '  . $cx . ',' . $pts[$i][1]
-                   . ' '  . $pts[$i][0] . ',' . $pts[$i][1];
-        }
-
-        $last = end($pts);
-        return [$line, $last[0], round($last[1] / $h * 100, 2)];
-    };
-
-    /* Fallback series when the controller hasn't sent real trends. */
-    $fallbackSeries = static function (float $value, string $bias = 'up'): array {
-        $base = max(1.0, abs($value));
-        $sign = $bias === 'down' ? -1 : 1;
-        $out  = [];
-        for ($i = 0; $i < 14; $i++) {
-            $t     = $i / 13;
-            $drift = $sign * $base * 0.05 * $t;
-            $wave  = sin($t * M_PI * 1.4) * $base * 0.06;
-            $out[] = round($base * 0.9 + $drift + $wave, 2);
-        }
-        $out[13] = round($value > 0 ? $value : $base, 2);
-        return $out;
-    };
-
-    /* Icon + colour per KPI, chosen to fit the metric. */
-    $kpiSpark = [
-        'total' => [
-            'value' => (float) ($total ?? count($patients)),
-            'color' => '#1976d2',   // layout blue
-            'good'  => 'up',
-            'unit'  => 'patients',
-            'icon'  => 'bi-people',
-        ],
-        'online' => [
-            'value' => (float) $onlineCount,
-            'color' => '#10b981',   // green — online bookings
-            'good'  => 'up',
-            'unit'  => 'patients',
-            'icon'  => 'bi-globe',
-        ],
-        'walkin' => [
-            'value' => (float) $walkinCount,
-            'color' => '#f59e0b',   // amber — desk registrations
-            'good'  => 'up',
-            'unit'  => 'patients',
-            'icon'  => 'bi-person-walking',
-        ],
-    ];
 ?>
 
 <div class="pt">
@@ -139,103 +59,15 @@
     </header>
 
 
-    <!-- ============================================================
-         KPI CARDS — sparkline + delta badge, matching Billing index
-         ============================================================ -->
-    <div class="pt-stats">
-
-        <?php
-        /* Render one KPI card with its sparkline. */
-        $renderStat = function (
-            string $key,
-            string $modifier,
-            string $icon,
-            string $valueFormatted,
-            string $label,
-            array  $meta
-        ) use ($kpiTrends, $sparkGeometry, $fallbackSeries) {
-
-            $series = $kpiTrends[$key] ?? [];
-            $series = is_array($series) ? array_map('floatval', $series) : [];
-
-            if (count($series) < 2) {
-                $series = $fallbackSeries((float) $meta['value'], $meta['good']);
-            }
-
-            [$line, $lastX, $lastY] = $sparkGeometry($series);
-
-            $first = $series[0] ?? 0;
-            $last  = $series[count($series) - 1] ?? 0;
-            $delta = $first > 0 ? round((($last - $first) / $first) * 100, 1) : 0;
-
-            $isUp      = $delta >= 0;
-            $isGood    = ($meta['good'] === 'up') ? $isUp : !$isUp;
-            $deltaText = ($isUp ? '↑ ' : '↓ ') . abs($delta) . '%';
-            $deltaCls  = $isGood ? 'is-good' : 'is-bad';
-
-            $spkTitle = 'Last 14 days · '
-                      . number_format($last, 0)
-                      . ' ' . $meta['unit']
-                      . ' · 14-day peak ' . number_format(max($series), 0);
-        ?>
-            <div class="pt-stat <?= esc($modifier, 'attr') ?>"
-                 style="--spark: <?= esc($meta['color'], 'attr') ?>;">
-
-                <div class="pt-stat-icon"><i class="bi <?= esc($icon, 'attr') ?>"></i></div>
-
-                <div class="pt-stat-body">
-                    <div class="pt-stat-value"><?= $valueFormatted ?></div>
-                    <div class="pt-stat-label"><?= esc($label) ?></div>
-
-                    <div class="pt-stat-delta <?= esc($deltaCls, 'attr') ?>">
-                        <span class="pt-delta-arrow"><?= $isUp ? '↑' : '↓' ?></span>
-                        <span><?= esc($deltaText) ?></span>
-                        <span class="pt-delta-caption">vs last month</span>
-                    </div>
-                </div>
-
-                <div class="pt-spark"
-                     role="img"
-                     aria-label="<?= esc($spkTitle, 'attr') ?>"
-                     title="<?= esc($spkTitle, 'attr') ?>">
-                    <svg viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true">
-                        <path d="<?= $line ?>" class="pt-spark-line" fill="none"
-                              vector-effect="non-scaling-stroke"/>
-                    </svg>
-                </div>
-            </div>
-        <?php
-        };
-
-        $renderStat(
-            'total',
-            'pt-stat--blue',
-            $kpiSpark['total']['icon'],
-            number_format($total ?? count($patients)),
-            'Total patients',
-            $kpiSpark['total']
-        );
-
-        $renderStat(
-            'online',
-            'pt-stat--green',
-            $kpiSpark['online']['icon'],
-            number_format($onlineCount),
-            'Online patients',
-            $kpiSpark['online']
-        );
-
-        $renderStat(
-            'walkin',
-            'pt-stat--amber',
-            $kpiSpark['walkin']['icon'],
-            number_format($walkinCount),
-            'Walk-in patients',
-            $kpiSpark['walkin']
-        );
-        ?>
-
-    </div>
+    <?= view('partials/kpi_strip', [
+        'id'      => 'patients',
+        'trends'  => $kpiTrends ?? [],
+        'cards'   => [
+            ['key' => 'total', 'label' => 'Total patients', 'value' => (int) ($total ?? count($patients)), 'delta' => 'sum', 'context' => 'new in 14 days'],
+            ['key' => 'online', 'label' => 'Online', 'value' => (int) $onlineCount,                 'delta' => 'sum', 'context' => 'new in 14 days'],
+            ['key' => 'walkin', 'label' => 'Walk-in', 'value' => (int) $walkinCount,                 'delta' => 'sum', 'context' => 'new in 14 days'],
+        ],
+    ]) ?>
 
 
     <!-- ALERTS -->
@@ -305,13 +137,10 @@
             <table class="pt-table" id="patientsTable">
                 <thead>
                     <tr>
-                        <th scope="col">Patient code</th>
-                        <th scope="col">Patient name</th>
+                        <th scope="col">Patient</th>
+                        <th scope="col">Code</th>
                         <th scope="col">Source</th>
-                        <th scope="col">Sex</th>
-                        <th scope="col">Age</th>
-                        <th scope="col">Phone</th>
-                        <th scope="col">Email</th>
+                        <th scope="col">Contact</th>
                         <th scope="col">Registered</th>
                         <th scope="col">Status</th>
                         <th scope="col" class="pt-c-actions"><span class="visually-hidden">Actions</span></th>
@@ -335,11 +164,6 @@
 
                             $isApproved = $code !== 'N/A' && $code !== '';
                             $patientId  = (int) ($patient['id'] ?? 0);
-
-                            $genderRaw  = strtolower(trim($gender));
-                            $isMale     = $genderRaw === 'male'   || $genderRaw === 'm';
-                            $isFemale   = $genderRaw === 'female' || $genderRaw === 'f';
-                            $avatarKind = $isMale ? 'male' : ($isFemale ? 'female' : 'neutral');
                         ?>
                             <tr class="pt-row pt-row--<?= esc($source, 'attr') ?>"
                                 data-patient-row
@@ -349,92 +173,70 @@
                                 data-age="<?= esc((string) (int) ($patient['age'] ?? 0), 'attr') ?>"
                                 data-created="<?= $patient['created_at'] ? esc(date('Y-m-d H:i:s', strtotime($patient['created_at'])), 'attr') : '' ?>">
 
-                                <td data-label="Code" class="pt-c-code">
-                                    <span class="pt-code<?= $isApproved ? '' : ' pt-code--pending' ?>">
-                                        <?= esc($code) ?>
-                                        <?php if (!$isApproved): ?>
-                                            <span class="pt-pending-badge">Pending</span>
-                                        <?php endif; ?>
-                                    </span>
-                                </td>
-
-                                <td data-label="Patient">
+                                <?php
+                                $demo = implode(' · ', array_filter([
+                                    ($gender !== '' && $gender !== 'N/A') ? $gender : '',
+                                    ($age !== '' && $age !== 'N/A') ? $age . ' y' : '',
+                                ]));
+                                ?>
+                                <td class="pt-c-patient">
                                     <div class="pt-patient">
-                                        <span class="pt-avatar pt-avatar--<?= esc($avatarKind, 'attr') ?>" aria-hidden="true">
-                                            <?php if ($isMale): ?>
-                                                <img src="<?= esc(base_url('assets/images/' . $maleAvatar), 'attr') ?>"
-                                                     alt=""
-                                                     class="pt-avatar-img"
-                                                     loading="lazy"
-                                                     decoding="async">
-                                            <?php elseif ($isFemale): ?>
-                                                <img src="<?= esc(base_url('assets/images/' . $femaleAvatar), 'attr') ?>"
-                                                     alt=""
-                                                     class="pt-avatar-img"
-                                                     loading="lazy"
-                                                     decoding="async">
-                                            <?php else: ?>
-                                                <?= esc($initialsOf($name)) ?>
-                                            <?php endif; ?>
-                                        </span>
+                                        <span class="pt-avatar" aria-hidden="true"><?= esc($initialsOf($name)) ?></span>
                                         <div class="pt-patient-body">
                                             <span class="pt-name"><?= esc($name) ?></span>
-                                            <span class="pt-sub">
-                                                <?= $gender !== 'N/A' ? esc($gender) : '—' ?>
-                                                ·
-                                                <?= $age !== 'N/A' ? esc($age) : '—' ?>
-                                            </span>
+                                            <span class="pt-sub"><?= $demo !== '' ? esc($demo) : 'No age or sex on file' ?></span>
                                         </div>
                                     </div>
                                 </td>
 
-                                <td data-label="Source">
-                                    <span class="pt-source pt-source--<?= esc($source, 'attr') ?>">
-                                        <i class="bi <?= $isWalkin ? 'bi-person-walking' : 'bi-globe' ?>" aria-hidden="true"></i>
-                                        <?= esc($patient['source'] ?? 'Unknown') ?>
-                                    </span>
-                                </td>
-
-                                <td data-label="Sex" class="pt-c-sex"><?= esc($gender !== '' ? $gender : '—') ?></td>
-
-                                <td data-label="Age" class="pt-c-age"><?= esc($age !== '' ? $age : '—') ?></td>
-
-                                <td data-label="Phone" class="pt-c-phone">
-                                    <?php if ($phone !== ''): ?>
-                                        <a href="tel:<?= esc($phone, 'attr') ?>" class="pt-link"><?= esc($phone) ?></a>
+                                <td data-label="Code" class="pt-c-code">
+                                    <?php if ($isApproved): ?>
+                                        <span class="pt-code"><?= esc($code) ?></span>
                                     <?php else: ?>
-                                        <span class="pt-muted">—</span>
+                                        <span class="pt-code-pending">Pending approval</span>
                                     <?php endif; ?>
                                 </td>
 
-                                <td data-label="Email" class="pt-c-email">
-                                    <?php if ($email !== ''): ?>
-                                        <a href="mailto:<?= esc($email, 'attr') ?>" class="pt-link"><?= esc($email) ?></a>
+                                <td data-label="Source">
+                                    <span class="pt-source pt-source--<?= esc($source, 'attr') ?>"><?= $isWalkin ? 'Walk-in' : 'Online' ?></span>
+                                </td>
+
+                                <td data-label="Contact" class="pt-c-contact">
+                                    <?php if ($phone === '' && $email === ''): ?>
+                                        <span class="pt-muted">&mdash;</span>
                                     <?php else: ?>
-                                        <span class="pt-muted">—</span>
+                                        <div class="pt-contact">
+                                            <?php if ($phone !== ''): ?>
+                                                <a href="tel:<?= esc($phone, 'attr') ?>" class="pt-link"><?= esc($phone) ?></a>
+                                            <?php endif; ?>
+                                            <?php if ($email !== ''): ?>
+                                                <a href="mailto:<?= esc($email, 'attr') ?>" class="pt-link pt-link--sub"><?= esc($email) ?></a>
+                                            <?php endif; ?>
+                                        </div>
                                     <?php endif; ?>
                                 </td>
 
                                 <td data-label="Registered" class="pt-c-date">
-                                    <time datetime="<?= $patient['created_at'] ? esc(date('c', strtotime($patient['created_at'])), 'attr') : '' ?>">
-                                        <?= $patient['created_at'] ? esc(date('M j, Y', strtotime($patient['created_at']))) : '—' ?>
-                                    </time>
+                                    <?php if (!empty($patient['created_at'])): ?>
+                                        <time datetime="<?= esc(date('c', strtotime($patient['created_at'])), 'attr') ?>"><?= esc(date('M j, Y', strtotime($patient['created_at']))) ?></time>
+                                    <?php else: ?>
+                                        <span class="pt-muted">&mdash;</span>
+                                    <?php endif; ?>
                                 </td>
 
                                 <td data-label="Status">
-                                    <span class="pt-status pt-status--<?= $isActive ? 'active' : 'inactive' ?>">
-                                        <?= $isActive ? 'Active' : 'Inactive' ?>
-                                    </span>
+                                    <span class="pt-status pt-status--<?= $isActive ? 'active' : 'inactive' ?>"
+                                          title="<?= $isActive ? 'Visited in the last 30 days' : 'No visit in the last 30 days' ?>"><?= $isActive ? 'Active' : 'Inactive' ?></span>
                                 </td>
 
                                 <td data-label="Actions" class="pt-c-actions">
                                     <div class="pt-actions">
                                         <?php if (!$isApproved && $patientId > 0): ?>
-                                            <button type="button" class="pt-icon-btn pt-icon-btn--approve"
-                                                    title="Approve patient"
+                                            <button type="button" class="pt-approve-btn"
                                                     aria-label="Approve <?= esc($name, 'attr') ?>"
                                                     onclick="approvePatient(<?= $patientId ?>)">
-                                                <i class="bi bi-check-circle" aria-hidden="true"></i>
+                                                <i class="bi bi-check2" aria-hidden="true"></i>
+                                                Approve
                                             </button>
                                         <?php endif; ?>
 
@@ -444,31 +246,13 @@
                                                 onclick="viewPatient(<?= $patientId ?>)">
                                             <i class="bi bi-eye" aria-hidden="true"></i>
                                         </button>
-
-                                        <?php if ($email !== ''): ?>
-                                            <a href="mailto:<?= esc($email, 'attr') ?>"
-                                               class="pt-icon-btn"
-                                               title="Email patient"
-                                               aria-label="Email <?= esc($name, 'attr') ?>">
-                                                <i class="bi bi-envelope" aria-hidden="true"></i>
-                                            </a>
-                                        <?php endif; ?>
-
-                                        <?php if ($phone !== ''): ?>
-                                            <a href="tel:<?= esc($phone, 'attr') ?>"
-                                               class="pt-icon-btn"
-                                               title="Call patient"
-                                               aria-label="Call <?= esc($name, 'attr') ?>">
-                                                <i class="bi bi-telephone" aria-hidden="true"></i>
-                                            </a>
-                                        <?php endif; ?>
                                     </div>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr class="pt-row-empty" data-empty-row>
-                            <td colspan="10">
+                            <td colspan="7">
                                 <div class="pt-empty">
                                     <div class="pt-empty-icon"><i class="bi bi-people" aria-hidden="true"></i></div>
                                     <h3>No patients registered yet</h3>
@@ -483,7 +267,7 @@
                     <?php endif; ?>
 
                     <tr class="pt-row-empty" data-noresults-row style="display: none;">
-                        <td colspan="10">
+                        <td colspan="7">
                             <div class="pt-empty">
                                 <div class="pt-empty-icon"><i class="bi bi-search" aria-hidden="true"></i></div>
                                 <h3>No matching patients</h3>
@@ -514,27 +298,27 @@
    ========================================================= */
 
 .pt {
-    --pt-ink:         #0f172a;
-    --pt-text:        #334155;
-    --pt-muted:       #64748b;
-    --pt-faint:       #94a3b8;
-    --pt-line:        #e2e8f0;
-    --pt-line-soft:   #f1f5f9;
-    --pt-surface:     #ffffff;
-    --pt-subtle:      #f8fafc;
+    --pt-ink:         var(--pm-text, #10202E);
+    --pt-text:        var(--pm-text-soft, #3B4C5E);
+    --pt-muted:       var(--pm-text-muted, #5D6E80);
+    --pt-faint:       #7A8B9D;
+    --pt-line:        var(--pm-line, #DDE4EC);
+    --pt-line-soft:   #EBF0F5;
+    --pt-surface:     #FFFFFF;
+    --pt-subtle:      #F8FAFC;
+    --pt-row-hover:   #F5F8FB;
 
-    /* === Aligned with layout blue === */
-    --pt-accent:      #1976d2;
-    --pt-accent-dark: #1565c0;
-    --pt-accent-soft: #e3f2fd;
+    --pt-accent:      var(--pm-accent, #0B67B2);
+    --pt-accent-dark: var(--pm-accent-hover, #08528F);
+    --pt-accent-soft: var(--pm-accent-soft, #E8F1FA);
 
-    --pt-gold:        #b45309;
-    --pt-gold-soft:   #fef3c7;
+    --pt-gold:        #93370D;
+    --pt-gold-soft:   #FEF6E7;
 
-    --pt-radius:      10px;
-    --pt-radius-sm:   7px;
-    --pt-ring:        0 0 0 3px rgba(25, 118, 210, 0.18);
-    --pt-mono:        ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --pt-radius:      8px;
+    --pt-radius-sm:   6px;
+    --pt-ring:        0 0 0 3px rgba(11, 103, 178, 0.18);
+    --pt-mono:        var(--pm-mono, ui-monospace, monospace);
 
     color: var(--pt-text);
 }
@@ -606,7 +390,6 @@
     background: var(--pt-surface);
     border: 1px solid var(--pt-line);
     border-radius: var(--pt-radius-sm);
-    box-shadow: 0 1px 1px rgba(15, 23, 42, 0.03);
     white-space: nowrap;
     text-decoration: none;
     cursor: pointer;
@@ -621,131 +404,25 @@
 .pt-btn--primary { background: var(--pt-accent); border-color: var(--pt-accent); }
 .pt-btn--primary:hover { background: var(--pt-accent-dark); border-color: var(--pt-accent-dark); }
 
-/* ============================================================
-   KPI CARDS — sparkline + delta badge, matching Billing index
-   ============================================================ */
-.pt-stats {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.9rem;
-    margin-bottom: 1.25rem;
-}
 
-.pt-stat {
-    position: relative;
-    display: grid;
-    grid-template-columns: 38px minmax(0, 1fr) auto;   /* icon | text | spark */
-    align-items: center;
-    column-gap: 0.9rem;
-    row-gap: 0.35rem;
-    padding: 1rem 1.1rem;
-    background: var(--pt-surface);
-    border: 1px solid var(--pt-line);
-    border-radius: var(--pt-radius);
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-    overflow: hidden;
-    min-width: 0;
-}
 
-.pt-stat--amber { background: linear-gradient(180deg, #fffbeb, var(--pt-surface)); }
 
-.pt-stat-icon {
-    grid-column: 1; grid-row: 1 / span 2;
-    display: grid;
-    place-items: center;
-    flex-shrink: 0;
-    width: 38px;
-    height: 38px;
-    border-radius: 10px;
-    font-size: 1rem;
-    color: var(--tone);
-    background: color-mix(in srgb, var(--tone) 12%, transparent);
-}
 
 /* Icon tones per card variant */
-.pt-stat--blue  .pt-stat-icon { --tone: #1976d2; }
-.pt-stat--green .pt-stat-icon { --tone: #10b981; }
-.pt-stat--amber .pt-stat-icon { --tone: #f59e0b; }
 
-.pt-stat-body {
-    grid-column: 2; grid-row: 1 / span 2;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
-}
 
-.pt-stat-value {
-    font-size: 1.2rem;
-    font-weight: 700;
-    line-height: 1.15;
-    letter-spacing: -0.02em;
-    color: var(--pt-ink);
-    font-variant-numeric: tabular-nums;
-}
 
-.pt-stat-label {
-    margin-top: 0.05rem;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    color: var(--pt-text);
-}
 
-.pt-stat-sub { font-size: 0.72rem; color: var(--pt-muted); }
 
 /* Small delta badge under the label */
-.pt-stat-delta {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    margin-top: 0.15rem;
-    font-size: 0.68rem;
-    font-weight: 600;
-    color: var(--pt-muted);
-    white-space: nowrap;
-}
-.pt-stat-delta .pt-delta-arrow { font-size: 0.72rem; line-height: 1; }
-.pt-stat-delta.is-good .pt-delta-arrow { color: #16a34a; }
-.pt-stat-delta.is-bad  .pt-delta-arrow { color: #dc2626; }
-.pt-stat-delta.is-good { color: #16a34a; }
-.pt-stat-delta.is-bad  { color: #dc2626; }
-.pt-delta-caption {
-    margin-left: 0.2rem;
-    font-weight: 500;
-    color: var(--pt-faint);
-}
 
-/* Sparkline: identical geometry to the Admin dashboard's .spark-inline */
-.pt-spark {
-    grid-column: 3; grid-row: 1 / span 2;
-    align-self: center;
-    flex-shrink: 0;
-    width: 72px;
-    height: 28px;
-    position: relative;
-}
-.pt-spark svg {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    display: block;
-    overflow: visible;
-}
-.pt-spark-line {
-    stroke: var(--spark, var(--pt-accent));
-    stroke-width: 1.8;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
 
 /* ---------- Panel ---------- */
 
 .pt-panel {
     background: var(--pt-surface);
     border: 1px solid var(--pt-line);
-    border-radius: 12px;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    border-radius: var(--pt-radius);
     overflow: hidden;
 }
 
@@ -802,7 +479,7 @@
     text-align: center;
     color: var(--pt-muted);
     background: var(--pt-line-soft);
-    border-radius: 999px;
+    border-radius: 4px;
 }
 
 .pt-tab.is-active .pt-tab-count { color: var(--pt-accent); background: var(--pt-accent-soft); }
@@ -875,10 +552,11 @@
 }
 
 .pt-table th {
-    padding: 0.65rem 1rem;
-    font-size: 0.72rem;
+    padding: 0.6rem 1rem;
+    font-size: 0.7rem;
     font-weight: 600;
-    letter-spacing: 0.01em;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
     text-align: left;
     white-space: nowrap;
     color: var(--pt-muted);
@@ -887,7 +565,7 @@
 }
 
 .pt-table td {
-    padding: 0.85rem 1rem;
+    padding: 0.7rem 1rem;
     vertical-align: middle;
     border-bottom: 1px solid var(--pt-line-soft);
 }
@@ -895,52 +573,11 @@
 .pt-table tbody tr:last-child td { border-bottom: 0; }
 
 .pt-row { transition: background-color 0.12s ease; }
-.pt-row:hover { background: #fafbfd; }
+.pt-row:hover { background: var(--pt-row-hover); }
 
-.pt-row td:first-child { position: relative; }
+/* ---- patient ---- */
 
-.pt-row td:first-child::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 3px;
-    background: var(--rail, transparent);
-}
-
-.pt-row--online  { --rail: #1976d2; }
-.pt-row--walk-in { --rail: #f59e0b; }
-
-.pt-c-code { white-space: nowrap; }
-
-.pt-code {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.15rem 0.5rem;
-    font-family: var(--pt-mono);
-    font-size: 0.76rem;
-    font-weight: 600;
-    color: var(--pt-ink);
-    background: var(--pt-line-soft);
-    border-radius: 5px;
-}
-
-.pt-code--pending { color: var(--pt-gold); background: var(--pt-gold-soft); }
-
-.pt-pending-badge {
-    padding: 0.05rem 0.4rem;
-    font-size: 0.6rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--pt-gold);
-    background: #fffbeb;
-    border-radius: 12px;
-}
-
-.pt-patient { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
+.pt-patient { display: flex; align-items: center; gap: 0.65rem; min-width: 0; }
 
 .pt-avatar {
     display: grid;
@@ -948,126 +585,167 @@
     flex-shrink: 0;
     width: 32px;
     height: 32px;
-    font-size: 0.68rem;
-    font-weight: 700;
-    color: var(--pt-accent);
-    background: var(--pt-accent-soft);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--pt-text);
+    background: var(--pt-line-soft);
     border-radius: 50%;
-    overflow: hidden;
-}
-
-.pt-avatar--male    { background: #e3f2fd; color: #1565c0; }
-.pt-avatar--female  { background: #fce9ee; color: #b32e50; }
-.pt-avatar--neutral { background: var(--pt-accent-soft); color: var(--pt-accent); }
-
-.pt-avatar-img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
 }
 
 .pt-patient-body { min-width: 0; }
 
 .pt-name {
     display: block;
+    max-width: 260px;
     font-weight: 600;
     color: var(--pt-ink);
-    line-height: 1.3;
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
-.pt-sub { display: block; font-size: 0.72rem; color: var(--pt-muted); }
+.pt-sub { display: block; font-size: 0.74rem; color: var(--pt-muted); }
 
-.pt-c-sex,
-.pt-c-age { white-space: nowrap; color: var(--pt-text); }
+/* ---- code ---- */
 
-.pt-c-phone,
-.pt-c-email { white-space: nowrap; }
+.pt-c-code { white-space: nowrap; }
 
-.pt-c-date { white-space: nowrap; font-variant-numeric: tabular-nums; }
-
-.pt-link {
+.pt-code {
+    font-family: var(--pt-mono);
+    font-size: 0.76rem;
+    font-weight: 500;
     color: var(--pt-text);
-    text-decoration: none;
 }
 
-.pt-link:hover { color: var(--pt-accent-dark); text-decoration: underline; text-underline-offset: 2px; }
+.pt-code-pending {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: var(--pt-gold);
+}
 
-.pt-muted { color: var(--pt-faint); }
+.pt-code-pending::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #DC6803;
+}
+
+/* ---- source: a dot label, not a tinted pill ---- */
 
 .pt-source {
     display: inline-flex;
     align-items: center;
-    gap: 0.3rem;
-    padding: 0.15rem 0.55rem;
-    font-size: 0.72rem;
-    font-weight: 600;
-    border-radius: 999px;
+    gap: 0.4rem;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--pt-text);
     white-space: nowrap;
 }
 
-.pt-source--online  { color: #1565c0; background: #e3f2fd; }
-.pt-source--walk-in { color: #b45309; background: #fff4e5; }
+.pt-source::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 2px;
+    background: var(--src, var(--pt-faint));
+}
 
-.pt-source i { font-size: 0.72em; }
+.pt-source--online  { --src: #0B67B2; }
+.pt-source--walk-in { --src: #D29A1E; }
+
+/* ---- contact ---- */
+
+.pt-contact { display: flex; flex-direction: column; min-width: 0; line-height: 1.35; }
+
+.pt-link {
+    max-width: 240px;
+    color: var(--pt-text);
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+}
+
+.pt-link--sub { font-size: 0.74rem; color: var(--pt-muted); }
+
+.pt-link:hover { color: var(--pt-accent); text-decoration: underline; text-underline-offset: 2px; }
+
+.pt-muted { color: var(--pt-faint); }
+
+.pt-c-date { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--pt-text); }
+
+/* ---- status: dot + text ---- */
 
 .pt-status {
     display: inline-flex;
     align-items: center;
-    gap: 0.3rem;
-    padding: 0.15rem 0.55rem;
-    font-size: 0.72rem;
-    font-weight: 600;
-    border-radius: 999px;
+    gap: 0.4rem;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--pt-text);
     white-space: nowrap;
 }
 
-.pt-status--active   { color: #15803d; background: #e7f6ec; }
-.pt-status--inactive { color: #b91c1c; background: #fdeaea; }
-
 .pt-status::before {
     content: "";
-    width: 5px;
-    height: 5px;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
-    background: currentColor;
+    background: var(--dot, #98A2B3);
 }
+
+.pt-status--active   { --dot: #17B26A; }
+.pt-status--inactive { --dot: #98A2B3; color: var(--pt-muted); }
+
+/* ---- actions ---- */
 
 .pt-c-actions { width: 1%; text-align: right; white-space: nowrap; }
 
-.pt-actions { display: inline-flex; align-items: center; gap: 0.25rem; }
+.pt-actions { display: inline-flex; align-items: center; gap: 0.35rem; }
 
 .pt-icon-btn {
+    width: 30px;
+    height: 30px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
-    font-size: 0.85rem;
+    padding: 0;
     color: var(--pt-muted);
     background: transparent;
     border: 1px solid transparent;
-    border-radius: var(--pt-radius-sm);
-    cursor: pointer;
+    border-radius: 6px;
     text-decoration: none;
-    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.pt-icon-btn:hover {
-    background: var(--pt-accent-soft);
-    color: var(--pt-accent-dark);
-    border-color: #cfe3f7;
+.pt-icon-btn:hover { background: var(--pt-line-soft); color: var(--pt-ink); }
+.pt-icon-btn.is-disabled { opacity: 0.35; cursor: not-allowed; }
+.pt-icon-btn.is-disabled:hover { background: transparent; color: var(--pt-muted); }
+
+.pt-approve-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    height: 30px;
+    padding: 0 0.7rem;
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: #FFFFFF;
+    background: var(--pt-accent);
+    border: 1px solid var(--pt-accent);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
-.pt-icon-btn--approve { color: var(--pt-gold); }
-.pt-icon-btn--approve:hover {
-    background: #fffbeb;
-    color: var(--pt-gold);
-    border-color: #fcd34d;
-}
+.pt-approve-btn:hover { background: var(--pt-accent-dark); border-color: var(--pt-accent-dark); }
 
 /* ---------- Empty states ---------- */
 
@@ -1131,14 +809,12 @@
 /* ---------- Responsive ---------- */
 
 @media (max-width: 992px) {
-    .pt-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 @media (max-width: 768px) {
     .pt-head { flex-direction: column; align-items: stretch; }
     .pt-head-actions .pt-btn { flex: 1; }
 
-    .pt-stats { grid-template-columns: minmax(0, 1fr); gap: 0.6rem; }
 
     .pt-filters .pt-search { flex-basis: 100%; max-width: none; }
     .pt-filters .pt-select { flex: 1; }
@@ -1154,8 +830,6 @@
         padding: 0.9rem 1rem;
         border-bottom: 1px solid var(--pt-line);
     }
-
-    .pt-row td:first-child::before { top: 0; bottom: 0; }
 
     .pt-table td {
         display: flex;
@@ -1176,18 +850,13 @@
         text-align: left;
     }
 
-    .pt-table td.pt-c-code,
-    .pt-table td:nth-child(2) { display: block; text-align: left; }
-    .pt-table td.pt-c-code::before,
-    .pt-table td:nth-child(2)::before { content: none; }
-    .pt-table td:nth-child(2) { margin: 0.35rem 0 0.5rem; }
+    .pt-table td.pt-c-patient { display: block; margin-bottom: 0.4rem; text-align: left; }
+    .pt-name { max-width: none; }
 
     .pt-table td.pt-c-actions { justify-content: flex-end; margin-top: 0.5rem; }
 
-    .pt-c-email,
-    .pt-c-phone { white-space: normal; }
-    .pt-c-email a,
-    .pt-c-phone a { display: inline-block; max-width: 100%; overflow-wrap: anywhere; }
+    .pt-contact { align-items: flex-end; }
+    .pt-link { max-width: 60vw; }
 
     .pt-foot { justify-content: center; }
 }

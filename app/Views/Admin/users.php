@@ -27,8 +27,25 @@ $slug = static function ($value, $fallback = '') {
     return $value !== '' ? $value : $fallback;
 };
 
-/* PNG avatar filename inside public/assets/images/. */
-$userAvatar = 'default-avatar.png';
+/* Initials for users without an uploaded profile photo. */
+$initialsOf = static function ($name) {
+    $parts = preg_split('/\s+/', trim((string) $name));
+    $first = mb_substr($parts[0] ?? '', 0, 1);
+    $last  = count($parts) > 1 ? mb_substr(end($parts), 0, 1) : '';
+    $out   = mb_strtoupper($first . $last);
+    return $out !== '' ? $out : '?';
+};
+
+/* "5 mins ago", "Yesterday", then a date. */
+$relativeTime = static function (int $ts): string {
+    $diff = time() - $ts;
+    if ($diff < 60)     { return 'Just now'; }
+    if ($diff < 3600)   { $n = (int) floor($diff / 60);   return $n . ($n === 1 ? ' min ago' : ' mins ago'); }
+    if ($diff < 86400)  { $n = (int) floor($diff / 3600); return $n . ($n === 1 ? ' hour ago' : ' hours ago'); }
+    if ($diff < 172800) { return 'Yesterday'; }
+    if ($diff < 604800) { return (int) floor($diff / 86400) . ' days ago'; }
+    return date('M j, Y', $ts);
+};
 ?>
 
 <div class="table-card">
@@ -73,11 +90,11 @@ $userAvatar = 'default-avatar.png';
                 <tr>
                     <th scope="col">User</th>
                     <th scope="col">Username</th>
-                    <th scope="col">Email</th>
                     <th scope="col">Role</th>
                     <th scope="col">PRC License</th>
+                    <th scope="col">Last sign-in</th>
                     <th scope="col">Status</th>
-                    <th scope="col" class="col-actions">Actions</th>
+                    <th scope="col" class="col-actions"><span class="visually-hidden">Actions</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -91,39 +108,57 @@ $userAvatar = 'default-avatar.png';
                         $isSelf     = ((string) ($user['id'] ?? '')) === ((string) $currentUser);
                         ?>
                         <tr data-user-row data-search="<?= esc($roleKey . ' ' . str_replace('_', ' ', $roleKey) . ' ' . $statusKey, 'attr') ?>">
+                            <?php
+                            $fullName  = (string) ($user['full_name'] ?? '');
+                            $avatarRel = ltrim(trim((string) ($user['avatar'] ?? '')), '/');
+                            $hasPhoto  = $avatarRel !== '' && strpos($avatarRel, '..') === false && is_file(FCPATH . $avatarRel);
+                            $lastSeen  = !empty($user['last_login_at']) ? strtotime($user['last_login_at']) : false;
+                            ?>
                             <td data-label="User">
                                 <div class="user-cell">
-                                    <span class="user-avatar" aria-hidden="true">
-                                        <img src="<?= esc(base_url('assets/images/' . $userAvatar), 'attr') ?>"
-                                             alt=""
-                                             class="user-avatar-img"
-                                             loading="lazy"
-                                             decoding="async">
+                                    <span class="user-avatar<?= $hasPhoto ? ' has-photo' : '' ?>" aria-hidden="true">
+                                        <?php if ($hasPhoto): ?>
+                                            <img src="<?= esc(base_url($avatarRel), 'attr') ?>"
+                                                 alt=""
+                                                 class="user-avatar-img"
+                                                 loading="lazy"
+                                                 decoding="async">
+                                        <?php else: ?>
+                                            <?= esc($initialsOf($fullName)) ?>
+                                        <?php endif; ?>
                                     </span>
-                                    <span class="user-name"><?= esc($user['full_name'] ?? '') ?></span>
-                                    <?php if ($isSelf): ?>
-                                        <span class="self-chip">You</span>
-                                    <?php endif; ?>
+                                    <div class="user-body">
+                                        <span class="user-name-line">
+                                            <span class="user-name"><?= esc($fullName) ?></span>
+                                            <?php if ($isSelf): ?>
+                                                <span class="self-chip">You</span>
+                                            <?php endif; ?>
+                                        </span>
+                                        <span class="user-email"><?= esc($user['email'] ?? '') ?></span>
+                                    </div>
                                 </div>
                             </td>
                             <td data-label="Username"><span class="cell-mono"><?= esc($user['username'] ?? '') ?></span></td>
-                            <td data-label="Email"><span class="cell-email"><?= esc($user['email'] ?? '') ?></span></td>
                             <td data-label="Role">
-                                <span class="role-badge <?= esc($roleKey, 'attr') ?>">
-                                    <?= esc($roleLabel) ?>
-                                </span>
+                                <span class="role-label role-label--<?= esc($roleKey, 'attr') ?>"><?= esc($roleLabel) ?></span>
                             </td>
                             <td data-label="PRC License">
                                 <?php if (!empty($user['prc_license'])): ?>
                                     <span class="cell-mono"><?= esc($user['prc_license']) ?></span>
                                 <?php else: ?>
-                                    <span class="cell-empty">—</span>
+                                    <span class="cell-empty">&mdash;</span>
+                                <?php endif; ?>
+                            </td>
+                            <td data-label="Last sign-in" class="cell-date">
+                                <?php if ($lastSeen): ?>
+                                    <time datetime="<?= esc(date('c', $lastSeen), 'attr') ?>"
+                                          title="<?= esc(date('M j, Y · g:i A', $lastSeen), 'attr') ?>"><?= esc($relativeTime($lastSeen)) ?></time>
+                                <?php else: ?>
+                                    <span class="cell-empty">Never</span>
                                 <?php endif; ?>
                             </td>
                             <td data-label="Status">
-                                <span class="status-badge <?= esc($statusKey, 'attr') ?>">
-                                    <span class="status-dot" aria-hidden="true"></span><?= esc($statusText) ?>
-                                </span>
+                                <span class="status-text status-text--<?= esc($statusKey, 'attr') ?>"><?= esc($statusText) ?></span>
                             </td>
                             <td data-label="Actions">
                                 <div class="action-group">
@@ -562,17 +597,20 @@ $userAvatar = 'default-avatar.png';
 
 .table-card,
 .admin-modal {
-    --um-accent:        #0148ca;
-    --um-ink:           #0a2b4e;
-    --um-text:          #334155;
-    --um-muted:         #64748b;
-    --um-faint:         #94a3b8;
-    --um-line:          #e2e8f0;
-    --um-line-soft:     #eef2f7;
-    --um-surface:       #ffffff;
-    --um-canvas:        #f8fafc;
-    --um-danger:        #b91c1c;
-    --um-radius:        12px;
+    --um-accent:        var(--pm-accent, #0B67B2);
+    --um-accent-soft:   var(--pm-accent-soft, #E8F1FA);
+    --um-ink:           var(--pm-text, #10202E);
+    --um-text:          var(--pm-text-soft, #3B4C5E);
+    --um-muted:         var(--pm-text-muted, #5D6E80);
+    --um-faint:         #7A8B9D;
+    --um-line:          var(--pm-line, #DDE4EC);
+    --um-line-soft:     #EBF0F5;
+    --um-surface:       #FFFFFF;
+    --um-canvas:        #F8FAFC;
+    --um-row-hover:     #F5F8FB;
+    --um-avatar:        #E3EAF2;
+    --um-danger:        #B42318;
+    --um-radius:        8px;
     --um-radius-sm:     8px;
     --um-radius-xs:     6px;
 }
@@ -581,49 +619,43 @@ $userAvatar = 'default-avatar.png';
 .page-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-end;
     gap: 1rem;
     flex-wrap: wrap;
     margin-bottom: 1.25rem;
-    padding-bottom: 1.25rem;
-    border-bottom: 1px solid var(--um-line-soft);
 }
 
 .page-header-text { min-width: 0; }
 
 .page-title {
-    font-weight: 700;
-    color: var(--um-ink);
-    margin: 0 0 2px;
+    margin: 0;
     font-size: 1.25rem;
-    letter-spacing: -0.01em;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    color: var(--um-ink);
 }
 
 .page-subtitle {
+    margin: 0.2rem 0 0;
+    font-size: 0.8125rem;
     color: var(--um-muted);
-    font-size: 0.85rem;
-    margin: 0;
 }
 
 .btn-add-user {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
-    border-radius: var(--um-radius-xs);
-    font-size: 0.875rem;
+    gap: 0.45rem;
+    height: 36px;
+    padding: 0 0.9rem;
+    font-size: 0.8125rem;
     font-weight: 600;
-    padding: 0.55rem 1rem;
+    border-radius: var(--um-radius-xs);
     white-space: nowrap;
 }
 
-/* ===== CARD ===== */
-.table-card {
-    background: var(--um-surface);
-    border-radius: var(--um-radius);
-    padding: 1.5rem;
-    box-shadow: 0 1px 2px rgba(10, 43, 78, 0.05);
-    border: 1px solid var(--um-line);
-}
+/* ===== FRAME ===== */
+/* The card is only a scope now; search, table and footer form one panel. */
+.table-card { padding: 0; background: transparent; border: 0; box-shadow: none; }
 
 .table-card :focus-visible {
     outline: 2px solid var(--um-accent);
@@ -636,10 +668,11 @@ $userAvatar = 'default-avatar.png';
     display: flex;
     align-items: center;
     gap: 0.6rem;
-    border-radius: var(--um-radius-sm);
-    font-size: 0.875rem;
+    margin-bottom: 1rem;
     padding: 0.75rem 2.5rem 0.75rem 0.9rem;
+    font-size: 0.8125rem;
     border-width: 1px;
+    border-radius: var(--um-radius);
 }
 
 .admin-alert i { font-size: 1rem; line-height: 1; flex-shrink: 0; }
@@ -647,86 +680,83 @@ $userAvatar = 'default-avatar.png';
 
 /* ===== TOOLBAR ===== */
 .table-toolbar {
-    margin-bottom: 1rem;
+    margin: 0;
+    padding: 0.75rem 1rem;
+    background: var(--um-surface);
+    border: 1px solid var(--um-line);
+    border-bottom: 0;
+    border-radius: var(--um-radius) var(--um-radius) 0 0;
 }
 
 .search-wrapper {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    max-width: 320px;
+    height: 34px;
+    padding: 0 0.7rem;
+    background: var(--um-surface);
     border: 1px solid var(--um-line);
     border-radius: var(--um-radius-xs);
-    padding: 0.1rem 0.75rem;
-    max-width: 320px;
-    background: var(--um-surface);
-    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .search-wrapper:focus-within {
     border-color: var(--um-accent);
-    box-shadow: 0 0 0 3px rgba(1, 72, 202, 0.10);
+    box-shadow: 0 0 0 3px rgba(11, 103, 178, 0.15);
 }
 
-.search-wrapper i { color: var(--um-faint); font-size: 0.9rem; }
+.search-wrapper i { color: var(--um-faint); font-size: 0.8rem; }
 
 .search-wrapper .form-control {
-    border: none;
-    padding: 0.5rem 0;
-    font-size: 0.875rem;
-    background: transparent;
+    height: 100%;
+    padding: 0;
+    font-size: 0.8125rem;
     color: var(--um-ink);
+    background: transparent;
+    border: 0;
 }
 
-.search-wrapper .form-control:focus {
-    box-shadow: none;
-    border: none;
-}
-
+.search-wrapper .form-control:focus { box-shadow: none; border: 0; }
 .search-wrapper .form-control::-webkit-search-cancel-button { cursor: pointer; }
 
 /* ===== TABLE ===== */
+.table-card .table-responsive {
+    background: var(--um-surface);
+    border-left: 1px solid var(--um-line);
+    border-right: 1px solid var(--um-line);
+}
+
 .admin-table {
     margin: 0;
-    border-collapse: separate;
-    border-spacing: 0;
+    border-collapse: collapse;
 }
 
 .admin-table thead th {
-    font-size: 0.68rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--um-muted);
+    padding: 0.6rem 1rem;
+    font-size: 0.7rem;
     font-weight: 600;
-    background: var(--um-canvas);
-    border-bottom: 1px solid var(--um-line);
-    border-top: 1px solid var(--um-line);
-    padding: 0.7rem 0.75rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
     white-space: nowrap;
-}
-
-.admin-table thead th:first-child {
-    border-left: 1px solid var(--um-line);
-    border-top-left-radius: var(--um-radius-xs);
-    border-bottom-left-radius: 0;
-}
-
-.admin-table thead th:last-child {
-    border-right: 1px solid var(--um-line);
-    border-top-right-radius: var(--um-radius-xs);
+    color: var(--um-muted);
+    background: var(--um-canvas);
+    border-top: 1px solid var(--um-line);
+    border-bottom: 1px solid var(--um-line);
 }
 
 .admin-table tbody td {
-    padding: 0.7rem 0.75rem;
+    padding: 0.7rem 1rem;
     vertical-align: middle;
-    font-size: 0.85rem;
+    font-size: 0.8125rem;
     color: var(--um-text);
-    border-bottom: 1px solid var(--um-line-soft);
     background: transparent;
+    border-bottom: 1px solid var(--um-line-soft);
 }
 
-.admin-table tbody tr:last-child td { border-bottom: none; }
+.admin-table tbody tr:last-child td { border-bottom: 0; }
 
-.admin-table tbody tr[data-user-row]:hover td { background: var(--um-canvas); }
+.admin-table tbody tr[data-user-row]:hover td { background: var(--um-row-hover); }
 
 .col-actions { text-align: right; }
 
@@ -734,21 +764,30 @@ $userAvatar = 'default-avatar.png';
 .user-cell {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
+    gap: 0.7rem;
     min-width: 0;
 }
 
+/* Uploaded photo when there is one; otherwise initials, never a stock silhouette */
 .user-avatar {
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+    display: grid;
+    place-items: center;
     flex-shrink: 0;
+    width: 36px;
+    height: 36px;
     overflow: hidden;
-    background: #eef2f7;
-    border: 1px solid var(--um-line);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--um-ink);
+    background: var(--um-avatar);
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 1px rgba(16, 32, 46, 0.06);
+}
+
+.user-avatar.has-photo {
+    background: var(--um-line-soft);
+    box-shadow: 0 0 0 1px var(--um-line);
 }
 
 .user-avatar-img {
@@ -758,145 +797,160 @@ $userAvatar = 'default-avatar.png';
     display: block;
 }
 
-.user-name {
-    font-weight: 600;
-    color: var(--um-ink);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+.user-body {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.35;
+}
+
+.user-name-line {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
     min-width: 0;
 }
 
+.user-name {
+    min-width: 0;
+    font-weight: 600;
+    color: var(--um-ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .self-chip {
-    font-size: 0.62rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--um-muted);
-    background: var(--um-line-soft);
-    border: 1px solid var(--um-line);
-    border-radius: 4px;
-    padding: 0.1rem 0.35rem;
     flex-shrink: 0;
+    padding: 0 0.3rem;
+    font-size: 0.64rem;
+    font-weight: 600;
+    line-height: 1.6;
+    color: var(--um-accent);
+    background: var(--um-accent-soft);
+    border-radius: 3px;
+}
+
+.user-email {
+    max-width: 260px;
+    font-size: 0.75rem;
+    color: var(--um-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .cell-mono {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: 0.8rem;
+    font-family: var(--pm-mono, ui-monospace, monospace);
+    font-size: 0.78rem;
     color: var(--um-text);
 }
 
 .cell-empty { color: var(--um-faint); }
 
-.cell-email {
-    color: var(--um-text);
-    overflow-wrap: anywhere;
+.cell-date {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
 }
 
-/* ===== BADGES ===== */
-.role-badge,
-.status-badge {
+.cell-date time { cursor: help; }
+
+/* ===== ROLE + STATUS: dot labels, not tinted badges ===== */
+.role-label,
+.status-text {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    padding: 0.22rem 0.55rem;
-    border-radius: var(--um-radius-xs);
-    font-size: 0.72rem;
-    font-weight: 600;
+    gap: 0.45rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--um-text);
     white-space: nowrap;
-    border: 1px solid transparent;
 }
 
-.role-badge.admin        { background: #e6f0fa; color: #0b3fa8; border-color: #cfe0f5; }
-.role-badge.receptionist { background: #e0f2f4; color: #0e7490; border-color: #c7e6ea; }
-.role-badge.med_tech     { background: #e7f6ee; color: #047857; border-color: #cbeada; }
-.role-badge.radiologist  { background: #fdf0e2; color: #b45309; border-color: #f6ddbf; }
-.role-badge.unknown      { background: var(--um-line-soft); color: var(--um-muted); border-color: var(--um-line); }
+.role-label::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 2px;
+    background: var(--role, var(--um-faint));
+    flex-shrink: 0;
+}
 
-.status-badge.active   { background: #e7f6ee; color: #15803d; border-color: #cbeada; }
-.status-badge.inactive { background: #fdeaea; color: #b91c1c; border-color: #f6d2d2; }
+/* Clinical roles use their department colour; desk roles stay neutral */
+.role-label--admin        { --role: var(--pm-ink, #0C2D48); }
+.role-label--receptionist { --role: #7C8DA0; }
+.role-label--med_tech     { --role: #0B67B2; }
+.role-label--radiologist  { --role: #0E8A7E; }
 
-.status-dot {
+.status-text::before {
+    content: "";
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: currentColor;
+    background: var(--dot, #98A2B3);
     flex-shrink: 0;
 }
+
+.status-text--active   { --dot: #17B26A; }
+.status-text--inactive { --dot: #98A2B3; color: var(--um-muted); }
 
 /* ===== ACTIONS ===== */
 .action-group {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 0.25rem;
+    gap: 0.15rem;
 }
 
 .action-icon {
-    background: transparent;
-    border: 1px solid transparent;
-    color: var(--um-faint);
-    width: 30px;
-    height: 30px;
-    border-radius: var(--um-radius-xs);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    cursor: pointer;
-    transition: color 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
+    width: 30px;
+    height: 30px;
     font-size: 0.9rem;
     line-height: 1;
+    color: var(--um-muted);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--um-radius-xs);
+    cursor: pointer;
+    transition: color 0.15s ease, background-color 0.15s ease;
 }
 
-.action-icon:hover {
-    color: var(--um-accent);
-    background: #eef4fd;
-    border-color: #d6e4fa;
-}
-
-.action-icon.delete-user:hover {
-    color: var(--um-danger);
-    background: #fdeaea;
-    border-color: #f6d2d2;
-}
-
-.action-icon.toggle-status:hover {
-    color: #b45309;
-    background: #fdf0e2;
-    border-color: #f6ddbf;
-}
+.action-icon:hover { color: var(--um-ink); background: var(--um-line-soft); }
+.action-icon.delete-user:hover { color: var(--um-danger); background: #FEF3F2; }
 
 .action-note {
-    font-size: 0.72rem;
+    font-size: 0.74rem;
     color: var(--um-faint);
-    font-style: normal;
 }
 
 /* ===== EMPTY STATES ===== */
 .empty-state {
+    padding: 2.5rem 1rem;
     text-align: center;
-    padding: 2rem 1rem;
     color: var(--um-muted);
 }
 
 .empty-state i {
-    font-size: 1.6rem;
-    color: #cbd5e1;
     display: block;
     margin-bottom: 0.5rem;
+    font-size: 1.5rem;
+    color: var(--um-faint);
 }
 
 .empty-title {
     margin: 0 0 0.15rem;
     font-size: 0.9rem;
     font-weight: 600;
-    color: var(--um-text);
+    color: var(--um-ink);
 }
 
 .empty-hint {
     margin: 0;
     font-size: 0.8rem;
-    color: var(--um-faint);
+    color: var(--um-muted);
 }
 
 /* ===== FOOTER ===== */
@@ -906,17 +960,23 @@ $userAvatar = 'default-avatar.png';
     align-items: center;
     gap: 0.75rem;
     flex-wrap: wrap;
-    margin-top: 1.25rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--um-line-soft);
+    margin: 0;
+    padding: 0.7rem 1rem;
+    background: var(--um-surface);
+    border: 1px solid var(--um-line);
+    border-radius: 0 0 var(--um-radius) var(--um-radius);
 }
 
 .table-footer span {
-    font-size: 0.82rem;
+    font-size: 0.78rem;
     color: var(--um-muted);
 }
 
 .filter-count { color: var(--um-accent); font-weight: 600; }
+
+/* Modal heading icons were decoration only */
+.add-user-heading-icon,
+.edit-user-heading-icon { display: none !important; }
 
 /* ============================================
    MODALS (shared)
@@ -1320,7 +1380,6 @@ $userAvatar = 'default-avatar.png';
 }
 
 @media (max-width: 768px) {
-    .table-card { padding: 1.1rem; }
 
     .page-header {
         flex-direction: column;
@@ -1343,10 +1402,8 @@ $userAvatar = 'default-avatar.png';
     }
 
     .admin-table tbody tr[data-user-row] {
-        border: 1px solid var(--um-line);
-        border-radius: var(--um-radius-sm);
-        padding: 0.35rem 0.85rem;
-        margin-bottom: 0.75rem;
+        padding: 0.35rem 1rem;
+        border-bottom: 1px solid var(--um-line);
         background: var(--um-surface);
     }
 
@@ -1399,8 +1456,6 @@ $userAvatar = 'default-avatar.png';
 }
 
 @media (max-width: 480px) {
-    .table-card { padding: 0.9rem; }
-    .cell-email { font-size: 0.8rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

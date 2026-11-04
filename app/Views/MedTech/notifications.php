@@ -45,14 +45,14 @@
 .nc-check input[type="checkbox"] {
     width: 16px;
     height: 16px;
-    accent-color: #1976d2;
+    accent-color: #0B67B2;
     cursor: pointer;
     display: block;
 }
 
 .nc-list.is-selecting .nc-card.is-selected {
     border-color: #bcd6f3;
-    box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.12);
+    box-shadow: 0 0 0 2px rgba(11, 103, 178, 0.12);
 }
 
 .nc-list.is-selecting .nc-card { cursor: pointer; }
@@ -86,8 +86,8 @@
 .nc-inline-form { display: inline-flex; margin: 0; }
 .nc-btn--accept,
 .nc-btn--accept:hover { color: #ffffff; }
-.nc-btn--accept { background: #1976d2; border-color: #1976d2; }
-.nc-btn--accept:hover { background: #1565c0; border-color: #1565c0; }
+.nc-btn--accept { background: #0B67B2; border-color: #0B67B2; }
+.nc-btn--accept:hover { background: #08528F; border-color: #08528F; }
 
 /* =========================================================
    Bulk delete review modal
@@ -207,7 +207,7 @@
     width: 16px;
     height: 16px;
     margin-top: 0.15rem;
-    accent-color: #1976d2;
+    accent-color: #0B67B2;
     cursor: pointer;
     flex-shrink: 0;
 }
@@ -558,7 +558,7 @@ arsort($typeCounts);
                                 </span>
 
                             <?php elseif ($type === 'lab'): ?>
-                                <span class="nc-tile nc-tile--png" aria-hidden="true">
+                                <span class="nc-tile nc-tile--png nc-tile--lab" aria-hidden="true">
                                     <img src="<?= esc(base_url('assets/images/' . $labIconPng), 'attr') ?>"
                                          alt=""
                                          class="nc-tile-img"
@@ -567,7 +567,7 @@ arsort($typeCounts);
                                 </span>
 
                             <?php elseif ($type === 'xray'): ?>
-                                <span class="nc-tile nc-tile--png" aria-hidden="true">
+                                <span class="nc-tile nc-tile--png nc-tile--xray" aria-hidden="true">
                                     <img src="<?= esc(base_url('assets/images/' . $xrayIconPng), 'attr') ?>"
                                          alt=""
                                          class="nc-tile-img"

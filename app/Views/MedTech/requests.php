@@ -12,9 +12,7 @@
    age, gender, lab_services, request_date, status — plus 'priority'
    when the controller supplies it (values: 'routine' | 'stat').
 
-   NOTE: TAT is a placeholder random value in the original file. The
-   view below keeps that behaviour so nothing breaks, but the value
-   should come from a real controller column when one is available.
+   TAT is computed from the request's own timestamps (see the loop).
    ------------------------------------------------------------------ */
 
 $statusMeta = [
@@ -30,6 +28,19 @@ $requests = is_array($requests ?? null) ? $requests : [];
 
 $pendingTotal = (int) ($counts['pending'] ?? 0);
 $exportRows   = [];
+
+/* 45 → "45m", 200 → "3h 20m", 1700 → "1d 4h" */
+$duration = static function (int $m): string {
+    if ($m < 60)   { return $m . 'm'; }
+    if ($m < 1440) { return intdiv($m, 60) . 'h' . ($m % 60 ? ' ' . ($m % 60) . 'm' : ''); }
+    $d = intdiv($m, 1440);
+    $h = intdiv($m % 1440, 60);
+    return $d . 'd' . ($h ? ' ' . $h . 'h' : '');
+};
+
+/* Lab workflow, in order. A request's stage is how many steps are done. */
+$stageNames = ['Received', 'Processing', 'Completed', 'Released'];
+$stageOf    = ['pending' => 1, 'in_progress' => 2, 'draft' => 2, 'completed' => 3, 'released' => 4, 'cancelled' => 0];
 
 $initialsOf = static function ($name) {
     $parts = preg_split('/\s+/', trim((string) $name));
@@ -119,7 +130,7 @@ $filterTabs = [
 
                     $id        = (string) ($request['id'] ?? '');
                     $key       = $id;
-                    $accession = 'ACC-26-' . str_pad($id, 4, '0', STR_PAD_LEFT);
+                    $accession = 'LAB-' . date('y') . '-' . str_pad($id, 4, '0', STR_PAD_LEFT);
                     $patient   = (string) ($request['patient_name'] ?? 'Unknown patient');
                     $status    = strtolower((string) ($request['status'] ?? 'pending'));
                     $meta      = $statusMeta[$status] ?? $statusMeta['pending'];
@@ -136,23 +147,36 @@ $filterTabs = [
                     $ageText = is_numeric($age) ? ((int) $age) . ' yrs' : '';
                     $demo    = implode(' · ', array_filter([$ageText, $gender]));
 
-                    $genderRaw  = strtolower($gender);
-                    $isMale     = $genderRaw === 'male'   || $genderRaw === 'm';
-                    $isFemale   = $genderRaw === 'female' || $genderRaw === 'f';
-                    $avatarKind = $isMale ? 'male' : ($isFemale ? 'female' : 'neutral');
 
                     $services = isset($request['lab_services'])
                         ? array_values(array_filter(array_map('trim', explode(',', (string) $request['lab_services'])), 'strlen'))
                         : [];
-                    $shown = array_slice($services, 0, 3);
+                    $shown = array_slice($services, 0, 4);
                     $extra = count($services) - count($shown);
 
                     /*
-                     * TAT placeholder — same as the previous view.
-                     * Replace with $request['tat_minutes'] when the
-                     * controller supplies a real value.
+                     * Turnaround from real timestamps (this used to be rand()):
+                     *   released  → request to release
+                     *   completed → request to completion (last update)
+                     *   open      → how long it has been waiting so far
                      */
-                    $tatMinutes = rand(18, 94);
+                    $startTs = !empty($request['created_at']) ? strtotime($request['created_at']) : false;
+                    $endTs   = false;
+                    $tatVerb = 'Waiting';
+                    if ($status === 'released' && !empty($request['released_at'])) {
+                        $endTs   = strtotime($request['released_at']);
+                        $tatVerb = 'Released in';
+                    } elseif ($status === 'completed' && !empty($request['updated_at'])) {
+                        $endTs   = strtotime($request['updated_at']);
+                        $tatVerb = 'Completed in';
+                    } elseif (in_array($status, ['pending', 'in_progress', 'draft'], true)) {
+                        $endTs = time();
+                    }
+                    $tatMinutes = ($startTs && $endTs && $endTs >= $startTs) ? (int) floor(($endTs - $startTs) / 60) : null;
+                    $tatText    = $tatMinutes === null ? '' : $duration($tatMinutes);
+                    $tatOpen    = $tatVerb === 'Waiting';
+
+                    $stage = $stageOf[$status] ?? 1;
 
                     $createdTs = !empty($request['request_date']) ? strtotime($request['request_date']) : false;
 
@@ -164,7 +188,7 @@ $filterTabs = [
                         'services'  => implode('; ', $services),
                         'priority'  => $isStat ? 'STAT' : 'Routine',
                         'requested' => $createdTs ? date('Y-m-d', $createdTs) : '',
-                        'tat'       => $tatMinutes . ' min',
+                        'tat'       => $tatMinutes !== null ? $tatMinutes . ' min' : '',
                         'status'    => $meta['label'],
                     ];
                 ?>
@@ -180,110 +204,91 @@ $filterTabs = [
                              data-search="<?= esc(strtolower(implode(' ', array_filter([$patient, $accession, implode(' ', $services), $isStat ? 'stat urgent' : '']))), 'attr') ?>">
 
                         <header class="dx-card-head">
-                            <span class="dx-ref"><?= esc($accession) ?></span>
-
-                            <div class="dx-card-flags">
+                            <span class="dx-card-id">
+                                <span class="dx-ref"><?= esc($accession) ?></span>
                                 <?php if ($isStat): ?>
                                     <span class="dx-tag-stat" title="Urgent">STAT</span>
                                 <?php endif; ?>
+                            </span>
+
+                            <span class="dx-card-flags">
                                 <?php foreach ($tags as $tag): $tm = $statusMeta[$tag] ?? $meta; ?>
                                     <span class="dx-status dx-status--<?= $tm['tone'] ?>"><?= esc($tm['label']) ?></span>
                                 <?php endforeach; ?>
-                            </div>
+                            </span>
                         </header>
 
                         <div class="dx-card-patient">
-                            <span class="dx-avatar dx-avatar--<?= esc($avatarKind, 'attr') ?>" aria-hidden="true">
-                                <?php if ($isMale): ?>
-                                    <img src="<?= esc(base_url('assets/images/man-avatar.png'), 'attr') ?>"
-                                         alt=""
-                                         class="dx-avatar-img"
-                                         loading="lazy"
-                                         decoding="async">
-                                <?php elseif ($isFemale): ?>
-                                    <img src="<?= esc(base_url('assets/images/woman-avatar.png'), 'attr') ?>"
-                                         alt=""
-                                         class="dx-avatar-img"
-                                         loading="lazy"
-                                         decoding="async">
+                            <h3 class="dx-card-name"><?= esc($patient) ?></h3>
+                            <p class="dx-card-demo">
+                                <?php if ($demo !== ''): ?>
+                                    <?= esc($demo) ?>
                                 <?php else: ?>
-                                    <?= esc($initialsOf($patient)) ?>
+                                    <span class="dx-muted">No age or sex on file</span>
                                 <?php endif; ?>
-                            </span>
-
-                            <div class="dx-card-patient-body">
-                                <h3 class="dx-card-name"><?= esc($patient) ?></h3>
-
-                                <p class="dx-card-demo">
-                                    <?php if ($demo !== ''): ?>
-                                        <?= esc($demo) ?>
-                                    <?php else: ?>
-                                        <span class="dx-muted">No age or sex on file</span>
-                                    <?php endif; ?>
-                                </p>
-                            </div>
+                            </p>
                         </div>
 
-                        <div class="dx-card-services">
+                        <div class="dx-tests">
+                            <div class="dx-tests-head">
+                                <span>Ordered tests</span>
+                                <span class="dx-tests-count"><?= count($services) ?></span>
+                            </div>
                             <?php if ($services): ?>
-                                <?php foreach ($shown as $service): ?>
-                                    <span class="dx-chip"><?= esc($service) ?></span>
-                                <?php endforeach; ?>
-                                <?php if ($extra > 0): ?>
-                                    <span class="dx-chip dx-chip--more">+<?= $extra ?> more</span>
-                                <?php endif; ?>
+                                <ul class="dx-tests-list" title="<?= esc(implode(', ', $services), 'attr') ?>">
+                                    <?php foreach ($shown as $service): ?>
+                                        <li><?= esc($service) ?></li>
+                                    <?php endforeach; ?>
+                                    <?php if ($extra > 0): ?>
+                                        <li class="dx-tests-more">+ <?= $extra ?> more</li>
+                                    <?php endif; ?>
+                                </ul>
                             <?php else: ?>
-                                <span class="dx-muted">No services listed</span>
+                                <p class="dx-tests-empty">No tests listed</p>
                             <?php endif; ?>
                         </div>
 
-                        <dl class="dx-card-meta">
-                            <div>
-                                <dt>Requested</dt>
-                                <dd>
-                                    <?php if ($createdTs): ?>
-                                        <time datetime="<?= esc(date('c', $createdTs), 'attr') ?>">
-                                            <?= esc(date('M d, Y', $createdTs)) ?>
-                                        </time>
-                                    <?php else: ?>
-                                        &mdash;
-                                    <?php endif; ?>
-                                </dd>
-                            </div>
-                            <div>
-                                <dt>Priority</dt>
-                                <dd class="<?= $isStat ? 'dx-priority-stat' : '' ?>">
-                                    <?= $isStat ? 'STAT' : 'Routine' ?>
-                                </dd>
-                            </div>
-                            <div>
-                                <dt>TAT</dt>
-                                <dd class="dx-amount">
-                                    <i class="bi bi-clock" aria-hidden="true"></i>
-                                    <?= (int) $tatMinutes ?> min
-                                </dd>
-                            </div>
-                        </dl>
+                        <div class="dx-progress">
+                            <ol class="dx-track" aria-label="<?= esc('Workflow: ' . ($stage > 0 ? $stageNames[$stage - 1] : 'Cancelled'), 'attr') ?>">
+                                <?php foreach ($stageNames as $i => $stageName): ?>
+                                    <li class="dx-track-step<?= $i < $stage ? ' is-done' : '' ?><?= $i === $stage - 1 ? ' is-current' : '' ?>"
+                                        title="<?= esc($stageName, 'attr') ?>"></li>
+                                <?php endforeach; ?>
+                            </ol>
+                            <p class="dx-progress-meta">
+                                <?php if ($createdTs): ?>
+                                    <time datetime="<?= esc(date('c', $createdTs), 'attr') ?>">Requested <?= esc(date('M j', $createdTs)) ?></time>
+                                <?php else: ?>
+                                    <span class="dx-muted">No request date</span>
+                                <?php endif; ?>
+                                <?php if ($tatText !== ''): ?>
+                                    <span class="dx-sep" aria-hidden="true">·</span>
+                                    <span class="dx-elapsed<?= $tatOpen ? ' is-open' : '' ?>"><?= esc($tatVerb) ?> <strong><?= esc($tatText) ?></strong></span>
+                                <?php endif; ?>
+                            </p>
+                        </div>
 
                         <footer class="dx-card-foot">
-                            <a class="dx-btn dx-btn--sm dx-btn--primary"
-                               href="<?= base_url('medtech/request/view/' . (int) $id) ?>">
-                                <i class="bi bi-eye" aria-hidden="true"></i>
-                                View
-                            </a>
-
                             <?php if ($status === 'released'): ?>
-                                <a class="dx-btn dx-btn--sm"
+                                <a class="dx-btn dx-btn--sm dx-btn--primary"
                                    href="<?= base_url('medtech/request/print/' . (int) $id) ?>"
                                    target="_blank">
-                                    <i class="bi bi-download" aria-hidden="true"></i>
-                                    Download
+                                    <i class="bi bi-printer" aria-hidden="true"></i>
+                                    Print result
                                 </a>
-                            <?php elseif ($status !== 'completed'): ?>
                                 <a class="dx-btn dx-btn--sm"
                                    href="<?= base_url('medtech/request/view/' . (int) $id) ?>">
-                                    <i class="bi bi-pencil" aria-hidden="true"></i>
-                                    Process
+                                    View
+                                </a>
+                            <?php elseif ($status === 'completed'): ?>
+                                <a class="dx-btn dx-btn--sm dx-btn--primary"
+                                   href="<?= base_url('medtech/request/view/' . (int) $id) ?>">
+                                    View results
+                                </a>
+                            <?php else: ?>
+                                <a class="dx-btn dx-btn--sm dx-btn--primary"
+                                   href="<?= base_url('medtech/request/view/' . (int) $id) ?>">
+                                    <?= $status === 'pending' ? 'Start processing' : 'Continue' ?>
                                 </a>
                             <?php endif; ?>
 
@@ -354,23 +359,24 @@ $filterTabs = [
    ========================================================= */
 
 .dx {
-    --dx-ink:         #0f172a;
-    --dx-text:        #334155;
-    --dx-muted:       #64748b;
-    --dx-faint:       #94a3b8;
-    --dx-line:        #e2e8f0;
-    --dx-line-soft:   #f1f5f9;
-    --dx-surface:     #ffffff;
-    --dx-subtle:      #f8fafc;
-    --dx-accent:      #1976d2;
-    --dx-accent-dark: #1565c0;
-    --dx-accent-soft: #e8f1fb;
-    --dx-danger:      #dc2626;
-    --dx-danger-dark: #b91c1c;
-    --dx-radius:      10px;
-    --dx-radius-sm:   7px;
-    --dx-ring:        0 0 0 3px rgba(25, 118, 210, 0.2);
-    --dx-mono:        ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --dx-ink:         var(--pm-text, #10202E);
+    --dx-text:        var(--pm-text-soft, #3B4C5E);
+    --dx-muted:       var(--pm-text-muted, #5D6E80);
+    --dx-faint:       #7A8B9D;
+    --dx-line:        var(--pm-line, #DDE4EC);
+    --dx-line-strong: var(--pm-line-strong, #C3CFDB);
+    --dx-line-soft:   #EBF0F5;
+    --dx-surface:     #FFFFFF;
+    --dx-subtle:      #F8FAFC;
+    --dx-accent:      var(--pm-accent, #0B67B2);
+    --dx-accent-dark: var(--pm-accent-hover, #08528F);
+    --dx-accent-soft: var(--pm-accent-soft, #E8F1FA);
+    --dx-danger:      #B42318;
+    --dx-danger-dark: #912018;
+    --dx-radius:      8px;
+    --dx-radius-sm:   6px;
+    --dx-ring:        0 0 0 3px rgba(11, 103, 178, 0.18);
+    --dx-mono:        var(--pm-mono, ui-monospace, monospace);
 
     color: var(--dx-text);
 }
@@ -438,7 +444,6 @@ $filterTabs = [
     background: var(--dx-surface);
     border: 1px solid var(--dx-line);
     border-radius: var(--dx-radius-sm);
-    box-shadow: 0 1px 1px rgba(15, 23, 42, 0.03);
     white-space: nowrap;
     text-decoration: none;
     cursor: pointer;
@@ -453,7 +458,7 @@ $filterTabs = [
 .dx-btn--primary { background: var(--dx-accent); border-color: var(--dx-accent); }
 .dx-btn--primary:hover { background: var(--dx-accent-dark); border-color: var(--dx-accent-dark); }
 
-.dx-btn--sm { height: 32px; padding: 0 0.75rem; font-size: 0.78rem; flex: 1; min-width: 0; }
+.dx-btn--sm { height: 32px; padding: 0 0.75rem; font-size: 0.78rem; min-width: 0; }
 
 .dx-icon-btn {
     width: 32px;
@@ -531,8 +536,7 @@ $filterTabs = [
 .dx-panel {
     background: var(--dx-surface);
     border: 1px solid var(--dx-line);
-    border-radius: 12px;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    border-radius: var(--dx-radius);
     overflow: hidden;
 }
 
@@ -587,7 +591,7 @@ $filterTabs = [
     text-align: center;
     color: var(--dx-muted);
     background: var(--dx-line-soft);
-    border-radius: 999px;
+    border-radius: 4px;
 }
 
 .dx-tab.is-active .dx-tab-count { color: var(--dx-accent); background: var(--dx-accent-soft); }
@@ -604,39 +608,36 @@ $filterTabs = [
 
 .dx-grid-wrap {
     border-top: 1px solid var(--dx-line);
-    background: #f8fafc;
+    background: var(--dx-subtle);
 }
 
 .dx-cards {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1.1rem;
-    padding: 1.15rem;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 0.85rem;
+    padding: 1rem;
 }
 
+/* A requisition slip: name first, the ordered tests, then where it is */
 .dx-card {
     position: relative;
     display: flex;
     flex-direction: column;
     min-width: 0;
-    padding: 1rem 1.05rem 1rem;
+    padding: 1rem 1.05rem 0;
     background: var(--dx-surface);
-    border: 1px solid #d4dbe5;
-    border-radius: var(--dx-radius);
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    border: 1px solid var(--dx-line);
+    border-radius: 10px;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .dx-card:hover {
-    border-color: #b6c2d2;
-    box-shadow: 0 8px 20px -8px rgba(15, 23, 42, 0.25), 0 2px 4px rgba(15, 23, 42, 0.06);
+    border-color: var(--dx-line-strong);
+    box-shadow: 0 8px 20px -14px rgba(12, 45, 72, 0.35);
 }
 
-/* Same subtle pink wash the Admin diagnostic view uses for STAT
-   requests, so urgent cards read differently at a glance. */
-.dx-card.is-stat {
-    background-image: linear-gradient(180deg, rgba(254, 242, 242, 0.55), transparent 45%);
-}
+.dx-card.is-stat { border-color: #F4C7C2; }
+.dx-card.is-stat:hover { border-color: #EAA29A; }
 
 .dx-card.is-hidden { display: none; }
 
@@ -647,82 +648,57 @@ $filterTabs = [
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
-    margin-bottom: 0.6rem;
+    margin-bottom: 0.7rem;
+}
+
+.dx-card-id {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
 }
 
 .dx-ref {
     font-family: var(--dx-mono);
-    font-size: 0.76rem;
-    font-weight: 600;
-    letter-spacing: 0.01em;
-    color: var(--dx-ink);
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--dx-muted);
     white-space: nowrap;
 }
 
 .dx-card-flags {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    flex-shrink: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.3rem;
 }
 
-/* Same STAT pill as the Admin diagnostic view. */
 .dx-tag-stat {
-    padding: 0 0.35rem;
-    font-size: 0.62rem;
+    padding: 0 0.3rem;
+    font-size: 0.6rem;
     font-weight: 700;
     letter-spacing: 0.06em;
-    line-height: 1.6;
-    color: var(--dx-danger-dark);
-    background: #fef2f2;
-    border: 1px solid #fecaca;
-    border-radius: 4px;
+    line-height: 1.65;
+    color: #FFFFFF;
+    background: var(--dx-danger);
+    border-radius: 3px;
 }
 
-/* ---- patient block ---- */
+/* ---- patient: typographic, no avatar ---- */
 
-.dx-card-patient {
-    display: flex;
-    align-items: center;
-    gap: 0.65rem;
-    margin-bottom: 0.7rem;
-}
-
-.dx-avatar {
-    display: grid;
-    place-items: center;
-    flex-shrink: 0;
-    width: 36px;
-    height: 36px;
-    font-size: 0.72rem;
-    font-weight: 700;
-    color: var(--dx-accent);
-    background: var(--dx-accent-soft);
-    border-radius: 50%;
-    overflow: hidden;
-}
-
-.dx-avatar--male    { color: #1d4ed8; background: #eaf2fe; }
-.dx-avatar--female  { color: #b32e50; background: #fce9ee; }
-.dx-avatar--neutral { color: var(--dx-accent); background: var(--dx-accent-soft); }
-
-.dx-avatar-img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-}
-
-.dx-card-patient-body { min-width: 0; }
+.dx-card-patient { min-width: 0; }
 
 .dx-card-name {
     margin: 0;
-    font-size: 0.95rem;
-    font-weight: 650;
+    font-size: 1rem;
+    font-weight: 600;
     letter-spacing: -0.01em;
     line-height: 1.3;
     color: var(--dx-ink);
-    overflow-wrap: anywhere;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .dx-card-demo {
@@ -731,107 +707,149 @@ $filterTabs = [
     color: var(--dx-muted);
 }
 
-/* ---- services ---- */
+/* ---- ordered tests: the work itself ---- */
 
-.dx-card-services {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.3rem;
-    margin-bottom: 0.85rem;
-    min-height: 1.55rem;
+.dx-tests {
+    margin-top: 0.85rem;
+    padding: 0.65rem 0.75rem 0.7rem;
+    background: var(--dx-subtle);
+    border: 1px solid var(--dx-line-soft);
+    border-radius: 8px;
 }
 
-.dx-chip {
-    padding: 0.15rem 0.5rem;
-    font-size: 0.72rem;
+.dx-tests-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.4rem;
+    font-size: 0.64rem;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--dx-faint);
+}
+
+.dx-tests-count {
+    min-width: 1.3rem;
+    padding: 0 0.3rem;
+    font-size: 0.68rem;
+    letter-spacing: 0;
+    text-align: center;
     color: var(--dx-text);
     background: var(--dx-surface);
     border: 1px solid var(--dx-line);
-    border-radius: 5px;
-    white-space: nowrap;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    border-radius: 4px;
+    font-variant-numeric: tabular-nums;
 }
 
-.dx-chip--more {
-    color: var(--dx-muted);
-    background: var(--dx-line-soft);
-    font-weight: 600;
-}
-
-/* ---- meta ---- */
-
-.dx-card-meta {
+.dx-tests-list {
     display: grid;
-    grid-template-columns: 1fr;
-    gap: 0.4rem;
-    margin: 0 0 0.85rem;
-    padding: 0.7rem 0;
-    border-top: 1px solid var(--dx-line-soft);
-    border-bottom: 1px solid var(--dx-line-soft);
-    font-size: 0.78rem;
-}
-
-.dx-card-meta > div {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 0.75rem;
-    min-width: 0;
-}
-
-.dx-card-meta dt {
-    flex-shrink: 0;
-    color: var(--dx-muted);
-    font-weight: 500;
-}
-
-.dx-card-meta dd {
+    gap: 0.25rem;
     margin: 0;
-    text-align: right;
+    padding: 0;
+    list-style: none;
+}
+
+.dx-tests-list li {
+    position: relative;
+    padding-left: 0.9rem;
+    font-size: 0.8rem;
+    line-height: 1.4;
     color: var(--dx-ink);
-    min-width: 0;
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
-.dx-card-meta time { font-variant-numeric: tabular-nums; }
-
-.dx-amount { font-variant-numeric: tabular-nums; font-weight: 600; }
-.dx-amount i { color: var(--dx-faint); margin-right: 0.15rem; }
-
-/* Priority row — plain for routine, red and bold for STAT. */
-.dx-priority-stat {
-    color: var(--dx-danger-dark);
-    font-weight: 700;
+/* Lab-blue bullet: same colour as "Lab" everywhere else */
+.dx-tests-list li::before {
+    content: "";
+    position: absolute;
+    left: 0.1rem;
+    top: 0.55em;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--dx-accent);
 }
+
+.dx-tests-list .dx-tests-more { color: var(--dx-muted); font-size: 0.76rem; }
+.dx-tests-list .dx-tests-more::before { background: transparent; }
+
+.dx-tests-empty { margin: 0; font-size: 0.78rem; color: var(--dx-faint); }
+
+/* ---- workflow track: Received → Processing → Completed → Released ---- */
+
+.dx-progress { margin: 0.85rem 0 0.9rem; }
+
+.dx-track {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 3px;
+    margin: 0 0 0.45rem;
+    padding: 0;
+    list-style: none;
+}
+
+.dx-track-step {
+    height: 4px;
+    background: var(--dx-line-soft);
+    border-radius: 2px;
+}
+
+.dx-track-step.is-done { background: var(--dx-accent); }
+
+/* Released: the whole track turns the "released" teal */
+.dx-card--released .dx-track-step.is-done { background: #009A85; }
+
+.dx-progress-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.15rem 0.4rem;
+    margin: 0;
+    font-size: 0.74rem;
+    color: var(--dx-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.dx-sep { color: var(--dx-line-strong); }
+
+.dx-elapsed strong { font-weight: 600; color: var(--dx-text); }
+
+/* Still waiting: the elapsed time is the number to watch */
+.dx-elapsed.is-open strong { color: var(--dx-ink); }
+.dx-card.is-stat .dx-elapsed.is-open strong { color: var(--dx-danger); }
 
 /* ---- footer ---- */
 
+/* Pinned to the bottom (cards in a row share a height); bleeds to the card edges */
 .dx-card-foot {
     display: flex;
     align-items: center;
     gap: 0.4rem;
-    margin-top: auto;
+    margin: auto -1.05rem 0;
+    padding: 0.7rem 1.05rem;
+    border-top: 1px solid var(--dx-line-soft);
 }
 
-.dx-card-menu { flex-shrink: 0; }
+.dx-card-foot .dx-btn--primary { flex: 1; }
 
-/* ---- status pill ---- */
+.dx-card-menu { flex-shrink: 0; margin-left: auto; }
+
+/* ---- status ---- */
 
 .dx-status {
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    padding: 0.2rem 0.55rem;
-    font-size: 0.72rem;
+    padding: 0.12rem 0.45rem;
+    font-size: 0.7rem;
     font-weight: 600;
     white-space: nowrap;
     color: var(--tone-fg);
     background: var(--tone-bg);
-    border-radius: 999px;
+    border-radius: 4px;
 }
 
 .dx-status::before {
@@ -842,12 +860,12 @@ $filterTabs = [
     background: var(--tone-dot);
 }
 
-.dx-status--pending   { --tone-bg: #fffbeb; --tone-fg: #b45309; --tone-dot: #f59e0b; }
-.dx-status--progress  { --tone-bg: #eff6ff; --tone-fg: #1d4ed8; --tone-dot: #3b82f6; }
-.dx-status--completed { --tone-bg: #ecfdf5; --tone-fg: #047857; --tone-dot: #10b981; }
-.dx-status--released  { --tone-bg: #f0fdfa; --tone-fg: #0f766e; --tone-dot: #14b8a6; }
-.dx-status--draft     { --tone-bg: #f1f5f9; --tone-fg: #64748b; --tone-dot: #94a3b8; }
-.dx-status--cancelled { --tone-bg: #f1f5f9; --tone-fg: #64748b; --tone-dot: #94a3b8; }
+.dx-status--pending   { --tone-bg: #FEF6E7; --tone-fg: #93370D; --tone-dot: #DC6803; }
+.dx-status--progress  { --tone-bg: #E8F1FA; --tone-fg: #08528F; --tone-dot: #0B67B2; }
+.dx-status--completed { --tone-bg: #ECFDF3; --tone-fg: #067647; --tone-dot: #17B26A; }
+.dx-status--released  { --tone-bg: #E6F6F4; --tone-fg: #0E6E64; --tone-dot: #009A85; }
+.dx-status--draft     { --tone-bg: #F2F4F7; --tone-fg: #475467; --tone-dot: #98A2B3; }
+.dx-status--cancelled { --tone-bg: #F2F4F7; --tone-fg: #475467; --tone-dot: #98A2B3; }
 
 /* ---- row menu ---- */
 
@@ -886,7 +904,7 @@ $filterTabs = [
     font-size: 1.2rem;
     color: var(--dx-faint);
     background: var(--dx-line-soft);
-    border-radius: 10px;
+    border-radius: 8px;
 }
 
 .dx-empty h3 { margin: 0 0 0.25rem; font-size: 0.95rem; font-weight: 600; color: var(--dx-ink); }
@@ -944,7 +962,7 @@ $filterTabs = [
     padding: 0.7rem 1rem;
     font-size: 0.8125rem;
     color: #f8fafc;
-    background: #0f172a;
+    background: var(--pm-ink, #0C2D48);
     border-radius: 9px;
     box-shadow: 0 12px 28px -8px rgba(15, 23, 42, 0.45);
 }
@@ -953,10 +971,6 @@ $filterTabs = [
 .dx-toast.is-error i { color: #f87171; }
 
 /* ---------- Responsive ---------- */
-
-@media (max-width: 1200px) {
-    .dx-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
 
 @media (max-width: 768px) {
     .dx-head { flex-direction: column; align-items: stretch; }
@@ -967,8 +981,6 @@ $filterTabs = [
 
     .dx-cards { grid-template-columns: minmax(0, 1fr); padding: 0.75rem; }
 
-    .dx-card-meta > div { align-items: flex-start; flex-direction: column; gap: 0.1rem; }
-    .dx-card-meta dd { text-align: left; white-space: normal; }
 
     .dx-foot { justify-content: center; }
 }

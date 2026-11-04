@@ -39,7 +39,8 @@
         'last_month' => 'Last month',
     ];
 
-    $tones = ['pending' => 'amber', 'in_progress' => 'blue', 'draft' => 'violet', 'completed' => 'teal', 'released' => 'green'];
+    /* Same status colours as every other page: completed green, released teal, drafts grey. */
+    $tones = ['pending' => 'amber', 'in_progress' => 'blue', 'draft' => 'slate', 'completed' => 'green', 'released' => 'teal'];
     $statusMeta = [];
     foreach ($tones as $key => $tone) $statusMeta[$key] = [$d['status'][$key], $tone];
 
@@ -163,11 +164,8 @@
     <section class="rp-kpis" aria-labelledby="rpKpiHeading">
         <h2 id="rpKpiHeading" class="visually-hidden">Key metrics</h2>
         <?php foreach ($kpis as $k): ?>
-            <div class="rp-kpi rp-kpi--<?= $k['tone'] ?>">
-                <div class="rp-kpi-top">
-                    <span class="rp-kpi-icon"><i class="bi <?= $k['icon'] ?>" aria-hidden="true"></i></span>
-                    <h3 class="rp-kpi-label"><?= esc($k['label']) ?></h3>
-                </div>
+            <div class="rp-kpi">
+                <h3 class="rp-kpi-label"><?= esc($k['label']) ?></h3>
                 <div class="rp-kpi-value"><?= $k['value'] ?></div>
                 <div class="rp-kpi-foot">
                     <?php if ($k['delta'] !== null):
@@ -176,8 +174,7 @@
                     ?>
                         <span class="rp-delta <?= abs($k['delta']) < 0.05 ? '' : ($good ? 'is-good' : 'is-bad') ?>"
                               title="vs <?= esc($prevLabel) ?>">
-                            <i class="bi <?= $up ? 'bi-arrow-up-right' : 'bi-arrow-down-right' ?>" aria-hidden="true"></i>
-                            <?= number_format(abs($k['delta']), 1) ?>%
+                            <?= $up ? '▲' : '▼' ?> <?= number_format(abs($k['delta']), 1) ?>%
                         </span>
                     <?php endif; ?>
                     <span class="rp-kpi-sub"><?= esc($k['sub']) ?></span>
@@ -195,8 +192,8 @@
                     <small><?= ucfirst($caseMany) ?> received (by <?= $daily['hourly'] ? 'time paid' : 'request date' ?>) vs results released</small>
                 </div>
                 <ul class="rp-chart-key" aria-hidden="true">
-                    <li><i style="background:#93c5fd"></i>Received</li>
-                    <li><i style="background:#047857"></i>Released</li>
+                    <li><i class="rp-key-received"></i>Received <b><?= number_format($s['received']) ?></b></li>
+                    <li><i class="rp-key-released"></i>Released <b><?= number_format($s['released']) ?></b></li>
                 </ul>
             </header>
             <?php if ($s['received'] > 0 || $s['released'] > 0): ?>
@@ -245,7 +242,7 @@
         <section class="rp-card">
             <header class="rp-card-head">
                 <div>
-                    <h2><i class="bi bi-stopwatch" aria-hidden="true"></i> Turnaround distribution</h2>
+                    <h2>Turnaround distribution</h2>
                     <small>Results released in the period, paid → released</small>
                 </div>
             </header>
@@ -268,7 +265,7 @@
         <section class="rp-card">
             <header class="rp-card-head">
                 <div>
-                    <h2><i class="bi bi-person-badge" aria-hidden="true"></i> <?= esc($staffTitle) ?> workload</h2>
+                    <h2><?= esc($staffTitle) ?> workload</h2>
                     <small>Results released in the period</small>
                 </div>
             </header>
@@ -295,7 +292,7 @@
             <section class="rp-card">
                 <header class="rp-card-head">
                     <div>
-                        <h2><i class="bi bi-diagram-3" aria-hidden="true"></i> <?= ucfirst($itemMany) ?> by section</h2>
+                        <h2><?= ucfirst($itemMany) ?> by section</h2>
                         <small><?= $s['items'] ?> <?= $itemMany ?> ordered this period</small>
                     </div>
                 </header>
@@ -318,7 +315,7 @@
         <section class="rp-card">
             <header class="rp-card-head">
                 <div>
-                    <h2><i class="bi bi-list-check" aria-hidden="true"></i> Top <?= $itemMany ?></h2>
+                    <h2>Top <?= $itemMany ?></h2>
                     <small>Most-requested this period</small>
                 </div>
             </header>
@@ -342,7 +339,7 @@
     <section class="rp-card">
         <header class="rp-card-head">
             <div>
-                <h2><i class="bi bi-exclamation-diamond" aria-hidden="true"></i> Unreleased backlog</h2>
+                <h2>Unreleased backlog</h2>
                 <small>Every paid <?= $caseOne ?> not yet released, as of <?= date('M j, Y g:i A') ?> — not limited to the period</small>
             </div>
             <a class="rp-link" href="<?= base_url($d['worklist']) ?>">Worklist <i class="bi bi-arrow-right"></i></a>
@@ -394,7 +391,7 @@
     <section class="rp-card rp-log">
         <header class="rp-card-head">
             <div>
-                <h2><i class="bi bi-journal-medical" aria-hidden="true"></i> <?= ucfirst($caseOne) ?> log</h2>
+                <h2><?= ucfirst($caseOne) ?> log</h2>
                 <small><?= count($studies) ?> <?= $cases(count($studies)) ?> with a request date in the period</small>
             </div>
             <label class="rp-search">
@@ -493,17 +490,17 @@
    Namespaced under .rp — same tokens as the Receptionist report.
    ========================================================= */
 .rp {
-    --rp-ink:#0f172a; --rp-text:#334155; --rp-muted:#64748b; --rp-faint:#94a3b8;
-    --rp-line:#e2e8f0; --rp-line-soft:#f1f5f9;
+    --rp-ink:var(--pm-text,#10202E); --rp-text:var(--pm-text-soft,#3B4C5E); --rp-muted:var(--pm-text-muted,#5D6E80); --rp-faint:#7A8B9D;
+    --rp-line:var(--pm-line,#DDE4EC); --rp-line-soft:#EBF0F5;
     --rp-surface:#ffffff; --rp-subtle:#f8fafc;
-    --rp-accent:#1976d2; --rp-accent-dark:#1565c0;
-    --rp-blue:#1d4ed8; --rp-blue-soft:#eaf2fe;
-    --rp-green:#047857; --rp-green-soft:#ecfdf5;
-    --rp-red:#b91c1c; --rp-red-soft:#fef2f2;
-    --rp-violet:#6d28d9; --rp-violet-soft:#f3e8ff;
-    --rp-amber:#b45309; --rp-amber-soft:#fff4e5;
-    --rp-teal:#0f766e; --rp-teal-soft:#e6f6f4;
-    --rp-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --rp-accent:#0B67B2; --rp-accent-dark:#08528F;
+    --rp-blue:#08528F; --rp-blue-soft:#E8F1FA;
+    --rp-green:#067647; --rp-green-soft:#ECFDF3;
+    --rp-red:#B42318; --rp-red-soft:#FEF3F2;
+    --rp-slate:#475467; --rp-slate-soft:#F2F4F7;
+    --rp-amber:#93370D; --rp-amber-soft:#FEF6E7;
+    --rp-teal:#0E6E64; --rp-teal-soft:#E6F6F4;
+    --rp-mono: var(--pm-mono, ui-monospace, monospace);
     color:var(--rp-text); font-size:.875rem;
 }
 .rp *:focus-visible { outline:2px solid var(--rp-accent); outline-offset:2px; }
@@ -518,7 +515,7 @@
 .rp-head-actions { display:flex; gap:.5rem; flex-wrap:wrap; }
 .rp-btn { display:inline-flex; align-items:center; justify-content:center; gap:.4rem; height:36px; padding:0 .9rem;
     font-size:.8125rem; font-weight:600; line-height:1; color:var(--rp-text); background:var(--rp-surface);
-    border:1px solid var(--rp-line); border-radius:7px; box-shadow:0 1px 1px rgba(15,23,42,.03);
+    border:1px solid var(--rp-line); border-radius:6px;
     white-space:nowrap; cursor:pointer; text-decoration:none; transition:background .15s, border-color .15s, color .15s; }
 .rp-btn:hover { background:var(--rp-subtle); border-color:#cbd5e1; color:var(--rp-ink); }
 .rp-btn--primary { background:var(--rp-accent); border-color:var(--rp-accent); color:#fff; }
@@ -526,42 +523,32 @@
 
 /* Filters */
 .rp-filters { display:flex; justify-content:space-between; align-items:flex-end; gap:.75rem 1rem; flex-wrap:wrap;
-    padding:.75rem .9rem; margin-bottom:1.1rem; background:var(--rp-surface); border:1px solid var(--rp-line); border-radius:12px; }
+    padding:.75rem .9rem; margin-bottom:1.1rem; background:var(--rp-surface); border:1px solid var(--rp-line); border-radius:8px; }
 .rp-presets { display:inline-flex; padding:3px; background:var(--rp-line-soft); border-radius:9px; flex-wrap:wrap; }
 .rp-preset { height:30px; padding:0 .8rem; font-size:.78rem; font-weight:600; color:var(--rp-muted);
     background:transparent; border:0; border-radius:7px; cursor:pointer; transition:background .15s, color .15s; }
 .rp-preset:hover { color:var(--rp-ink); }
-.rp-preset.is-active { background:var(--rp-surface); color:var(--rp-accent); box-shadow:0 1px 2px rgba(15,23,42,.08); }
+.rp-preset.is-active { background:var(--rp-surface); color:var(--rp-ink); box-shadow:0 1px 2px rgba(15,23,42,.08); }
 .rp-filter-fields { display:flex; align-items:flex-end; gap:.6rem; flex-wrap:wrap; }
 .rp-field { display:flex; flex-direction:column; gap:.2rem; margin:0; }
 .rp-field span { font-size:.68rem; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--rp-faint); }
 .rp-field input, .rp-field select { height:36px; padding:0 .6rem; font-size:.8125rem; color:var(--rp-ink);
     background:var(--rp-surface); border:1px solid var(--rp-line); border-radius:7px; min-width:0; }
 .rp-field select { min-width:170px; }
-.rp-field input:focus, .rp-field select:focus { outline:none; border-color:var(--rp-accent); box-shadow:0 0 0 3px rgba(25,118,210,.18); }
+.rp-field input:focus, .rp-field select:focus { outline:none; border-color:var(--rp-accent); box-shadow:0 0 0 3px rgba(11,103,178,.18); }
 
 /* KPIs */
-.rp-kpis { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:.9rem; margin:0 0 1.1rem; }
-.rp-kpi { padding:1rem 1.1rem; background:var(--rp-surface); border:1px solid var(--rp-line); border-radius:12px;
-    box-shadow:0 1px 2px rgba(15,23,42,.04); min-width:0; }
-.rp-kpi--blue   { --tone:#1976d2; }
-.rp-kpi--green  { --tone:#10b981; }
-.rp-kpi--violet { --tone:#7c3aed; }
-.rp-kpi--teal   { --tone:#0d9488; }
-.rp-kpi--slate  { --tone:#475569; }
-.rp-kpi--amber  { --tone:#f59e0b; background:linear-gradient(180deg,#fffbeb,var(--rp-surface)); }
-.rp-kpi-top { display:flex; align-items:center; gap:.55rem; margin-bottom:.6rem; }
-.rp-kpi-icon { display:grid; place-items:center; width:30px; height:30px; border-radius:8px; font-size:.9rem;
-    color:var(--tone); background:color-mix(in srgb, var(--tone) 12%, transparent); flex-shrink:0; }
-.rp-kpi-label { margin:0; font-size:.8rem; font-weight:600; line-height:1.3; color:var(--rp-text); }
-.rp-kpi-value { font-size:1.3rem; font-weight:700; letter-spacing:-.02em; color:var(--rp-ink);
+.rp-kpis { display:grid; grid-template-columns:repeat($1,minmax(0,1fr)); margin:0 0 1.1rem; overflow:hidden;
+    background:var(--rp-surface); border:1px solid var(--rp-line); border-radius:8px; }
+.rp-kpi { padding:.85rem 1.1rem; min-width:0; box-shadow:-1px -1px 0 0 var(--rp-line-soft); }
+.rp-kpi-label { margin:0 0 .3rem; font-size:.76rem; font-weight:500; line-height:1.3; color:var(--rp-muted); }
+.rp-kpi-value { font-size:1.35rem; font-weight:600; letter-spacing:-.02em; color:var(--rp-ink);
     font-variant-numeric:tabular-nums; overflow-wrap:anywhere; line-height:1.2; }
 .rp-kpi-foot { display:flex; align-items:center; gap:.45rem; margin-top:.35rem; flex-wrap:wrap; }
 .rp-kpi-sub { font-size:.72rem; color:var(--rp-muted); }
-.rp-delta { display:inline-flex; align-items:center; gap:.15rem; padding:.05rem .4rem; font-size:.68rem; font-weight:700;
-    border-radius:999px; color:var(--rp-muted); background:var(--rp-line-soft); font-variant-numeric:tabular-nums; }
-.rp-delta.is-good { color:#15803d; background:#dcfce7; }
-.rp-delta.is-bad  { color:#b91c1c; background:#fee2e2; }
+.rp-delta { font-size:.72rem; font-weight:600; color:var(--rp-muted); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.rp-delta.is-good { color:#067647; }
+.rp-delta.is-bad  { color:#B42318; }
 
 /* Cards & grids */
 .rp-grid { display:grid; gap:.9rem; margin-bottom:.9rem; }
@@ -569,18 +556,20 @@
 .rp-grid--3 { grid-template-columns:repeat(3,minmax(0,1fr)); }
 .rp-grid--2 { grid-template-columns:repeat(2,minmax(0,1fr)); }
 .rp-grid > .rp-card { margin-bottom:0; }
-.rp-card { background:var(--rp-surface); border:1px solid var(--rp-line); border-radius:12px; padding:1.1rem 1.2rem;
-    box-shadow:0 1px 2px rgba(15,23,42,.04); margin-bottom:.9rem; min-width:0; }
+.rp-card { background:var(--rp-surface); border:1px solid var(--rp-line); border-radius:8px; padding:1.1rem 1.2rem;
+    margin-bottom:.9rem; min-width:0; }
 .rp-card-head { display:flex; justify-content:space-between; align-items:flex-start; gap:.75rem; margin-bottom:.9rem; flex-wrap:wrap; }
-.rp-card-head h2 { margin:0; font-size:.95rem; font-weight:650; color:var(--rp-ink); }
-.rp-card-head h2 i { color:var(--rp-accent); margin-right:.3rem; }
+.rp-card-head h2 { margin:0; font-size:.95rem; font-weight:600; color:var(--rp-ink); }
 .rp-card-head small { display:block; margin-top:.15rem; font-size:.75rem; color:var(--rp-muted); }
 .rp-link { font-size:.78rem; font-weight:600; color:var(--rp-accent); text-decoration:none; white-space:nowrap; }
 .rp-link:hover { text-decoration:underline; }
 .rp-chart { position:relative; height:260px; }
 .rp-chart-key { display:flex; gap:.9rem; list-style:none; margin:0; padding:0; font-size:.75rem; color:var(--rp-muted); }
 .rp-chart-key li { display:flex; align-items:center; gap:.35rem; }
-.rp-chart-key i { width:10px; height:10px; border-radius:3px; }
+.rp-chart-key i { width:10px; height:10px; border-radius:2px; }
+.rp-chart-key b { font-weight:600; color:var(--rp-ink); font-variant-numeric:tabular-nums; }
+.rp-key-received { background:#0B67B2; }
+.rp-key-released { background:#009A85; }
 .rp-none { margin:.4rem 0 0; font-size:.8rem; color:var(--rp-faint); }
 .rp-empty { text-align:center; padding:2.2rem 1rem; color:var(--rp-muted); }
 .rp-empty i { display:block; font-size:2rem; color:var(--rp-faint); margin-bottom:.5rem; }
@@ -590,7 +579,7 @@
 .rp-footnote { margin:.8rem 0 0; font-size:.72rem; color:var(--rp-faint); }
 
 /* Status stack + legend */
-.rp-stack { display:flex; gap:2px; height:8px; border-radius:99px; overflow:hidden; background:var(--rp-line-soft); }
+.rp-stack { display:flex; gap:2px; height:8px; border-radius:4px; overflow:hidden; background:var(--rp-line-soft); }
 .rp-stack--lg { height:14px; border-radius:6px; }
 .rp-legend { list-style:none; margin:.6rem 0 0; padding:0; display:flex; flex-direction:column; gap:.25rem; }
 .rp-legend li { display:flex; align-items:center; gap:.45rem; font-size:.78rem; color:var(--rp-muted); }
@@ -599,32 +588,30 @@
 .rp-legend li em { width:3rem; text-align:right; font-style:normal; color:var(--rp-faint); font-variant-numeric:tabular-nums; }
 .rp-legend--lg { margin-top:.9rem; gap:.5rem; }
 .rp-legend--lg li { font-size:.8125rem; }
-.rp-mini-stats { display:grid; grid-template-columns:1fr 1fr; gap:.5rem; margin-top:1rem; padding-top:.9rem; border-top:1px dashed var(--rp-line); }
+.rp-mini-stats { display:grid; grid-template-columns:1fr 1fr; gap:.5rem; margin-top:1rem; padding-top:.9rem; border-top:1px solid var(--rp-line-soft); }
 .rp-mini-stats span { display:block; font-size:.7rem; color:var(--rp-muted); }
 .rp-mini-stats strong { font-size:1rem; color:var(--rp-ink); font-variant-numeric:tabular-nums; }
-.tone-green  { background:#10b981; }
-.tone-blue   { background:#1976d2; }
-.tone-violet { background:#7c3aed; }
-.tone-amber  { background:#f59e0b; }
-.tone-teal   { background:#14b8a6; }
+.tone-amber { background:#DC6803; }
+.tone-blue  { background:#0B67B2; }
+.tone-slate { background:#98A2B3; }
+.tone-green { background:#17B26A; }
+.tone-teal  { background:#009A85; }
 
 /* Inline bars */
 .rp-bars { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:.6rem; }
 .rp-bar-inline { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) 2rem; align-items:center; gap:.6rem; font-size:.8125rem; }
 .rp-bar-name { font-weight:500; color:var(--rp-ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .rp-bar-amt { font-weight:600; text-align:right; font-variant-numeric:tabular-nums; }
-.rp-bar-track { height:8px; border-radius:99px; background:var(--rp-line-soft); overflow:hidden; }
-.rp-bar-track span { display:block; height:100%; border-radius:99px; background:var(--rp-accent); }
-.rp-bar-track span.is-slow { background:#f59e0b; }
+.rp-bar-track { height:8px; border-radius:4px; background:var(--rp-line-soft); overflow:hidden; }
+.rp-bar-track span { display:block; height:100%; border-radius:4px; background:var(--rp-accent); }
+.rp-bar-track span.is-slow { background:#DC6803; }
 
 /* Aging */
 .rp-aging { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.5rem; margin-bottom:.8rem; max-width:560px; }
 .rp-aging > div { padding:.55rem .7rem; border-radius:8px; background:var(--rp-subtle); border:1px solid var(--rp-line-soft); }
 .rp-aging span { display:block; font-size:.7rem; color:var(--rp-muted); }
 .rp-aging strong { font-size:.95rem; color:var(--rp-ink); font-variant-numeric:tabular-nums; }
-.rp-aging .is-warn { background:var(--rp-amber-soft); border-color:#fed7aa; }
 .rp-aging .is-warn strong { color:var(--rp-amber); }
-.rp-aging .is-bad  { background:var(--rp-red-soft); border-color:#fecaca; }
 .rp-aging .is-bad strong { color:var(--rp-red); }
 
 /* Tables */
@@ -644,24 +631,24 @@
 .rp-nowrap { white-space:nowrap; }
 .rp-ok   { color:var(--rp-green); font-weight:600; }
 .rp-late { color:var(--rp-red); font-weight:600; }
-.rp-pill { display:inline-block; padding:.12rem .5rem; font-size:.66rem; font-weight:700; border-radius:999px;
+.rp-pill { display:inline-block; padding:.12rem .45rem; font-size:.68rem; font-weight:600; border-radius:4px;
     vertical-align:middle; white-space:nowrap; }
 small .rp-pill { margin-left:.3rem; }
 .rp-pill--blue   { background:var(--rp-blue-soft);   color:var(--rp-blue); }
-.rp-pill--violet { background:var(--rp-violet-soft); color:var(--rp-violet); }
+.rp-pill--slate-dark { background:var(--rp-slate-soft); color:var(--rp-slate); }
 .rp-pill--red    { background:var(--rp-red-soft);    color:var(--rp-red); }
 .rp-pill--green  { background:var(--rp-green-soft);  color:var(--rp-green); }
 .rp-pill--amber  { background:var(--rp-amber-soft);  color:var(--rp-amber); }
 .rp-pill--teal   { background:var(--rp-teal-soft);   color:var(--rp-teal); }
-.rp-pill--slate  { background:var(--rp-line-soft);   color:var(--rp-muted); }
-.rp-icon-btn { display:inline-grid; place-items:center; width:30px; height:30px; border-radius:7px; color:var(--rp-muted);
+.rp-pill--slate  { background:var(--rp-slate-soft); color:var(--rp-slate); }
+.rp-icon-btn { display:inline-grid; place-items:center; width:30px; height:30px; border-radius:6px; color:var(--rp-muted);
     border:1px solid var(--rp-line); background:var(--rp-surface); text-decoration:none; }
 .rp-icon-btn:hover { color:var(--rp-accent); border-color:var(--rp-accent); }
 .rp-search { position:relative; margin:0; }
 .rp-search i { position:absolute; left:.65rem; top:50%; transform:translateY(-50%); color:var(--rp-faint); font-size:.8rem; }
 .rp-search input { height:34px; width:260px; max-width:100%; padding:0 .6rem 0 1.9rem; font-size:.8125rem;
     border:1px solid var(--rp-line); border-radius:7px; }
-.rp-search input:focus { outline:none; border-color:var(--rp-accent); box-shadow:0 0 0 3px rgba(25,118,210,.18); }
+.rp-search input:focus { outline:none; border-color:var(--rp-accent); box-shadow:0 0 0 3px rgba(11,103,178,.18); }
 
 /* Responsive */
 @media (max-width: 1500px) {
@@ -758,16 +745,19 @@ document.addEventListener('DOMContentLoaded', function () {
                 labels: buckets.map(function (b) { return b.label; }),
                 datasets: [
                     { label: 'Received', data: buckets.map(function (b) { return b.received; }),
-                      backgroundColor: '#93c5fd', borderRadius: 4, maxBarThickness: 22 },
+                      backgroundColor: '#0B67B2', borderRadius: { topLeft: 4, topRight: 4 }, borderSkipped: 'bottom', borderWidth: { left: 1, right: 1 }, borderColor: '#FFFFFF', maxBarThickness: 18 },
                     { label: 'Released', data: buckets.map(function (b) { return b.released; }),
-                      backgroundColor: '#047857', borderRadius: 4, maxBarThickness: 22 }
+                      backgroundColor: '#009A85', borderRadius: { topLeft: 4, topRight: 4 }, borderSkipped: 'bottom', borderWidth: { left: 1, right: 1 }, borderColor: '#FFFFFF', maxBarThickness: 18 }
                 ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 interaction: { mode: 'index', intersect: false },
-                plugins: { legend: { display: false } },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { backgroundColor: '#FFFFFF', titleColor: '#10202E', bodyColor: '#5D6E80', borderColor: '#DDE4EC', borderWidth: 1, padding: 10, cornerRadius: 6, boxWidth: 8, boxHeight: 8, boxPadding: 4 }
+                },
                 scales: {
                     x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 11 }, maxRotation: 0, autoSkip: true } },
                     y: {

@@ -69,14 +69,14 @@
     --av-subtle:     #f8fafc;
 
     /* === Aligned with layout blue === */
-    --av-accent:     #1976d2;
-    --av-accent-dark:#1565c0;
-    --av-accent-soft:#e3f2fd;
+    --av-accent:     #0B67B2;
+    --av-accent-dark:#08528F;
+    --av-accent-soft:#E8F1FA;
 
     --av-danger:     #dc2626;
     --av-danger-soft:#fef2f2;
     --av-amber:      #b45309;
-    --av-blue:       #1976d2;
+    --av-blue:       #0B67B2;
 
     --av-radius:     14px;
     --av-radius-sm:  9px;
@@ -313,7 +313,7 @@
 .av-input:focus, .av-select:focus, .av-textarea:focus {
     outline: none;
     border-color: var(--av-accent);
-    box-shadow: 0 0 0 3px rgba(25, 118, 210, .15);
+    box-shadow: 0 0 0 3px rgba(11, 103, 178, .15);
 }
 
 .av-textarea {
@@ -567,14 +567,14 @@
     background: var(--av-accent);
     border-color: var(--av-accent);
     color: #fff;
-    box-shadow: 0 1px 2px rgba(25, 118, 210, .35);
+    box-shadow: 0 1px 2px rgba(11, 103, 178, .35);
 }
 
 .av-btn--primary:hover {
     background: var(--av-accent-dark);
     border-color: var(--av-accent-dark);
     color: #fff;
-    box-shadow: 0 4px 12px rgba(25, 118, 210, .28);
+    box-shadow: 0 4px 12px rgba(11, 103, 178, .28);
 }
 
 .av-btn--danger {
@@ -716,7 +716,7 @@
 
 .av-day.is-today {
     border-color: var(--av-accent);
-    box-shadow: 0 0 0 3px rgba(25, 118, 210, .14);
+    box-shadow: 0 0 0 3px rgba(11, 103, 178, .14);
 }
 
 .av-day-top {
@@ -779,7 +779,7 @@
     transition: width .35s ease;
 }
 
-.av-bar-row--lab  { --av-bar-color: #1976d2; }
+.av-bar-row--lab  { --av-bar-color: #0B67B2; }
 .av-bar-row--xray { --av-bar-color: #7c3aed; }
 
 .av-bar-row b { color: var(--av-ink); font-weight: 650; font-variant-numeric: tabular-nums; }
@@ -1128,7 +1128,7 @@
                     <?php else: ?>
 
                         <div class="av-legend">
-                            <span><i style="background:#1976d2;"></i> Laboratory</span>
+                            <span><i style="background:#0B67B2;"></i> Laboratory</span>
                             <span><i style="background:#7c3aed;"></i> X-Ray</span>
                             <span><i style="background:#d97706;"></i> Fully booked</span>
                             <span><i style="background:#fecaca;"></i> Holiday</span>

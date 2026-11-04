@@ -843,8 +843,9 @@ class Admin extends BaseController
                             ->with('error', 'Appointment not found');
         }
 
-        $data['lab_services']  = json_decode($data['appointment']['lab_services'], true) ?? [];
-        $data['xray_services'] = json_decode($data['appointment']['xray_services'], true) ?? [];
+        $data['lab_services']  = json_decode($data['appointment']['lab_services'] ?? '', true) ?? [];
+        $data['xray_services'] = json_decode($data['appointment']['xray_services'] ?? '', true) ?? [];
+        $data['patient']       = $this->patientForAppointment($data['appointment']);
 
         $data['statusClass'] = [
             'pending'   => 'warning',

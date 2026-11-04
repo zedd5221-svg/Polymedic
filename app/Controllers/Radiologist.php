@@ -188,7 +188,8 @@ class Radiologist extends BaseController
         $model->resetQuery();
         $data['weekly_data'] = $model->getWeeklyVolumeData();
 
-        $data['kpiTrends'] = $this->getKpiTrends(14, (int) $data['total']);
+        $data['kpiTrends']  = $this->getKpiTrends(14, (int) $data['total']);
+        $data['turnaround'] = $this->getTurnaroundStats(14);
 
         return view('Radiologist/dashboard', $data);
     }
@@ -239,8 +240,60 @@ class Radiologist extends BaseController
             'completed'   => $series('DATE(updated_at)', 'COUNT(*)', ['status' => 'completed']),
             'released'    => $series('DATE(released_at)', 'COUNT(*)', ['status' => 'released']),
             'total'       => $total,
+            'requested'   => $newTotal,
             'revenue_today' => $this->getXrayRevenueSeries($dates, false),
             'revenue_month' => $this->getXrayRevenueSeries($dates, true),
+        ];
+    }
+
+    /**
+     * Request-to-release turnaround for X-ray studies released in the
+     * last $days days: median, 90th percentile and a bucketed spread.
+     */
+    private function getTurnaroundStats(int $days): array
+    {
+        $since = date('Y-m-d 00:00:00', strtotime('-' . ($days - 1) . ' days'));
+
+        $rows = db_connect()->table('diagnostic_requests')
+            ->select('TIMESTAMPDIFF(MINUTE, created_at, released_at) AS m', false)
+            ->where('type', DiagnosticRequestModel::TYPE_XRAY)
+            ->where('status', DiagnosticRequestModel::STATUS_RELEASED)
+            ->where('released_at IS NOT NULL', null, false)
+            ->where('released_at >=', $since)
+            ->get()
+            ->getResultArray();
+
+        $minutes = [];
+        foreach ($rows as $r) {
+            if ($r['m'] !== null && (int) $r['m'] >= 0) {
+                $minutes[] = (int) $r['m'];
+            }
+        }
+        sort($minutes);
+
+        $n        = count($minutes);
+        $quantile = static function (float $q) use ($minutes, $n): ?float {
+            if ($n === 0) { return null; }
+            $pos  = ($n - 1) * $q;
+            $low  = (int) floor($pos);
+            $high = (int) ceil($pos);
+            return $minutes[$low] + ($minutes[$high] - $minutes[$low]) * ($pos - $low);
+        };
+
+        $buckets = ['Under 1 h' => 0, '1–4 h' => 0, '4–24 h' => 0, 'Over 24 h' => 0];
+        foreach ($minutes as $m) {
+            if ($m < 60)        { $buckets['Under 1 h']++; }
+            elseif ($m < 240)   { $buckets['1–4 h']++; }
+            elseif ($m < 1440)  { $buckets['4–24 h']++; }
+            else                { $buckets['Over 24 h']++; }
+        }
+
+        return [
+            'days'    => $days,
+            'count'   => $n,
+            'median'  => $quantile(0.5),
+            'p90'     => $quantile(0.9),
+            'buckets' => $buckets,
         ];
     }
 

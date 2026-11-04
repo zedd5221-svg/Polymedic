@@ -1,18 +1,21 @@
 <?php
 /* ------------------------------------------------------------------
-   Shared KPI board used by every role dashboard.
+   Shared KPI board used by every role dashboard. List pages use
+   the lighter partials/kpi_strip.
 
-   Four headline cards (value, change pill, 14-day bar chart) plus one
+   Headline cards (value, change, 14-day bar chart) plus an optional
    status card. Self-contained: it brings its own tokens and CSS, so
-   it renders the same inside any dashboard wrapper.
+   it renders the same inside any page wrapper.
 
    Data:
      $cards    list of [
-                 key, icon, color, label, value (number), money (bool),
-                 delta ('dod' | 'window' | null), goodUp (bool, default true),
+                 key, icon (bi-* class or legacy PNG name), label,
+                 value (number), money (bool),
+                 delta ('dod' | 'window' | 'sum' | null), goodUp (bool, default true),
                  context, unit, link (string|null)
                ]
      $trends   ['dates' => [...], <key> => [14 daily values], ...]
+               Without 'dates' the series are taken to end today.
      $pipeline [
                  title, sub, link, split (bool: statuses are mutually
                  exclusive, so draw the share bar and percentages),
@@ -24,6 +27,14 @@ $trends   = $trends ?? [];
 $pipeline = $pipeline ?? null;
 $kpiDates = $trends['dates'] ?? [];
 
+if (!$kpiDates) {
+    $lengths = array_map('count', array_filter($trends, 'is_array'));
+    $days    = $lengths ? max($lengths) : 0;
+    for ($i = $days - 1; $i >= 0; $i--) {
+        $kpiDates[] = date('Y-m-d', strtotime('-' . $i . ' days'));
+    }
+}
+
 /* Peso amount split into symbol / whole / cents so the cents can be de-emphasised. */
 $moneyHtml = static function (float $amount): string {
     $parts = explode('.', number_format($amount, 2));
@@ -34,12 +45,23 @@ $moneyHtml = static function (float $amount): string {
 /*
  * Change indicator for a series.
  *  'dod'    : today vs yesterday, as a percentage.
- *  'window' : absolute change across the whole series.
+ *  'window' : absolute change across the whole series (cumulative series).
+ *  'sum'    : total added across the whole series (daily-count series).
  * Returns ['text', 'dir' => up|down|flat, 'tone' => good|bad|neutral] or null.
  */
 $kpiDelta = static function (array $vals, string $mode, bool $goodUp, bool $money = false): ?array {
     $n = count($vals);
     if ($n < 2) { return null; }
+
+    if ($mode === 'sum') {
+        $added = array_sum($vals);
+        if ($added < 0.005) {
+            return ['text' => 'None', 'dir' => 'flat', 'tone' => 'neutral'];
+        }
+        $text = '+' . ($money ? '₱' . number_format($added, 2) : number_format($added));
+        return ['text' => $text, 'dir' => 'up', 'tone' => $goodUp ? 'good' : 'bad'];
+    }
+
     $cur  = (float) $vals[$n - 1];
     $prev = $mode === 'window' ? (float) $vals[0] : (float) $vals[$n - 2];
     $diff = $cur - $prev;
@@ -66,9 +88,23 @@ $deltaArrow = [
     'flat' => '<rect x="2" y="5.25" width="8" height="1.5" rx=".75"/>',
 ];
 $dayLabel = static fn($i) => isset($kpiDates[$i]) ? date('M j', strtotime($kpiDates[$i])) : '';
+
+/* Line icons replace the legacy clip-art PNGs; an unknown name falls back to the image. */
+$iconMap = [
+    'people-blue.png'       => 'bi-people',
+    'people-check-blue.png' => 'bi-person-check',
+    'document.png'          => 'bi-calendar2-check',
+    'file (1).png'          => 'bi-file-earmark-text',
+    'money-yellow.png'      => 'bi-cash-stack',
+    'clock (4).png'         => 'bi-hourglass-split',
+    'time.png'              => 'bi-clock-history',
+    'analysis.png'          => 'bi-clipboard2-pulse',
+];
 ?>
 
-<section class="kpi-board<?= $pipeline ? '' : ' kpi-board--cards-only' ?>" aria-labelledby="kpiHeading">
+<section class="kpi-board<?= $pipeline ? '' : ' kpi-board--cards-only' ?>"
+         style="--kpi-cols:<?= max(1, count($cards)) ?>"
+         aria-labelledby="kpiHeading">
     <h2 id="kpiHeading" class="visually-hidden">Key metrics</h2>
 
     <?php foreach ($cards as $card): ?>
@@ -87,11 +123,16 @@ $dayLabel = static fn($i) => isset($kpiDates[$i]) ? date('M j', strtotime($kpiDa
             $chartLabel = '14-day trend of ' . $card['unit'] . ': ' . $fmt(end($vals)) . ' today, peak ' . $fmt($peak);
             $tag = !empty($card['link']) ? 'a' : 'div';
         ?>
-        <<?= $tag ?> class="kpi-card"<?= !empty($card['link']) ? ' href="' . esc($card['link'], 'attr') . '"' : '' ?>
-            style="--kpi:<?= esc($card['color'], 'attr') ?>">
+        <?php /* Headline cards share one accent; per-card rainbow colours carried no meaning. */ ?>
+        <<?= $tag ?> class="kpi-card"<?= !empty($card['link']) ? ' href="' . esc($card['link'], 'attr') . '"' : '' ?>>
             <div class="kpi-head">
-                <img class="kpi-icon" src="<?= esc(base_url('assets/images/' . $card['icon']), 'attr') ?>"
-                     alt="" loading="lazy" decoding="async">
+                <?php $iconClass = strpos($card['icon'], 'bi-') === 0 ? $card['icon'] : ($iconMap[$card['icon']] ?? null); ?>
+                <?php if ($iconClass !== null): ?>
+                    <i class="bi <?= esc($iconClass, 'attr') ?> kpi-icon" aria-hidden="true"></i>
+                <?php else: ?>
+                    <img class="kpi-icon" src="<?= esc(base_url('assets/images/' . $card['icon']), 'attr') ?>"
+                         alt="" loading="lazy" decoding="async">
+                <?php endif; ?>
                 <h3 class="kpi-label" title="<?= esc($card['label'], 'attr') ?>"><?= esc($card['label']) ?></h3>
                 <?php if (!empty($card['link'])): ?>
                     <svg class="kpi-go" width="16" height="16" viewBox="0 0 24 24" fill="none"
@@ -195,31 +236,33 @@ $dayLabel = static fn($i) => isset($kpiDates[$i]) ? date('M j', strtotime($kpiDa
 /* ===== KPI BOARD (shared) ===== */
 
 .kpi-board {
-    --kb-surface:     #FFFFFF;
-    --kb-subtle:      #F1F5F9;
-    --kb-border:      #E2E8F0;
-    --kb-border-hi:   #CBD5E1;
-    --kb-text:        #0F172A;
-    --kb-text-soft:   #475569;
-    --kb-text-muted:  #94A3B8;
-    --kb-accent:      #1976d2;
-    --kb-accent-dark: #1565c0;
-    --kb-radius:      16px;
-    --kb-radius-sm:   10px;
-    --kb-shadow:      0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 14px -6px rgba(15, 23, 42, 0.06);
-    --kb-shadow-hi:   0 2px 4px rgba(15, 23, 42, 0.04), 0 14px 28px -10px rgba(15, 23, 42, 0.16);
+    --kb-surface:     var(--pm-surface, #FFFFFF);
+    --kb-subtle:      var(--pm-subtle, #EBF0F5);
+    --kb-border:      var(--pm-line, #DDE4EC);
+    --kb-border-hi:   var(--pm-line-strong, #C3CFDB);
+    --kb-text:        var(--pm-text, #10202E);
+    --kb-text-soft:   var(--pm-text-soft, #3B4C5E);
+    --kb-text-muted:  var(--pm-text-muted, #5D6E80);
+    --kb-accent:      var(--pm-accent, #0B67B2);
+    --kb-accent-dark: var(--pm-accent-hover, #08528F);
+    --kb-radius:      8px;
+    --kb-radius-sm:   6px;
+    --kb-shadow:      none;
+    --kb-shadow-hi:   none;
 
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(0, 2.1fr);
     gap: 16px;
     margin-bottom: 20px;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: var(--pm-font);
     color: var(--kb-text);
 }
 
-.kpi-board--cards-only { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.kpi-board--cards-only { grid-template-columns: repeat(var(--kpi-cols, 4), minmax(0, 1fr)); }
+
 
 .kpi-board .kpi-card {
+    --kpi: var(--kb-accent);
     position: relative;
     display: flex;
     flex-direction: column;
@@ -232,14 +275,12 @@ $dayLabel = static fn($i) => isset($kpiDates[$i]) ? date('M j', strtotime($kpiDa
     color: inherit;
     text-decoration: none;
     overflow: hidden;
-    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    transition: border-color 0.15s ease;
 }
 
 .kpi-board a.kpi-card:hover,
 .kpi-board a.kpi-card:focus-visible {
-    transform: translateY(-2px);
-    border-color: color-mix(in srgb, var(--kpi) 35%, var(--kb-border));
-    box-shadow: var(--kb-shadow-hi);
+    border-color: var(--kb-border-hi);
     color: inherit;
     text-decoration: none;
 }
@@ -253,11 +294,14 @@ $dayLabel = static fn($i) => isset($kpiDates[$i]) ? date('M j', strtotime($kpiDa
 }
 
 .kpi-board .kpi-icon {
-    flex: 0 0 24px;
-    width: 24px;
-    height: 24px;
+    flex: 0 0 18px;
+    width: 18px;
+    height: 18px;
     object-fit: contain;
     display: block;
+    font-size: 1rem;
+    line-height: 18px;
+    color: var(--kb-text-muted);
 }
 
 .kpi-board .kpi-label {
@@ -265,9 +309,8 @@ $dayLabel = static fn($i) => isset($kpiDates[$i]) ? date('M j', strtotime($kpiDa
     min-width: 0;
     margin: 0;
     font-size: 0.8rem;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 1.25;
-    letter-spacing: 0.01em;
     color: var(--kb-text-soft);
     white-space: nowrap;
     overflow: hidden;
@@ -282,15 +325,14 @@ $dayLabel = static fn($i) => isset($kpiDates[$i]) ? date('M j', strtotime($kpiDa
 
 .kpi-board .kpi-card:hover .kpi-go,
 .kpi-board .kpi-card:focus-visible .kpi-go {
-    color: var(--kpi);
-    transform: translate(1px, -1px);
+    color: var(--kb-text-soft);
 }
 
 .kpi-board .kpi-value {
     font-size: 1.75rem;
-    font-weight: 700;
+    font-weight: 600;
     line-height: 1.1;
-    letter-spacing: -0.03em;
+    letter-spacing: -0.02em;
     color: var(--kb-text);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -330,16 +372,15 @@ $dayLabel = static fn($i) => isset($kpiDates[$i]) ? date('M j', strtotime($kpiDa
     align-items: center;
     gap: 3px;
     flex-shrink: 0;
-    padding: 2px 7px;
-    border-radius: 999px;
-    font-weight: 650;
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
     line-height: 1.4;
 }
 
-.kpi-board .kpi-delta.is-good    { color: #047857; background: #D1FAE5; }
-.kpi-board .kpi-delta.is-bad     { color: #B91C1C; background: #FEE2E2; }
-.kpi-board .kpi-delta.is-neutral { color: var(--kb-text-soft); background: var(--kb-subtle); }
+/* Coloured text + arrow is enough; filled pills competed with the value. */
+.kpi-board .kpi-delta.is-good    { color: #067647; }
+.kpi-board .kpi-delta.is-bad     { color: #B42318; }
+.kpi-board .kpi-delta.is-neutral { color: var(--kb-text-soft); }
 
 .kpi-board .kpi-context {
     min-width: 0;
@@ -366,8 +407,8 @@ $dayLabel = static fn($i) => isset($kpiDates[$i]) ? date('M j', strtotime($kpiDa
 .kpi-board .kpi-bar {
     flex: 1 1 0;
     min-width: 0;
-    border-radius: 3px 3px 0 0;
-    background: color-mix(in srgb, var(--kpi) 28%, #FFFFFF);
+    border-radius: 1px 1px 0 0;
+    background: color-mix(in srgb, var(--kpi) 22%, #FFFFFF);
     transition: background-color 0.15s ease;
 }
 
@@ -408,7 +449,7 @@ $dayLabel = static fn($i) => isset($kpiDates[$i]) ? date('M j', strtotime($kpiDa
 .kpi-board .pipeline-title {
     margin: 0;
     font-size: 0.95rem;
-    font-weight: 700;
+    font-weight: 600;
     letter-spacing: -0.01em;
     color: var(--kb-text);
 }
@@ -436,8 +477,8 @@ $dayLabel = static fn($i) => isset($kpiDates[$i]) ? date('M j', strtotime($kpiDa
 .kpi-board .pipeline-bar {
     display: flex;
     gap: 2px;
-    height: 8px;
-    border-radius: 999px;
+    height: 6px;
+    border-radius: 2px;
     overflow: hidden;
     background: var(--kb-subtle);
     margin-bottom: 14px;
@@ -462,17 +503,17 @@ $dayLabel = static fn($i) => isset($kpiDates[$i]) ? date('M j', strtotime($kpiDa
     min-width: 0;
     padding: 10px 12px;
     border-radius: var(--kb-radius-sm);
-    background: color-mix(in srgb, var(--kpi) 6%, #FFFFFF);
-    border: 1px solid color-mix(in srgb, var(--kpi) 14%, #FFFFFF);
+    background: var(--kb-surface);
+    border: 1px solid var(--kb-border);
     color: inherit;
     text-decoration: none;
-    transition: border-color 0.2s ease, background-color 0.2s ease;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
 .kpi-board a.stage:hover,
 .kpi-board a.stage:focus-visible {
-    border-color: color-mix(in srgb, var(--kpi) 45%, #FFFFFF);
-    background: color-mix(in srgb, var(--kpi) 10%, #FFFFFF);
+    border-color: var(--kb-border-hi);
+    background: #F8FAFC;
     color: inherit;
     text-decoration: none;
 }
@@ -503,7 +544,7 @@ $dayLabel = static fn($i) => isset($kpiDates[$i]) ? date('M j', strtotime($kpiDa
     align-items: baseline;
     gap: 6px;
     font-size: 1.4rem;
-    font-weight: 700;
+    font-weight: 600;
     line-height: 1.1;
     letter-spacing: -0.02em;
     color: var(--kb-text);
@@ -526,14 +567,14 @@ $dayLabel = static fn($i) => isset($kpiDates[$i]) ? date('M j', strtotime($kpiDa
 }
 
 .kpi-board .stage-note strong {
-    color: color-mix(in srgb, var(--kpi) 75%, #0F172A);
-    font-weight: 650;
+    color: var(--kb-text-soft);
+    font-weight: 600;
 }
 
 /* ----- Responsive ----- */
 
 @media (max-width: 1600px) {
-    .kpi-board { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .kpi-board:not(.kpi-board--cards-only) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     .kpi-board .pipeline-card { grid-column: 1 / -1; }
 }
 

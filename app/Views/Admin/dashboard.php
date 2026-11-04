@@ -28,7 +28,7 @@ $monthlyRevenueVal = (float) ($monthlyRevenue ?? 0);
 $avgMonthlyRevenue = array_sum($revenueDataArr['values']) / max(1, count($revenueDataArr['values']));
 
 /* Only allow a colour value that is safe to place inside a style attribute. */
-$safeColor = static function ($color, $fallback = '#1976d2') {
+$safeColor = static function ($color, $fallback = '#0B67B2') {
     $color = is_string($color) ? trim($color) : '';
     if ($color !== '' && preg_match('/^(#[0-9A-Fa-f]{3,8}|rgba?\([0-9.,%\s]+\)|hsla?\([0-9.,%\sdegrad]+\)|[A-Za-z]{3,20})$/', $color)) {
         return $color;
@@ -52,7 +52,7 @@ $kpiBoard = [
         [
             'key'     => 'patients',
             'icon'    => 'people-blue.png',
-            'color'   => '#1976d2',
+            'color'   => '#0B67B2',
             'label'   => 'Total Patients',
             'value'   => (int) ($totalPatients ?? 0),
             'delta'   => 'window',
@@ -392,9 +392,9 @@ $kpiBoard = [
 
 .dashboard-wrapper,
 #toastContainer {
-    --db-accent:        #1976d2;
-    --db-accent-soft:   #e3f2fd;
-    --db-accent-dark:   #1565c0;
+    --db-accent:        #0B67B2;
+    --db-accent-soft:   #E8F1FA;
+    --db-accent-dark:   #08528F;
     --db-surface:       #FFFFFF;
     --db-canvas:        #f4f7fb;
     --db-subtle:        #F1F5F9;
@@ -412,7 +412,7 @@ $kpiBoard = [
 }
 
 .dashboard-wrapper {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: var(--pm-font);
     background: var(--db-canvas);
     padding: 24px;
     min-height: 100vh;
@@ -670,8 +670,8 @@ $kpiBoard = [
     height: 34px;
     font-size: 0.72rem;
     font-weight: 700;
-    color: #1565c0;
-    background: #e3f2fd;
+    color: #08528F;
+    background: #E8F1FA;
     border-radius: 50%;
 }
 
@@ -718,8 +718,8 @@ $kpiBoard = [
     background: #F1F5F9;
 }
 
-.pending-tag--laboratory { color: #1565c0; background: #e3f2fd; }
-.pending-tag--xray       { color: #6D28D9; background: #EDE9FE; }
+.pending-tag--laboratory { color: #08528F; background: #E8F1FA; }
+.pending-tag--xray       { color: #3B4C5E; background: #EBF0F5; }
 
 .pending-actions {
     display: flex;
@@ -756,11 +756,11 @@ $kpiBoard = [
 
 .pending-btn--approve {
     color: #FFFFFF;
-    background: #1976d2;
-    border: 1px solid #1976d2;
+    background: #0B67B2;
+    border: 1px solid #0B67B2;
 }
 
-.pending-btn--approve:hover { background: #1565c0; border-color: #1565c0; color: #FFFFFF; }
+.pending-btn--approve:hover { background: #08528F; border-color: #08528F; color: #FFFFFF; }
 
 .pending-pager {
     display: flex;
@@ -786,7 +786,7 @@ $kpiBoard = [
     transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.pager-btn:hover:not(:disabled) { color: #1976d2; background: #e3f2fd; border-color: #90caf9; }
+.pager-btn:hover:not(:disabled) { color: #0B67B2; background: #E8F1FA; border-color: #9DC4E8; }
 .pager-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .pager-status {
@@ -804,13 +804,13 @@ $kpiBoard = [
     padding: 0.45rem;
     font-size: 0.74rem;
     font-weight: 600;
-    color: #1976d2;
+    color: #0B67B2;
     text-decoration: none;
     border-radius: 7px;
     transition: background-color 0.15s ease;
 }
 
-.pending-all:hover { background: #e3f2fd; color: #1565c0; }
+.pending-all:hover { background: #E8F1FA; color: #08528F; }
 
 .visually-hidden {
     position: absolute; width: 1px; height: 1px;
@@ -953,23 +953,26 @@ $kpiBoard = [
 }
 
 /* ============================================
-   MODERN SKIN
+   THEME (pm-theme.css tokens)
    ============================================ */
 
 .dashboard-wrapper,
 #toastContainer {
-    --db-radius:       16px;
-    --db-radius-sm:    10px;
-    --db-shadow:       0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 14px -6px rgba(15, 23, 42, 0.06);
-    --db-shadow-hover: 0 2px 4px rgba(15, 23, 42, 0.04), 0 14px 28px -10px rgba(15, 23, 42, 0.16);
+    --db-canvas:       var(--pm-canvas, #F3F6F9);
+    --db-subtle:       var(--pm-subtle, #EBF0F5);
+    --db-border:       var(--pm-line, #DDE4EC);
+    --db-border-strong:var(--pm-line-strong, #C3CFDB);
+    --db-text:         var(--pm-text, #10202E);
+    --db-text-soft:    var(--pm-text-soft, #3B4C5E);
+    --db-text-muted:   var(--pm-text-muted, #5D6E80);
+    --db-radius:       8px;
+    --db-radius-sm:    6px;
+    --db-shadow:       none;
+    --db-shadow-hover: none;
 }
 
-.dashboard-wrapper {
-    background:
-        radial-gradient(900px 320px at 8% -80px, rgba(25, 118, 210, 0.08), transparent 70%),
-        radial-gradient(700px 300px at 100% -60px, rgba(37, 99, 235, 0.05), transparent 70%),
-        var(--db-canvas);
-}
+/* The layout already pads the content area; doubling it wasted the first 24px. */
+.dashboard-wrapper { padding: 0; min-height: 0; background: transparent; }
 
 .dash-head {
     display: flex;
@@ -993,47 +996,55 @@ $kpiBoard = [
     color: var(--db-text-muted);
 }
 
-.chart-card {
-    border-color: rgba(226, 232, 240, 0.9);
-    padding: 22px;
-    transition: box-shadow 0.2s ease;
-}
+.chart-card { padding: 20px; }
 
-.chart-card:hover { box-shadow: var(--db-shadow-hover); }
+.card-header { border-bottom: 0; padding-bottom: 0; margin-bottom: 16px; }
 
-.card-header { border-bottom: 0; padding-bottom: 0; margin-bottom: 18px; }
-
-.card-title svg {
-    box-sizing: content-box;
-    padding: 6px;
-    border-radius: 9px;
-    background: var(--db-accent-soft);
-}
+.card-title { font-weight: 600; }
+.card-title svg { color: var(--db-text-muted); }
 
 .badge-time {
-    border-radius: 999px;
-    background: #FFFFFF;
-    padding: 4px 11px;
+    background: transparent;
+    border: 0;
+    padding: 2px 0;
+    color: var(--db-text-muted);
+    font-weight: 500;
+    letter-spacing: 0;
 }
 
-.badge-pending { background: #FEF3C7; }
-
-.avg-box {
-    padding: 6px 12px;
-    border-radius: 10px;
-    background: var(--db-accent-soft);
+.badge-pending {
+    padding: 2px 8px;
+    border-radius: 4px;
+    color: #93370D;
+    background: #FEF0C7;
 }
-.avg-value { color: #1565c0; }
 
-.test-progress { height: 8px; border-radius: 999px; }
-.test-fill { border-radius: 999px; }
+.avg-label { color: var(--db-text-muted); }
+.avg-value { font-weight: 600; }
 
-.pending-item { border-radius: 12px; }
+/* Bars keep their data colour; neutral track, square ends */
+.test-progress { height: 6px; border-radius: 1px; }
+.test-fill { border-radius: 1px; }
 
-.btn-refresh {
-    border-radius: 10px;
-    box-shadow: var(--db-shadow);
+/* Pending list reads as rows, not a stack of floating cards */
+.pending-list { gap: 0; }
+.pending-item {
+    border: 0;
+    border-bottom: 1px solid var(--db-border);
+    border-radius: 0;
+    padding: 0.7rem 0;
+    animation: none;
 }
+.pending-item:hover { box-shadow: none; transform: none; border-color: var(--db-border); }
+.pending-avatar { color: var(--db-text-soft); background: var(--db-subtle); }
+.pending-name { font-size: 0.84rem; color: var(--db-text); }
+.pending-ref { font-family: var(--pm-mono, monospace); color: var(--db-text-muted); }
+.pending-meta { font-size: 0.74rem; color: var(--db-text-muted); }
+.pending-tag { border-radius: 4px; letter-spacing: 0.02em; }
+.pending-btn { border-radius: 6px; }
+.pending-pager { border-top: 0; }
+
+.btn-refresh { border-radius: 6px; }
 
 @media (max-width: 576px) {
     .dash-head { align-items: flex-start; }
@@ -1074,9 +1085,9 @@ const requestsData = <?= json_encode($requestsDataArr, $jsonFlags) ?>;
 // ============================================
 
 const DB_COLORS = {
-    accent:  '#1976d2',
-    accent2: '#1565c0',
-    success: '#10B981',
+    accent:  '#0B67B2',
+    accent2: '#08528F',
+    success: '#067647',
     muted:   '#E2E8F0',
     grid:    '#F1F5F9',
     tick:    '#94A3B8',
@@ -1105,14 +1116,14 @@ function dbCompactPeso(value) {
 }
 
 const dbBaseTooltip = {
-    backgroundColor: 'rgba(15, 23, 42, 0.94)',
+    backgroundColor: 'rgba(12, 45, 72, 0.95)',
     titleColor: '#F8FAFC',
     bodyColor: '#E2E8F0',
     footerColor: '#F8FAFC',
     borderColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
     padding: 12,
-    cornerRadius: 10,
+    cornerRadius: 6,
     boxPadding: 4,
     caretSize: 6,
     titleFont: { size: 12, weight: '600' },
@@ -1142,7 +1153,7 @@ const dbCrosshair = {
         ctx.save();
         ctx.beginPath();
         ctx.setLineDash([4, 4]);
-        ctx.strokeStyle = 'rgba(25, 118, 210, 0.35)';
+        ctx.strokeStyle = 'rgba(11, 103, 178, 0.35)';
         ctx.lineWidth = 1;
         ctx.moveTo(x, area.top);
         ctx.lineTo(x, area.bottom);
@@ -1277,9 +1288,9 @@ dbInitChart('revenueChart', {
             label: 'Revenue',
             data: revenueData.values,
             borderColor: DB_COLORS.accent,
-            backgroundColor: dbGradient('rgba(25, 118, 210, __A__)', 0.28, 0),
+            backgroundColor: dbGradient('rgba(11, 103, 178, __A__)', 0.10, 0),
             fill: true,
-            tension: 0.4,
+            tension: 0.25,
             pointBackgroundColor: DB_COLORS.accent,
             pointBorderColor: '#FFFFFF',
             pointBorderWidth: 2,
@@ -1287,7 +1298,7 @@ dbInitChart('revenueChart', {
             pointRadius: function (ctx) {
                 return ctx.dataIndex === ctx.dataset.data.length - 1 ? 5 : 0;
             },
-            borderWidth: 2.5
+            borderWidth: 2
         }]
     },
     plugins: [dbCrosshair],
@@ -1328,7 +1339,7 @@ const deptChart = dbInitChart('visitsChart', {
                 data: deptLab,
                 backgroundColor: DB_COLORS.accent,
                 hoverBackgroundColor: DB_COLORS.accent2,
-                borderRadius: { topLeft: 0, topRight: 0, bottomLeft: 6, bottomRight: 6 },
+                borderRadius: 0,
                 borderSkipped: false,
                 barPercentage: 0.7,
                 categoryPercentage: 0.8,
@@ -1338,9 +1349,9 @@ const deptChart = dbInitChart('visitsChart', {
             {
                 label: 'X-Ray',
                 data: deptXray,
-                backgroundColor: '#7C3AED',
-                hoverBackgroundColor: '#6D28D9',
-                borderRadius: { topLeft: 6, topRight: 6, bottomLeft: 0, bottomRight: 0 },
+                backgroundColor: '#7C8DA0',
+                hoverBackgroundColor: '#5D6E80',
+                borderRadius: { topLeft: 2, topRight: 2, bottomLeft: 0, bottomRight: 0 },
                 borderSkipped: false,
                 barPercentage: 0.7,
                 categoryPercentage: 0.8,
@@ -1412,7 +1423,7 @@ const requestsChart = dbInitChart('requestsChart', {
                 label: 'Requested',
                 data: requestsData.requested,
                 backgroundColor: DB_COLORS.accent,
-                borderRadius: 6,
+                borderRadius: 2,
                 borderSkipped: false,
                 barPercentage: 0.7,
                 categoryPercentage: 0.8,
@@ -1422,7 +1433,7 @@ const requestsChart = dbInitChart('requestsChart', {
                 label: 'Completed',
                 data: requestsData.completed,
                 backgroundColor: DB_COLORS.success,
-                borderRadius: 6,
+                borderRadius: 2,
                 borderSkipped: false,
                 barPercentage: 0.7,
                 categoryPercentage: 0.8,

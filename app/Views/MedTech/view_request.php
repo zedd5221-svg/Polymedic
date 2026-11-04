@@ -5,6 +5,10 @@
 <?= $this->section('medtechContent') ?>
 
 <?php
+/* ------------------------------------------------------------------
+   Laboratory request: one summary card (who + request facts), then
+   the results panel with the entry progress ring.
+   ------------------------------------------------------------------ */
 $isReleased = ($request['status'] === 'released');
 $status     = (string) $request['status'];
 
@@ -16,15 +20,16 @@ $statusLabel = [
     'released'    => 'Released',
 ][$status] ?? ucfirst($status);
 
+/* Same tones as the Lab requests list */
 $statusTone = [
-    'pending'     => 'amber',
-    'in_progress' => 'blue',
-    'draft'       => 'slate',
-    'completed'   => 'green',
-    'released'    => 'teal',
-][$status] ?? 'slate';
+    'pending'     => 'pending',
+    'in_progress' => 'progress',
+    'draft'       => 'draft',
+    'completed'   => 'completed',
+    'released'    => 'released',
+][$status] ?? 'draft';
 
-$refNo = 'LAB-' . date('Y') . '-' . str_pad((string) $request['id'], 4, '0', STR_PAD_LEFT);
+$refNo = 'LAB-' . date('y') . '-' . str_pad((string) $request['id'], 4, '0', STR_PAD_LEFT);
 
 /*
  * Group the merged result rows back under the service they came from.
@@ -60,20 +65,33 @@ foreach ($results as $row) {
 }
 
 $flagOptions = ['normal' => 'Normal', 'high' => 'High', 'low' => 'Low', 'critical' => 'Critical'];
-$technologist = esc(session()->get('full_name') ?: '—');
+
+/* The technologist on the request; the signed-in user until one is stamped. */
+$technologist = trim((string) ($request['med_tech_name'] ?? '')) ?: trim((string) (session()->get('full_name') ?? ''));
 
 /* Payment state passed by the controller. */
 $isPaid = !empty($isPaid ?? false);
 
-/*
- * Gender-based avatar for the hero.
- */
-$genderRaw = strtolower(trim((string) ($request['gender'] ?? '')));
-$isMale    = in_array($genderRaw, ['male', 'm', 'man', 'boy'], true);
-$isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
+$nameParts = preg_split('/\s+/', trim((string) ($request['patient_name'] ?? '')));
+$initials  = mb_strtoupper(mb_substr($nameParts[0] ?? '', 0, 1) . (count($nameParts) > 1 ? mb_substr(end($nameParts), 0, 1) : '')) ?: '?';
+
+$demo = implode(' · ', array_filter([
+    ($request['age'] ?? '') !== '' ? $request['age'] . ' y' : '',
+    trim((string) ($request['gender'] ?? '')),
+]));
+
+$labDate = static function ($value, string $format = 'M j, Y') {
+    $ts = empty($value) ? false : strtotime((string) $value);
+    return $ts ? date($format, $ts) : null;
+};
+$releasedOn = $labDate($request['released_at'] ?? null, 'M j, Y · g:i A');
 ?>
 
 <div class="lab<?= $isReleased ? ' lab--locked' : '' ?>">
+
+    <a href="<?= base_url('medtech/requests') ?>" class="lab-back">
+        <i class="bi bi-arrow-left" aria-hidden="true"></i>Lab requests
+    </a>
 
     <?php if (session()->getFlashdata('success')): ?>
         <div class="lab-msg lab-msg--ok">
@@ -103,142 +121,93 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
         </div>
     <?php endif; ?>
 
-
-    <?php /* ========================================================
-             PAYMENT WARNING
-             ======================================================== */ ?>
     <?php if (!$isPaid && !$isReleased): ?>
-        <div class="lab-msg lab-msg--err" role="alert">
-            <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+        <div class="lab-msg lab-msg--warn" role="alert">
+            <i class="bi bi-lock" aria-hidden="true"></i>
             <div>
-                <strong>This request has not been paid yet.</strong>
-                <p style="margin:.35rem 0 0;font-size:.8rem;">
-                    The receptionist must open the diagnostic-requests page and click
-                    <strong>Start</strong> before you can enter or release results.
-                    You can still view the request but saving will be refused.
-                </p>
+                <strong>Not paid yet</strong>
+                <p>The front desk must press <b>Start</b> on this request before results can be saved. You can still look it over.</p>
             </div>
         </div>
     <?php endif; ?>
 
     <?php if (!empty($assignedTo) && !$isReleased): ?>
-        <div class="lab-msg lab-msg--err" role="alert">
+        <div class="lab-msg lab-msg--warn" role="alert">
             <i class="bi bi-person-lock" aria-hidden="true"></i>
             <div>
-                <strong>Assigned to <?= esc($assignedTo) ?>.</strong>
-                <p style="margin:.35rem 0 0;font-size:.8rem;">
-                    The front desk sent this patient to another med tech.
-                    You can still view the request but saving will be refused.
-                </p>
+                <strong>Assigned to <?= esc($assignedTo) ?></strong>
+                <p>The front desk sent this patient to another med tech, so saving is turned off for you.</p>
             </div>
         </div>
     <?php endif; ?>
 
 
-    <!-- ============================================================
-         HERO
-         ============================================================ -->
-    <div class="lab-hero">
-        <div class="lab-hero-main">
-
-            <?php if ($isMale || $isFemale): ?>
-                <span class="lab-hero-avatar lab-hero-avatar--<?= $isFemale ? 'female' : 'male' ?>">
-                    <img src="<?= esc(base_url('assets/images/' . ($isFemale ? 'woman-avatar.png' : 'man-avatar.png')), 'attr') ?>"
-                         alt=""
-                         loading="lazy"
-                         decoding="async">
-                </span>
-            <?php else: ?>
-                <div class="lab-hero-icon" aria-hidden="true">
-                    <i class="bi bi-clipboard2-pulse"></i>
+    <!-- ===== SUMMARY: patient + request facts ===== -->
+    <section class="lab-card lab-summary" aria-label="Request summary">
+        <header class="lab-head">
+            <div class="lab-head-main">
+                <span class="lab-avatar" aria-hidden="true"><?= esc($initials) ?></span>
+                <div class="lab-head-text">
+                    <h1 class="lab-name"><?= esc($request['patient_name']) ?></h1>
+                    <p class="lab-meta">
+                        <?php if ($demo !== ''): ?>
+                            <span><?= esc($demo) ?></span>
+                            <span class="lab-sep" aria-hidden="true">·</span>
+                        <?php endif; ?>
+                        <span class="lab-mono"><?= esc($refNo) ?></span>
+                    </p>
                 </div>
-            <?php endif; ?>
-
-            <div class="lab-hero-text">
-                <div class="lab-hero-titleline">
-                    <h1 class="lab-hero-title"><?= esc($request['patient_name']) ?></h1>
-                    <?php if ($status === 'draft'): ?>
-                        <span class="lab-pill lab-pill--blue">
-                            <span class="lab-pill-dot" aria-hidden="true"></span>In progress
-                        </span>
-                    <?php endif; ?>
-                    <span class="lab-pill lab-pill--<?= esc($statusTone, 'attr') ?>">
-                        <span class="lab-pill-dot" aria-hidden="true"></span><?= esc($statusLabel) ?>
-                    </span>
-                </div>
-                <p class="lab-hero-sub">
-                    <span class="lab-ref"><?= esc($refNo) ?></span>
-                    <span class="lab-dot" aria-hidden="true"></span>
-                    <?= esc($request['age']) ?> / <?= esc($request['gender']) ?>
-                    <span class="lab-dot" aria-hidden="true"></span>
-                    Collected <?= date('M j, Y', strtotime($request['request_date'])) ?>
-                </p>
             </div>
-        </div>
 
-        <div class="lab-hero-actions">
-            <a href="<?= base_url('medtech/requests') ?>" class="lab-btn lab-btn--ghost">
-                <i class="bi bi-arrow-left" aria-hidden="true"></i>
-                <span>Back</span>
-            </a>
-            <a href="<?= base_url('medtech/request/print/' . (int) $request['id']) ?>"
-               target="_blank" rel="noopener"
-               class="lab-btn">
-                <i class="bi bi-printer" aria-hidden="true"></i>
-                <span>Print</span>
-            </a>
-            <?php if (!$isReleased): ?>
-                <button type="button" class="lab-btn lab-btn--go" onclick="releaseResult(<?= (int) $request['id'] ?>)">
-                    <i class="bi bi-check2-circle" aria-hidden="true"></i>
-                    <span>Release result</span>
-                </button>
-            <?php endif; ?>
-        </div>
-    </div>
+            <div class="lab-head-side">
+                <span class="lab-status lab-status--<?= esc($statusTone, 'attr') ?>"><?= esc($statusLabel) ?></span>
+                <a href="<?= base_url('medtech/request/print/' . (int) $request['id']) ?>"
+                   target="_blank" rel="noopener" class="lab-btn">
+                    <i class="bi bi-printer" aria-hidden="true"></i><span>Print</span>
+                </a>
+                <?php if (!$isReleased): ?>
+                    <button type="button" class="lab-btn lab-btn--go" onclick="releaseResult(<?= (int) $request['id'] ?>)">
+                        <i class="bi bi-check2-all" aria-hidden="true"></i><span>Release result</span>
+                    </button>
+                <?php endif; ?>
+            </div>
+        </header>
 
-
-    <!-- ============================================================
-         PATIENT STRIP
-         ============================================================ -->
-    <div class="lab-strip">
-        <div class="lab-strip-cell">
-            <span class="lab-strip-label">Patient</span>
-            <span class="lab-strip-value"><?= esc($request['patient_name']) ?></span>
-        </div>
-        <div class="lab-strip-cell">
-            <span class="lab-strip-label">Age / Sex</span>
-            <span class="lab-strip-value"><?= esc($request['age']) ?> / <?= esc($request['gender']) ?></span>
-        </div>
-        <div class="lab-strip-cell">
-            <span class="lab-strip-label">Date collected</span>
-            <span class="lab-strip-value"><?= date('M j, Y', strtotime($request['request_date'])) ?></span>
-        </div>
-        <div class="lab-strip-cell">
-            <span class="lab-strip-label">Technologist</span>
-            <span class="lab-strip-value"><?= $technologist ?></span>
-        </div>
-        <div class="lab-strip-cell">
-            <span class="lab-strip-label">Requesting MD</span>
-            <span class="lab-strip-value"><?= esc($request['doctor_name'] ?: '—') ?></span>
-        </div>
-        <div class="lab-strip-cell">
-            <span class="lab-strip-label">Reference</span>
-            <span class="lab-strip-value lab-mono"><?= esc($refNo) ?></span>
-        </div>
-    </div>
+        <dl class="lab-facts">
+            <div class="lab-fact">
+                <dt>Collected</dt>
+                <dd><?= esc($labDate($request['request_date'] ?? null) ?? '—') ?></dd>
+            </div>
+            <div class="lab-fact">
+                <dt>Requesting physician</dt>
+                <dd><?= trim((string) ($request['doctor_name'] ?? '')) !== '' ? esc($request['doctor_name']) : '<span class="lab-faint">Not given</span>' ?></dd>
+            </div>
+            <div class="lab-fact">
+                <dt>Medical technologist</dt>
+                <dd><?= $technologist !== '' ? esc($technologist) : '<span class="lab-faint">Unassigned</span>' ?></dd>
+            </div>
+            <div class="lab-fact">
+                <?php if ($isReleased): ?>
+                    <dt>Released</dt>
+                    <dd><?= esc($releasedOn ?? '—') ?></dd>
+                <?php else: ?>
+                    <dt>Payment</dt>
+                    <dd class="lab-pay lab-pay--<?= $isPaid ? 'ok' : 'due' ?>"><?= $isPaid ? 'Paid' : 'Not paid' ?></dd>
+                <?php endif; ?>
+            </div>
+        </dl>
+    </section>
 
 
-    <!-- ============================================================
-         REPORT PANEL
-         ============================================================ -->
-    <div class="lab-panel">
+    <!-- ===== RESULTS ===== -->
+    <div class="lab-card lab-panel">
 
         <div class="lab-panel-head">
             <div class="lab-panel-head-text">
-                <h2 class="lab-panel-title">Laboratory Results</h2>
+                <h2 class="lab-panel-title">Results</h2>
                 <span class="lab-panel-count">
                     <?= number_format($totalTests) ?> <?= $totalTests === 1 ? 'test' : 'tests' ?>
-                    across
+                    <span class="lab-sep" aria-hidden="true">·</span>
                     <?= number_format(count($grouped)) ?> <?= count($grouped) === 1 ? 'service' : 'services' ?>
                     <?php if ($abnormalCount > 0): ?>
                         <span class="lab-abn-pill">
@@ -250,19 +219,22 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
             </div>
 
             <?php if (!$isReleased): ?>
-                <div class="lab-progress" id="labProgress"
-                     data-total="<?= (int) $totalTests ?>"
-                     data-filled="<?= (int) $filledTests ?>"
-                     role="img"
-                     aria-label="<?= (int) $filledTests ?> of <?= (int) $totalTests ?> results entered">
-                    <svg viewBox="0 0 44 44" class="lab-ring" aria-hidden="true">
-                        <circle class="lab-ring-bg" cx="22" cy="22" r="18"></circle>
-                        <circle class="lab-ring-fg" cx="22" cy="22" r="18"
-                                style="--pct: <?= (int) $pct ?>"></circle>
-                    </svg>
-                    <div class="lab-progress-text">
-                        <span class="lab-progress-num" id="labProgressNum"><?= (int) $filledTests ?></span>
-                        <span class="lab-progress-of">/ <?= (int) $totalTests ?></span>
+                <div class="lab-progress-wrap">
+                    <span class="lab-progress-label">Entered</span>
+                    <div class="lab-progress<?= $totalTests > 0 && $filledTests === $totalTests ? ' is-done' : '' ?>" id="labProgress"
+                         data-total="<?= (int) $totalTests ?>"
+                         data-filled="<?= (int) $filledTests ?>"
+                         role="img"
+                         aria-label="<?= (int) $filledTests ?> of <?= (int) $totalTests ?> results entered">
+                        <svg viewBox="0 0 44 44" class="lab-ring" aria-hidden="true">
+                            <circle class="lab-ring-bg" cx="22" cy="22" r="18"></circle>
+                            <circle class="lab-ring-fg" cx="22" cy="22" r="18"
+                                    style="--pct: <?= (int) $pct ?>"></circle>
+                        </svg>
+                        <div class="lab-progress-text">
+                            <span class="lab-progress-num" id="labProgressNum"><?= (int) $filledTests ?></span>
+                            <span class="lab-progress-of">/<?= (int) $totalTests ?></span>
+                        </div>
                     </div>
                 </div>
             <?php endif; ?>
@@ -344,13 +316,8 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
             <div class="lab-sign">
                 <div class="lab-sign-col">
                     <div class="lab-sign-line"></div>
-                    <div class="lab-sign-name"><?= esc(session()->get('full_name') ?: 'Medical Technologist') ?></div>
-                    <div class="lab-sign-role">Medical Technologist</div>
-                </div>
-                <div class="lab-sign-col">
-                    <div class="lab-sign-line"></div>
-                    <div class="lab-sign-name"><?= esc($request['doctor_name'] ?: 'Pathologist') ?></div>
-                    <div class="lab-sign-role">Pathologist</div>
+                    <div class="lab-sign-name"><?= esc($technologist !== '' ? $technologist : 'Medical Technologist') ?></div>
+                    <div class="lab-sign-role">Medical Technologist<?= $releasedOn ? ' · Released ' . esc($releasedOn) : '' ?></div>
                 </div>
             </div>
 
@@ -616,46 +583,42 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
 
 <style>
 /* =========================================================
-   LABORATORY REPORT
+   LABORATORY REQUEST (theme tokens from pm-theme.css)
    ========================================================= */
 
 .lab {
-    --lab-ink:         #0f172a;
-    --lab-text:        #334155;
-    --lab-muted:       #64748b;
-    --lab-faint:       #94a3b8;
-    --lab-line:        #e2e8f0;
-    --lab-line-soft:   #f1f5f9;
-    --lab-surface:     #ffffff;
-    --lab-canvas:      #f8fafc;
-    --lab-rail:        #f9fafb;
+    --lab-ink:         var(--pm-text, #10202E);
+    --lab-text:        var(--pm-text-soft, #3B4C5E);
+    --lab-muted:       var(--pm-text-muted, #5D6E80);
+    --lab-faint:       #7A8B9D;
+    --lab-line:        var(--pm-line, #DDE4EC);
+    --lab-strong:      var(--pm-line-strong, #C3CFDB);
+    --lab-line-soft:   #EBF0F5;
+    --lab-surface:     #FFFFFF;
+    --lab-canvas:      #F8FAFC;
 
-    --lab-accent:      #0d9488;
-    --lab-accent-dark: #0f766e;
-    --lab-accent-soft: #e6fbf6;
+    --lab-accent:      var(--pm-accent, #0B67B2);
+    --lab-accent-dark: var(--pm-accent-hover, #08528F);
+    --lab-accent-soft: #E8F1FA;
 
-    --lab-danger:      #dc2626;
-    --lab-danger-soft: #fef2f2;
-    --lab-amber:       #b45309;
-    --lab-amber-soft:  #fef3c7;
-    --lab-green:       #047857;
-    --lab-green-soft:  #ecfdf5;
-    --lab-blue:        #1d4ed8;
-    --lab-blue-soft:   #eff6ff;
+    --lab-danger:      #B42318;
+    --lab-danger-soft: #FEF3F2;
+    --lab-amber:       #93370D;
+    --lab-amber-soft:  #FEF6E7;
+    --lab-green:       #067647;
+    --lab-green-soft:  #ECFDF3;
+    --lab-blue:        #08528F;
+    --lab-blue-soft:   #E8F1FA;
 
-    --lab-radius:      14px;
-    --lab-radius-sm:   9px;
-    --lab-mono:        ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --lab-radius:      10px;
+    --lab-radius-sm:   6px;
+    --lab-mono:        var(--pm-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
 
-    --lab-shadow:      0 1px 2px rgba(15, 23, 42, 0.04);
-
+    max-width: 1180px;
+    margin: 0 auto;
     color: var(--lab-text);
-    -webkit-font-smoothing: antialiased;
-    width: 100%;
-    max-width: 100%;
+    font-size: 0.875rem;
     min-width: 0;
-    display: block;
-    box-sizing: border-box;
 }
 
 .lab *,
@@ -674,7 +637,28 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
     clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
 
-.lab-mono { font-family: var(--lab-mono); }
+.lab-mono  { font-family: var(--lab-mono); font-size: 0.78rem; }
+.lab-faint { color: var(--lab-faint); }
+.lab-sep   { color: var(--lab-strong); }
+
+.lab-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--lab-muted);
+    text-decoration: none;
+}
+
+.lab-back:hover { color: var(--lab-ink); }
+
+.lab-card {
+    background: var(--lab-surface);
+    border: 1px solid var(--lab-line);
+    border-radius: var(--lab-radius);
+}
 
 /* ---------- Messages ---------- */
 
@@ -682,159 +666,143 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
     display: flex;
     align-items: flex-start;
     gap: 0.65rem;
-    padding: 0.8rem 1rem;
-    margin-bottom: 1rem;
-    font-size: 0.85rem;
+    padding: 0.75rem 0.95rem;
+    margin-bottom: 0.85rem;
+    font-size: 0.82rem;
     line-height: 1.5;
+    border: 1px solid;
     border-radius: var(--lab-radius-sm);
 }
 
-.lab-msg > i:first-child { margin-top: 0.15rem; }
+.lab-msg > i:first-child { margin-top: 0.1rem; }
 .lab-msg > div { min-width: 0; }
-.lab-msg strong { display: block; margin-bottom: 0.35rem; }
+.lab-msg strong { display: block; font-weight: 600; }
+.lab-msg p { margin: 0.15rem 0 0; }
 .lab-msg ul { margin: 0.3rem 0 0; padding-left: 1.1rem; }
 
-.lab-msg--ok  { background: var(--lab-green-soft);  color: #166534; border: 1px solid #bbf7d0; }
-.lab-msg--err { background: var(--lab-danger-soft); color: #991b1b; border: 1px solid #fecaca; }
+.lab-msg--ok   { color: var(--lab-green);  background: var(--lab-green-soft);  border-color: #ABEFC6; }
+.lab-msg--err  { color: var(--lab-danger); background: var(--lab-danger-soft); border-color: #FECDCA; }
+.lab-msg--warn { color: var(--lab-amber);  background: var(--lab-amber-soft);  border-color: #FEDF89; }
 
-/* ---------- Hero ---------- */
+/* ---------- Summary ---------- */
 
-.lab-hero {
+.lab-summary { margin-bottom: 1rem; overflow: hidden; }
+
+.lab-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 1.25rem;
+    gap: 1rem;
     flex-wrap: wrap;
     padding: 1.1rem 1.25rem;
-    margin-bottom: 0.85rem;
-    background:
-        radial-gradient(120% 140% at 0% 0%, #f0fdfa 0%, rgba(240, 253, 250, 0) 55%),
-        var(--lab-surface);
-    border: 1px solid var(--lab-line);
-    border-radius: var(--lab-radius);
-    box-shadow: var(--lab-shadow);
 }
 
-.lab-hero-main {
-    display: flex;
-    align-items: center;
-    gap: 0.9rem;
-    min-width: 0;
-}
+.lab-head-main { display: flex; align-items: center; gap: 0.9rem; min-width: 0; }
+.lab-head-text { min-width: 0; }
 
-.lab-hero-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 46px;
-    height: 46px;
+.lab-avatar {
+    display: grid;
+    place-items: center;
     flex-shrink: 0;
-    font-size: 1.35rem;
-    color: var(--lab-accent-dark);
-    background: var(--lab-accent-soft);
-    border: 1px solid rgba(13, 148, 136, 0.18);
-    border-radius: var(--lab-radius-sm);
-}
-
-.lab-hero-avatar {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 46px;
-    height: 46px;
-    flex-shrink: 0;
-    overflow: hidden;
+    width: 48px;
+    height: 48px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    color: var(--lab-ink);
+    background: #E3EAF2;
     border-radius: 50%;
-    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.06);
 }
 
-.lab-hero-avatar--male   {
-    background: #eaf2fe;
-    box-shadow: inset 0 0 0 1px rgba(29, 78, 216, 0.12);
-}
-
-.lab-hero-avatar--female {
-    background: #fce9ee;
-    box-shadow: inset 0 0 0 1px rgba(179, 46, 80, 0.12);
-}
-
-.lab-hero-avatar img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-}
-
-.lab-hero-text { min-width: 0; }
-
-.lab-hero-titleline {
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
-    flex-wrap: wrap;
-}
-
-.lab-hero-title {
+.lab-name {
     margin: 0;
-    font-size: 1.2rem;
-    font-weight: 700;
-    letter-spacing: -0.02em;
+    font-size: 1.3rem;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    line-height: 1.25;
     color: var(--lab-ink);
     overflow-wrap: anywhere;
 }
 
-.lab-hero-sub {
+.lab-meta {
     display: flex;
-    align-items: center;
     flex-wrap: wrap;
-    gap: 0.4rem;
-    margin: 0.2rem 0 0;
-    font-size: 0.8rem;
+    align-items: center;
+    gap: 0.25rem 0.45rem;
+    margin: 0.3rem 0 0;
+    font-size: 0.8125rem;
     color: var(--lab-muted);
 }
 
-.lab-dot {
-    width: 3px;
-    height: 3px;
-    border-radius: 50%;
-    background: var(--lab-faint);
-}
+.lab-meta .lab-mono { color: var(--lab-ink); font-weight: 500; }
 
-.lab-ref {
-    font-family: var(--lab-mono);
-    font-size: 0.76rem;
-    font-weight: 600;
-    color: var(--lab-ink);
-}
+.lab-head-side { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 
-.lab-hero-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-}
-
-/* ---------- Status pill ---------- */
-
-.lab-pill {
+.lab-status {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    padding: 0.2rem 0.6rem;
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    border-radius: 999px;
+    gap: 0.4rem;
+    margin-right: 0.25rem;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.74rem;
+    font-weight: 600;
     white-space: nowrap;
+    color: var(--fg);
+    background: var(--bg);
+    border-radius: 4px;
 }
 
-.lab-pill-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.lab-status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--dot); }
 
-.lab-pill--amber { background: var(--lab-amber-soft);  color: var(--lab-amber); }
-.lab-pill--blue  { background: var(--lab-blue-soft);   color: var(--lab-blue); }
-.lab-pill--green { background: var(--lab-green-soft);  color: var(--lab-green); }
-.lab-pill--teal  { background: var(--lab-accent-soft); color: var(--lab-accent-dark); }
-.lab-pill--slate { background: var(--lab-line-soft);   color: var(--lab-muted); }
+.lab-status--pending   { --bg: #FEF6E7; --fg: #93370D; --dot: #DC6803; }
+.lab-status--progress  { --bg: #E8F1FA; --fg: #08528F; --dot: #0B67B2; }
+.lab-status--draft     { --bg: #F2F4F7; --fg: #475467; --dot: #98A2B3; }
+.lab-status--completed { --bg: #ECFDF3; --fg: #067647; --dot: #17B26A; }
+.lab-status--released  { --bg: #E6F6F3; --fg: #00715F; --dot: #009A85; }
+
+/* Request facts: one hairline row */
+.lab-facts {
+    display: flex;
+    flex-wrap: wrap;
+    margin: 0;
+    overflow: hidden;
+    border-top: 1px solid var(--lab-line-soft);
+}
+
+.lab-fact {
+    flex: 1 1 170px;
+    min-width: 0;
+    margin: 0 0 0 -1px;
+    padding: 0.7rem 1.25rem 0.75rem;
+    border-left: 1px solid var(--lab-line-soft);
+    box-shadow: 0 -1px 0 0 var(--lab-line-soft);
+}
+
+.lab-fact dt {
+    margin: 0;
+    font-size: 0.66rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--lab-faint);
+}
+
+.lab-fact dd {
+    margin: 0.2rem 0 0;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--lab-ink);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.lab-pay { display: flex; align-items: center; gap: 0.4rem; }
+.lab-pay::before { content: ""; width: 7px; height: 7px; border-radius: 50%; }
+.lab-pay--ok::before  { background: #17B26A; }
+.lab-pay--due         { color: var(--lab-amber) !important; }
+.lab-pay--due::before { background: #DC6803; }
 
 /* ---------- Buttons ---------- */
 
@@ -842,88 +810,42 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.45rem;
-    height: 36px;
-    padding: 0 0.9rem;
-    font-size: 0.8125rem;
+    gap: 0.4rem;
+    height: 34px;
+    padding: 0 0.85rem;
+    font-size: 0.8rem;
     font-weight: 600;
     line-height: 1;
     color: var(--lab-ink);
     background: var(--lab-surface);
     border: 1px solid var(--lab-line);
     border-radius: var(--lab-radius-sm);
-    box-shadow: 0 1px 1px rgba(15, 23, 42, 0.03);
     white-space: nowrap;
     text-decoration: none;
     cursor: pointer;
-    transition: background-color 0.15s ease, border-color 0.15s ease,
-                color 0.15s ease, transform 0.12s ease;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.lab-btn:hover { background: var(--lab-canvas); border-color: #cbd5e1; color: var(--lab-ink); }
-.lab-btn:active { transform: translateY(1px); }
-.lab-btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+.lab-btn:hover { background: var(--lab-canvas); border-color: var(--lab-strong); color: var(--lab-ink); }
+.lab-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .lab-btn i { font-size: 0.9em; }
 
-.lab-btn--ghost { background: transparent; border-color: var(--lab-line); color: var(--lab-muted); }
-.lab-btn--ghost:hover { background: var(--lab-line-soft); color: var(--lab-ink); }
+.lab-btn--ghost { color: var(--lab-muted); }
+.lab-btn--ghost:hover { color: var(--lab-ink); }
 
-.lab-btn--go {
-    color: #ffffff;
-    background: var(--lab-accent);
-    border-color: var(--lab-accent);
-    box-shadow: 0 1px 2px rgba(13, 148, 136, 0.28);
-}
+.lab-btn--go { color: #FFFFFF; background: var(--lab-accent); border-color: var(--lab-accent); }
+.lab-btn--go:hover { color: #FFFFFF; background: var(--lab-accent-dark); border-color: var(--lab-accent-dark); }
 
-.lab-btn--go:hover { background: var(--lab-accent-dark); border-color: var(--lab-accent-dark); color: #ffffff; }
+/* ---------- Results panel ---------- */
 
-/* ---------- Patient strip ---------- */
-
-.lab-strip {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 1rem 1.25rem;
-    padding: 1rem 1.25rem;
-    margin-bottom: 0.85rem;
-    background: var(--lab-surface);
-    border: 1px solid var(--lab-line);
-    border-radius: var(--lab-radius);
-    box-shadow: var(--lab-shadow);
-}
-
-.lab-strip-cell { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
-
-.lab-strip-label {
-    font-size: 0.66rem;
-    font-weight: 700;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-    color: var(--lab-faint);
-}
-
-.lab-strip-value {
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: var(--lab-ink);
-    overflow-wrap: anywhere;
-}
-
-/* ---------- Panel ---------- */
-
-.lab-panel {
-    background: var(--lab-surface);
-    border: 1px solid var(--lab-line);
-    border-radius: var(--lab-radius);
-    box-shadow: var(--lab-shadow);
-    overflow: hidden;
-}
+.lab-panel { overflow: hidden; }
 
 .lab-panel-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    padding: 1.1rem 1.25rem;
+    padding: 0.9rem 1.25rem;
     border-bottom: 1px solid var(--lab-line);
 }
 
@@ -931,9 +853,8 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
 
 .lab-panel-title {
     margin: 0 0 0.15rem;
-    font-size: 1rem;
-    font-weight: 700;
-    letter-spacing: -0.01em;
+    font-size: 0.95rem;
+    font-weight: 600;
     color: var(--lab-ink);
 }
 
@@ -941,31 +862,42 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
     display: inline-flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 0.45rem;
+    gap: 0.4rem;
     font-size: 0.78rem;
     color: var(--lab-muted);
+    font-variant-numeric: tabular-nums;
 }
 
 .lab-abn-pill {
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
-    padding: 0.12rem 0.5rem;
+    margin-left: 0.2rem;
+    padding: 0.1rem 0.45rem;
     font-size: 0.7rem;
-    font-weight: 700;
+    font-weight: 600;
     color: var(--lab-danger);
     background: var(--lab-danger-soft);
-    border: 1px solid #fecaca;
-    border-radius: 999px;
+    border-radius: 4px;
 }
 
 /* ---------- Progress ring ---------- */
 
+.lab-progress-wrap { display: flex; align-items: center; gap: 0.6rem; flex-shrink: 0; }
+
+.lab-progress-label {
+    font-size: 0.66rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--lab-faint);
+}
+
 .lab-progress {
     position: relative;
     flex-shrink: 0;
-    width: 52px;
-    height: 52px;
+    width: 50px;
+    height: 50px;
 }
 
 .lab-ring { width: 100%; height: 100%; transform: rotate(-90deg); }
@@ -976,14 +908,16 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
     stroke-linecap: round;
 }
 
-.lab-ring-bg { stroke: var(--lab-line); }
+.lab-ring-bg { stroke: var(--lab-line-soft); }
 
 .lab-ring-fg {
     stroke: var(--lab-accent);
     stroke-dasharray: 113.1;
     stroke-dashoffset: calc(113.1 - (113.1 * var(--pct, 0) / 100));
-    transition: stroke-dashoffset 0.4s ease;
+    transition: stroke-dashoffset 0.4s ease, stroke 0.2s ease;
 }
+
+.lab-progress.is-done .lab-ring-fg { stroke: #17B26A; }
 
 .lab-progress-text {
     position: absolute;
@@ -991,13 +925,12 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 1px;
     font-size: 0.62rem;
     font-variant-numeric: tabular-nums;
-    color: var(--lab-muted);
+    color: var(--lab-faint);
 }
 
-.lab-progress-num { font-size: 0.8rem; font-weight: 700; color: var(--lab-ink); }
+.lab-progress-num { font-size: 0.8rem; font-weight: 600; color: var(--lab-ink); }
 
 /* ---------- Table ---------- */
 
@@ -1013,10 +946,10 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
     position: sticky;
     top: 0;
     z-index: 3;
-    padding: 0.65rem 0.9rem;
+    padding: 0.6rem 0.9rem;
     font-size: 0.66rem;
-    font-weight: 700;
-    letter-spacing: 0.07em;
+    font-weight: 600;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     text-align: left;
     color: var(--lab-faint);
@@ -1036,6 +969,8 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
 .lab-right  { text-align: right; }
 .lab-center { text-align: center; }
 
+.lab-table thead th.lab-right { text-align: right; }
+
 .lab-w-test   { width: 24%; }
 .lab-w-result { width: 16%; }
 .lab-w-unit   { width: 14%; }
@@ -1043,13 +978,14 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
 .lab-w-flag   { width: 16%; }
 .lab-w-action { width: 56px; }
 
-.lab-cell-name { font-weight: 600; color: var(--lab-ink); }
+.lab-cell-name { font-weight: 500; color: var(--lab-ink); }
 .lab-cell-soft { color: var(--lab-muted); font-size: 0.8rem; }
 
-.lab-bad { font-weight: 700; color: var(--lab-danger); }
-.lab-row.is-bad { background: #fffbfb; }
+.lab-table td.lab-right { font-variant-numeric: tabular-nums; }
+.lab-bad { font-weight: 600; color: var(--lab-danger); }
+.lab-row.is-bad td { background: #FFFBFA; }
 
-.lab-req { color: var(--lab-danger); font-weight: 700; }
+.lab-req { color: var(--lab-danger); font-weight: 600; }
 
 /* ---------- Service groups ---------- */
 
@@ -1058,46 +994,47 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
     top: 33px;
     z-index: 2;
     padding: 0.55rem 0.9rem !important;
-    background: linear-gradient(90deg, #f6fdfb 0%, var(--lab-canvas) 60%);
+    background: var(--lab-surface);
     border-top: 1px solid var(--lab-line);
-    border-bottom: 1px solid var(--lab-line);
+    border-bottom: 1px solid var(--lab-line-soft);
 }
 
 .lab-group:first-of-type .lab-group-head td { border-top: 0; }
 
+/* Lab dot, the same marker the worklists use for laboratory */
 .lab-group-bar {
     display: inline-block;
-    width: 3px;
-    height: 13px;
+    width: 8px;
+    height: 8px;
     margin-right: 0.5rem;
-    vertical-align: -2px;
-    background: var(--lab-accent);
+    vertical-align: 1px;
+    background: #0B67B2;
     border-radius: 2px;
 }
 
 .lab-group-name {
-    font-size: 0.76rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--lab-accent-dark);
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--lab-ink);
 }
 
 .lab-group-count {
     margin-left: 0.5rem;
-    font-size: 0.7rem;
+    font-size: 0.72rem;
     color: var(--lab-faint);
     font-variant-numeric: tabular-nums;
 }
 
 .lab-group-progress {
-    margin-left: 0.5rem;
-    font-size: 0.7rem;
-    font-weight: 600;
+    float: right;
+    font-size: 0.72rem;
+    font-weight: 500;
     color: var(--lab-faint);
+    font-variant-numeric: tabular-nums;
 }
 
 .lab-group-progress.is-done { color: var(--lab-green); }
+.lab-group-progress.is-done::before { content: "\2713\00a0"; }
 
 .lab-group-toggle {
     display: inline-flex;
@@ -1105,7 +1042,7 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
     justify-content: center;
     width: 20px;
     height: 20px;
-    margin-right: 0.15rem;
+    margin-right: 0.25rem;
     vertical-align: -4px;
     font-size: 0.7rem;
     color: var(--lab-muted);
@@ -1116,7 +1053,7 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
     transition: transform 0.18s ease, background-color 0.15s ease;
 }
 
-.lab-group-toggle:hover { background: rgba(15, 23, 42, 0.06); }
+.lab-group-toggle:hover { background: var(--lab-line-soft); }
 .lab-group.is-collapsed .lab-group-toggle { transform: rotate(-90deg); }
 .lab-group.is-collapsed .lab-row { display: none; }
 
@@ -1138,54 +1075,51 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
 .lab-select { height: 34px; padding: 0 0.6rem; }
 
 .lab-input::placeholder,
-.lab-field textarea::placeholder { color: #cbd5e1; font-style: italic; }
+.lab-field textarea::placeholder { color: #A3B1C0; }
 
 .lab-input:hover,
 .lab-select:hover,
-.lab-field textarea:hover { border-color: #cbd5e1; }
+.lab-field textarea:hover { border-color: var(--lab-strong); }
 
 .lab-input:focus,
 .lab-select:focus,
 .lab-field textarea:focus {
     outline: none;
     border-color: var(--lab-accent);
-    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+    box-shadow: 0 0 0 3px rgba(11, 103, 178, 0.14);
 }
 
 .lab-input--num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
 
-.lab-input--num.is-filled { background: #fbfffe; border-color: #cdeae4; }
-
 .lab-input.is-invalid,
 .lab-field textarea.is-invalid {
-    border-color: var(--lab-danger);
+    border-color: #F04438;
     background: var(--lab-danger-soft);
 }
 
 .lab-select {
     appearance: none;
     padding-right: 1.8rem;
-    font-weight: 600;
+    font-weight: 500;
     cursor: pointer;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%2364748b'%3E%3Cpath d='M4.5 6.5 8 10l3.5-3.5z'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%235D6E80'%3E%3Cpath d='M4.5 6.5 8 10l3.5-3.5z'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 0.45rem center;
     background-size: 14px;
 }
 
 .lab-select--normal   { color: var(--lab-muted); }
-.lab-select--high     { color: var(--lab-danger); background-color: var(--lab-danger-soft); border-color: #fecaca; }
-.lab-select--low      { color: var(--lab-blue);   background-color: var(--lab-blue-soft);   border-color: #bfdbfe; }
+.lab-select--high     { color: var(--lab-danger); background-color: var(--lab-danger-soft); border-color: #FECDCA; font-weight: 600; }
+.lab-select--low      { color: var(--lab-blue);   background-color: var(--lab-blue-soft);   border-color: #B9D6F2; font-weight: 600; }
 .lab-select--critical {
-    color: #ffffff;
+    color: #FFFFFF;
+    font-weight: 600;
     background-color: var(--lab-danger);
     border-color: var(--lab-danger);
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23ffffff'%3E%3Cpath d='M4.5 6.5 8 10l3.5-3.5z'/%3E%3C/svg%3E");
 }
 
-.lab-row.is-flag-high td,
-.lab-row.is-flag-low  td { background: #fcfdff; }
-.lab-row.is-flag-critical td { background: #fff5f5; }
+.lab-row.is-flag-critical td { background: #FFFBFA; }
 
 /* ---------- Trash ---------- */
 
@@ -1198,13 +1132,13 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
     font-size: 0.8rem;
     color: var(--lab-faint);
     background: none;
-    border: 1px solid transparent;
+    border: 0;
     border-radius: var(--lab-radius-sm);
     cursor: pointer;
-    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.lab-trash:hover { color: var(--lab-danger); background: var(--lab-danger-soft); border-color: #fecaca; }
+.lab-trash:hover { color: var(--lab-danger); background: var(--lab-danger-soft); }
 
 /* ---------- Empty ---------- */
 
@@ -1212,10 +1146,9 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
     padding: 2.75rem 1rem;
     text-align: center;
     color: var(--lab-muted);
-    background: var(--lab-canvas);
 }
 
-.lab-empty i { display: block; margin-bottom: 0.5rem; font-size: 1.6rem; color: var(--lab-faint); }
+.lab-empty i { display: block; margin-bottom: 0.5rem; font-size: 1.4rem; color: var(--lab-faint); }
 .lab-empty p { margin: 0; font-size: 0.82rem; }
 
 /* ---------- Add row ---------- */
@@ -1224,7 +1157,7 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    padding: 0.75rem 1rem;
+    padding: 0.7rem 1rem;
     border-top: 1px solid var(--lab-line-soft);
 }
 
@@ -1241,14 +1174,12 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
     border-top: 1px solid var(--lab-line);
 }
 
-.lab-notes-edit { background: var(--lab-canvas); }
-
 .lab-note { display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; }
 
 .lab-note-key {
     font-size: 0.66rem;
-    font-weight: 700;
-    letter-spacing: 0.07em;
+    font-weight: 600;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--lab-faint);
 }
@@ -1263,7 +1194,7 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
 
 .lab-field { display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; }
 
-.lab-field label { font-size: 0.78rem; font-weight: 600; color: var(--lab-text); }
+.lab-field label { font-size: 0.78rem; font-weight: 600; color: var(--lab-ink); }
 
 .lab-field textarea {
     padding: 0.6rem 0.7rem;
@@ -1278,32 +1209,31 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
-    padding: 0.16rem 0.5rem;
+    padding: 0.12rem 0.45rem;
     font-size: 0.71rem;
-    font-weight: 700;
-    border-radius: 999px;
+    font-weight: 600;
+    border-radius: 4px;
     white-space: nowrap;
 }
 
-.lab-flag--ok       { background: var(--lab-line-soft);   color: var(--lab-muted); }
+.lab-flag--ok       { color: var(--lab-faint); background: none; font-weight: 500; }
 .lab-flag--high     { background: var(--lab-danger-soft); color: var(--lab-danger); }
 .lab-flag--low      { background: var(--lab-blue-soft);   color: var(--lab-blue); }
-.lab-flag--critical { background: var(--lab-danger);      color: #ffffff; }
+.lab-flag--critical { background: var(--lab-danger);      color: #FFFFFF; }
 
-/* ---------- Signatures ---------- */
+/* ---------- Sign-off (medical technologist) ---------- */
 
 .lab-sign {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 2rem;
-    padding: 2.5rem 1.25rem 1.5rem;
+    display: flex;
+    justify-content: flex-end;
+    padding: 2.25rem 1.25rem 1.4rem;
     border-top: 1px solid var(--lab-line);
 }
 
-.lab-sign-col { text-align: center; }
-.lab-sign-line { height: 1px; margin-bottom: 0.5rem; background: var(--lab-ink); }
-.lab-sign-name { font-size: 0.85rem; font-weight: 700; color: var(--lab-ink); }
-.lab-sign-role { font-size: 0.72rem; color: var(--lab-muted); }
+.lab-sign-col { width: min(300px, 100%); text-align: center; }
+.lab-sign-line { height: 1px; margin-bottom: 0.5rem; background: var(--lab-strong); }
+.lab-sign-name { font-size: 0.85rem; font-weight: 600; color: var(--lab-ink); }
+.lab-sign-role { margin-top: 0.1rem; font-size: 0.74rem; color: var(--lab-muted); }
 
 /* ---------- Action bar ---------- */
 
@@ -1316,11 +1246,11 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
     justify-content: space-between;
     gap: 1rem;
     flex-wrap: wrap;
-    padding: 0.85rem 1.25rem;
+    padding: 0.8rem 1.25rem;
     border-top: 1px solid var(--lab-line);
-    background: rgba(255, 255, 255, 0.92);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
 }
 
 .lab-actions-status {
@@ -1331,7 +1261,7 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
     color: var(--lab-muted);
 }
 
-.lab-actions-status.is-warn { color: var(--lab-amber); }
+.lab-actions-status.is-warn  { color: var(--lab-amber); }
 .lab-actions-status.is-ready { color: var(--lab-green); }
 
 .lab-actions-btns { display: flex; gap: 0.5rem; flex-wrap: wrap; }
@@ -1339,9 +1269,8 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
 /* ---------- Responsive ---------- */
 
 @media (max-width: 900px) {
-    .lab-hero { flex-direction: column; align-items: stretch; }
-    .lab-hero-actions { width: 100%; }
-    .lab-hero-actions .lab-btn { flex: 1; }
+    .lab-head-side { width: 100%; }
+    .lab-head-side .lab-btn--go { flex: 1; }
 }
 
 @media (max-width: 768px) {
@@ -1357,7 +1286,6 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
     .lab-group-head td {
         position: static;
         padding: 0.6rem 0.75rem !important;
-        border-radius: 0;
     }
 
     .lab-row {
@@ -1366,7 +1294,6 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
         border: 1px solid var(--lab-line);
         border-radius: var(--lab-radius-sm);
         background: var(--lab-surface);
-        box-shadow: var(--lab-shadow);
     }
 
     .lab-table td {
@@ -1383,17 +1310,18 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
         content: attr(data-label);
         flex-shrink: 0;
         font-size: 0.66rem;
-        font-weight: 700;
+        font-weight: 600;
         letter-spacing: 0.06em;
         text-transform: uppercase;
         color: var(--lab-faint);
     }
 
-    .lab-table td.lab-right { text-align: right; }
     .lab-input, .lab-select { max-width: 60%; }
 
-    .lab-strip { padding: 0.9rem 1rem; }
-    .lab-panel-head { flex-direction: row; align-items: flex-start; }
+    .lab-head { padding: 1rem; }
+    .lab-fact { padding: 0.65rem 1rem; }
+    .lab-panel-head { align-items: flex-start; padding: 0.9rem 1rem; }
+    .lab-progress-label { display: none; }
 
     .lab-actions { flex-direction: column; align-items: stretch; }
     .lab-actions-btns { width: 100%; }
@@ -1401,28 +1329,25 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
 }
 
 @media (max-width: 480px) {
-    .lab-hero-title { font-size: 1.05rem; }
-    .lab-hero-icon,
-    .lab-hero-avatar { width: 40px; height: 40px; }
-    .lab-hero-icon { font-size: 1.15rem; }
+    .lab-name { font-size: 1.1rem; }
+    .lab-avatar { width: 40px; height: 40px; font-size: 0.8rem; }
     .lab-input, .lab-select { max-width: 55%; }
     .lab-notes, .lab-notes-edit { padding: 1rem; }
 }
 
 @media print {
-    .lab-hero-actions,
+    .lab-back,
+    .lab-head-side,
     .lab-actions,
     .lab-add-row,
-    .lab-progress,
+    .lab-progress-wrap,
     .lab-group-toggle,
     .lab-trash,
     .lab-msg,
     .lab-w-action,
     td[data-label="Action"] { display: none !important; }
 
-    .lab-hero,
-    .lab-strip,
-    .lab-panel { border: 0; box-shadow: none; background: none; }
+    .lab-card { border: 0; }
 
     .lab-table thead th { position: static; background: none; color: #000; border-bottom: 1px solid #000; }
     .lab-group-head td { position: static; background: none; border-top: 1px solid #000; }
@@ -1436,11 +1361,6 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
         animation-duration: 0.01ms !important;
     }
 }
-
-.lab-hero, .lab-hero-text, .lab-strip, .lab-strip-cell,
-.lab-panel, .lab-panel-head, .lab-panel-head-text,
-.lab-notes, .lab-notes-edit, .lab-field,
-.lab-actions, .lab-actions-status, .lab-msg, .lab-msg > div { min-width: 0; }
 </style>
 
 
@@ -1534,6 +1454,7 @@ $isFemale  = in_array($genderRaw, ['female', 'f', 'woman', 'girl'], true);
 
         if (progNum) { progNum.textContent = filled; }
         if (progress) {
+            progress.classList.toggle('is-done', total > 0 && filled === total);
             progress.dataset.filled = filled;
             progress.dataset.total = total;
             progress.setAttribute('aria-label', filled + ' of ' + total + ' results entered');

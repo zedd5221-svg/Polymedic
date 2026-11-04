@@ -849,6 +849,31 @@ trait HandlesDiagnosticRequests
        --------------------------------------------------------- */
 
     /**
+     * The patient record behind an appointment, found the same way booking
+     * matches patients (email, phone, then name + age). Read-only: never
+     * creates a record. Appointments do not store a patient id.
+     */
+    protected function patientForAppointment(array $appointment): ?array
+    {
+        $model = new PatientModel();
+        $email = trim((string) ($appointment['email'] ?? ''));
+        $phone = trim((string) ($appointment['phone'] ?? ''));
+        $name  = trim((string) ($appointment['full_name'] ?? ''));
+
+        $patient = null;
+        if ($email !== '') {
+            $patient = $model->where('email', $email)->first();
+        }
+        if (!$patient && $phone !== '') {
+            $patient = $model->where('phone', $phone)->first();
+        }
+        if (!$patient && $name !== '') {
+            $patient = $model->where('full_name', $name)->where('age', $appointment['age'] ?? null)->first();
+        }
+        return $patient ?: null;
+    }
+
+    /**
      * Data for the patient detail page, shaped like an appointment so
      * the existing appointment_view template can render it.
      */

@@ -10,7 +10,6 @@
     <!-- The CDN stylesheets below block the first paint; opening the
          connections early shortens that wait. -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-    <link rel="preconnect" href="https://unpkg.com" crossorigin>
 
     <!-- Main CSS -->
     <link href="<?= base_url('assets/css/AppointmentStyle.css') ?>" rel="stylesheet">
@@ -25,9 +24,6 @@
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <!-- AOS -->
-    <link rel="stylesheet" href="https://unpkg.com/aos@2.3.4/dist/aos.css">
-    <script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script>
 
     <!-- =====================================================
          CRITICAL ICON SIZING — must stay in <head>
@@ -105,9 +101,9 @@
         --sidebar-collapsed-width: 84px;
         --header-height: 64px;
 
-        --active-blue: #1976d2;
-        --active-blue-dark: #1565c0;
-        --active-blue-light: #e3f2fd;
+        --active-blue: #0B67B2;
+        --active-blue-dark: #08528F;
+        --active-blue-light: #E8F1FA;
         --text-blue: #1e40af;
         --icon-gray: #9ca3af;
         --bg-light: #f4f7fb;
@@ -121,9 +117,9 @@
         --sb-hover-text: #ffffff;
         --sb-border: rgba(255, 255, 255, 0.10);
 
-        --sb-active-from: #1976d2;
-        --sb-active-to: #43a3f5;
-        --sb-active-glow: rgba(25, 118, 210, 0.45);
+        --sb-active-from: #0B67B2;
+        --sb-active-to: #3D8FD1;
+        --sb-active-glow: rgba(11, 103, 178, 0.45);
 
         --sidebar-ease: cubic-bezier(0.4, 0, 0.2, 1);
         --sidebar-spring: cubic-bezier(0.22, 1, 0.36, 1);
@@ -994,8 +990,8 @@
         color: #334155; background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer;
     }
     .notif-act:hover { background: #f8fafc; }
-    .notif-act--primary { color: #fff; background: #1976d2; border-color: #1976d2; }
-    .notif-act--primary:hover { background: #1565c0; }
+    .notif-act--primary { color: #fff; background: #0B67B2; border-color: #0B67B2; }
+    .notif-act--primary:hover { background: #08528F; }
     .notif-act:disabled { opacity: 0.6; cursor: wait; }
     .notif-actions-msg { font-size: 0.72rem; color: #166534; }
     .notif-actions-msg.is-error { color: #b91c1c; }
@@ -1079,8 +1075,8 @@
         flex-shrink: 0;
     }
 
-    .notif-icon-box.appointment { background: #e3f2fd !important; color: #1976d2 !important; }
-    .notif-icon-box.xray        { background: #e3f2fd !important; color: #1976d2 !important; }
+    .notif-icon-box.appointment { background: #E8F1FA !important; color: #0B67B2 !important; }
+    .notif-icon-box.xray        { background: #E8F1FA !important; color: #0B67B2 !important; }
     .notif-icon-box.system      { background: #fef3c7 !important; color: #d97706 !important; }
     .notif-icon-box.lab         { background: #e8f5e9 !important; color: #28a745 !important; }
     .notif-icon-box.billing     { background: #fff3e0 !important; color: #ff6b00 !important; }
@@ -1247,6 +1243,12 @@
         setTimeout(reveal, 1200);
     }());
     </script>
+
+    <!-- Theme: loaded last so it wins over the layout and Bootstrap defaults -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="<?= base_url() ?>assets/css/pm-theme.css" rel="stylesheet">
 
 </head>
 
@@ -1478,16 +1480,12 @@
                         <div class="dropdown-menu dropdown-menu-end notif-dropdown-menu shadow-lg border-0"
                              aria-labelledby="notifDropdownBtn">
 
-                            <div class="notif-dropdown-header d-flex justify-content-between align-items-center">
-                                <div class="d-flex align-items-center gap-2">
-                                    <i class="bi bi-bell text-primary"></i>
-                                    <span class="fw-bold text-dark fs-6">Notifications</span>
+                            <div class="notif-dropdown-header">
+                                <div class="notif-head-title">
+                                    <span>Notifications</span>
+                                    <span class="notif-head-count" id="notifHeadCount" hidden></span>
                                 </div>
-                                <button type="button"
-                                        class="btn btn-link btn-sm p-0 text-primary text-decoration-none small"
-                                        onclick="markAllNotificationsRead(event)">
-                                    Mark all read
-                                </button>
+                                <button type="button" class="notif-markall" onclick="markAllNotificationsRead(event)">Mark all read</button>
                             </div>
 
                             <div class="notif-dropdown-body" id="notifDropdownList">
@@ -1497,12 +1495,8 @@
                                 </div>
                             </div>
 
-                            <div class="notif-dropdown-footer text-center">
-                                <a href="<?= base_url('radiologist/notifications') ?>"
-                                   class="text-primary fw-semibold small text-decoration-none">
-                                    View All Notifications
-                                    <i class="bi bi-arrow-right ms-1"></i>
-                                </a>
+                            <div class="notif-dropdown-footer">
+                                <a href="<?= base_url('radiologist/notifications') ?>" class="notif-viewall">View all notifications</a>
                             </div>
 
                         </div>
@@ -1756,6 +1750,12 @@
     }
 
     function updateNotificationBadge(count) {
+        var head = document.getElementById('notifHeadCount');
+        if (head) {
+            head.hidden = !(count > 0);
+            head.textContent = (count > 99 ? '99+' : count) + ' new';
+        }
+
         var badge = document.getElementById('notifBadge');
         if (!badge) return;
 
@@ -1773,7 +1773,7 @@
     function notifLeadHtml(item, iconClass, colorClass) {
         var lead = item.lead || {};
         if (lead.kind === 'img') {
-            return '<div class="notif-icon-box ' + (lead.avatar ? 'is-avatar' : 'is-png') + '">' +
+            return '<div class="notif-icon-box ' + (lead.avatar ? 'is-avatar' : 'is-png t-' + escapeHtml(String(item.type || ''))) + '">' +
                    '<img src="' + escapeHtml(lead.src) + '" alt="" loading="lazy" decoding="async"></div>';
         }
         if (lead.kind === 'initials') {
@@ -1789,10 +1789,11 @@
 
         if (!notifications || notifications.length === 0) {
             listContainer.innerHTML = `
-                <div class="p-3 text-center text-muted small">
-                    <i class="bi bi-bell-slash d-block fs-4 mb-1"></i>
-                    No notifications yet
-                </div>
+                <div class="notif-empty">
+                    <i class="bi bi-bell-slash" aria-hidden="true"></i>
+                    <p>You're all caught up</p>
+                    <small>New notifications will appear here.</small>
+                    </div>
             `;
             return;
         }
@@ -1835,7 +1836,7 @@
                         '<div class="notif-content">' +
                             '<div class="notif-title">' + escapeHtml(item.title) + '</div>' +
                             '<div class="notif-msg">' + escapeHtml(item.message) + '</div>' +
-                            '<div class="notif-time"><i class="bi bi-clock me-1"></i>' + item.time_ago + '</div>' +
+                            '<div class="notif-time">' + escapeHtml(String(item.time_ago || '')) + '</div>' +
                             '<div class="notif-actions">' +
                                 '<button type="button" class="notif-act" onclick="respondTransfer(' + Number(item.reference_id) + ', \'decline\', this, event)">Decline</button>' +
                                 '<button type="button" class="notif-act notif-act--primary" onclick="respondTransfer(' + Number(item.reference_id) + ', \'accept\', this, event)">Accept</button>' +
@@ -1846,12 +1847,12 @@
             }
 
             html += `
-                <a href="${link}" class="notif-item ${unreadClass}" onclick="markNotificationRead(${item.id}, event)">
+                <a href="${escapeHtml(String(link))}" class="notif-item ${unreadClass}" onclick="markNotificationRead(${item.id}, event)">
                     ${notifLeadHtml(item, iconClass, colorClass)}
                     <div class="notif-content">
                         <div class="notif-title">${escapeHtml(item.title)}</div>
                         <div class="notif-msg">${escapeHtml(item.message)}</div>
-                        <div class="notif-time"><i class="bi bi-clock me-1"></i>${item.time_ago}</div>
+                        <div class="notif-time">${escapeHtml(String(item.time_ago || ''))}</div>
                     </div>
                 </a>
             `;

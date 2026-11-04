@@ -49,7 +49,7 @@ arsort($serviceCounts);
 
 $serviceTotal = array_sum($serviceCounts);
 
-$donutPalette = ['#2450d8', '#f0b429', '#0f9d76', '#7b8794', '#d9534f', '#0e7490'];
+$donutPalette = ['#0B67B2', '#D29A1E', '#3E9B5A', '#7C8DA0', '#D0654A', '#0E8A7E'];
 
 /* ------------------------------------------------------------------
    APPOINTMENT TRENDS
@@ -76,7 +76,7 @@ $kpiBoard = [
         [
             'key'     => 'patients',
             'icon'    => 'people-blue.png',
-            'color'   => '#1976d2',
+            'color'   => '#0B67B2',
             'label'   => 'All Patients',
             'value'   => (int) ($total_patients ?? 0),
             'delta'   => 'window',
@@ -153,7 +153,7 @@ $kpiBoard = [
                 </div>
                 <?php if ($hasTrend): ?>
                     <span class="chart-pill">
-                        <span class="pill-dot" style="background: #2450d8;"></span>
+                        <span class="pill-dot" style="background: #0B67B2;"></span>
                         <?= number_format(array_sum($trendValues)) ?> total
                     </span>
                 <?php endif; ?>
@@ -373,37 +373,35 @@ $kpiBoard = [
    ========================================================= */
 
 .dashboard-container {
-    --db-accent:      #2450d8;
-    --db-accent-dark: #1b3fb0;
-    --db-accent-soft: #eef3ff;
+    --db-accent:      var(--pm-accent, #0B67B2);
+    --db-accent-dark: var(--pm-accent-hover, #08528F);
+    --db-accent-soft: var(--pm-accent-soft, #E8F1FA);
 
-    --db-ink:         #0b1220;
-    --db-ink-soft:    #414e63;
-    --db-ink-mute:    #6b7789;
-    --db-ink-faint:   #9aa5b5;
+    --db-ink:         var(--pm-text, #10202E);
+    --db-ink-soft:    var(--pm-text-soft, #3B4C5E);
+    --db-ink-mute:    var(--pm-text-muted, #5D6E80);
+    --db-ink-faint:   #8496A8;
 
-    --db-line:        #e4e8ef;
-    --db-line-soft:   #eef1f6;
+    --db-line:        var(--pm-line, #DDE4EC);
+    --db-line-soft:   #EBF0F5;
     --db-surface:     #ffffff;
-    --db-canvas:      #f4f6fa;
-    --db-rail:        #f7f9fc;
+    --db-canvas:      var(--pm-canvas, #F3F6F9);
+    --db-rail:        #F8FAFC;
 
     --db-amber:       #b45309;
     --db-green:       #067a55;
     --db-teal:        #0f766e;
-    --db-cyan:        #0e7490;
+    --db-cyan:        #0E8A7E;
     --db-red:         #c2323b;
 
-    --db-r-lg:        14px;
-    --db-r-md:        10px;
-    --db-r-sm:        7px;
+    --db-r-lg:        8px;
+    --db-r-md:        8px;
+    --db-r-sm:        6px;
     --db-r-xs:        5px;
 
-    --db-mono:        ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --db-mono:        var(--pm-mono), ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 
-    padding: 1.5rem;
-    background: var(--db-canvas);
-    min-height: 100vh;
+    padding: 0;
     color: var(--db-ink);
     -webkit-font-smoothing: antialiased;
 }
@@ -430,8 +428,7 @@ $kpiBoard = [
     border: 1px solid var(--db-line);
     border-radius: var(--db-r-lg);
     padding: 1.15rem 1.25rem 1.25rem;
-    box-shadow: 0 1px 2px rgba(11, 18, 32, 0.04),
-                0 12px 28px -20px rgba(11, 18, 32, 0.18);
+    box-shadow: none;
     min-width: 0;
 }
 
@@ -448,8 +445,8 @@ $kpiBoard = [
 
 .dashboard-container .chart-heading h5 {
     font-size: 0.94rem;
-    font-weight: 700;
-    letter-spacing: -0.015em;
+    font-weight: 600;
+    letter-spacing: -0.005em;
     color: var(--db-ink);
     margin: 0 0 0.15rem;
     display: flex;
@@ -457,7 +454,7 @@ $kpiBoard = [
     gap: 0.45rem;
 }
 
-.dashboard-container .chart-heading h5 i { color: var(--db-accent); font-size: 0.9rem; }
+.dashboard-container .chart-heading h5 i { color: var(--db-ink-mute); font-size: 0.9rem; }
 
 .dashboard-container .chart-heading small {
     font-size: 0.75rem;
@@ -537,7 +534,7 @@ $kpiBoard = [
 
 .dashboard-container .donut-value {
     font-size: 1.9rem;
-    font-weight: 800;
+    font-weight: 600;
     letter-spacing: -0.04em;
     line-height: 1;
     color: var(--db-ink);
@@ -611,8 +608,7 @@ $kpiBoard = [
     background: var(--db-surface);
     border: 1px solid var(--db-line);
     border-radius: var(--db-r-lg);
-    box-shadow: 0 1px 2px rgba(11, 18, 32, 0.04),
-                0 12px 28px -20px rgba(11, 18, 32, 0.18);
+    box-shadow: none;
     overflow: hidden;
 }
 
@@ -657,7 +653,6 @@ $kpiBoard = [
     padding: 0.4rem 0.75rem;
     text-decoration: none;
     white-space: nowrap;
-    box-shadow: 0 1px 2px rgba(36, 80, 216, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.12);
     transition: background-color 0.16s ease, border-color 0.16s ease;
 }
 
@@ -981,13 +976,13 @@ $kpiBoard = [
                     datasets: [{
                         label: 'Appointments',
                         data: trendValues,
-                        borderColor: '#2450d8',
-                        backgroundColor: 'rgba(36, 80, 216, 0.07)',
+                        borderColor: '#0B67B2',
+                        backgroundColor: 'rgba(11, 103, 178, 0.07)',
                         fill: true,
-                        tension: 0.38,
+                        tension: 0.25,
                         borderWidth: 2,
                         pointRadius: 3,
-                        pointBackgroundColor: '#2450d8',
+                        pointBackgroundColor: '#0B67B2',
                         pointBorderColor: '#ffffff',
                         pointBorderWidth: 2,
                         pointHoverRadius: 6

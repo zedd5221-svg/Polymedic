@@ -11,10 +11,6 @@
 $examinations = (isset($examinations) && is_array($examinations)) ? $examinations : [];
 $counts       = is_array($counts ?? null) ? $counts : [];
 
-// PNG avatar filenames inside public/assets/images/.
-$maleAvatar   = 'man-avatar.png';
-$femaleAvatar = 'woman-avatar.png';
-
 $statusMeta = [
     'pending'     => ['label' => 'Pending',    'tone' => 'pending'],
     'in_progress' => ['label' => 'In reading', 'tone' => 'progress'],
@@ -38,12 +34,6 @@ $initialsOf = static function ($name) {
     return mb_strtoupper($first . $last);
 };
 
-$shorten = static function ($text, $max = 46) {
-    $text = trim((string) $text);
-    if ($text === '') { return ''; }
-    if (mb_strlen($text) <= $max) { return $text; }
-    return mb_substr($text, 0, $max - 1) . '…';
-};
 ?>
 
 <div class="dx">
@@ -114,10 +104,6 @@ $shorten = static function ($text, $max = 46) {
                     $hasDraft = trim((string) ($exam['findings'] ?? '')) !== ''
                              || trim((string) ($exam['interpretation'] ?? '')) !== '';
 
-                    $genderRaw  = strtolower(trim((string) ($exam['gender'] ?? '')));
-                    $isMale     = $genderRaw === 'male'   || $genderRaw === 'm';
-                    $isFemale   = $genderRaw === 'female' || $genderRaw === 'f';
-                    $avatarKind = $isMale ? 'male' : ($isFemale ? 'female' : 'neutral');
 
                     $modality = 'xray';
                     if (stripos($examType, 'ct') !== false)      { $modality = 'ct'; }
@@ -149,113 +135,106 @@ $shorten = static function ($text, $max = 46) {
                              data-status="<?= esc($statusKey, 'attr') ?>"
                              data-search="<?= esc($searchIndex, 'attr') ?>">
 
-                        <header class="dx-card-head">
-                            <span class="dx-ref"><?= esc($reference) ?></span>
+                        <?php
+                        /* First stored image (multi-image JSON first, legacy single path second). */
+                        $images = [];
+                        $decoded = json_decode((string) ($exam['image_paths'] ?? ''), true);
+                        if (is_array($decoded)) {
+                            foreach ($decoded as $p) {
+                                if (is_string($p) && trim($p) !== '') { $images[] = trim($p); }
+                            }
+                        }
+                        if (!$images && !empty($exam['image_path'])) { $images[] = (string) $exam['image_path']; }
+                        $images   = array_values(array_unique($images));
+                        $thumb    = $images[0] ?? null;
+                        $imgCount = count($images);
 
-                            <div class="dx-card-flags">
+                        $sinceTs = $createdTs ?: $dateTs;
+                        $since   = '';
+                        if ($sinceTs) {
+                            $ago = time() - $sinceTs;
+                            if ($ago < 60)         { $since = 'Just now'; }
+                            elseif ($ago < 3600)   { $since = floor($ago / 60) . 'm ago'; }
+                            elseif ($ago < 86400)  { $since = floor($ago / 3600) . 'h ago'; }
+                            elseif ($ago < 604800) { $since = floor($ago / 86400) . 'd ago'; }
+                            else                   { $since = date('M j', $sinceTs); }
+                        }
+                        ?>
+                        <header class="dx-card-head">
+                            <span class="dx-card-id">
+                                <span class="dx-ref"><?= esc($reference) ?></span>
+                                <?php if ($since !== ''): ?>
+                                    <span class="dx-since" title="Requested <?= esc(date('M j, Y · g:i A', $sinceTs), 'attr') ?>"><?= esc($since) ?></span>
+                                <?php endif; ?>
+                            </span>
+
+                            <span class="dx-card-flags">
                                 <?php if ($isStat): ?>
                                     <span class="dx-tag-stat" title="Urgent">STAT</span>
                                 <?php endif; ?>
-                                <span class="dx-status dx-status--<?= esc($meta['tone'], 'attr') ?>">
-                                    <?= esc($meta['label']) ?>
-                                </span>
-                            </div>
+                                <span class="dx-status dx-status--<?= esc($meta['tone'], 'attr') ?>"><?= esc($meta['label']) ?></span>
+                            </span>
                         </header>
 
-                        <div class="dx-card-patient">
-                            <span class="dx-avatar dx-avatar--<?= esc($avatarKind, 'attr') ?>" aria-hidden="true">
-                                <?php if ($isMale): ?>
-                                    <img src="<?= esc(base_url('assets/images/' . $maleAvatar), 'attr') ?>"
-                                         alt=""
-                                         class="dx-avatar-img"
-                                         loading="lazy"
-                                         decoding="async">
-                                <?php elseif ($isFemale): ?>
-                                    <img src="<?= esc(base_url('assets/images/' . $femaleAvatar), 'attr') ?>"
-                                         alt=""
-                                         class="dx-avatar-img"
-                                         loading="lazy"
-                                         decoding="async">
-                                <?php else: ?>
-                                    <?= esc($initialsOf($name)) ?>
-                                <?php endif; ?>
-                            </span>
+                        <div class="dx-card-body">
+                            <div class="dx-card-patient">
+                                <span class="dx-avatar" aria-hidden="true"><?= esc($initialsOf($name)) ?></span>
+                                <div class="dx-card-patient-body">
+                                    <h3 class="dx-card-name"><?= esc($name) ?></h3>
+                                    <p class="dx-card-demo">
+                                        <?php if ($demo !== ''): ?>
+                                            <?= esc($demo) ?>
+                                        <?php else: ?>
+                                            <span class="dx-muted">No age or sex on file</span>
+                                        <?php endif; ?>
+                                    </p>
+                                </div>
+                            </div>
 
-                            <div class="dx-card-patient-body">
-                                <h3 class="dx-card-name"><?= esc($name) ?></h3>
-                                <p class="dx-card-demo">
-                                    <?php if ($demo !== ''): ?>
-                                        <?= esc($demo) ?>
+                            <div class="dx-study">
+                                <span class="dx-film<?= $thumb ? ' has-image' : '' ?>" aria-hidden="true">
+                                    <?php if ($thumb): ?>
+                                        <img src="<?= esc(base_url($thumb), 'attr') ?>" alt="" loading="lazy" decoding="async">
+                                        <?php if ($imgCount > 1): ?>
+                                            <span class="dx-film-count"><?= (int) $imgCount ?></span>
+                                        <?php endif; ?>
                                     <?php else: ?>
-                                        <span class="dx-muted">No age or sex on file</span>
+                                        <img src="<?= esc(base_url('assets/images/bones.png'), 'attr') ?>" alt="" class="dx-film-art" loading="lazy" decoding="async">
                                     <?php endif; ?>
-                                </p>
-                            </div>
-                        </div>
+                                </span>
 
-                        <div class="dx-card-tags">
-                            <span class="dx-kind dx-kind--xray">
-                                <i class="bi bi-radioactive" aria-hidden="true"></i>
-                                <?= esc($kindLabel) ?>
-                            </span>
-                        </div>
-
-                        <div class="dx-card-services">
-                            <span class="dx-chip" title="<?= esc($examType, 'attr') ?>">
-                                <?= esc($shorten($examType !== '' ? $examType : '—')) ?>
-                            </span>
-                        </div>
-
-                        <dl class="dx-card-meta">
-                            <div>
-                                <dt>Requested</dt>
-                                <dd>
-                                    <?php if ($createdTs): ?>
-                                        <time datetime="<?= esc(date('c', $createdTs), 'attr') ?>">
-                                            <?= esc(date('M j, Y', $createdTs)) ?>
-                                            <span aria-hidden="true">·</span>
-                                            <?= esc(date('g:i A', $createdTs)) ?>
-                                        </time>
-                                    <?php elseif ($dateTs): ?>
-                                        <time datetime="<?= esc(date('c', $dateTs), 'attr') ?>">
-                                            <?= esc(date('M j, Y', $dateTs)) ?>
-                                        </time>
-                                    <?php else: ?>
-                                        &mdash;
+                                <div class="dx-study-body">
+                                    <span class="dx-kind dx-kind--<?= esc($modality, 'attr') ?>"><?= esc($kindLabel) ?></span>
+                                    <p class="dx-exam-name" title="<?= esc($examType, 'attr') ?>">
+                                        <?= $examType !== '' ? esc($examType) : '<span class="dx-muted">No exam type recorded</span>' ?>
+                                    </p>
+                                    <?php if (!$thumb || ($hasDraft && $statusKey !== 'released')): ?>
+                                        <span class="dx-study-note">
+                                            <?php if ($hasDraft && $statusKey !== 'released'): ?>
+                                                <i class="bi bi-pencil" aria-hidden="true"></i>Draft saved
+                                            <?php else: ?>
+                                                No image yet
+                                            <?php endif; ?>
+                                        </span>
                                     <?php endif; ?>
-                                </dd>
+                                </div>
                             </div>
-                            <div>
-                                <dt>Referred by</dt>
-                                <dd><?= $doctor !== '' ? esc($doctor) : '<span class="dx-muted">&mdash;</span>' ?></dd>
-                            </div>
-                            <div>
-                                <dt>Radiologist</dt>
-                                <dd><?= $radiologist !== '' ? esc($radiologist) : '<span class="dx-muted">&mdash;</span>' ?></dd>
-                            </div>
-                        </dl>
 
-                        <?php if ($hasImage || $hasDraft): ?>
-                            <div class="dx-card-chips">
-                                <?php if ($hasImage): ?>
-                                    <span class="dx-chip dx-chip--image">
-                                        <i class="bi bi-image" aria-hidden="true"></i>
-                                        Image attached
-                                    </span>
-                                <?php endif; ?>
-                                <?php if ($hasDraft && $statusKey !== 'released'): ?>
-                                    <span class="dx-chip dx-chip--draft">
-                                        <i class="bi bi-pencil" aria-hidden="true"></i>
-                                        Draft saved
-                                    </span>
-                                <?php endif; ?>
-                            </div>
-                        <?php endif; ?>
+                            <dl class="dx-card-meta">
+                                <div>
+                                    <dt>Referred by</dt>
+                                    <dd title="<?= esc($doctor, 'attr') ?>"><?= $doctor !== '' ? esc($doctor) : '<span class="dx-muted">&mdash;</span>' ?></dd>
+                                </div>
+                                <div>
+                                    <dt>Radiologist</dt>
+                                    <dd title="<?= esc($radiologist, 'attr') ?>"><?= $radiologist !== '' ? esc($radiologist) : '<span class="dx-muted">Unassigned</span>' ?></dd>
+                                </div>
+                            </dl>
+                        </div>
 
                         <footer class="dx-card-foot">
                             <a href="<?= base_url('radiologist/examination/view/' . $examId) ?>"
                                class="dx-btn dx-btn--sm dx-btn--primary">
-                                <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i>
                                 Open study
                             </a>
 
@@ -322,23 +301,24 @@ $shorten = static function ($text, $max = 46) {
    ========================================================= */
 
 .dx {
-    --dx-ink:         #0f172a;
-    --dx-text:        #334155;
-    --dx-muted:       #64748b;
-    --dx-faint:       #94a3b8;
-    --dx-line:        #e2e8f0;
-    --dx-line-soft:   #f1f5f9;
-    --dx-surface:     #ffffff;
-    --dx-subtle:      #f8fafc;
-    --dx-accent:      #1d4ed8;
-    --dx-accent-dark: #1e40af;
-    --dx-accent-soft: #eaf2fe;
-    --dx-danger:      #dc2626;
-    --dx-danger-dark: #b91c1c;
-    --dx-radius:      10px;
-    --dx-radius-sm:   7px;
-    --dx-ring:        0 0 0 3px rgba(29, 78, 216, 0.18);
-    --dx-mono:        ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --dx-ink:         var(--pm-text, #10202E);
+    --dx-text:        var(--pm-text-soft, #3B4C5E);
+    --dx-muted:       var(--pm-text-muted, #5D6E80);
+    --dx-faint:       #7A8B9D;
+    --dx-line:        var(--pm-line, #DDE4EC);
+    --dx-line-strong: var(--pm-line-strong, #C3CFDB);
+    --dx-line-soft:   #EBF0F5;
+    --dx-surface:     #FFFFFF;
+    --dx-subtle:      #F8FAFC;
+    --dx-accent:      var(--pm-accent, #0B67B2);
+    --dx-accent-dark: var(--pm-accent-hover, #08528F);
+    --dx-accent-soft: var(--pm-accent-soft, #E8F1FA);
+    --dx-danger:      #B42318;
+    --dx-danger-dark: #912018;
+    --dx-radius:      8px;
+    --dx-radius-sm:   6px;
+    --dx-ring:        0 0 0 3px rgba(11, 103, 178, 0.18);
+    --dx-mono:        var(--pm-mono, ui-monospace, monospace);
 
     color: var(--dx-text);
 }
@@ -396,7 +376,6 @@ $shorten = static function ($text, $max = 46) {
     background: var(--dx-surface);
     border: 1px solid var(--dx-line);
     border-radius: var(--dx-radius-sm);
-    box-shadow: 0 1px 1px rgba(15, 23, 42, 0.03);
     white-space: nowrap;
     text-decoration: none;
     cursor: pointer;
@@ -411,7 +390,7 @@ $shorten = static function ($text, $max = 46) {
 .dx-btn--primary { background: var(--dx-accent); border-color: var(--dx-accent); }
 .dx-btn--primary:hover { background: var(--dx-accent-dark); border-color: var(--dx-accent-dark); }
 
-.dx-btn--sm { height: 32px; padding: 0 0.75rem; font-size: 0.78rem; flex: 1; min-width: 0; }
+.dx-btn--sm { height: 32px; padding: 0 0.75rem; font-size: 0.78rem; min-width: 0; }
 
 .dx-icon-btn {
     width: 32px;
@@ -489,8 +468,7 @@ $shorten = static function ($text, $max = 46) {
 .dx-panel {
     background: var(--dx-surface);
     border: 1px solid var(--dx-line);
-    border-radius: 12px;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    border-radius: var(--dx-radius);
     overflow: hidden;
 }
 
@@ -545,7 +523,7 @@ $shorten = static function ($text, $max = 46) {
     text-align: center;
     color: var(--dx-muted);
     background: var(--dx-line-soft);
-    border-radius: 999px;
+    border-radius: 4px;
 }
 
 .dx-tab.is-active .dx-tab-count { color: var(--dx-accent); background: var(--dx-accent-soft); }
@@ -562,14 +540,15 @@ $shorten = static function ($text, $max = 46) {
 
 .dx-grid-wrap {
     border-top: 1px solid var(--dx-line);
-    background: #f8fafc;
+    background: var(--dx-subtle);
 }
 
+/* As many columns as fit; cards never get narrower than ~290px */
 .dx-cards {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1.1rem;
-    padding: 1.15rem;
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+    gap: 0.85rem;
+    padding: 1rem;
 }
 
 .dx-card {
@@ -577,43 +556,62 @@ $shorten = static function ($text, $max = 46) {
     display: flex;
     flex-direction: column;
     min-width: 0;
-    padding: 1rem 1.05rem 1rem;
+    overflow: hidden;
     background: var(--dx-surface);
-    border: 1px solid #d4dbe5;
-    border-radius: var(--dx-radius);
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
-    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+    border: 1px solid var(--dx-line);
+    border-radius: 10px;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .dx-card:hover {
-    border-color: #b6c2d2;
-    box-shadow: 0 8px 20px -8px rgba(15, 23, 42, 0.25), 0 2px 4px rgba(15, 23, 42, 0.06);
-}
-
-.dx-card.is-stat {
-    background-image: linear-gradient(180deg, rgba(254, 242, 242, 0.55), transparent 45%);
+    border-color: var(--dx-line-strong);
+    box-shadow: 0 8px 20px -14px rgba(12, 45, 72, 0.35);
 }
 
 .dx-card.is-hidden { display: none; }
 
-/* ---- header ---- */
+/* ---- header band: identity of the request, not of the patient ---- */
 
 .dx-card-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
-    margin-bottom: 0.6rem;
+    padding: 0.55rem 0.9rem;
+    background: #FBFCFD;
+    border-bottom: 1px solid var(--dx-line-soft);
+}
+
+/* STAT: the band carries the urgency, the rest of the card stays calm */
+.dx-card.is-stat .dx-card-head {
+    background: #FEF6F5;
+    border-bottom-color: #FBE1DE;
+}
+
+.dx-card-id {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.45rem;
+    min-width: 0;
 }
 
 .dx-ref {
     font-family: var(--dx-mono);
-    font-size: 0.76rem;
-    font-weight: 600;
-    letter-spacing: 0.01em;
-    color: var(--dx-ink);
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--dx-text);
     white-space: nowrap;
 }
+
+.dx-since {
+    font-size: 0.72rem;
+    color: var(--dx-muted);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    cursor: help;
+}
+
+.dx-since::before { content: "\00B7"; margin-right: 0.45rem; color: var(--dx-faint); }
 
 .dx-card-flags {
     display: inline-flex;
@@ -623,49 +621,45 @@ $shorten = static function ($text, $max = 46) {
 }
 
 .dx-tag-stat {
-    padding: 0 0.35rem;
-    font-size: 0.62rem;
+    padding: 0 0.3rem;
+    font-size: 0.6rem;
     font-weight: 700;
     letter-spacing: 0.06em;
-    line-height: 1.6;
-    color: var(--dx-danger-dark);
-    background: #fef2f2;
-    border: 1px solid #fecaca;
-    border-radius: 4px;
+    line-height: 1.65;
+    color: #FFFFFF;
+    background: var(--dx-danger);
+    border-radius: 3px;
 }
 
-/* ---- patient block with avatar ---- */
+/* ---- body ---- */
+
+.dx-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    padding: 0.9rem 0.9rem 0.85rem;
+    flex: 1;
+}
 
 .dx-card-patient {
     display: flex;
     align-items: center;
-    gap: 0.65rem;
-    margin-bottom: 0.7rem;
+    gap: 0.7rem;
+    min-width: 0;
 }
 
 .dx-avatar {
     display: grid;
     place-items: center;
     flex-shrink: 0;
-    width: 36px;
-    height: 36px;
-    font-size: 0.72rem;
-    font-weight: 700;
-    color: var(--dx-accent);
-    background: var(--dx-accent-soft);
+    width: 38px;
+    height: 38px;
+    font-size: 0.74rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    color: var(--dx-ink);
+    background: #E3EAF2;
     border-radius: 50%;
-    overflow: hidden;
-}
-
-.dx-avatar--male    { color: #1d4ed8; background: #eaf2fe; }
-.dx-avatar--female  { color: #b32e50; background: #fce9ee; }
-.dx-avatar--neutral { color: var(--dx-accent); background: var(--dx-accent-soft); }
-
-.dx-avatar-img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
 }
 
 .dx-card-patient-body { min-width: 0; }
@@ -673,119 +667,156 @@ $shorten = static function ($text, $max = 46) {
 .dx-card-name {
     margin: 0;
     font-size: 0.95rem;
-    font-weight: 650;
+    font-weight: 600;
     letter-spacing: -0.01em;
     line-height: 1.3;
     color: var(--dx-ink);
-    overflow-wrap: anywhere;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .dx-card-demo {
-    margin: 0.1rem 0 0;
-    font-size: 0.76rem;
+    margin: 0.05rem 0 0;
+    font-size: 0.75rem;
     color: var(--dx-muted);
 }
 
-/* ---- kind + source chips ---- */
+/* ---- study tile: the film and what was ordered ---- */
 
-.dx-card-tags {
+.dx-study {
     display: flex;
     align-items: center;
-    gap: 0.35rem;
-    flex-wrap: wrap;
-    margin-bottom: 0.7rem;
+    gap: 0.75rem;
+    min-width: 0;
+    padding: 0.55rem;
+    background: var(--dx-subtle);
+    border: 1px solid var(--dx-line-soft);
+    border-radius: 8px;
+}
+
+.dx-film {
+    position: relative;
+    flex-shrink: 0;
+    width: 56px;
+    height: 56px;
+    overflow: hidden;
+    border-radius: 6px;
+    background: #0E8A7E;
+    box-shadow: inset 0 0 0 1px rgba(16, 32, 46, 0.08);
+}
+
+.dx-film img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* Attached image: shown on a film-dark ground */
+.dx-film.has-image { background: #0B141C; }
+.dx-film.has-image img { filter: grayscale(1) contrast(1.05); }
+
+/* No image yet: the X-Ray artwork, tinted like the notifications tile */
+.dx-film-art { mix-blend-mode: screen; opacity: 0.95; }
+
+.dx-film-count {
+    position: absolute;
+    right: 3px;
+    bottom: 3px;
+    min-width: 16px;
+    padding: 0 0.25rem;
+    font-size: 0.6rem;
+    font-weight: 600;
+    line-height: 16px;
+    text-align: center;
+    color: #FFFFFF;
+    background: rgba(11, 20, 28, 0.72);
+    border-radius: 3px;
+}
+
+.dx-study-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
 }
 
 .dx-kind {
     display: inline-flex;
     align-items: center;
-    gap: 0.3rem;
-    padding: 0.15rem 0.5rem;
-    font-size: 0.72rem;
+    gap: 0.4rem;
+    font-size: 0.64rem;
     font-weight: 600;
-    border-radius: 5px;
-    border: 1px solid transparent;
-    white-space: nowrap;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--dx-muted);
 }
 
-.dx-kind--xray { color: #4338ca; background: #eef2ff; border-color: #e0e7ff; }
-
-.dx-kind i { font-size: 0.72em; }
-
-/* ---- services ---- */
-
-.dx-card-services {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.3rem;
-    margin-bottom: 0.85rem;
-    min-height: 1.55rem;
+.dx-kind::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 2px;
+    background: var(--kind, #0E8A7E);
 }
 
-.dx-chip {
-    padding: 0.15rem 0.5rem;
-    font-size: 0.72rem;
-    color: var(--dx-text);
-    background: var(--dx-surface);
-    border: 1px solid var(--dx-line);
-    border-radius: 5px;
-    white-space: nowrap;
-    max-width: 100%;
+.dx-kind--xray { --kind: #0E8A7E; }
+.dx-kind--ct   { --kind: #0B67B2; }
+.dx-kind--mri  { --kind: #7D5A80; }
+.dx-kind--us   { --kind: #D29A1E; }
+
+.dx-exam-name {
+    margin: 0;
+    font-size: 0.84rem;
+    font-weight: 500;
+    line-height: 1.35;
+    color: var(--dx-ink);
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
     overflow: hidden;
-    text-overflow: ellipsis;
 }
 
-.dx-card-chips {
-    display: flex;
-    flex-wrap: wrap;
+.dx-study-note {
+    display: inline-flex;
+    align-items: center;
     gap: 0.3rem;
-    margin-bottom: 0.85rem;
+    font-size: 0.7rem;
+    color: var(--dx-muted);
 }
 
-.dx-chip--image { color: #0e7490; background: #ecfeff; border-color: #cffafe; }
-.dx-chip--draft { color: #b45309; background: #fff4e5; border-color: #fde68a; }
+.dx-study-note i { font-size: 0.72rem; color: #B54708; }
 
-.dx-chip i { font-size: 0.72em; }
-
-/* ---- meta ---- */
+/* ---- meta: two quiet columns ---- */
 
 .dx-card-meta {
     display: grid;
-    grid-template-columns: 1fr;
-    gap: 0.4rem;
-    margin: 0 0 0.85rem;
-    padding: 0.7rem 0;
-    border-top: 1px solid var(--dx-line-soft);
-    border-bottom: 1px solid var(--dx-line-soft);
-    font-size: 0.78rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0 0.15rem;
 }
 
-.dx-card-meta > div {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 0.75rem;
-    min-width: 0;
-}
+.dx-card-meta > div { min-width: 0; }
 
 .dx-card-meta dt {
-    flex-shrink: 0;
-    color: var(--dx-muted);
-    font-weight: 500;
+    font-size: 0.64rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--dx-faint);
 }
 
 .dx-card-meta dd {
-    margin: 0;
-    text-align: right;
+    margin: 0.15rem 0 0;
+    font-size: 0.8rem;
     color: var(--dx-ink);
-    min-width: 0;
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
 }
-
-.dx-card-meta time { font-variant-numeric: tabular-nums; }
-.dx-card-meta time > span { color: var(--dx-faint); margin: 0 0.1rem; }
 
 /* ---- footer ---- */
 
@@ -793,24 +824,27 @@ $shorten = static function ($text, $max = 46) {
     display: flex;
     align-items: center;
     gap: 0.4rem;
-    margin-top: auto;
+    padding: 0.65rem 0.9rem;
+    border-top: 1px solid var(--dx-line-soft);
 }
+
+.dx-card-foot .dx-btn--sm { flex: 1; }
 
 .dx-card-menu { flex-shrink: 0; }
 
-/* ---- status pill ---- */
+/* ---- status ---- */
 
 .dx-status {
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    padding: 0.2rem 0.55rem;
-    font-size: 0.72rem;
+    padding: 0.12rem 0.45rem;
+    font-size: 0.7rem;
     font-weight: 600;
     white-space: nowrap;
     color: var(--tone-fg);
     background: var(--tone-bg);
-    border-radius: 999px;
+    border-radius: 4px;
 }
 
 .dx-status::before {
@@ -821,11 +855,11 @@ $shorten = static function ($text, $max = 46) {
     background: var(--tone-dot);
 }
 
-.dx-status--pending   { --tone-bg: #fffbeb; --tone-fg: #b45309; --tone-dot: #f59e0b; }
-.dx-status--progress  { --tone-bg: #eff6ff; --tone-fg: #1d4ed8; --tone-dot: #3b82f6; }
-.dx-status--completed { --tone-bg: #ecfdf5; --tone-fg: #047857; --tone-dot: #10b981; }
-.dx-status--released  { --tone-bg: #f0fdfa; --tone-fg: #0f766e; --tone-dot: #14b8a6; }
-.dx-status--cancelled { --tone-bg: #f1f5f9; --tone-fg: #64748b; --tone-dot: #94a3b8; }
+.dx-status--pending   { --tone-bg: #FEF6E7; --tone-fg: #93370D; --tone-dot: #DC6803; }
+.dx-status--progress  { --tone-bg: #E8F1FA; --tone-fg: #08528F; --tone-dot: #0B67B2; }
+.dx-status--completed { --tone-bg: #ECFDF3; --tone-fg: #067647; --tone-dot: #17B26A; }
+.dx-status--released  { --tone-bg: #E6F6F4; --tone-fg: #0E6E64; --tone-dot: #0E8A7E; }
+.dx-status--cancelled { --tone-bg: #F2F4F7; --tone-fg: #475467; --tone-dot: #98A2B3; }
 
 /* ---- row menu ---- */
 
@@ -865,7 +899,7 @@ $shorten = static function ($text, $max = 46) {
     font-size: 1.2rem;
     color: var(--dx-faint);
     background: var(--dx-line-soft);
-    border-radius: 10px;
+    border-radius: 8px;
 }
 
 .dx-empty h3 { margin: 0 0 0.25rem; font-size: 0.95rem; font-weight: 600; color: var(--dx-ink); }
@@ -911,10 +945,6 @@ $shorten = static function ($text, $max = 46) {
 
 /* ---------- Responsive ---------- */
 
-@media (max-width: 1200px) {
-    .dx-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-
 @media (max-width: 768px) {
     .dx-head { flex-direction: column; align-items: stretch; }
     .dx-head-actions .dx-btn { flex: 1; }
@@ -922,10 +952,8 @@ $shorten = static function ($text, $max = 46) {
     .dx-filters .dx-search { flex-basis: 100%; max-width: none; }
     .dx-kbd { display: none; }
 
-    .dx-cards { grid-template-columns: minmax(0, 1fr); padding: 0.75rem; }
+    .dx-cards { grid-template-columns: minmax(0, 1fr); padding: 0.75rem; gap: 0.6rem; }
 
-    .dx-card-meta > div { align-items: flex-start; flex-direction: column; gap: 0.1rem; }
-    .dx-card-meta dd { text-align: left; white-space: normal; }
 
     .dx-foot { justify-content: center; }
 }

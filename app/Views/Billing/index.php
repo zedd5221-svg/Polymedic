@@ -34,24 +34,9 @@ $kpiTrends = $kpiTrends ?? [];
 
 <div class="bl">
 
-    <?php if (session()->getFlashdata('success')): ?>
-        <div class="bl-alert bl-alert--success">
-            <i class="bi bi-check-circle-fill"></i>
-            <span><?= esc(session()->getFlashdata('success')) ?></span>
-        </div>
-    <?php endif; ?>
-    <?php if (session()->getFlashdata('error')): ?>
-        <div class="bl-alert bl-alert--error">
-            <i class="bi bi-exclamation-circle-fill"></i>
-            <span><?= esc(session()->getFlashdata('error')) ?></span>
-        </div>
-    <?php endif; ?>
-
     <!-- HEADER -->
     <header class="bl-head">
-        <div>
-            <h2 class="bl-title">Billing</h2>
-        </div>
+       
         <div class="bl-head-actions">
             <?php if ($isAdminUser): ?>
                 <a class="bl-btn" href="<?= base_url($routeBase . '/reports') ?>">
@@ -251,14 +236,14 @@ $kpiTrends = $kpiTrends ?? [];
 <style>
 /* ── Billing namespace ─────────────────────────────────────── */
 .bl {
-    --bl-ink:#0f172a; --bl-text:#334155; --bl-muted:#64748b; --bl-faint:#94a3b8;
-    --bl-line:#e2e8f0; --bl-line-soft:#f1f5f9; --bl-surface:#fff; --bl-subtle:#f8fafc;
+    --bl-ink:var(--pm-text); --bl-text:var(--pm-text-soft); --bl-muted:var(--pm-text-muted); --bl-faint:var(--pm-text-muted);
+    --bl-line:var(--pm-line); --bl-line-soft:var(--pm-subtle); --bl-surface:var(--pm-surface); --bl-subtle:var(--pm-subtle);
     /* Accent aligned with the layout's --active-blue */
-    --bl-accent:#0B67B2; --bl-accent-dark:#08528F; --bl-accent-soft:#E8F1FA;
-    --bl-warn:#b45309; --bl-warn-soft:#fff7ed;
-    --bl-danger:#b91c1c; --bl-danger-soft:#fef2f2;
-    --bl-green:#047857; --bl-green-soft:#ecfdf5;
-    --bl-blue:#1d4ed8; --bl-blue-soft:#eaf2fe;
+    --bl-accent:var(--pm-accent); --bl-accent-dark:var(--pm-accent-text); --bl-accent-soft:var(--pm-accent-soft);
+    --bl-warn:#b45309; --bl-warn-soft:var(--pm-tint-amber);
+    --bl-danger:#b91c1c; --bl-danger-soft:var(--pm-tint-red);
+    --bl-green:#047857; --bl-green-soft:var(--pm-tint-green);
+    --bl-blue:#1d4ed8; --bl-blue-soft:var(--pm-tint-blue);
     --bl-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
     color:var(--bl-text);
     font-size:.875rem;
@@ -270,8 +255,8 @@ $kpiTrends = $kpiTrends ?? [];
     padding:.7rem .9rem; margin-bottom:1rem;
     border:1px solid transparent; border-radius:10px; font-size:.8125rem;
 }
-.bl-alert--success { background:#f0fdf4; border-color:#bbf7d0; color:#166534; }
-.bl-alert--error   { background:#fef2f2; border-color:#fecaca; color:#991b1b; }
+.bl-alert--success { background:var(--pm-dk-bg-green, #f0fdf4); border-color:var(--pm-dk-edge-green, #bbf7d0); color:var(--pm-dk-fg-green, #166534); }
+.bl-alert--error   { background:var(--pm-dk-bg-red, #fef2f2); border-color:var(--pm-dk-edge-red, #fecaca); color:var(--pm-dk-fg-red, #991b1b); }
 
 .bl-head { display:flex; align-items:flex-end; justify-content:space-between;
            gap:1rem; flex-wrap:wrap; margin-bottom:1.1rem; }
@@ -291,13 +276,13 @@ $kpiTrends = $kpiTrends ?? [];
     text-decoration:none; cursor:pointer;
     transition:background .15s, border-color .15s, color .15s;
 }
-.bl-btn:hover { background:var(--bl-subtle); border-color:#cbd5e1; color:var(--bl-ink); }
+.bl-btn:hover { background:var(--bl-subtle); border-color:var(--pm-line); color:var(--bl-ink); }
 .bl-btn i { font-size:.9em; }
 .bl-btn--primary, .bl-btn--primary:hover { color:#fff; }
 .bl-btn--primary { background:var(--bl-accent); border-color:var(--bl-accent);
-                   box-shadow:0 1px 2px rgba(11,103,178,.25); }
+                   box-shadow:0 1px 2px rgba(23, 85, 99,.25); }
 .bl-btn--primary:hover { background:var(--bl-accent-dark); border-color:var(--bl-accent-dark);
-                         box-shadow:0 4px 12px rgba(11,103,178,.25); }
+                         box-shadow:0 4px 12px rgba(23, 85, 99,.25); }
 
 
 
@@ -332,12 +317,12 @@ $kpiTrends = $kpiTrends ?? [];
                 font-weight:600; text-align:center; color:var(--bl-muted);
                 background:var(--bl-line-soft); border-radius:999px;
                 font-variant-numeric:tabular-nums; }
-.bl-tab.is-active .bl-tab-count { color:var(--bl-accent); background:var(--bl-accent-soft); }
+.bl-tab.is-active .bl-tab-count { color:var(--bl-accent-dark); background:var(--bl-accent-soft); }
 
 /* FILTERS */
 .bl-filters { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;
               padding:.85rem 1rem; border-bottom:1px solid var(--bl-line);
-              background:linear-gradient(180deg,#fcfdfe,var(--bl-surface)); }
+              background:linear-gradient(180deg, var(--pm-surface-top), var(--pm-surface)); }
 .bl-search { position:relative; flex:1 1 280px; max-width:460px; }
 .bl-search > i { position:absolute; left:.75rem; top:50%;
                  transform:translateY(-50%); font-size:.8rem;
@@ -349,7 +334,7 @@ $kpiTrends = $kpiTrends ?? [];
     transition:border-color .15s, box-shadow .15s;
 }
 .bl-input:focus { outline:none; border-color:var(--bl-accent);
-                  box-shadow:0 0 0 3px rgba(11,103,178,.15); }
+                  box-shadow:0 0 0 3px rgba(23, 85, 99,.15); }
 .bl-search .bl-input { width:100%; padding-left:2.1rem; }
 .bl-date-range { position:relative; display:inline-flex; align-items:center; gap:.35rem;
                  padding-left:1.8rem; }
@@ -372,7 +357,7 @@ $kpiTrends = $kpiTrends ?? [];
                border-bottom:1px solid var(--bl-line-soft); }
 .bl-table tbody tr:last-child td { border-bottom:0; }
 .bl-table tbody tr { transition:background .12s; }
-.bl-table tbody tr:hover { background:#fafbfd; }
+.bl-table tbody tr:hover { background:var(--pm-subtle); }
 
 .bl-c-ref { white-space:nowrap; }
 .bl-ref { font-family:var(--bl-mono); font-size:.78rem; font-weight:600;
@@ -400,11 +385,11 @@ $kpiTrends = $kpiTrends ?? [];
              border-radius:999px; white-space:nowrap;
              color:var(--tone-fg,#334155); background:var(--tone-bg,#f1f5f9); }
 .bl-status i { font-size:.75em; }
-.bl-status--draft    { --tone-bg:#f1f5f9; --tone-fg:#475569; }
+.bl-status--draft    { --tone-bg:var(--pm-subtle); --tone-fg:#475569; }
 .bl-status--unpaid   { --tone-bg:var(--bl-warn-soft); --tone-fg:var(--bl-warn); }
 .bl-status--partial  { --tone-bg:var(--bl-blue-soft); --tone-fg:var(--bl-blue); }
 .bl-status--paid     { --tone-bg:var(--bl-green-soft); --tone-fg:var(--bl-green); }
-.bl-status--void     { --tone-bg:#f1f5f9; --tone-fg:#64748b; }
+.bl-status--void     { --tone-bg:var(--pm-subtle); --tone-fg:#64748b; }
 .bl-status--refunded { --tone-bg:var(--bl-danger-soft); --tone-fg:var(--bl-danger); }
 
 .bl-actions-col { width:1%; }
@@ -417,11 +402,11 @@ $kpiTrends = $kpiTrends ?? [];
     border-radius:8px; text-decoration:none; cursor:pointer;
     transition:background .15s, color .15s, border-color .15s;
 }
-.bl-icon-btn:hover { background:var(--bl-blue-soft); color:var(--bl-blue); border-color:#dbe6fb; }
-.bl-icon-btn--primary:hover { background:var(--bl-accent-soft); color:var(--bl-accent-dark); border-color:#C6DCF1; }
+.bl-icon-btn:hover { background:var(--bl-blue-soft); color:var(--bl-blue); border-color:var(--pm-dk-edge-blue, #dbe6fb); }
+.bl-icon-btn--primary:hover { background:var(--bl-accent-soft); color:var(--bl-accent-dark); border-color:var(--pm-dk-edge-teal, #C5DCE0); }
 
 .bl-empty { padding:3rem 1rem; text-align:center; }
-.bl-empty i { font-size:1.8rem; color:var(--bl-faint); display:block; margin-bottom:.6rem; }
+.bl-empty > i { font-size:1.8rem; color:var(--bl-faint); display:block; margin-bottom:.6rem; }
 .bl-empty h3 { margin:0 0 .35rem; font-size:.95rem; font-weight:600; color:var(--bl-ink); }
 .bl-empty p { margin:0 auto 1rem; max-width:26rem; font-size:.8125rem; color:var(--bl-muted); }
 
@@ -437,7 +422,7 @@ $kpiTrends = $kpiTrends ?? [];
     text-decoration:none; font-variant-numeric:tabular-nums;
     transition:background .15s, border-color .15s, color .15s;
 }
-.bl-page:hover { background:var(--bl-subtle); border-color:#cbd5e1; }
+.bl-page:hover { background:var(--bl-subtle); border-color:var(--pm-line); }
 .bl-page.active { background:var(--bl-accent); border-color:var(--bl-accent); color:#fff; }
 .bl-page.is-disabled { opacity:.45; pointer-events:none; }
 .bl-gap { color:var(--bl-faint); padding:0 .15rem; }

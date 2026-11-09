@@ -40,16 +40,7 @@ $initialsOf = static function ($name) {
 
     <!-- PAGE HEADER -->
     <header class="dx-head">
-        <div>
-            <h2 class="dx-title">X-Ray examinations</h2>
-        </div>
-
-        <div class="dx-head-actions">
-            <button type="button" class="dx-btn" onclick="window.location.reload()">
-                <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
-                Refresh
-            </button>
-        </div>
+       
     </header>
 
 
@@ -304,20 +295,20 @@ $initialsOf = static function ($name) {
     --dx-ink:         var(--pm-text, #10202E);
     --dx-text:        var(--pm-text-soft, #3B4C5E);
     --dx-muted:       var(--pm-text-muted, #5D6E80);
-    --dx-faint:       #7A8B9D;
+    --dx-faint:       var(--pm-text-muted);
     --dx-line:        var(--pm-line, #DDE4EC);
     --dx-line-strong: var(--pm-line-strong, #C3CFDB);
-    --dx-line-soft:   #EBF0F5;
-    --dx-surface:     #FFFFFF;
-    --dx-subtle:      #F8FAFC;
-    --dx-accent:      var(--pm-accent, #0B67B2);
-    --dx-accent-dark: var(--pm-accent-hover, #08528F);
-    --dx-accent-soft: var(--pm-accent-soft, #E8F1FA);
+    --dx-line-soft:   var(--pm-line);
+    --dx-surface:     var(--pm-surface);
+    --dx-subtle:      var(--pm-subtle);
+    --dx-accent:      var(--pm-accent, #175563);
+    --dx-accent-dark: var(--pm-accent-hover, #10404B);
+    --dx-accent-soft: var(--pm-accent-soft, #EBF2F4);
     --dx-danger:      #B42318;
     --dx-danger-dark: #912018;
     --dx-radius:      8px;
     --dx-radius-sm:   6px;
-    --dx-ring:        0 0 0 3px rgba(11, 103, 178, 0.18);
+    --dx-ring:        0 0 0 3px rgba(23, 85, 99, 0.18);
     --dx-mono:        var(--pm-mono, ui-monospace, monospace);
 
     color: var(--dx-text);
@@ -382,7 +373,7 @@ $initialsOf = static function ($name) {
     transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.dx-btn:hover { background: var(--dx-subtle); border-color: #cbd5e1; color: var(--dx-ink); }
+.dx-btn:hover { background: var(--dx-subtle); border-color: var(--pm-line); color: var(--dx-ink); }
 .dx-btn i { font-size: 0.9em; }
 
 .dx-btn--primary,
@@ -565,7 +556,7 @@ $initialsOf = static function ($name) {
 
 .dx-card:hover {
     border-color: var(--dx-line-strong);
-    box-shadow: 0 8px 20px -14px rgba(12, 45, 72, 0.35);
+    box-shadow: 0 8px 20px -14px rgba(20, 45, 54, 0.35);
 }
 
 .dx-card.is-hidden { display: none; }
@@ -578,14 +569,14 @@ $initialsOf = static function ($name) {
     justify-content: space-between;
     gap: 0.5rem;
     padding: 0.55rem 0.9rem;
-    background: #FBFCFD;
+    background: var(--pm-surface-top);
     border-bottom: 1px solid var(--dx-line-soft);
 }
 
 /* STAT: the band carries the urgency, the rest of the card stays calm */
 .dx-card.is-stat .dx-card-head {
-    background: #FEF6F5;
-    border-bottom-color: #FBE1DE;
+    background: var(--pm-tint-red);
+    border-bottom-color: rgba(240, 68, 56, 0.2);
 }
 
 .dx-card-id {
@@ -658,7 +649,7 @@ $initialsOf = static function ($name) {
     font-weight: 600;
     letter-spacing: 0.03em;
     color: var(--dx-ink);
-    background: #E3EAF2;
+    background: var(--pm-avatar);
     border-radius: 50%;
 }
 
@@ -762,7 +753,7 @@ $initialsOf = static function ($name) {
 }
 
 .dx-kind--xray { --kind: #0E8A7E; }
-.dx-kind--ct   { --kind: #0B67B2; }
+.dx-kind--ct   { --kind: #175563; }
 .dx-kind--mri  { --kind: #7D5A80; }
 .dx-kind--us   { --kind: #D29A1E; }
 
@@ -787,7 +778,7 @@ $initialsOf = static function ($name) {
     color: var(--dx-muted);
 }
 
-.dx-study-note i { font-size: 0.72rem; color: #B54708; }
+.dx-study-note i { font-size: 0.72rem; color: var(--pm-dk-fg-amber, #B54708); }
 
 /* ---- meta: two quiet columns ---- */
 
@@ -856,10 +847,10 @@ $initialsOf = static function ($name) {
 }
 
 .dx-status--pending   { --tone-bg: #FEF6E7; --tone-fg: #93370D; --tone-dot: #DC6803; }
-.dx-status--progress  { --tone-bg: #E8F1FA; --tone-fg: #08528F; --tone-dot: #0B67B2; }
+.dx-status--progress  { --tone-bg: #EBF2F4; --tone-fg: #10404B; --tone-dot: #175563; }
 .dx-status--completed { --tone-bg: #ECFDF3; --tone-fg: #067647; --tone-dot: #17B26A; }
 .dx-status--released  { --tone-bg: #E6F6F4; --tone-fg: #0E6E64; --tone-dot: #0E8A7E; }
-.dx-status--cancelled { --tone-bg: #F2F4F7; --tone-fg: #475467; --tone-dot: #98A2B3; }
+.dx-status--cancelled { --tone-bg: var(--pm-subtle); --tone-fg: #475467; --tone-dot: #98A2B3; }
 
 /* ---- row menu ---- */
 
@@ -938,9 +929,9 @@ $initialsOf = static function ($name) {
     cursor: pointer;
 }
 
-.dx-page:hover:not(:disabled) { background: var(--dx-subtle); border-color: #cbd5e1; }
+.dx-page:hover:not(:disabled) { background: var(--dx-subtle); border-color: var(--pm-line); }
 .dx-page:disabled { opacity: 0.45; cursor: not-allowed; }
-.dx-page[aria-current="page"] { color: var(--dx-accent); background: var(--dx-accent-soft); border-color: #bcd6f3; }
+.dx-page[aria-current="page"] { color: var(--dx-accent); background: var(--dx-accent-soft); border-color: var(--pm-dk-edge-blue, #bcd6f3); }
 .dx-page-gap { min-width: 20px; text-align: center; color: var(--dx-faint); }
 
 /* ---------- Responsive ---------- */

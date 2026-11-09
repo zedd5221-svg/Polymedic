@@ -52,13 +52,13 @@ $old = static fn (string $key) => old($key, $user[$key] ?? '');
     --pf-ink:    var(--pm-text, #10202E);
     --pf-text:   var(--pm-text-soft, #3B4C5E);
     --pf-muted:  var(--pm-text-muted, #5D6E80);
-    --pf-faint:  #7A8B9D;
+    --pf-faint:  var(--pm-text-muted);
     --pf-line:   var(--pm-line, #DDE4EC);
     --pf-strong: var(--pm-line-strong, #C3CFDB);
-    --pf-soft:   #EBF0F5;
-    --pf-subtle: #F8FAFC;
-    --pf-accent: var(--pm-accent, #0B67B2);
-    --pf-accent-dark: var(--pm-accent-hover, #08528F);
+    --pf-soft:   var(--pm-subtle);
+    --pf-subtle: var(--pm-subtle);
+    --pf-accent: var(--pm-accent, #175563);
+    --pf-accent-dark: var(--pm-accent-hover, #10404B);
 
     max-width: 1120px;
     margin: 0 auto;
@@ -66,7 +66,7 @@ $old = static fn (string $key) => old($key, $user[$key] ?? '');
 }
 
 .pf-card {
-    background: #FFFFFF;
+    background: var(--pm-surface);
     border: 1px solid var(--pf-line);
     border-radius: 8px;
 }
@@ -95,7 +95,7 @@ $old = static fn (string $key) => old($key, $user[$key] ?? '');
     font-weight: 600;
     letter-spacing: 0.02em;
     color: var(--pf-ink);
-    background: #E3EAF2;
+    background: var(--pm-avatar);
     box-shadow: 0 0 0 1px var(--pf-line);
 }
 
@@ -160,7 +160,7 @@ $old = static fn (string $key) => old($key, $user[$key] ?? '');
     font-size: 0.8rem;
     font-weight: 600;
     color: var(--pf-ink);
-    background: #FFFFFF;
+    background: var(--pm-surface);
     border: 1px solid var(--pf-line);
     border-radius: 6px;
     cursor: pointer;
@@ -172,7 +172,7 @@ $old = static fn (string $key) => old($key, $user[$key] ?? '');
 .pf-btn:focus-visible { outline: 2px solid var(--pf-accent); outline-offset: 2px; }
 
 .pf-btn--quiet { color: var(--pf-muted); border-color: transparent; background: transparent; }
-.pf-btn--quiet:hover { color: #B42318; background: #FEF3F2; border-color: transparent; }
+.pf-btn--quiet:hover { color: var(--pm-dk-fg-red, #B42318); background: var(--pm-dk-bg-red, #FEF3F2); border-color: transparent; }
 
 /* ---------- Layout ---------- */
 
@@ -329,7 +329,7 @@ $old = static fn (string $key) => old($key, $user[$key] ?? '');
 .pf .form-control:focus,
 .pf .form-select:focus {
     border-color: var(--pf-accent);
-    box-shadow: 0 0 0 3px rgba(11, 103, 178, 0.15);
+    box-shadow: 0 0 0 3px rgba(23, 85, 99, 0.15);
 }
 
 .pf .form-control[readonly] {
@@ -338,9 +338,9 @@ $old = static fn (string $key) => old($key, $user[$key] ?? '');
     border-color: var(--pf-line);
 }
 
-.pf-req { color: #B42318; }
+.pf-req { color: var(--pm-dk-fg-red, #B42318); }
 .pf-hint { margin-top: 0.3rem; font-size: 0.74rem; color: var(--pf-muted); }
-.pf-hint.is-error { color: #B42318; }
+.pf-hint.is-error { color: var(--pm-dk-fg-red, #B42318); }
 
 .pf-pw { position: relative; }
 .pf-pw .form-control { padding-right: 2.6rem; }
@@ -381,7 +381,7 @@ $old = static fn (string $key) => old($key, $user[$key] ?? '');
 .pf-form-foot--start { justify-content: flex-start; }
 
 .pf .btn { font-size: 0.8125rem; font-weight: 600; border-radius: 6px; }
-.pf .btn-light { color: var(--pf-text); background: #FFFFFF; border-color: var(--pf-line); }
+.pf .btn-light { color: var(--pf-text); background: var(--pm-surface); border-color: var(--pf-line); }
 .pf .btn-light:hover { background: var(--pf-subtle); border-color: var(--pf-strong); }
 
 /* ---------- Responsive ---------- */
@@ -401,19 +401,6 @@ $old = static fn (string $key) => old($key, $user[$key] ?? '');
 </style>
 
 <div class="pf">
-
-    <?php if (session()->getFlashdata('success')): ?>
-        <div class="alert alert-success alert-dismissible fade show pf-alert" role="alert">
-            <i class="bi bi-check-circle-fill me-2"></i><?= esc(session()->getFlashdata('success')) ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    <?php endif; ?>
-    <?php if (session()->getFlashdata('error')): ?>
-        <div class="alert alert-danger alert-dismissible fade show pf-alert" role="alert">
-            <i class="bi bi-exclamation-triangle-fill me-2"></i><?= esc(session()->getFlashdata('error')) ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    <?php endif; ?>
 
     <!-- =====================================================
          HEADER
@@ -705,7 +692,7 @@ $old = static fn (string $key) => old($key, $user[$key] ?? '');
     var confirmPw = root.querySelector('#pfConfirmPw');
     var bars = root.querySelectorAll('#pfStrength span');
     var mismatch = root.querySelector('#pfMismatch');
-    var colors = ['#B42318', '#DC6803', '#0B67B2', '#17B26A'];
+    var colors = ['#B42318', '#DC6803', '#175563', '#17B26A'];
 
     function checkMatch() {
         mismatch.hidden = !confirmPw.value || confirmPw.value === newPw.value;

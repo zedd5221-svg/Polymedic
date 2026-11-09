@@ -736,14 +736,14 @@ $tabLabel = ['lab' => 'Laboratory', 'xray' => 'X-ray'];
         <div class="container">
             <div class="row g-5 align-items-center">
                 <div class="col-lg-6 order-lg-2">
-                    <img class="pm-illustration" src="<?= base_url() ?>assets/images/Appointment2.png" alt="Patient booking an appointment on a phone" loading="lazy">
+                    <img class="pm-illustration" src="<?= base_url() ?>assets/images/appointment2.png" alt="Patient booking an appointment on a phone" loading="lazy">
                 </div>
                 <div class="col-lg-6 order-lg-1">
                     <h2>How to book an appointment</h2>
                     <p class="pm-intro">It takes about two minutes. You'll get a confirmation once your booking is saved.</p>
                     <ol class="pm-steps">
                         <li><strong>Open the booking page</strong><span>Tap Book appointment anywhere on this page.</span></li>
-                        <li><strong>Choose your date</strong><span>Pick the day that works best for you.</span></li>
+                        <li><strong>Choose A Service</strong><span>Pick the service you need.</span></li>
                         <li><strong>Enter your details</strong><span>Add your personal information and any special requests.</span></li>
                         <li><strong>Review and confirm</strong><span>Check everything is correct, then confirm your booking.</span></li>
                     </ol>

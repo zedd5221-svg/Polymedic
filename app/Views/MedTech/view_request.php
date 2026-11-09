@@ -35,6 +35,7 @@ $refNo = 'LAB-' . date('y') . '-' . str_pad((string) $request['id'], 4, '0', STR
  * Group the merged result rows back under the service they came from.
  */
 $grouped = [];
+$groupSection = [];   // service => lab section (Chemistry, Hematology...)
 foreach ($results as $row) {
     $svc = trim((string) ($row['service_name'] ?? ''));
     if ($svc === '') {
@@ -42,6 +43,9 @@ foreach ($results as $row) {
     }
     if (!isset($grouped[$svc])) {
         $grouped[$svc] = [];
+    }
+    if (!isset($groupSection[$svc]) && !empty($row['section'])) {
+        $groupSection[$svc] = (string) $row['section'];
     }
     $grouped[$svc][] = $row;
 }
@@ -92,20 +96,6 @@ $releasedOn = $labDate($request['released_at'] ?? null, 'M j, Y · g:i A');
     <a href="<?= base_url('medtech/requests') ?>" class="lab-back">
         <i class="bi bi-arrow-left" aria-hidden="true"></i>Lab requests
     </a>
-
-    <?php if (session()->getFlashdata('success')): ?>
-        <div class="lab-msg lab-msg--ok">
-            <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
-            <span><?= esc(session()->getFlashdata('success')) ?></span>
-        </div>
-    <?php endif; ?>
-
-    <?php if (session()->getFlashdata('error')): ?>
-        <div class="lab-msg lab-msg--err">
-            <i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i>
-            <span><?= esc(session()->getFlashdata('error')) ?></span>
-        </div>
-    <?php endif; ?>
 
     <?php if (session()->getFlashdata('validation_errors')): ?>
         <div class="lab-msg lab-msg--err">
@@ -240,6 +230,21 @@ $releasedOn = $labDate($request['released_at'] ?? null, 'M j, Y · g:i A');
             <?php endif; ?>
         </div>
 
+        <?php if (!empty($orderedServices)): ?>
+            <!-- What the patient was ordered, each with its lab section -->
+            <div class="lab-ordered">
+                <span class="lab-ordered-label">Ordered</span>
+                <ul class="lab-ordered-list">
+                    <?php foreach ($orderedServices as $os): ?>
+                        <li class="lab-ordered-item">
+                            <span class="lab-ordered-type"><?= esc($os['section']) ?></span>
+                            <span class="lab-ordered-name"><?= esc($os['name']) ?></span>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+        <?php endif; ?>
+
 
         <?php if ($isReleased): ?>
 
@@ -261,6 +266,7 @@ $releasedOn = $labDate($request['released_at'] ?? null, 'M j, Y · g:i A');
                                 <td colspan="5">
                                     <span class="lab-group-bar" aria-hidden="true"></span>
                                     <span class="lab-group-name"><?= esc($svcName) ?></span>
+<?php if (!empty($groupSection[$svcName])): ?><span class="lab-group-type"><?= esc($groupSection[$svcName]) ?></span><?php endif; ?>
                                     <span class="lab-group-count">
                                         <?= count($rows) ?> <?= count($rows) === 1 ? 'test' : 'tests' ?>
                                     </span>
@@ -339,8 +345,8 @@ $releasedOn = $labDate($request['released_at'] ?? null, 'M j, Y · g:i A');
                             <tr>
                                 <th class="lab-w-test">Test</th>
                                 <th class="lab-right lab-w-result">Result <span class="lab-req" title="Required">*</span></th>
-                                <th class="lab-w-unit">Unit <span class="lab-req" title="Required">*</span></th>
-                                <th class="lab-w-range">Reference range <span class="lab-req" title="Required">*</span></th>
+                                <th class="lab-w-unit">Unit</th>
+                                <th class="lab-w-range">Reference range</th>
                                 <th class="lab-w-flag">Flag</th>
                                 <th class="lab-right lab-w-action"><span class="visually-hidden">Actions</span></th>
                             </tr>
@@ -357,6 +363,7 @@ $releasedOn = $labDate($request['released_at'] ?? null, 'M j, Y · g:i A');
                                         </button>
                                         <span class="lab-group-bar" aria-hidden="true"></span>
                                         <span class="lab-group-name"><?= esc($svcName) ?></span>
+<?php if (!empty($groupSection[$svcName])): ?><span class="lab-group-type"><?= esc($groupSection[$svcName]) ?></span><?php endif; ?>
                                         <span class="lab-group-count">
                                             <span data-count><?= count($rows) ?></span>
                                             <?= count($rows) === 1 ? 'test' : 'tests' ?>
@@ -407,14 +414,14 @@ $releasedOn = $labDate($request['released_at'] ?? null, 'M j, Y · g:i A');
                                         <td data-label="Unit">
                                             <input type="text" class="lab-input" name="unit[]"
                                                    value="<?= esc($result['unit']) ?>"
-                                                   data-required autocomplete="off"
+                                                   autocomplete="off"
                                                    autocorrect="off" autocapitalize="off" spellcheck="false"
                                                    enterkeyhint="next" list="labUnits">
                                         </td>
                                         <td data-label="Reference range">
                                             <input type="text" class="lab-input" name="reference_range[]"
                                                    value="<?= esc($result['reference_range']) ?>"
-                                                   data-required autocomplete="off"
+                                                   autocomplete="off"
                                                    autocorrect="off" autocapitalize="off" spellcheck="false"
                                                    enterkeyhint="next">
                                         </td>
@@ -439,7 +446,7 @@ $releasedOn = $labDate($request['released_at'] ?? null, 'M j, Y · g:i A');
 
                     <div class="lab-empty" id="emptyRow" <?= !empty($grouped) ? 'hidden' : '' ?>>
                         <i class="bi bi-clipboard-plus" aria-hidden="true"></i>
-                        <p>No tests matched the ordered services. Use <strong>Add row</strong> below to enter them manually.</p>
+                        <p>No services on this request. Use <strong>Add row</strong> below to enter tests manually.</p>
                     </div>
                 </div>
 
@@ -532,13 +539,13 @@ $releasedOn = $labDate($request['released_at'] ?? null, 'M j, Y · g:i A');
                     </td>
                     <td data-label="Unit">
                         <input type="text" class="lab-input" name="unit[]"
-                               data-required autocomplete="off"
+                               autocomplete="off"
                                autocorrect="off" autocapitalize="off" spellcheck="false"
                                enterkeyhint="next" list="labUnits">
                     </td>
                     <td data-label="Reference range">
                         <input type="text" class="lab-input" name="reference_range[]"
-                               data-required autocomplete="off"
+                               autocomplete="off"
                                autocorrect="off" autocapitalize="off" spellcheck="false"
                                enterkeyhint="next">
                     </td>
@@ -590,25 +597,25 @@ $releasedOn = $labDate($request['released_at'] ?? null, 'M j, Y · g:i A');
     --lab-ink:         var(--pm-text, #10202E);
     --lab-text:        var(--pm-text-soft, #3B4C5E);
     --lab-muted:       var(--pm-text-muted, #5D6E80);
-    --lab-faint:       #7A8B9D;
+    --lab-faint:       var(--pm-text-muted);
     --lab-line:        var(--pm-line, #DDE4EC);
     --lab-strong:      var(--pm-line-strong, #C3CFDB);
-    --lab-line-soft:   #EBF0F5;
-    --lab-surface:     #FFFFFF;
-    --lab-canvas:      #F8FAFC;
+    --lab-line-soft:   var(--pm-line);
+    --lab-surface:     var(--pm-surface);
+    --lab-canvas:      var(--pm-canvas);
 
-    --lab-accent:      var(--pm-accent, #0B67B2);
-    --lab-accent-dark: var(--pm-accent-hover, #08528F);
-    --lab-accent-soft: #E8F1FA;
+    --lab-accent:      var(--pm-accent, #175563);
+    --lab-accent-dark: var(--pm-accent-hover, #10404B);
+    --lab-accent-soft: var(--pm-accent-soft);
 
     --lab-danger:      #B42318;
-    --lab-danger-soft: #FEF3F2;
+    --lab-danger-soft: var(--pm-tint-red);
     --lab-amber:       #93370D;
-    --lab-amber-soft:  #FEF6E7;
+    --lab-amber-soft:  var(--pm-tint-amber);
     --lab-green:       #067647;
-    --lab-green-soft:  #ECFDF3;
-    --lab-blue:        #08528F;
-    --lab-blue-soft:   #E8F1FA;
+    --lab-green-soft:  var(--pm-tint-green);
+    --lab-blue:        #10404B;
+    --lab-blue-soft:   var(--pm-accent-soft);
 
     --lab-radius:      10px;
     --lab-radius-sm:   6px;
@@ -680,9 +687,9 @@ $releasedOn = $labDate($request['released_at'] ?? null, 'M j, Y · g:i A');
 .lab-msg p { margin: 0.15rem 0 0; }
 .lab-msg ul { margin: 0.3rem 0 0; padding-left: 1.1rem; }
 
-.lab-msg--ok   { color: var(--lab-green);  background: var(--lab-green-soft);  border-color: #ABEFC6; }
-.lab-msg--err  { color: var(--lab-danger); background: var(--lab-danger-soft); border-color: #FECDCA; }
-.lab-msg--warn { color: var(--lab-amber);  background: var(--lab-amber-soft);  border-color: #FEDF89; }
+.lab-msg--ok   { color: var(--lab-green);  background: var(--lab-green-soft);  border-color: var(--pm-dk-edge-green, #ABEFC6); }
+.lab-msg--err  { color: var(--lab-danger); background: var(--lab-danger-soft); border-color: var(--pm-dk-edge-red, #FECDCA); }
+.lab-msg--warn { color: var(--lab-amber);  background: var(--lab-amber-soft);  border-color: var(--pm-dk-edge-amber, #FEDF89); }
 
 /* ---------- Summary ---------- */
 
@@ -710,7 +717,7 @@ $releasedOn = $labDate($request['released_at'] ?? null, 'M j, Y · g:i A');
     font-weight: 600;
     letter-spacing: 0.03em;
     color: var(--lab-ink);
-    background: #E3EAF2;
+    background: var(--pm-avatar);
     border-radius: 50%;
 }
 
@@ -755,7 +762,7 @@ $releasedOn = $labDate($request['released_at'] ?? null, 'M j, Y · g:i A');
 .lab-status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--dot); }
 
 .lab-status--pending   { --bg: #FEF6E7; --fg: #93370D; --dot: #DC6803; }
-.lab-status--progress  { --bg: #E8F1FA; --fg: #08528F; --dot: #0B67B2; }
+.lab-status--progress  { --bg: #EBF2F4; --fg: #10404B; --dot: #175563; }
 .lab-status--draft     { --bg: #F2F4F7; --fg: #475467; --dot: #98A2B3; }
 .lab-status--completed { --bg: #ECFDF3; --fg: #067647; --dot: #17B26A; }
 .lab-status--released  { --bg: #E6F6F3; --fg: #00715F; --dot: #009A85; }
@@ -983,7 +990,7 @@ $releasedOn = $labDate($request['released_at'] ?? null, 'M j, Y · g:i A');
 
 .lab-table td.lab-right { font-variant-numeric: tabular-nums; }
 .lab-bad { font-weight: 600; color: var(--lab-danger); }
-.lab-row.is-bad td { background: #FFFBFA; }
+.lab-row.is-bad td { background: var(--pm-dk-bg-neutral, #FFFBFA); }
 
 .lab-req { color: var(--lab-danger); font-weight: 600; }
 
@@ -1008,7 +1015,7 @@ $releasedOn = $labDate($request['released_at'] ?? null, 'M j, Y · g:i A');
     height: 8px;
     margin-right: 0.5rem;
     vertical-align: 1px;
-    background: #0B67B2;
+    background: #175563;
     border-radius: 2px;
 }
 
@@ -1018,6 +1025,56 @@ $releasedOn = $labDate($request['released_at'] ?? null, 'M j, Y · g:i A');
     color: var(--lab-ink);
 }
 
+/* Ordered services strip, under the Results header */
+.lab-ordered {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.7rem 1.25rem;
+    border-bottom: 1px solid var(--lab-line);
+    background: var(--lab-canvas);
+}
+.lab-ordered-label {
+    flex: none;
+    padding-top: 0.32rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--lab-faint);
+}
+.lab-ordered-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.lab-ordered-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.22rem 0.6rem 0.22rem 0.25rem;
+    background: var(--lab-surface);
+    border: 1px solid var(--lab-line);
+    border-radius: 6px;
+    font-size: 0.8rem;
+    line-height: 1.3;
+}
+.lab-ordered-type,
+.lab-group-type {
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    background: var(--lab-accent-soft);
+    color: var(--lab-accent-dark);
+    font-size: 0.66rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+.lab-ordered-name { font-weight: 500; color: var(--lab-ink); }
+.lab-group-type { margin-left: 0.5rem; vertical-align: 1px; }
 .lab-group-count {
     margin-left: 0.5rem;
     font-size: 0.72rem;
@@ -1086,7 +1143,7 @@ $releasedOn = $labDate($request['released_at'] ?? null, 'M j, Y · g:i A');
 .lab-field textarea:focus {
     outline: none;
     border-color: var(--lab-accent);
-    box-shadow: 0 0 0 3px rgba(11, 103, 178, 0.14);
+    box-shadow: 0 0 0 3px rgba(23, 85, 99, 0.14);
 }
 
 .lab-input--num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
@@ -1109,8 +1166,8 @@ $releasedOn = $labDate($request['released_at'] ?? null, 'M j, Y · g:i A');
 }
 
 .lab-select--normal   { color: var(--lab-muted); }
-.lab-select--high     { color: var(--lab-danger); background-color: var(--lab-danger-soft); border-color: #FECDCA; font-weight: 600; }
-.lab-select--low      { color: var(--lab-blue);   background-color: var(--lab-blue-soft);   border-color: #B9D6F2; font-weight: 600; }
+.lab-select--high     { color: var(--lab-danger); background-color: var(--lab-danger-soft); border-color: var(--pm-dk-edge-red, #FECDCA); font-weight: 600; }
+.lab-select--low      { color: var(--lab-blue);   background-color: var(--lab-blue-soft);   border-color: var(--pm-dk-edge-blue, #B9D6F2); font-weight: 600; }
 .lab-select--critical {
     color: #FFFFFF;
     font-weight: 600;
@@ -1119,7 +1176,7 @@ $releasedOn = $labDate($request['released_at'] ?? null, 'M j, Y · g:i A');
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23ffffff'%3E%3Cpath d='M4.5 6.5 8 10l3.5-3.5z'/%3E%3C/svg%3E");
 }
 
-.lab-row.is-flag-critical td { background: #FFFBFA; }
+.lab-row.is-flag-critical td { background: var(--pm-dk-bg-neutral, #FFFBFA); }
 
 /* ---------- Trash ---------- */
 
@@ -1351,7 +1408,7 @@ $releasedOn = $labDate($request['released_at'] ?? null, 'M j, Y · g:i A');
 
     .lab-table thead th { position: static; background: none; color: #000; border-bottom: 1px solid #000; }
     .lab-group-head td { position: static; background: none; border-top: 1px solid #000; }
-    .lab-table td { border-bottom: 1px solid #ddd; }
+    .lab-table td { border-bottom: 1px solid var(--pm-dk-edge-neutral, #ddd); }
     .lab-bad { color: #000; text-decoration: underline; }
 }
 

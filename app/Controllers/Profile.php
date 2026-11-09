@@ -116,7 +116,7 @@ class Profile extends BaseController
         session()->set('email', $data['email']);
 
         return redirect()->to($this->profileUrl())
-                         ->with('success', 'Your profile has been updated.');
+                         ->with('success', 'Profile updated');
     }
 
     /* ---------------------------------------------------------
@@ -162,7 +162,7 @@ class Profile extends BaseController
         session()->regenerate(true);
 
         return redirect()->to($this->profileUrl())
-                         ->with('success', 'Your password has been changed.')
+                         ->with('success', 'Password changed')
                          ->with('profile_tab', 'security');
     }
 

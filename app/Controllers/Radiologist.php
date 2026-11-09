@@ -447,7 +447,7 @@ class Radiologist extends BaseController
             $model->update($id, $update);
 
             return redirect()->to(base_url('radiologist/examination/view/' . $id))
-                            ->with('success', 'Draft saved. Complete the report when both sections are filled.');
+                            ->with('success', 'Draft saved. Complete it when both sections are filled.');
 
         } catch (\Exception $e) {
             log_message('error', 'Save draft error: ' . $e->getMessage());
@@ -509,7 +509,7 @@ class Radiologist extends BaseController
             $model->update($id, $update);
 
             return redirect()->to(base_url('radiologist/examination/view/' . $id))
-                            ->with('success', 'Report completed. You can now release it to the receptionist.');
+                            ->with('success', 'Report completed. Ready to release.');
 
         } catch (\Exception $e) {
             log_message('error', 'Save findings error: ' . $e->getMessage());
@@ -751,11 +751,11 @@ class Radiologist extends BaseController
 
         $count = count($added);
         $msg   = $count === 1
-            ? 'Image uploaded successfully.'
-            : $count . ' images uploaded successfully.';
+            ? 'Image uploaded'
+            : $count . ' images uploaded';
 
         if ($skipped > 0) {
-            $msg .= ' ' . $skipped . ' file' . ($skipped === 1 ? ' was' : 's were') . ' skipped (invalid type or over the 5-image limit).';
+            $msg .= '. ' . $skipped . ' skipped (wrong type or over the 5-image limit)';
         }
 
         return redirect()->back()->with('success', $msg);
@@ -874,7 +874,7 @@ class Radiologist extends BaseController
             $model->update($id, $update);
 
             return redirect()->to(base_url('radiologist/examinations'))
-                            ->with('success', 'Result released. The receptionist can now print it.');
+                            ->with('success', 'Result released. Ready to print at the front desk.');
 
         } catch (\Exception $e) {
             log_message('error', 'Release result error: ' . $e->getMessage());

@@ -126,6 +126,29 @@ class InvoiceModel extends Model
         return $this->find($invoiceId);
     }
 
+    /**
+     * Void an invoice that has no money on it. An invoice with paid
+     * payments must have them refunded first, so the books never show a
+     * void invoice holding real money.
+     */
+    public function voidInvoice(int $invoiceId, string $reason, string $byName): bool
+    {
+        $invoice = $this->recalculate($invoiceId);
+        if (!$invoice
+            || in_array($invoice['status'], [self::STATUS_VOID, self::STATUS_REFUNDED], true)
+            || (float) $invoice['amount_paid'] > 0) {
+            return false;
+        }
+
+        return (bool) $this->update($invoiceId, [
+            'status'      => self::STATUS_VOID,
+            'balance'     => '0.00',
+            'voided_by'   => $byName,
+            'voided_at'   => date('Y-m-d H:i:s'),
+            'void_reason' => mb_substr($reason, 0, 255),
+        ]);
+    }
+
     // -------------------------------------------------------------
     // NUMBERING
     // -------------------------------------------------------------
@@ -236,12 +259,15 @@ class InvoiceModel extends Model
         }
 
         $itemModel = new InvoiceItemModel();
+        /* A line with no category of its own takes its request's department */
+        $requestCategory = ['lab' => 'laboratory', 'xray' => 'xray'][$payment['request_type'] ?? ''] ?? null;
+
         $normalised = [];
         foreach ($items as $item) {
             if (is_array($item)) {
                 $normalised[] = [
                     'service_name' => $item['name'] ?? $item['service_name'] ?? '',
-                    'category'     => $item['category'] ?? null,
+                    'category'     => $item['category'] ?? $requestCategory,
                     'qty'          => 1,
                     'unit_price'   => $item['price'] ?? $item['charge'] ?? $item['amount'] ?? 0,
                     'notes'        => null,
@@ -249,7 +275,7 @@ class InvoiceModel extends Model
             } else {
                 $normalised[] = [
                     'service_name' => (string) $item,
-                    'category'     => null,
+                    'category'     => $requestCategory,
                     'qty'          => 1,
                     'unit_price'   => 0,
                     'notes'        => null,

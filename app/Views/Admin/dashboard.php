@@ -13,7 +13,6 @@ $revenueDataArr  = $revenueData  ?? ['labels' => [], 'values' => []];
 $visitsDataArr   = $visitsData   ?? ['labels' => [], 'lab' => [], 'xray' => []];
 $requestsDataArr = $requestsData ?? ['labels' => [], 'requested' => [], 'completed' => []];
 
-$hasRevenueChart  = !empty($revenueDataArr['labels'])  && !empty($revenueDataArr['values']);
 $hasVisitsChart   = !empty($visitsDataArr['labels'])
                     && (!empty($visitsDataArr['lab']) || !empty($visitsDataArr['xray']));
 
@@ -27,15 +26,6 @@ $hasRequestsChart = !empty($requestsDataArr['labels']) && !empty($requestsDataAr
 $monthlyRevenueVal = (float) ($monthlyRevenue ?? 0);
 $avgMonthlyRevenue = array_sum($revenueDataArr['values']) / max(1, count($revenueDataArr['values']));
 
-/* Only allow a colour value that is safe to place inside a style attribute. */
-$safeColor = static function ($color, $fallback = '#0B67B2') {
-    $color = is_string($color) ? trim($color) : '';
-    if ($color !== '' && preg_match('/^(#[0-9A-Fa-f]{3,8}|rgba?\([0-9.,%\s]+\)|hsla?\([0-9.,%\sdegrad]+\)|[A-Za-z]{3,20})$/', $color)) {
-        return $color;
-    }
-    return $fallback;
-};
-
 $jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
 
 /* ------------------------------------------------------------------
@@ -47,12 +37,14 @@ $completedRequests = (int) ($completedRequests ?? 0);
 $releasedResults   = (int) ($releasedResults ?? 0);
 
 $kpiBoard = [
+    'chart'    => 'spike',
+    'featured' => true,
     'trends' => $kpiTrends ?? [],
     'cards'  => [
         [
             'key'     => 'patients',
             'icon'    => 'people-blue.png',
-            'color'   => '#0B67B2',
+            'color'   => '#175563',
             'label'   => 'Total Patients',
             'value'   => (int) ($totalPatients ?? 0),
             'delta'   => 'window',
@@ -133,22 +125,30 @@ $kpiBoard = [
                         </svg>
                         Revenue Overview
                     </h5>
-                    <span class="card-subtitle">Monthly revenue <?= date('Y') ?></span>
+                    <span class="card-subtitle" id="revSubtitle">Monthly revenue <?= date('Y') ?></span>
                 </div>
-                <div class="avg-box">
-                    <span class="avg-label">Avg. monthly</span>
-                    <span class="avg-value">&#8369;<?= number_format($avgMonthlyRevenue, 2) ?></span>
-                </div>
+                <label class="visually-hidden" for="revRange">Revenue period</label>
+                <select class="rev-range" id="revRange">
+                    <option value="year" selected>This year</option>
+                    <option value="days">Last 14 days</option>
+                </select>
             </div>
-            <?php if ($hasRevenueChart): ?>
-                <div class="chart-container">
-                    <canvas id="revenueChart"></canvas>
+
+            <div class="chart-container rev-box">
+                <div class="rev-summary">
+                    <div>
+                        <span class="rev-total-label">Total income</span>
+                        <span class="rev-total" id="revTotal">&#8369;<?= number_format(array_sum($revenueDataArr['values']), 2) ?></span>
+                    </div>
+                    <span class="rev-unit" id="revUnit"><span class="rev-unit-cell" aria-hidden="true"></span><span id="revUnitText"></span></span>
+                    <div class="avg-box">
+                        <span class="avg-label" id="revAvgLabel">Avg. monthly</span>
+                        <span class="avg-value" id="revAvg">&#8369;<?= number_format($avgMonthlyRevenue, 2) ?></span>
+                    </div>
                 </div>
-            <?php else: ?>
-                <div class="empty-state empty-state-chart">
-                    <p>No revenue data recorded yet</p>
-                </div>
-            <?php endif; ?>
+                <div class="rev-matrix" id="revMatrix" role="img" aria-label="Revenue per period"></div>
+                <div class="rev-labels" id="revLabels" aria-hidden="true"></div>
+            </div>
         </div>
 
         <!-- Pending Appointments - approve without leaving the dashboard -->
@@ -356,17 +356,17 @@ $kpiBoard = [
                     <?php
                     $testCounts = array_filter(array_column($topTests, 'count'), 'is_numeric');
                     $maxCount   = !empty($testCounts) ? max($testCounts) : 0;
-                    foreach ($topTests as $test):
+                    foreach ($topTests as $testIx => $test):
                         $count = (float) ($test['count'] ?? 0);
                         $width = ($maxCount > 0) ? min(100, ($count / $maxCount) * 100) : 0;
                     ?>
-                        <div class="test-item">
+                        <div class="test-item<?= $testIx === 0 ? ' is-top' : '' ?>">
                             <div class="test-top">
                                 <span class="test-name"><?= esc($test['name'] ?? '') ?></span>
                                 <span class="test-count"><?= number_format($count) ?></span>
                             </div>
                             <div class="test-progress">
-                                <div class="test-fill" style="width: <?= round($width, 2) ?>%; background: <?= $safeColor($test['color'] ?? '') ?>;"></div>
+                                <div class="test-fill" style="width: <?= round($width, 2) ?>%;"></div>
                             </div>
                         </div>
                     <?php endforeach; ?>
@@ -392,16 +392,16 @@ $kpiBoard = [
 
 .dashboard-wrapper,
 #toastContainer {
-    --db-accent:        #0B67B2;
-    --db-accent-soft:   #E8F1FA;
-    --db-accent-dark:   #08528F;
-    --db-surface:       #FFFFFF;
-    --db-canvas:        #f4f7fb;
-    --db-subtle:        #F1F5F9;
-    --db-border:        #E2E8F0;
+    --db-accent:        var(--pm-accent, #175563);
+    --db-accent-soft:   var(--pm-accent-soft);
+    --db-accent-dark:   var(--pm-accent-hover, #10404B);
+    --db-surface:       var(--pm-surface);
+    --db-canvas:        var(--pm-canvas);
+    --db-subtle:        var(--pm-subtle);
+    --db-border:        var(--pm-line);
     --db-border-strong: #CBD5E1;
-    --db-text:          #0F172A;
-    --db-text-soft:     #475569;
+    --db-text:          var(--pm-text);
+    --db-text-soft:     var(--pm-text-soft);
     --db-text-muted:    #94A3B8;
     --db-radius:        12px;
     --db-radius-sm:     8px;
@@ -561,6 +561,118 @@ $kpiBoard = [
     position: relative;
 }
 
+/* ===== REVENUE: square-cell matrix (same 280px box as before) ===== */
+.rev-range {
+    height: 32px;
+    padding: 0 28px 0 12px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--db-text);
+    background: #FFFFFF url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%235D6E80'%3E%3Cpath d='M4.5 6.5 8 10l3.5-3.5z'/%3E%3C/svg%3E") no-repeat right 8px center / 14px;
+    border: 1px solid var(--db-border);
+    border-radius: 999px;
+    appearance: none;
+    cursor: pointer;
+}
+
+.rev-range:hover { border-color: var(--db-border-strong); }
+.rev-range:focus-visible { outline: 2px solid var(--db-accent); outline-offset: 2px; }
+
+.rev-box { display: flex; flex-direction: column; gap: 10px; }
+
+.rev-summary {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.rev-total-label { display: block; font-size: 0.78rem; color: var(--db-text-soft); }
+
+.rev-total {
+    display: block;
+    margin-top: 2px;
+    font-size: 1.6rem;
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    color: var(--db-text);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Each period is a block of square cells, filled bottom-up, row by row */
+.rev-matrix {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: flex-end;
+    gap: var(--rev-group-gap, 8px);
+    overflow: hidden;
+}
+
+.rev-col {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: var(--rev-gap, 3px);
+    cursor: default;
+}
+
+.rev-row { display: flex; gap: var(--rev-gap, 3px); }
+
+.rev-cell {
+    flex: 1 1 0;
+    height: var(--rev-cell, 12px);
+    background: var(--pm-dk-bg-blue, #E6ECF2);
+    border-radius: 2px;
+    transition: background-color 0.15s ease;
+}
+
+.rev-cell.is-on        { background: var(--db-accent); }
+/* The last square fills from the bottom by its fraction of one square's value */
+.rev-cell.is-part      { box-shadow: inset 0 calc(var(--rev-cell, 12px) * -1 * var(--part, 0)) 0 var(--db-accent); }
+.rev-col:hover .rev-cell.is-part { box-shadow: inset 0 calc(var(--rev-cell, 12px) * -1 * var(--part, 0)) 0 var(--db-accent-dark); }
+
+.rev-unit {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 auto 4px 16px;
+    font-size: 0.75rem;
+    color: var(--db-text-soft);
+    white-space: nowrap;
+}
+
+.rev-unit-cell { width: 10px; height: 10px; border-radius: 2px; background: var(--db-accent); }
+.rev-col.is-future .rev-cell { background: var(--pm-subtle); }
+.rev-col:hover .rev-cell.is-on { background: var(--db-accent-dark); }
+.rev-col:hover .rev-cell:not(.is-on) { background: var(--pm-dk-bg-blue, #D5DEE8); }
+
+.rev-labels { display: flex; gap: var(--rev-group-gap, 8px); }
+
+.rev-labels span {
+    flex: 1 1 0;
+    min-width: 0;
+    font-size: 0.68rem;
+    text-align: center;
+    white-space: nowrap;
+    color: var(--db-text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.rev-labels span.is-now { font-weight: 600; color: var(--db-text); }
+
+.rev-labels b {
+    display: block;
+    margin-top: 1px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--db-text);
+}
+
+.rev-labels b.is-zero { font-weight: 400; color: var(--db-text-muted); }
+
 /* ===== TESTS LIST ===== */
 .tests-list {
     display: flex;
@@ -609,9 +721,14 @@ $kpiBoard = [
 
 .test-fill {
     height: 100%;
+    background: var(--pm-dk-bg-blue, #B9D6F2);
     border-radius: 3px;
     transition: width 0.5s ease;
 }
+
+/* One colour: the most requested test in the clinic blue, the rest a pale tint */
+.test-item.is-top .test-fill { background: var(--db-accent); }
+.test-item.is-top .test-name { color: var(--db-text); font-weight: 600; }
 
 /* ============================================
    PENDING APPOINTMENTS PANEL
@@ -623,9 +740,9 @@ $kpiBoard = [
 }
 
 .badge-pending {
-    color: #B45309;
-    background: #FEF3C7;
-    border-color: #FDE68A;
+    color: var(--pm-dk-fg-amber, #B45309);
+    background: var(--pm-dk-bg-amber, #FEF3C7);
+    border-color: var(--pm-dk-edge-amber, #FDE68A);
 }
 
 .pending-list {
@@ -641,15 +758,15 @@ $kpiBoard = [
     align-items: center;
     gap: 0.7rem;
     padding: 0.65rem 0.7rem;
-    border: 1px solid #E2E8F0;
+    border: 1px solid var(--pm-line);
     border-radius: 10px;
-    background: #FFFFFF;
+    background: var(--pm-surface);
     transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
     animation: pendingIn 0.28s cubic-bezier(0.2, 0.7, 0.3, 1) both;
 }
 
 .pending-item:hover {
-    border-color: #CBD5E1;
+    border-color: var(--pm-line);
     box-shadow: 0 4px 12px -6px rgba(15, 23, 42, 0.2);
     transform: translateY(-1px);
 }
@@ -670,8 +787,8 @@ $kpiBoard = [
     height: 34px;
     font-size: 0.72rem;
     font-weight: 700;
-    color: #08528F;
-    background: #E8F1FA;
+    color: var(--pm-accent-text);
+    background: var(--pm-accent-soft);
     border-radius: 50%;
 }
 
@@ -687,14 +804,14 @@ $kpiBoard = [
 .pending-name {
     font-size: 0.8rem;
     font-weight: 600;
-    color: #1E293B;
+    color: var(--pm-text);
     overflow-wrap: anywhere;
 }
 
 .pending-ref {
     font-size: 0.66rem;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    color: #94A3B8;
+    color: var(--pm-text-muted);
 }
 
 .pending-meta {
@@ -703,7 +820,7 @@ $kpiBoard = [
     gap: 0.3rem;
     margin-top: 0.15rem;
     font-size: 0.7rem;
-    color: #64748B;
+    color: var(--pm-text-muted);
 }
 
 .pending-tag {
@@ -714,12 +831,12 @@ $kpiBoard = [
     text-transform: uppercase;
     letter-spacing: 0.03em;
     border-radius: 999px;
-    color: #475569;
-    background: #F1F5F9;
+    color: var(--pm-text-soft);
+    background: var(--pm-subtle);
 }
 
-.pending-tag--laboratory { color: #08528F; background: #E8F1FA; }
-.pending-tag--xray       { color: #3B4C5E; background: #EBF0F5; }
+.pending-tag--laboratory { color: var(--pm-dk-fg-teal, #10404B); background: var(--pm-dk-bg-teal, #EBF2F4); }
+.pending-tag--xray       { color: var(--pm-dk-fg-blue, #3B4C5E); background: var(--pm-dk-bg-blue, #EBF0F5); }
 
 .pending-actions {
     display: flex;
@@ -747,20 +864,20 @@ $kpiBoard = [
 .pending-btn--ghost {
     width: 30px;
     padding: 0;
-    color: #64748B;
+    color: var(--pm-text-muted);
     background: transparent;
-    border: 1px solid #E2E8F0;
+    border: 1px solid var(--pm-line);
 }
 
-.pending-btn--ghost:hover { color: #1E293B; background: #F8FAFC; border-color: #CBD5E1; }
+.pending-btn--ghost:hover { color: var(--pm-text); background: var(--pm-subtle); border-color: var(--pm-line); }
 
 .pending-btn--approve {
     color: #FFFFFF;
-    background: #0B67B2;
-    border: 1px solid #0B67B2;
+    background: #175563;
+    border: 1px solid #175563;
 }
 
-.pending-btn--approve:hover { background: #08528F; border-color: #08528F; color: #FFFFFF; }
+.pending-btn--approve:hover { background: #10404B; border-color: #10404B; color: #FFFFFF; }
 
 .pending-pager {
     display: flex;
@@ -769,7 +886,7 @@ $kpiBoard = [
     gap: 0.6rem;
     padding-top: 0.7rem;
     margin-top: 0.7rem;
-    border-top: 1px solid #E2E8F0;
+    border-top: 1px solid var(--pm-line);
 }
 
 .pager-btn {
@@ -778,20 +895,20 @@ $kpiBoard = [
     justify-content: center;
     width: 28px;
     height: 28px;
-    color: #64748B;
-    background: #FFFFFF;
-    border: 1px solid #E2E8F0;
+    color: var(--pm-text-muted);
+    background: var(--pm-surface);
+    border: 1px solid var(--pm-line);
     border-radius: 7px;
     cursor: pointer;
     transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.pager-btn:hover:not(:disabled) { color: #0B67B2; background: #E8F1FA; border-color: #9DC4E8; }
+.pager-btn:hover:not(:disabled) { color: var(--pm-dk-fg-teal, #175563); background: var(--pm-dk-bg-teal, #EBF2F4); border-color: var(--pm-dk-edge-blue, #9DC4E8); }
 .pager-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .pager-status {
     font-size: 0.72rem;
-    color: #64748B;
+    color: var(--pm-text-muted);
     font-variant-numeric: tabular-nums;
 }
 
@@ -804,13 +921,13 @@ $kpiBoard = [
     padding: 0.45rem;
     font-size: 0.74rem;
     font-weight: 600;
-    color: #0B67B2;
+    color: var(--pm-dk-fg-teal, #175563);
     text-decoration: none;
     border-radius: 7px;
     transition: background-color 0.15s ease;
 }
 
-.pending-all:hover { background: #E8F1FA; color: #08528F; }
+.pending-all:hover { background: var(--pm-dk-bg-teal, #EBF2F4); color: var(--pm-dk-fg-teal, #10404B); }
 
 .visually-hidden {
     position: absolute; width: 1px; height: 1px;
@@ -883,9 +1000,9 @@ $kpiBoard = [
 }
 
 .toast.success i { color: #059669; }
-.toast.error i   { color: #DC2626; }
+.toast.error i   { color: var(--pm-dk-fg-red, #DC2626); }
 .toast.warning i { color: #D97706; }
-.toast.info i    { color: #2563EB; }
+.toast.info i    { color: var(--pm-dk-fg-blue, #2563EB); }
 
 .toast-message {
     flex: 1;
@@ -1015,8 +1132,8 @@ $kpiBoard = [
 .badge-pending {
     padding: 2px 8px;
     border-radius: 4px;
-    color: #93370D;
-    background: #FEF0C7;
+    color: var(--pm-dk-fg-amber, #93370D);
+    background: var(--pm-dk-bg-amber, #FEF0C7);
 }
 
 .avg-label { color: var(--db-text-muted); }
@@ -1063,7 +1180,7 @@ $kpiBoard = [
 
 /* ===== PRINT ===== */
 @media print {
-    .dashboard-wrapper { background: #FFFFFF; padding: 0; min-height: 0; }
+    .dashboard-wrapper { background: var(--pm-surface); padding: 0; min-height: 0; }
     .chart-card { box-shadow: none; break-inside: avoid; page-break-inside: avoid; }
     .btn-refresh,
     .pending-card,
@@ -1085,8 +1202,8 @@ const requestsData = <?= json_encode($requestsDataArr, $jsonFlags) ?>;
 // ============================================
 
 const DB_COLORS = {
-    accent:  '#0B67B2',
-    accent2: '#08528F',
+    accent:  '#175563',
+    accent2: '#10404B',
     success: '#067647',
     muted:   '#E2E8F0',
     grid:    '#F1F5F9',
@@ -1104,19 +1221,8 @@ function dbFormatPeso(value, decimals) {
     });
 }
 
-function dbCompactPeso(value) {
-    const number = Number(value) || 0;
-    if (Math.abs(number) >= 1000000) {
-        return '\u20B1' + (number / 1000000).toLocaleString('en-PH', { maximumFractionDigits: 1 }) + 'M';
-    }
-    if (Math.abs(number) >= 1000) {
-        return '\u20B1' + (number / 1000).toLocaleString('en-PH', { maximumFractionDigits: 1 }) + 'k';
-    }
-    return '\u20B1' + number.toLocaleString('en-PH', { maximumFractionDigits: 0 });
-}
-
 const dbBaseTooltip = {
-    backgroundColor: 'rgba(12, 45, 72, 0.95)',
+    backgroundColor: 'rgba(20, 45, 54, 0.95)',
     titleColor: '#F8FAFC',
     bodyColor: '#E2E8F0',
     footerColor: '#F8FAFC',
@@ -1128,38 +1234,6 @@ const dbBaseTooltip = {
     caretSize: 6,
     titleFont: { size: 12, weight: '600' },
     bodyFont: { size: 12 }
-};
-
-function dbGradient(color, topAlpha, bottomAlpha) {
-    return function (context) {
-        const chart = context.chart;
-        const area = chart.chartArea;
-        if (!area) { return color; }
-        const g = chart.ctx.createLinearGradient(0, area.top, 0, area.bottom);
-        g.addColorStop(0, color.replace('__A__', topAlpha));
-        g.addColorStop(1, color.replace('__A__', bottomAlpha));
-        return g;
-    };
-}
-
-const dbCrosshair = {
-    id: 'dbCrosshair',
-    afterDatasetsDraw: function (chart) {
-        const active = chart.tooltip && chart.tooltip.getActiveElements();
-        if (!active || !active.length) { return; }
-        const x = active[0].element.x;
-        const area = chart.chartArea;
-        const ctx = chart.ctx;
-        ctx.save();
-        ctx.beginPath();
-        ctx.setLineDash([4, 4]);
-        ctx.strokeStyle = 'rgba(11, 103, 178, 0.35)';
-        ctx.lineWidth = 1;
-        ctx.moveTo(x, area.top);
-        ctx.lineTo(x, area.bottom);
-        ctx.stroke();
-        ctx.restore();
-    }
 };
 
 const dbBaseLegend = {
@@ -1228,38 +1302,6 @@ function dbBarAnimation(stagger) {
     };
 }
 
-function dbLineAnimation() {
-    if (DB_REDUCED_MOTION) { return { duration: 0 }; }
-    return {
-        duration: 900,
-        easing: 'easeOutQuart',
-        x: {
-            type: 'number',
-            easing: 'linear',
-            duration: 22,
-            from: NaN,
-            delay: function (context) {
-                if (context.type !== 'data' || context.xStarted) { return 0; }
-                context.xStarted = true;
-                return context.index * 22;
-            }
-        },
-        y: {
-            type: 'number',
-            easing: 'easeOutQuart',
-            duration: 320,
-            from: function (context) {
-                return context.chart.scales.y.getPixelForValue(0);
-            },
-            delay: function (context) {
-                if (context.type !== 'data' || context.yStarted) { return 0; }
-                context.yStarted = true;
-                return context.index * 22;
-            }
-        }
-    };
-}
-
 function dbAnimateOnView(chart, canvasId) {
     if (!chart || DB_REDUCED_MOTION || !('IntersectionObserver' in window)) { return; }
     const canvas = document.getElementById(canvasId);
@@ -1280,47 +1322,148 @@ function dbAnimateOnView(chart, canvasId) {
 // 1. REVENUE CHART
 // ============================================
 
-dbInitChart('revenueChart', {
-    type: 'line',
-    data: {
-        labels: revenueData.labels,
-        datasets: [{
-            label: 'Revenue',
-            data: revenueData.values,
-            borderColor: DB_COLORS.accent,
-            backgroundColor: dbGradient('rgba(11, 103, 178, __A__)', 0.10, 0),
-            fill: true,
-            tension: 0.25,
-            pointBackgroundColor: DB_COLORS.accent,
-            pointBorderColor: '#FFFFFF',
-            pointBorderWidth: 2,
-            pointHoverRadius: 6,
-            pointRadius: function (ctx) {
-                return ctx.dataIndex === ctx.dataset.data.length - 1 ? 5 : 0;
-            },
-            borderWidth: 2
-        }]
-    },
-    plugins: [dbCrosshair],
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-            legend: { display: false },
-            tooltip: Object.assign({}, dbBaseTooltip, {
-                displayColors: false,
-                callbacks: {
-                    label: function (context) {
-                        return 'Revenue: ' + dbFormatPeso(context.parsed.y, 2);
-                    }
-                }
+(function () {
+    const matrix = document.getElementById('revMatrix');
+    const labels = document.getElementById('revLabels');
+    const select = document.getElementById('revRange');
+    if (!matrix || !labels) { return; }
+
+    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const daily  = <?= json_encode([
+        'dates'  => $kpiTrends['dates'] ?? [],
+        'values' => array_map('floatval', $kpiTrends['revenue_today'] ?? []),
+    ], $jsonFlags) ?>;
+
+    /* Each range: one entry per period; months after this one are shown as future (empty) */
+    const RANGES = {
+        year: {
+            subtitle: 'Monthly revenue <?= date('Y') ?>',
+            avgLabel: 'Avg. monthly',
+            unit: 'month',
+            periods: MONTHS.map(function (m, i) {
+                const known = i < revenueData.values.length;
+                return { label: m, value: known ? Number(revenueData.values[i]) || 0 : 0, future: !known, now: i === revenueData.values.length - 1 };
             })
         },
-        animation: dbLineAnimation(),
-        scales: dbScales(function (value) { return dbCompactPeso(value); })
+        days: {
+            subtitle: 'Daily revenue, last 14 days',
+            avgLabel: 'Avg. daily',
+            unit: 'day',
+            periods: (daily.dates || []).map(function (d, i, all) {
+                const date = new Date(d + 'T00:00:00');
+                return {
+                    label: i === all.length - 1 ? 'Today' : MONTHS[date.getMonth()] + ' ' + date.getDate(),
+                    value: Number(daily.values[i]) || 0,
+                    future: false,
+                    now: i === all.length - 1
+                };
+            })
+        }
+    };
+
+    const CELL = 12, GAP = 3, GROUP_GAP = 8;
+
+    /* ₱950, ₱2.8k, ₱12k: short enough to sit under a 14-day label */
+    function revShort(v) {
+        if (v >= 1000) { return '₱' + (v / 1000).toFixed(v >= 10000 ? 0 : 1).replace(/\.0$/, '') + 'k'; }
+        return '₱' + Math.round(v).toLocaleString('en-PH');
     }
-});
+    let current = 'year';
+
+    function draw() {
+        const range   = RANGES[current];
+        const periods = range.periods;
+        const n       = periods.length;
+        if (!n) { matrix.innerHTML = ''; labels.innerHTML = ''; return; }
+
+        /* Square cells: as many 12px columns per period as fit, then rows to fill the height */
+        const width  = matrix.clientWidth;
+        const height = matrix.clientHeight;
+        const perGroup = (width - (n - 1) * GROUP_GAP) / n;
+        const across = Math.max(1, Math.floor((perGroup + GAP) / (CELL + GAP)));
+        const size   = (perGroup - (across - 1) * GAP) / across;
+        const rows   = Math.max(1, Math.floor((height + GAP) / (size + GAP)));
+        const slots  = rows * across;
+        const peak   = Math.max.apply(null, periods.map(function (p) { return p.value; }));
+
+        /* One square is worth a round peso amount (1/2/2.5/5 x 10^k), the smallest
+           that fits the best period in its block, so every block is read on one scale */
+        let unit = 1;
+        if (peak > 0) {
+            const raw = peak / slots;
+            const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+            unit = [1, 2, 2.5, 5, 10].map(function (m) { return m * mag; })
+                .find(function (u) { return u >= raw; });
+            unit = Math.max(1, unit);
+        }
+
+        matrix.style.setProperty('--rev-cell', size.toFixed(2) + 'px');
+        matrix.style.setProperty('--rev-gap', GAP + 'px');
+        matrix.style.setProperty('--rev-group-gap', GROUP_GAP + 'px');
+        labels.style.setProperty('--rev-group-gap', GROUP_GAP + 'px');
+
+        let html = '';
+        periods.forEach(function (p) {
+            const exact = Math.min(slots, p.value / unit);
+            const full  = Math.floor(exact);
+            const part  = exact - full;
+            let cells = 0, col = '';
+            for (let r = 0; r < rows; r++) {
+                let row = '';
+                for (let c = 0; c < across; c++) {
+                    if (cells < full) {
+                        row += '<span class="rev-cell is-on"></span>';
+                    } else if (cells === full && part > 0.04) {
+                        row += '<span class="rev-cell is-part" style="--part:' + part.toFixed(3) + '"></span>';
+                    } else {
+                        row += '<span class="rev-cell"></span>';
+                    }
+                    cells++;
+                }
+                col += '<span class="rev-row">' + row + '</span>';
+            }
+            html += '<span class="rev-col' + (p.future ? ' is-future' : '') + '" title="' + p.label + ' · ' + dbFormatPeso(p.value, 2) + '">' + col + '</span>';
+        });
+        matrix.innerHTML = html;
+
+        /* Labels: every period for a year, every other day for 14 days (today always shown) */
+        const step = n > 12 ? 2 : 1;
+        labels.innerHTML = periods.map(function (p, i) {
+            const show = (n - 1 - i) % step === 0;
+            const amount = p.future ? '' : '<b class="' + (p.value > 0 ? '' : 'is-zero') + '">' + (p.value > 0 ? revShort(p.value) : '₱0') + '</b>';
+            return '<span class="' + (p.now ? 'is-now' : '') + '">' + (show ? p.label + amount : '') + '</span>';
+        }).join('');
+
+        const known = periods.filter(function (p) { return !p.future; });
+        const total = known.reduce(function (s, p) { return s + p.value; }, 0);
+
+        /* Average over the periods since income was first recorded, not the empty ones before it */
+        const first  = known.findIndex(function (p) { return p.value > 0; });
+        const counted = first < 0 ? known : known.slice(first);
+        const since  = first > 0
+            ? ' · ' + counted.length + ' ' + range.unit + (counted.length === 1 ? '' : 's') + ' with income'
+            : '';
+        document.getElementById('revTotal').textContent = dbFormatPeso(total, 2);
+        document.getElementById('revAvg').textContent = dbFormatPeso(total / Math.max(1, counted.length), 2);
+        document.getElementById('revAvgLabel').textContent = range.avgLabel + since;
+        document.getElementById('revUnitText').textContent = '1 square = ' + dbFormatPeso(unit, unit % 1 ? 2 : 0);
+        document.getElementById('revSubtitle').textContent = range.subtitle;
+        matrix.setAttribute('aria-label', range.subtitle + ': total ' + dbFormatPeso(total, 2));
+    }
+
+    if (select) {
+        select.addEventListener('change', function () { current = select.value; draw(); });
+    }
+
+    if ('ResizeObserver' in window) {
+        let frame = 0;
+        new ResizeObserver(function () {
+            cancelAnimationFrame(frame);
+            frame = requestAnimationFrame(draw);
+        }).observe(matrix);
+    }
+    draw();
+})();
 
 // ============================================
 // 2. DEPARTMENT PATIENT VOLUME CHART

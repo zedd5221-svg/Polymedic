@@ -45,14 +45,14 @@
 .nc-check input[type="checkbox"] {
     width: 16px;
     height: 16px;
-    accent-color: #0B67B2;
+    accent-color: #175563;
     cursor: pointer;
     display: block;
 }
 
 .nc-list.is-selecting .nc-card.is-selected {
-    border-color: #bcd6f3;
-    box-shadow: 0 0 0 2px rgba(11, 103, 178, 0.12);
+    border-color: var(--pm-dk-edge-blue, #bcd6f3);
+    box-shadow: 0 0 0 2px rgba(23, 85, 99, 0.12);
 }
 
 .nc-list.is-selecting .nc-card { cursor: pointer; }
@@ -72,7 +72,7 @@
 
 .nc-selectbar-count {
     font-size: 0.8125rem;
-    color: #10366f;
+    color: var(--pm-dk-fg-blue, #10366f);
     font-weight: 600;
     margin-right: 0.25rem;
 }
@@ -86,8 +86,8 @@
 .nc-inline-form { display: inline-flex; margin: 0; }
 .nc-btn--accept,
 .nc-btn--accept:hover { color: #ffffff; }
-.nc-btn--accept { background: #0B67B2; border-color: #0B67B2; }
-.nc-btn--accept:hover { background: #08528F; border-color: #08528F; }
+.nc-btn--accept { background: #175563; border-color: #175563; }
+.nc-btn--accept:hover { background: #10404B; border-color: #10404B; }
 
 /* =========================================================
    Bulk delete review modal
@@ -112,9 +112,9 @@
     max-height: min(85vh, 720px);
     display: flex;
     flex-direction: column;
-    background: #ffffff;
+    background: var(--pm-surface);
     border-radius: 12px;
-    border: 1px solid #e2e8f0;
+    border: 1px solid var(--pm-line);
     box-shadow: 0 24px 48px -12px rgba(15, 23, 42, 0.32);
     overflow: hidden;
     animation: bulkIn 0.18s ease;
@@ -131,7 +131,7 @@
     justify-content: space-between;
     gap: 1rem;
     padding: 1.05rem 1.25rem;
-    border-bottom: 1px solid #eef2f7;
+    border-bottom: 1px solid var(--pm-line);
 }
 
 .bulk-head-text { min-width: 0; }
@@ -140,18 +140,18 @@
     margin: 0;
     font-size: 1rem;
     font-weight: 650;
-    color: #0f172a;
+    color: var(--pm-text);
     display: flex;
     align-items: center;
     gap: 0.5rem;
 }
 
-.bulk-title i { color: #dc2626; }
+.bulk-title i { color: var(--pm-dk-fg-red, #dc2626); }
 
 .bulk-sub {
     margin: 0.15rem 0 0;
     font-size: 0.8rem;
-    color: #64748b;
+    color: var(--pm-text-muted);
 }
 
 .bulk-close {
@@ -161,14 +161,14 @@
     width: 30px;
     height: 30px;
     font-size: 0.8rem;
-    color: #64748b;
+    color: var(--pm-text-muted);
     background: transparent;
     border: 0;
     border-radius: 6px;
     cursor: pointer;
 }
 
-.bulk-close:hover { background: #eef2f7; color: #0f172a; }
+.bulk-close:hover { background: var(--pm-dk-bg-neutral, #eef2f7); color: var(--pm-text); }
 
 .bulk-body {
     padding: 0.75rem 1rem 1rem;
@@ -178,14 +178,14 @@
 .bulk-body-note {
     margin: 0 0 0.75rem;
     font-size: 0.78rem;
-    color: #64748b;
+    color: var(--pm-text-muted);
 }
 
 .bulk-list {
     list-style: none;
     margin: 0;
     padding: 0;
-    border: 1px solid #eef2f7;
+    border: 1px solid var(--pm-line);
     border-radius: 8px;
     overflow: hidden;
 }
@@ -195,19 +195,19 @@
     align-items: flex-start;
     gap: 0.65rem;
     padding: 0.65rem 0.85rem;
-    border-bottom: 1px solid #f1f5f9;
-    background: #ffffff;
+    border-bottom: 1px solid var(--pm-line);
+    background: var(--pm-surface);
     cursor: pointer;
 }
 
 .bulk-item:last-child { border-bottom: 0; }
-.bulk-item:hover { background: #f8fafc; }
+.bulk-item:hover { background: var(--pm-subtle); }
 
 .bulk-item input[type="checkbox"] {
     width: 16px;
     height: 16px;
     margin-top: 0.15rem;
-    accent-color: #0B67B2;
+    accent-color: #175563;
     cursor: pointer;
     flex-shrink: 0;
 }
@@ -218,7 +218,7 @@
     margin: 0;
     font-size: 0.83rem;
     font-weight: 600;
-    color: #0f172a;
+    color: var(--pm-text);
     line-height: 1.35;
     overflow-wrap: anywhere;
 }
@@ -226,7 +226,7 @@
 .bulk-item-msg {
     margin: 0.15rem 0 0;
     font-size: 0.78rem;
-    color: #64748b;
+    color: var(--pm-text-muted);
     line-height: 1.45;
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -238,7 +238,7 @@
     display: block;
     margin-top: 0.2rem;
     font-size: 0.72rem;
-    color: #94a3b8;
+    color: var(--pm-text-muted);
 }
 
 .bulk-foot {
@@ -248,16 +248,16 @@
     gap: 0.75rem;
     flex-wrap: wrap;
     padding: 0.85rem 1.25rem;
-    background: #f8fafc;
-    border-top: 1px solid #eef2f7;
+    background: var(--pm-subtle);
+    border-top: 1px solid var(--pm-line);
 }
 
 .bulk-foot-note {
     font-size: 0.78rem;
-    color: #64748b;
+    color: var(--pm-text-muted);
 }
 
-.bulk-foot-note strong { color: #0f172a; }
+.bulk-foot-note strong { color: var(--pm-text); }
 
 .bulk-foot-actions {
     display: inline-flex;
@@ -277,15 +277,15 @@
     font-weight: 600;
     line-height: 1;
     border-radius: 7px;
-    border: 1px solid #e2e8f0;
-    background: #ffffff;
-    color: #334155;
+    border: 1px solid var(--pm-line);
+    background: var(--pm-surface);
+    color: var(--pm-text-soft);
     cursor: pointer;
     white-space: nowrap;
     text-decoration: none;
 }
 
-.bulk-btn:hover { background: #f8fafc; border-color: #cbd5e1; color: #0f172a; }
+.bulk-btn:hover { background: var(--pm-subtle); border-color: var(--pm-line); color: var(--pm-text); }
 
 .bulk-btn--danger,
 .bulk-btn--danger:hover { color: #ffffff; }
@@ -367,15 +367,9 @@ arsort($typeCounts);
 <div class="nc" id="ncRoot">
 
     <header class="nc-head">
-        <div class="nc-head-text">
-            <h2 class="nc-title">Notifications</h2>
+        <div class="nc-head-text">            
             <p class="nc-lede">
-                <?php if ($unread_count > 0): ?>
-                    <strong><?= (int) $unread_count ?></strong>
-                    unread notification<?= $unread_count === 1 ? '' : 's' ?>.
-                <?php else: ?>
-                    You're all caught up.
-                <?php endif; ?>
+
             </p>
         </div>
 
@@ -410,22 +404,6 @@ arsort($typeCounts);
 
         </div>
     </header>
-
-    <?php if (session()->getFlashdata('success')): ?>
-        <div class="nc-alert nc-alert--success alert alert-dismissible fade show" role="status">
-            <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
-            <span><?= esc(session()->getFlashdata('success')) ?></span>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss"></button>
-        </div>
-    <?php endif; ?>
-
-    <?php if (session()->getFlashdata('error')): ?>
-        <div class="nc-alert nc-alert--error alert alert-dismissible fade show" role="alert">
-            <i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i>
-            <span><?= esc(session()->getFlashdata('error')) ?></span>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss"></button>
-        </div>
-    <?php endif; ?>
 
     <section class="nc-panel" aria-label="Notifications">
 

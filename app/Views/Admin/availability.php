@@ -60,23 +60,23 @@
    ========================================================= */
 
 .av-shell {
-    --av-ink:        #0f172a;
-    --av-text:       #334155;
-    --av-muted:      #64748b;
-    --av-faint:      #94a3b8;
-    --av-line:       #e5e9f0;
-    --av-line-soft:  #f1f5f9;
-    --av-subtle:     #f8fafc;
+    --av-ink:        var(--pm-text);
+    --av-text:       var(--pm-text-soft);
+    --av-muted:      var(--pm-text-muted);
+    --av-faint:      var(--pm-text-muted);
+    --av-line:       var(--pm-line);
+    --av-line-soft:  var(--pm-subtle);
+    --av-subtle:     var(--pm-subtle);
 
     /* === Aligned with layout blue === */
-    --av-accent:     #0B67B2;
-    --av-accent-dark:#08528F;
-    --av-accent-soft:#E8F1FA;
+    --av-accent:     var(--pm-accent);
+    --av-accent-dark:var(--pm-accent-text);
+    --av-accent-soft:var(--pm-accent-soft);
 
     --av-danger:     #dc2626;
-    --av-danger-soft:#fef2f2;
+    --av-danger-soft:var(--pm-tint-red);
     --av-amber:      #b45309;
-    --av-blue:       #0B67B2;
+    --av-blue:       #175563;
 
     --av-radius:     14px;
     --av-radius-sm:  9px;
@@ -133,7 +133,7 @@
     display: grid;
     grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 0;
-    background: #fff;
+    background: var(--pm-surface);
     border: 1px solid var(--av-line);
     border-radius: var(--av-radius);
     box-shadow: var(--av-shadow);
@@ -197,8 +197,8 @@
     border: 1px solid transparent;
 }
 
-.av-alert--success { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
-.av-alert--error   { background: var(--av-danger-soft); border-color: #fecaca; color: #991b1b; }
+.av-alert--success { background: var(--pm-dk-bg-green, #f0fdf4); border-color: var(--pm-dk-edge-green, #bbf7d0); color: var(--pm-dk-fg-green, #166534); }
+.av-alert--error   { background: var(--av-danger-soft); border-color: var(--pm-dk-edge-red, #fecaca); color: var(--pm-dk-fg-red, #991b1b); }
 
 /* ---------------------------------------------------------
    MAIN GRID
@@ -223,7 +223,7 @@
    --------------------------------------------------------- */
 
 .av-card {
-    background: #fff;
+    background: var(--pm-surface);
     border: 1px solid var(--av-line);
     border-radius: var(--av-radius);
     box-shadow: var(--av-shadow);
@@ -239,7 +239,7 @@
     gap: .75rem;
     padding: .85rem 1.15rem;
     border-bottom: 1px solid var(--av-line-soft);
-    background: linear-gradient(180deg, #fcfdfe, #fff);
+    background: linear-gradient(180deg, var(--pm-surface-top), var(--pm-surface));
     flex-shrink: 0;
 }
 
@@ -302,18 +302,18 @@
     font-size: .875rem;
     font-family: inherit;
     color: var(--av-ink);
-    background: #fff;
+    background: var(--pm-surface);
     border: 1px solid var(--av-line);
     border-radius: var(--av-radius-sm);
     transition: border-color .15s ease, box-shadow .15s ease;
 }
 
-.av-input:hover, .av-select:hover, .av-textarea:hover { border-color: #cbd5e1; }
+.av-input:hover, .av-select:hover, .av-textarea:hover { border-color: var(--pm-line); }
 
 .av-input:focus, .av-select:focus, .av-textarea:focus {
     outline: none;
     border-color: var(--av-accent);
-    box-shadow: 0 0 0 3px rgba(11, 103, 178, .15);
+    box-shadow: 0 0 0 3px rgba(23, 85, 99, .15);
 }
 
 .av-textarea {
@@ -391,7 +391,7 @@
     padding: .4rem .7rem;
     border: 1px solid var(--av-line);
     border-radius: 99px;
-    background: #fff;
+    background: var(--pm-surface);
     font-size: .8rem;
     font-weight: 600;
     color: var(--av-text);
@@ -400,7 +400,7 @@
     transition: background .15s ease, border-color .15s ease, color .15s ease;
 }
 
-.av-weekday:hover { border-color: #cbd5e1; background: var(--av-subtle); }
+.av-weekday:hover { border-color: var(--pm-line); background: var(--av-subtle); }
 
 .av-weekday input {
     position: absolute;
@@ -412,11 +412,11 @@
 
 .av-weekday:has(input:checked) {
     background: var(--av-danger-soft);
-    border-color: #fecaca;
-    color: #b91c1c;
+    border-color: var(--pm-dk-edge-red, #fecaca);
+    color: var(--pm-dk-fg-red, #b91c1c);
 }
 
-.av-weekday:has(input:checked) i { color: #dc2626; }
+.av-weekday:has(input:checked) i { color: var(--pm-dk-fg-red, #dc2626); }
 
 .av-weekday:has(input:focus-visible) {
     outline: 2px solid var(--av-accent);
@@ -473,7 +473,7 @@
     transition: background .15s ease, color .15s ease;
 }
 
-.av-chip button:hover { background: #fee2e2; color: var(--av-danger); }
+.av-chip button:hover { background: var(--pm-dk-bg-red, #fee2e2); color: var(--av-danger); }
 
 .av-chips-empty { font-size: .78rem; color: var(--av-faint); }
 
@@ -532,7 +532,7 @@
 }
 
 .av-segment button[aria-pressed="true"] {
-    background: #fff;
+    background: var(--pm-surface);
     color: var(--av-ink);
     box-shadow: 0 1px 2px rgba(15, 23, 42, .12);
 }
@@ -553,28 +553,28 @@
     font-family: inherit;
     border-radius: var(--av-radius-sm);
     border: 1px solid var(--av-line);
-    background: #fff;
+    background: var(--pm-surface);
     color: var(--av-text);
     cursor: pointer;
     white-space: nowrap;
     transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, transform .12s ease;
 }
 
-.av-btn:hover { background: var(--av-subtle); border-color: #cbd5e1; color: var(--av-ink); }
+.av-btn:hover { background: var(--av-subtle); border-color: var(--pm-line); color: var(--av-ink); }
 .av-btn:active { transform: translateY(1px); }
 
 .av-btn--primary {
     background: var(--av-accent);
     border-color: var(--av-accent);
     color: #fff;
-    box-shadow: 0 1px 2px rgba(11, 103, 178, .35);
+    box-shadow: 0 1px 2px rgba(23, 85, 99, .35);
 }
 
 .av-btn--primary:hover {
     background: var(--av-accent-dark);
     border-color: var(--av-accent-dark);
     color: #fff;
-    box-shadow: 0 4px 12px rgba(11, 103, 178, .28);
+    box-shadow: 0 4px 12px rgba(23, 85, 99, .28);
 }
 
 .av-btn--danger {
@@ -624,7 +624,7 @@
     color: var(--av-faint);
 }
 
-.av-savebar.is-dirty { border-color: #fcd34d; background: #fffdf5; }
+.av-savebar.is-dirty { border-color: var(--pm-dk-edge-amber, #fcd34d); background: var(--pm-dk-surface, #fffdf5); }
 .av-savebar.is-dirty .av-savebar-note { color: var(--av-amber); font-weight: 600; }
 
 /* ---------------------------------------------------------
@@ -664,7 +664,7 @@
 
 .av-preview-scroll::-webkit-scrollbar { width: 6px; }
 .av-preview-scroll::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
+    background: var(--pm-dk-bg-blue, #cbd5e1);
     border-radius: 3px;
 }
 .av-preview-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
@@ -674,7 +674,7 @@
     position: sticky;
     top: 0;
     z-index: 1;
-    background: #ffffff;
+    background: var(--pm-surface);
     padding: .35rem 0 .5rem;
     margin-top: 0;
 }
@@ -705,18 +705,18 @@
     padding: .65rem .75rem;
     border: 1px solid var(--av-line);
     border-radius: var(--av-radius-sm);
-    background: #fff;
+    background: var(--pm-surface);
     transition: border-color .15s ease, box-shadow .15s ease;
 }
 
-.av-day:hover { border-color: #cbd5e1; box-shadow: var(--av-shadow); }
+.av-day:hover { border-color: var(--pm-line); box-shadow: var(--av-shadow); }
 
 .av-day.is-closed  { background: var(--av-subtle); }
-.av-day.is-holiday { background: var(--av-danger-soft); border-color: #fecaca; }
+.av-day.is-holiday { background: var(--av-danger-soft); border-color: var(--pm-dk-edge-red, #fecaca); }
 
 .av-day.is-today {
     border-color: var(--av-accent);
-    box-shadow: 0 0 0 3px rgba(11, 103, 178, .14);
+    box-shadow: 0 0 0 3px rgba(23, 85, 99, .14);
 }
 
 .av-day-top {
@@ -748,9 +748,9 @@
 }
 
 .av-day-tag--today   { background: var(--av-accent-soft); color: var(--av-accent-dark); }
-.av-day-tag--closed  { background: #e2e8f0; color: #475569; }
-.av-day-tag--holiday { background: #fee2e2; color: #b91c1c; }
-.av-day-tag--full    { background: #fef3c7; color: #92400e; }
+.av-day-tag--closed  { background: var(--pm-dk-bg-blue, #e2e8f0); color: var(--pm-text-soft); }
+.av-day-tag--holiday { background: var(--pm-dk-bg-red, #fee2e2); color: var(--pm-dk-fg-red, #b91c1c); }
+.av-day-tag--full    { background: var(--pm-dk-bg-amber, #fef3c7); color: var(--pm-dk-fg-amber, #92400e); }
 
 /* capacity bars */
 .av-bar-row {
@@ -767,7 +767,7 @@
 .av-bar {
     height: 6px;
     border-radius: 99px;
-    background: #e8edf4;
+    background: var(--pm-dk-bg-blue, #e8edf4);
     overflow: hidden;
 }
 
@@ -779,7 +779,7 @@
     transition: width .35s ease;
 }
 
-.av-bar-row--lab  { --av-bar-color: #0B67B2; }
+.av-bar-row--lab  { --av-bar-color: #175563; }
 .av-bar-row--xray { --av-bar-color: #7c3aed; }
 
 .av-bar-row b { color: var(--av-ink); font-weight: 650; font-variant-numeric: tabular-nums; }
@@ -841,28 +841,7 @@
 
 <div class="av-shell">
 
-    <?php if (session()->getFlashdata('success')): ?>
-        <div class="av-alert av-alert--success" role="status">
-            <i class="bi bi-check-circle-fill"></i>
-            <span><?= esc(session()->getFlashdata('success')) ?></span>
-        </div>
-    <?php endif; ?>
-
-    <?php if (session()->getFlashdata('error')): ?>
-        <div class="av-alert av-alert--error" role="alert">
-            <i class="bi bi-exclamation-circle-fill"></i>
-            <span><?= esc(session()->getFlashdata('error')) ?></span>
-        </div>
-    <?php endif; ?>
-
     <header class="av-head">
-        <div>
-            <h2 class="av-title">Clinic Availability</h2>
-            <p class="av-lede">
-                Operating hours, closed weekdays, holidays and the booking horizon.
-                Changes apply to future bookings only — appointments already booked are unaffected.
-            </p>
-        </div>
     </header>
 
     <dl class="av-summary">
@@ -1128,10 +1107,10 @@
                     <?php else: ?>
 
                         <div class="av-legend">
-                            <span><i style="background:#0B67B2;"></i> Laboratory</span>
+                            <span><i style="background:#175563;"></i> Laboratory</span>
                             <span><i style="background:#7c3aed;"></i> X-Ray</span>
                             <span><i style="background:#d97706;"></i> Fully booked</span>
-                            <span><i style="background:#fecaca;"></i> Holiday</span>
+                            <span><i style="background:var(--pm-dk-bg-red, #fecaca);"></i> Holiday</span>
                         </div>
 
                         <?php

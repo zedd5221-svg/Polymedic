@@ -1,0 +1,155 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1475 1067" width="1475" height="1067">
+  <defs>
+    <linearGradient id="snakeGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f4a03a"/>
+      <stop offset="1" stop-color="#e07812"/>
+    </linearGradient>
+    <linearGradient id="rodGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#c9661a"/>
+      <stop offset="0.45" stop-color="#f0a04a"/>
+      <stop offset="1" stop-color="#b9560f"/>
+    </linearGradient>
+    <path id="leaf" d="M0 0 C 32 -22 34 -70 0 -105 C -34 -70 -32 -22 0 0 Z"/>
+  </defs>
+
+
+  <!-- Outer ring -->
+  <ellipse cx="762" cy="515" rx="535" ry="397" fill="none" stroke="#1c2a87" stroke-width="28"/>
+
+  <!-- Curved name -->
+  <g font-family="Arial, 'Liberation Sans', Helvetica, sans-serif" font-weight="900" font-size="88" fill="#1c2a87">
+    <text transform="translate(360.6 827.4) rotate(-144.59)" text-anchor="middle">C</text>
+    <text transform="translate(307.2 783.8) rotate(-136.86)" text-anchor="middle">O</text>
+    <text transform="translate(263.8 737.2) rotate(-128.80)" text-anchor="middle">T</text>
+    <text transform="translate(229.3 687.0) rotate(-120.13)" text-anchor="middle">A</text>
+    <text transform="translate(201.3 627.0) rotate(-109.63)" text-anchor="middle">B</text>
+    <text transform="translate(185.3 562.8) rotate(-98.21)" text-anchor="middle">A</text>
+    <text transform="translate(182.4 501.9) rotate(-87.28)" text-anchor="middle">T</text>
+    <text transform="translate(191.6 439.0) rotate(-76.02)" text-anchor="middle">O</text>
+    <text transform="translate(224.7 355.1) rotate(-61.26)" text-anchor="middle">P</text>
+    <text transform="translate(261.3 299.9) rotate(-51.73)" text-anchor="middle">O</text>
+    <text transform="translate(304.3 252.9) rotate(-43.60)" text-anchor="middle">L</text>
+    <text transform="translate(348.8 215.2) rotate(-36.96)" text-anchor="middle">Y</text>
+    <text transform="translate(406.4 177.3) rotate(-29.91)" text-anchor="middle">M</text>
+    <text transform="translate(467.9 146.4) rotate(-23.56)" text-anchor="middle">E</text>
+    <text transform="translate(527.6 123.7) rotate(-18.14)" text-anchor="middle">D</text>
+    <text transform="translate(570.9 111.0) rotate(-14.50)" text-anchor="middle">I</text>
+    <text transform="translate(615.0 101.0) rotate(-10.99)" text-anchor="middle">C</text>
+    <text transform="translate(704.6 89.1) rotate(-4.22)" text-anchor="middle">&amp;</text>
+    <text transform="translate(794.9 87.7) rotate(2.41)" text-anchor="middle">D</text>
+    <text transform="translate(840.0 90.9) rotate(5.75)" text-anchor="middle">I</text>
+    <text transform="translate(884.8 96.7) rotate(9.13)" text-anchor="middle">A</text>
+    <text transform="translate(952.3 110.8) rotate(14.44)" text-anchor="middle">G</text>
+    <text transform="translate(1018.1 131.2) rotate(20.05)" text-anchor="middle">N</text>
+    <text transform="translate(1081.5 158.1) rotate(26.09)" text-anchor="middle">O</text>
+    <text transform="translate(1139.4 190.5) rotate(32.44)" text-anchor="middle">S</text>
+    <text transform="translate(1186.9 224.3) rotate(38.60)" text-anchor="middle">T</text>
+    <text transform="translate(1217.2 250.5) rotate(43.20)" text-anchor="middle">I</text>
+    <text transform="translate(1248.6 282.9) rotate(48.81)" text-anchor="middle">C</text>
+    <text transform="translate(1300.3 356.9) rotate(61.59)" text-anchor="middle">C</text>
+    <text transform="translate(1325.5 415.3) rotate(71.83)" text-anchor="middle">E</text>
+    <text transform="translate(1339.5 477.3) rotate(82.88)" text-anchor="middle">N</text>
+    <text transform="translate(1341.3 538.2) rotate(93.81)" text-anchor="middle">T</text>
+    <text transform="translate(1332.2 595.8) rotate(104.13)" text-anchor="middle">E</text>
+    <text transform="translate(1311.0 655.7) rotate(114.70)" text-anchor="middle">R</text>
+    <text transform="translate(1289.6 695.6) rotate(121.63)" text-anchor="middle">,</text>
+    <text transform="translate(1262.0 735.0) rotate(128.43)" text-anchor="middle">I</text>
+    <text transform="translate(1232.1 768.9) rotate(134.28)" text-anchor="middle">N</text>
+    <text transform="translate(1182.7 813.0) rotate(142.01)" text-anchor="middle">C</text>
+    <text transform="translate(1145.9 839.3) rotate(146.80)" text-anchor="middle">.</text>
+  </g>
+
+  <!-- Year -->
+  <text x="762" y="1022" text-anchor="middle" font-family="Arial, 'Liberation Sans', Helvetica, sans-serif" font-weight="900" font-size="122" fill="#1c2a87" letter-spacing="6">1992</text>
+
+  <!-- Microscope / building group -->
+  <g stroke="#1c2a87" stroke-width="5" stroke-linejoin="round">
+    <!-- tube -->
+    <g transform="rotate(-27 880 315)">
+      <rect x="770" y="278" width="185" height="74" rx="4" fill="#eef2fb"/>
+      <rect x="955" y="292" width="110" height="40" rx="3" fill="#eef2fb"/>
+      <line x1="968" y1="303" x2="1052" y2="303"/>
+      <line x1="790" y1="300" x2="935" y2="300" stroke-width="3"/>
+    </g>
+    <!-- arm -->
+    <path d="M800 352 L860 330 L900 372 L842 392 Z" fill="#e6ebf7"/>
+    <!-- stage -->
+    <rect x="880" y="360" width="52" height="16" fill="#eef2fb"/>
+    <rect x="872" y="376" width="88" height="22" rx="3" fill="#eef2fb"/>
+    <!-- left column -->
+    <rect x="530" y="368" width="88" height="318" fill="#e6ebf7"/>
+    <!-- building / chart -->
+    <rect x="618" y="392" width="378" height="294" fill="#ffffff"/>
+    <g stroke-width="4">
+      <line x1="628" y1="428" x2="692" y2="428"/>
+      <line x1="628" y1="462" x2="692" y2="462"/>
+      <line x1="628" y1="496" x2="692" y2="496"/>
+      <line x1="628" y1="530" x2="692" y2="530"/>
+      <line x1="628" y1="564" x2="692" y2="564"/>
+      <line x1="628" y1="598" x2="692" y2="598"/>
+      <line x1="628" y1="632" x2="692" y2="632"/>
+      <line x1="800" y1="446" x2="986" y2="446"/>
+      <line x1="800" y1="560" x2="986" y2="560"/>
+      <line x1="800" y1="590" x2="986" y2="590"/>
+    </g>
+    <rect x="855" y="490" width="64" height="46" fill="#ffffff"/>
+    <rect x="868" y="510" width="9" height="20" fill="#1c2a87" stroke="none"/>
+    <rect x="890" y="510" width="9" height="20" fill="#1c2a87" stroke="none"/>
+    <rect x="825" y="610" width="128" height="62" fill="#ffffff"/>
+    <g fill="#1c2a87" stroke="none">
+      <rect x="840" y="618" width="10" height="46"/>
+      <rect x="868" y="618" width="10" height="46"/>
+      <rect x="896" y="618" width="10" height="46"/>
+      <rect x="924" y="618" width="10" height="46"/>
+    </g>
+    <!-- base -->
+    <rect x="478" y="682" width="492" height="64" rx="10" fill="#eef2fb"/>
+  </g>
+
+  <!-- Olive / plant branch -->
+  <g>
+    <path d="M790 853 C 900 795, 1010 725, 1078 645 C 1125 570, 1118 440, 1080 300"
+          fill="none" stroke="#1f8f37" stroke-width="11" stroke-linecap="round"/>
+    <path d="M1060 680 C 1110 650, 1160 610, 1190 560" fill="none" stroke="#1f8f37" stroke-width="8" stroke-linecap="round"/>
+    <g fill="#2ea546" stroke="#17772c" stroke-width="3">
+      <use href="#leaf" xlink:href="#leaf" transform="translate(1080 305) rotate(-25) scale(0.85)"/>
+      <use href="#leaf" xlink:href="#leaf" transform="translate(1092 345) rotate(-55) scale(0.9)"/>
+      <use href="#leaf" xlink:href="#leaf" transform="translate(1102 350) rotate(25) scale(0.95)"/>
+      <use href="#leaf" xlink:href="#leaf" transform="translate(1108 430) rotate(-60) scale(1.0)"/>
+      <use href="#leaf" xlink:href="#leaf" transform="translate(1112 440) rotate(35) scale(1.1)"/>
+      <use href="#leaf" xlink:href="#leaf" transform="translate(1106 520) rotate(-55) scale(1.05)"/>
+      <use href="#leaf" xlink:href="#leaf" transform="translate(1112 520) rotate(45) scale(1.1)"/>
+      <use href="#leaf" xlink:href="#leaf" transform="translate(1082 610) rotate(-40) scale(1.1)"/>
+      <use href="#leaf" xlink:href="#leaf" transform="translate(1190 562) rotate(20) scale(0.8)"/>
+      <use href="#leaf" xlink:href="#leaf" transform="translate(1150 612) rotate(70) scale(0.85)"/>
+      <use href="#leaf" xlink:href="#leaf" transform="translate(1020 705) rotate(-30) scale(1.15)"/>
+      <use href="#leaf" xlink:href="#leaf" transform="translate(1070 665) rotate(75) scale(1.0)"/>
+      <use href="#leaf" xlink:href="#leaf" transform="translate(950 765) rotate(-10) scale(0.9)"/>
+    </g>
+  </g>
+
+  <!-- Rod of Asclepius -->
+  <path d="M540 811 H700" stroke="#a24d10" stroke-width="26" stroke-linecap="round"/>
+  <path d="M540 811 H700" stroke="#e48a2c" stroke-width="18" stroke-linecap="round"/>
+  <rect x="720" y="200" width="40" height="450" rx="6" fill="url(#rodGrad)" stroke="#9c4a0c" stroke-width="3"/>
+  <ellipse cx="740" cy="193" rx="34" ry="15" fill="#b23a1c" stroke="#7a2210" stroke-width="3"/>
+
+  <!-- Red cross -->
+  <path d="M688 638 H800 V692 H878 V780 H800 V840 H688 V780 H612 V692 H688 Z"
+        fill="#e3170f" stroke="#a20e08" stroke-width="4" stroke-linejoin="round"/>
+
+  <!-- Snake -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path id="snakeBody" d="M785 228 C 700 212, 560 238, 545 300 C 532 360, 640 366, 720 370 C 820 376, 872 420, 842 472 C 810 522, 700 510, 682 562 C 664 612, 760 620, 798 640"
+          stroke="#9a4a0e" stroke-width="44"/>
+    <path d="M785 228 C 700 212, 560 238, 545 300 C 532 360, 640 366, 720 370 C 820 376, 872 420, 842 472 C 810 522, 700 510, 682 562 C 664 612, 760 620, 798 640"
+          stroke="url(#snakeGrad)" stroke-width="36"/>
+    <path d="M770 220 C 700 208, 572 232, 558 292 M 735 362 C 820 368, 860 405, 845 450 M 690 548 C 690 590, 740 602, 780 620"
+          stroke="#fbc77c" stroke-width="6" opacity="0.8"/>
+  </g>
+  <!-- head -->
+  <ellipse cx="800" cy="225" rx="34" ry="21" fill="url(#snakeGrad)" stroke="#9a4a0e" stroke-width="4"/>
+  <circle cx="808" cy="218" r="4" fill="#3a1a05"/>
+  <path d="M820 236 Q 810 242 798 238" fill="none" stroke="#6a2f08" stroke-width="3" stroke-linecap="round"/>
+  <path d="M832 230 L855 232 L866 225 M855 232 L866 238" fill="none" stroke="#1c2a87" stroke-width="3" stroke-linecap="round"/>
+</svg>

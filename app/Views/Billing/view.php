@@ -6,19 +6,27 @@
 /** @var array $invoice @var array $items @var array $payments @var array|null $request */
 /** @var string $routeBase @var bool $isAdminUser */
 
+/* ------------------------------------------------------------------
+   Invoice page: the invoice on the left (who, what, totals, payments),
+   what to do about it on the right (balance, record payment, admin).
+   Self-contained styles, scoped to .inv.
+   ------------------------------------------------------------------ */
+
 $statusMeta = [
     'draft'    => ['label' => 'Draft',    'tone' => 'draft'],
     'unpaid'   => ['label' => 'Unpaid',   'tone' => 'unpaid'],
-    'partial'  => ['label' => 'Partial',  'tone' => 'partial'],
+    'partial'  => ['label' => 'Partly paid', 'tone' => 'partial'],
     'paid'     => ['label' => 'Paid',     'tone' => 'paid'],
     'void'     => ['label' => 'Void',     'tone' => 'void'],
     'refunded' => ['label' => 'Refunded', 'tone' => 'refunded'],
 ];
-$meta    = $statusMeta[$invoice['status']] ?? ['label' => $invoice['status'], 'tone' => 'draft'];
+$meta    = $statusMeta[$invoice['status']] ?? ['label' => ucfirst((string) $invoice['status']), 'tone' => 'draft'];
 $total   = (float) $invoice['total'];
 $paid    = (float) $invoice['amount_paid'];
 $balance = (float) $invoice['balance'];
-$canPay  = $balance > 0 && !in_array($invoice['status'], ['void', 'refunded'], true);
+$isClosed = in_array($invoice['status'], ['void', 'refunded'], true);
+$canPay  = $balance > 0 && !$isClosed;
+$paidPct = $total > 0 ? min(100, $paid / $total * 100) : 0;
 
 $discountAmount = 0.0;
 if ($invoice['discount_type'] === 'percent') {
@@ -35,322 +43,497 @@ $canSync = $isAdminUser
     && is_array($request)
     && ($request['status'] ?? '') === 'pending'
     && !empty($items);
+
+$peso = static fn (float $v): string => '₱' . number_format($v, 2);
+
+/* Line item department, from the stored category */
+$kindOf = static function (?string $category): array {
+    $c = strtolower(trim((string) $category));
+    if (in_array($c, ['xray', 'x-ray'], true))     { return ['xray', 'X-ray']; }
+    if (in_array($c, ['laboratory', 'lab'], true)) { return ['lab', 'Lab']; }
+    return ['other', $c !== '' ? ucfirst($c) : 'Other'];
+};
+
+$methodName = ['cash' => 'Cash', 'gcash' => 'GCash', 'paymaya' => 'Maya', 'card' => 'Card', 'insurance' => 'HMO / Insurance'];
+$requestStatus = is_array($request) ? (string) ($request['status'] ?? '') : '';
 ?>
 
-<div class="bl">
+<div class="inv">
 
-    <?php if (session()->getFlashdata('success')): ?>
-        <div class="bl-alert bl-alert--success"><i class="bi bi-check-circle-fill"></i><span><?= esc(session()->getFlashdata('success')) ?></span></div>
-    <?php endif; ?>
-    <?php if (session()->getFlashdata('error')): ?>
-        <div class="bl-alert bl-alert--error"><i class="bi bi-exclamation-circle-fill"></i><span><?= esc(session()->getFlashdata('error')) ?></span></div>
-    <?php endif; ?>
+    <a class="inv-back" href="<?= base_url($routeBase) ?>"><i class="bi bi-arrow-left" aria-hidden="true"></i>Billing</a>
 
-    <header class="bl-head">
-        <div>
-            <h2 class="bl-title">
-                <span class="bl-ref bl-ref--lg"><?= esc($invoice['invoice_no']) ?></span>
-            </h2>
-            <p class="bl-lede">
-                Created <?= esc(date('M j, Y · g:i A', strtotime($invoice['created_at']))) ?>
-                <?php if (!empty($invoice['created_by'])): ?>
-                    <span class="bl-dot">·</span> by <?= esc($invoice['created_by']) ?>
-                <?php endif; ?>
-            </p>
+    <!-- ===== HEADER ===== -->
+    <header class="inv-head">
+        <div class="inv-head-main">
+            <h1 class="inv-no"><?= esc($invoice['invoice_no']) ?></h1>
+            <span class="inv-status inv-status--<?= esc($meta['tone'], 'attr') ?>"><?= esc($meta['label']) ?></span>
         </div>
-        <div class="bl-head-actions">
-            <a class="bl-btn" href="<?= base_url($routeBase) ?>"><i class="bi bi-arrow-left"></i> Back to list</a>
-            <?php if ($canPay): ?>
-                <a class="bl-btn bl-btn--primary" href="#pay"><i class="bi bi-cash-coin"></i> Record payment</a>
-            <?php endif; ?>
-        </div>
+        <p class="inv-head-meta">
+            Created <?= esc(date('M j, Y · g:i A', strtotime($invoice['created_at']))) ?>
+            <?php if (!empty($invoice['created_by'])): ?> by <?= esc($invoice['created_by']) ?><?php endif; ?>
+        </p>
     </header>
 
-    <!-- SUMMARY -->
-    <section class="bl-summary">
-        <div class="bl-summary-col">
-            <h3 class="bl-summary-title">Billed to</h3>
-            <div class="bl-summary-name"><?= esc($invoice['patient_name']) ?></div>
-            <?php if (!empty($invoice['patient_code'])): ?>
-                <div class="bl-summary-sub"><?= esc($invoice['patient_code']) ?></div>
-            <?php endif; ?>
-            <?php if (!empty($invoice['appointment_id'])): ?>
-                <div class="bl-summary-sub">Appointment #<?= (int) $invoice['appointment_id'] ?></div>
-            <?php endif; ?>
-            <?php if (!empty($invoice['request_id'])): ?>
-                <div class="bl-summary-sub">
-                    Diagnostic request #<?= (int) $invoice['request_id'] ?>
-                    (<?= esc($invoice['request_type'] === 'xray' ? 'X-Ray' : 'Laboratory') ?>)
-                    <?php if (is_array($request)): ?>
-                        <span class="bl-status bl-status--<?= esc($request['status'] === 'pending' ? 'unpaid' : 'paid', 'attr') ?>" style="margin-left:.4rem;">
-                            Request: <?= esc(ucfirst($request['status'])) ?>
-                        </span>
+    <div class="inv-grid">
+
+        <!-- ================= THE INVOICE ================= -->
+        <div class="inv-main">
+
+            <section class="inv-card" aria-labelledby="invBilledTitle">
+                <div class="inv-billed">
+                    <div>
+                        <h2 class="inv-label" id="invBilledTitle">Billed to</h2>
+                        <p class="inv-patient"><?= esc($invoice['patient_name']) ?></p>
+                        <?php if (!empty($invoice['patient_code'])): ?>
+                            <p class="inv-sub"><span class="inv-mono"><?= esc($invoice['patient_code']) ?></span></p>
+                        <?php endif; ?>
+                    </div>
+
+                    <?php if (!empty($invoice['request_id']) || !empty($invoice['appointment_id'])): ?>
+                        <dl class="inv-links">
+                            <?php if (!empty($invoice['request_id'])): ?>
+                                <div>
+                                    <dt>Diagnostic request</dt>
+                                    <dd>
+                                        #<?= (int) $invoice['request_id'] ?> · <?= esc($invoice['request_type'] === 'xray' ? 'X-ray' : 'Laboratory') ?>
+                                        <?php if ($requestStatus !== ''): ?>
+                                            <span class="inv-chip"><?= esc(ucwords(str_replace('_', ' ', $requestStatus))) ?></span>
+                                        <?php endif; ?>
+                                    </dd>
+                                </div>
+                            <?php endif; ?>
+                            <?php if (!empty($invoice['appointment_id'])): ?>
+                                <div>
+                                    <dt>Appointment</dt>
+                                    <dd><a class="inv-link" href="<?= base_url(($isAdminUser ? 'admin' : 'receptionist') . '/appointment/view/' . (int) $invoice['appointment_id']) ?>">#<?= (int) $invoice['appointment_id'] ?></a></dd>
+                                </div>
+                            <?php endif; ?>
+                        </dl>
                     <?php endif; ?>
                 </div>
+
+                <!-- Line items -->
+                <table class="inv-table">
+                    <caption class="visually-hidden">Line items</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">Service</th>
+                            <th scope="col" class="num">Qty</th>
+                            <th scope="col" class="num">Unit price</th>
+                            <th scope="col" class="num">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($items as $it):
+                            [$kind, $kindLabel] = $kindOf($it['category'] ?? null); ?>
+                            <tr>
+                                <td>
+                                    <span class="inv-item"><?= esc($it['service_name']) ?></span>
+                                    <span class="inv-kind inv-kind--<?= $kind ?>"><?= esc($kindLabel) ?></span>
+                                </td>
+                                <td class="num"><?= rtrim(rtrim(number_format((float) $it['qty'], 2, '.', ''), '0'), '.') ?></td>
+                                <td class="num"><?= esc($peso((float) $it['unit_price'])) ?></td>
+                                <td class="num inv-strong"><?= esc($peso((float) $it['line_total'])) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        <?php if (empty($items)): ?>
+                            <tr><td colspan="4" class="inv-none">No line items on this invoice.</td></tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+
+                <!-- Totals -->
+                <dl class="inv-totals">
+                    <div><dt>Subtotal</dt><dd><?= esc($peso((float) $invoice['subtotal'])) ?></dd></div>
+                    <?php if ($discountAmount > 0): ?>
+                        <div>
+                            <dt>
+                                Discount<?= $invoice['discount_type'] === 'percent' ? ' (' . (float) $invoice['discount_value'] . '%)' : '' ?>
+                                <?php if (!empty($invoice['discount_reason'])): ?><small><?= esc($invoice['discount_reason']) ?></small><?php endif; ?>
+                            </dt>
+                            <dd>−<?= esc($peso($discountAmount)) ?></dd>
+                        </div>
+                    <?php endif; ?>
+                    <?php if ((float) $invoice['tax'] > 0): ?>
+                        <div><dt>Tax</dt><dd><?= esc($peso((float) $invoice['tax'])) ?></dd></div>
+                    <?php endif; ?>
+                    <div class="inv-totals-grand"><dt>Total</dt><dd><?= esc($peso($total)) ?></dd></div>
+                    <div><dt>Paid</dt><dd><?= esc($peso($paid)) ?></dd></div>
+                    <div class="inv-totals-due<?= $balance > 0 && !$isClosed ? ' is-due' : '' ?>"><dt>Balance due</dt><dd><?= esc($peso($balance)) ?></dd></div>
+                </dl>
+
+                <?php if (!empty($invoice['notes'])): ?>
+                    <p class="inv-notes"><b>Notes</b> <?= esc($invoice['notes']) ?></p>
+                <?php endif; ?>
+            </section>
+
+            <!-- Payment history -->
+            <section class="inv-card" aria-labelledby="invPayTitle">
+                <header class="inv-card-head">
+                    <h2 id="invPayTitle">Payments</h2>
+                    <span class="inv-count"><?= count($payments) ?></span>
+                </header>
+
+                <?php if ($payments): ?>
+                    <ul class="inv-payments">
+                        <?php foreach ($payments as $p):
+                            $method  = (string) ($p['payment_method'] ?? 'cash');
+                            $pstatus = (string) ($p['payment_status'] ?? 'paid');
+                        ?>
+                            <li class="inv-pay<?= $pstatus === 'refunded' ? ' is-refunded' : '' ?>">
+                                <div class="inv-pay-main">
+                                    <span class="inv-pay-amount"><?= esc($peso((float) $p['amount_paid'])) ?></span>
+                                    <span class="inv-method"><?= esc($methodName[$method] ?? ucfirst($method)) ?></span>
+                                    <?php if ($pstatus === 'refunded'): ?><span class="inv-status inv-status--refunded">Refunded</span><?php endif; ?>
+                                </div>
+                                <p class="inv-pay-meta">
+                                    <?= esc(date('M j, Y · g:i A', strtotime($p['payment_date']))) ?>
+                                    · <?= esc($p['received_by'] ?? '—') ?>
+                                    · <span class="inv-mono"><?= esc($p['reference_number'] ?? '—') ?></span>
+                                    <?php if (!empty($p['reference_no']) && $p['reference_no'] !== ($p['reference_number'] ?? '')): ?>
+                                        · ref <span class="inv-mono"><?= esc($p['reference_no']) ?></span>
+                                    <?php endif; ?>
+                                    <?php if ((float) ($p['change_amount'] ?? 0) > 0): ?>
+                                        · change <?= esc($peso((float) $p['change_amount'])) ?>
+                                    <?php endif; ?>
+                                </p>
+                                <div class="inv-pay-actions">
+                                    <a class="inv-btn inv-btn--sm" href="<?= base_url($routeBase . '/receipt/' . $p['id']) ?>" target="_blank" rel="noopener">
+                                        <i class="bi bi-printer" aria-hidden="true"></i>Receipt
+                                    </a>
+                                    <?php if ($isAdminUser && $pstatus === 'paid'): ?>
+                                        <button type="button" class="inv-btn inv-btn--sm inv-btn--quiet-danger" data-refund="<?= (int) $p['id'] ?>">Refund</button>
+                                    <?php endif; ?>
+                                </div>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php else: ?>
+                    <p class="inv-empty">No payments recorded yet.</p>
+                <?php endif; ?>
+            </section>
+        </div>
+
+        <!-- ================= ACTIONS ================= -->
+        <aside class="inv-side">
+
+            <section class="inv-card inv-balance" aria-label="Balance">
+                <p class="inv-label"><?= $isClosed ? 'Status' : ($balance > 0 ? 'Balance due' : 'Settled') ?></p>
+                <p class="inv-balance-value<?= $balance > 0 && !$isClosed ? ' is-due' : '' ?>"><?= $isClosed ? esc($meta['label']) : esc($peso($balance)) ?></p>
+                <div class="inv-progress" role="progressbar" aria-label="Paid so far" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?= round($paidPct) ?>">
+                    <span style="width: <?= round($paidPct, 1) ?>%"></span>
+                </div>
+                <p class="inv-sub"><?= esc($peso($paid)) ?> paid of <?= esc($peso($total)) ?></p>
+            </section>
+
+            <?php if ($canPay): ?>
+                <section class="inv-card" id="pay" aria-labelledby="invRecordTitle">
+                    <header class="inv-card-head"><h2 id="invRecordTitle">Record payment</h2></header>
+                    <form method="post" action="<?= base_url($routeBase . '/pay/' . $invoice['id']) ?>" class="inv-form" id="invPayForm">
+                        <?= csrf_field() ?>
+                        <label class="inv-field">
+                            <span>Amount <b aria-hidden="true">*</b></span>
+                            <span class="inv-money"><i aria-hidden="true">₱</i>
+                                <input type="number" id="pay_amount" name="amount" step="0.01" min="0.01" max="<?= esc(number_format($balance, 2, '.', ''), 'attr') ?>"
+                                       value="<?= esc(number_format($balance, 2, '.', ''), 'attr') ?>" required>
+                            </span>
+                        </label>
+                        <label class="inv-field">
+                            <span>Method</span>
+                            <select id="pay_method" name="method">
+                                <?php foreach ($methodName as $val => $label): ?>
+                                    <option value="<?= $val ?>"><?= esc($label) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </label>
+                        <label class="inv-field" id="cash_tendered_wrap">
+                            <span>Cash tendered</span>
+                            <span class="inv-money"><i aria-hidden="true">₱</i>
+                                <input type="number" id="pay_tendered" name="cash_tendered" step="0.01" min="0" placeholder="0.00">
+                            </span>
+                            <small class="inv-change" id="payChange" aria-live="polite"></small>
+                        </label>
+                        <label class="inv-field" id="pay_ref_wrap">
+                            <span>Reference no.</span>
+                            <input type="text" id="pay_ref" name="reference_no" placeholder="From the e-wallet or card slip">
+                        </label>
+                        <label class="inv-field">
+                            <span>Notes</span>
+                            <input type="text" id="pay_notes" name="notes" placeholder="Optional">
+                        </label>
+                        <button type="submit" class="inv-btn inv-btn--primary inv-btn--block">
+                            <i class="bi bi-check2" aria-hidden="true"></i>Record payment
+                        </button>
+                    </form>
+                </section>
             <?php endif; ?>
-        </div>
 
-        <div class="bl-summary-col bl-summary-col--right">
-            <div class="bl-summary-status">
-                <span class="bl-status bl-status--<?= esc($meta['tone'], 'attr') ?>"><?= esc($meta['label']) ?></span>
-            </div>
-            <div class="bl-summary-totals">
-                <div class="bl-summary-row"><span>Subtotal</span><span>₱<?= number_format((float) $invoice['subtotal'], 2) ?></span></div>
-                <?php if ($discountAmount > 0): ?>
-                    <div class="bl-summary-row"><span>Discount<?= $invoice['discount_type'] === 'percent' ? ' (' . (float) $invoice['discount_value'] . '%)' : '' ?></span><span>−₱<?= number_format($discountAmount, 2) ?></span></div>
-                <?php endif; ?>
-                <?php if ((float) $invoice['tax'] > 0): ?>
-                    <div class="bl-summary-row"><span>Tax</span><span>₱<?= number_format((float) $invoice['tax'], 2) ?></span></div>
-                <?php endif; ?>
-                <div class="bl-summary-row bl-summary-row--grand"><span>Total</span><span>₱<?= number_format($total, 2) ?></span></div>
-                <div class="bl-summary-row"><span>Paid</span><span>₱<?= number_format($paid, 2) ?></span></div>
-                <div class="bl-summary-row <?= $balance > 0 ? 'bl-summary-row--due' : '' ?>"><span>Balance</span><span>₱<?= number_format($balance, 2) ?></span></div>
-            </div>
-        </div>
-    </section>
-
-    <!-- SYNC TO DIAGNOSTIC REQUEST -->
-    <?php if ($canSync): ?>
-    <section class="bl-panel bl-panel--plain">
-        <h3 class="bl-section-title">Sync to diagnostic request</h3>
-        <p class="bl-note" style="margin-bottom:.9rem;">
-            The invoice has <?= count($items) ?> line item<?= count($items) === 1 ? '' : 's' ?>.
-            The linked diagnostic request <strong>#<?= (int) $invoice['request_id'] ?></strong>
-            is still <strong>pending</strong>, so you can push these services back to it.
-            This adds any missing services to the request without removing existing ones.
-        </p>
-        <form method="post" action="<?= base_url($routeBase . '/sync-request/' . $invoice['id']) ?>"
-              onsubmit="return confirm('Sync the invoice services back to the diagnostic request?');">
-            <?= csrf_field() ?>
-            <div class="bl-form-actions">
-                <button type="submit" class="bl-btn bl-btn--primary">
-                    <i class="bi bi-arrow-repeat"></i>
-                    Sync to diagnostic request
-                </button>
-            </div>
-        </form>
-    </section>
-    <?php endif; ?>
-
-    <!-- LINE ITEMS -->
-    <section class="bl-panel bl-panel--plain">
-        <h3 class="bl-section-title">Line items</h3>
-        <table class="bl-lines">
-            <thead>
-                <tr>
-                    <th>Service</th>
-                    <th>Category</th>
-                    <th class="bl-num">Qty</th>
-                    <th class="bl-num">Unit price</th>
-                    <th class="bl-num">Line total</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($items as $it): ?>
-                    <tr>
-                        <td><?= esc($it['service_name']) ?></td>
-                        <td><?= esc($it['category'] ?? '—') ?></td>
-                        <td class="bl-num"><?= rtrim(rtrim(number_format((float) $it['qty'], 2, '.', ''), '0'), '.') ?></td>
-                        <td class="bl-num">₱<?= number_format((float) $it['unit_price'], 2) ?></td>
-                        <td class="bl-num">₱<?= number_format((float) $it['line_total'], 2) ?></td>
-                    </tr>
-                <?php endforeach; ?>
-                <?php if (empty($items)): ?>
-                    <tr><td colspan="5" class="bl-empty-cell">No line items on this invoice.</td></tr>
-                <?php endif; ?>
-            </tbody>
-        </table>
-    </section>
-
-    <!-- PAYMENT HISTORY -->
-    <section class="bl-panel bl-panel--plain">
-        <h3 class="bl-section-title">Payment history</h3>
-        <table class="bl-lines">
-            <thead>
-                <tr>
-                    <th>Reference</th>
-                    <th>Date</th>
-                    <th>Method</th>
-                    <th>Received by</th>
-                    <th class="bl-num">Amount</th>
-                    <th class="bl-actions-col"></th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($payments as $p):
-                    $method  = (string) ($p['payment_method'] ?? 'cash');
-                    $pstatus = (string) ($p['payment_status'] ?? 'paid');
-                ?>
-                    <tr>
-                        <td class="bl-c-ref"><span class="bl-ref"><?= esc($p['reference_number'] ?? '—') ?></span></td>
-                        <td><?= esc(date('M j, Y · g:i A', strtotime($p['payment_date']))) ?></td>
-                        <td><span class="bl-method bl-method--<?= esc($method, 'attr') ?>"><?= esc(ucfirst($method)) ?></span></td>
-                        <td><?= esc($p['received_by'] ?? '—') ?></td>
-                        <td class="bl-num">
-                            <strong>₱<?= number_format((float) $p['amount_paid'], 2) ?></strong>
-                            <?php if ($pstatus === 'refunded'): ?>
-                                <span class="bl-status bl-status--refunded" style="margin-left:.4rem;">Refunded</span>
-                            <?php endif; ?>
-                        </td>
-                        <td class="bl-c-actions">
-                            <div class="bl-actions">
-                                <a class="bl-icon-btn" href="<?= base_url($routeBase . '/receipt/' . $p['id']) ?>" target="_blank" title="Print receipt">
-                                    <i class="bi bi-printer"></i>
-                                </a>
-                                <?php if ($isAdminUser && $pstatus === 'paid'): ?>
-                                    <button type="button" class="bl-icon-btn bl-icon-btn--danger" data-refund="<?= (int) $p['id'] ?>" title="Refund">
-                                        <i class="bi bi-arrow-counterclockwise"></i>
-                                    </button>
-                                <?php endif; ?>
-                            </div>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-                <?php if (empty($payments)): ?>
-                    <tr><td colspan="6" class="bl-empty-cell">No payments recorded yet.</td></tr>
-                <?php endif; ?>
-            </tbody>
-        </table>
-    </section>
-
-    <!-- RECORD PAYMENT -->
-    <?php if ($canPay): ?>
-    <section class="bl-panel bl-panel--plain" id="pay">
-        <h3 class="bl-section-title">Record payment</h3>
-        <form method="post" action="<?= base_url($routeBase . '/pay/' . $invoice['id']) ?>" class="bl-pay-form">
-            <?= csrf_field() ?>
-            <div class="bl-grid-3">
-                <div>
-                    <label class="bl-label" for="pay_amount">Amount <span class="bl-req">*</span></label>
-                    <input type="number" class="bl-input" id="pay_amount" name="amount" step="0.01" min="0.01"
-                           value="<?= esc(number_format($balance, 2, '.', ''), 'attr') ?>" required>
-                </div>
-                <div>
-                    <label class="bl-label" for="pay_method">Method</label>
-                    <select class="bl-input" id="pay_method" name="method">
-                        <option value="cash">Cash</option>
-                        <option value="gcash">GCash</option>
-                        <option value="paymaya">Maya</option>
-                        <option value="card">Card</option>
-                        <option value="insurance">HMO / Insurance</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="bl-label" for="pay_ref">Reference # (e-wallet / card)</label>
-                    <input type="text" class="bl-input" id="pay_ref" name="reference_no" placeholder="Optional">
-                </div>
-                <div id="cash_tendered_wrap">
-                    <label class="bl-label" for="pay_tendered">Cash tendered</label>
-                    <input type="number" class="bl-input" id="pay_tendered" name="cash_tendered" step="0.01" min="0"
-                           placeholder="For change computation">
-                </div>
-                <div class="bl-span-2">
-                    <label class="bl-label" for="pay_notes">Notes</label>
-                    <input type="text" class="bl-input" id="pay_notes" name="notes" placeholder="Optional">
-                </div>
-            </div>
-            <div class="bl-form-actions">
-                <button type="submit" class="bl-btn bl-btn--primary"><i class="bi bi-check2-circle"></i> Record payment</button>
-            </div>
-        </form>
-    </section>
-    <?php endif; ?>
-
-    <!-- ADMIN ACTIONS -->
-    <?php if ($isAdminUser && !in_array($invoice['status'], ['void', 'refunded'], true)): ?>
-        <section class="bl-panel bl-panel--plain">
-            <h3 class="bl-section-title">Admin actions</h3>
-            <form method="post" action="<?= base_url($routeBase . '/void/' . $invoice['id']) ?>" class="bl-void-form"
-                  onsubmit="return confirm('Void this invoice? This is a bookkeeping action and cannot be undone.')">
-                <?= csrf_field() ?>
-                <div class="bl-grid-2">
-                    <div>
-                        <label class="bl-label" for="void_reason">Reason for voiding</label>
-                        <input type="text" class="bl-input" id="void_reason" name="reason" required>
+            <?php if ($canSync): ?>
+                <section class="inv-card" aria-labelledby="invSyncTitle">
+                    <header class="inv-card-head"><h2 id="invSyncTitle">Diagnostic request</h2></header>
+                    <div class="inv-card-body">
+                        <p class="inv-text">
+                            Request <b>#<?= (int) $invoice['request_id'] ?></b> is still pending. Add this invoice's
+                            <?= count($items) ?> service<?= count($items) === 1 ? '' : 's' ?> to it; nothing already on the request is removed.
+                        </p>
+                        <form method="post" action="<?= base_url($routeBase . '/sync-request/' . $invoice['id']) ?>"
+                              onsubmit="return confirm('Sync the invoice services back to the diagnostic request?');">
+                            <?= csrf_field() ?>
+                            <button type="submit" class="inv-btn inv-btn--block"><i class="bi bi-arrow-repeat" aria-hidden="true"></i>Sync to request</button>
+                        </form>
                     </div>
-                </div>
-                <div class="bl-form-actions">
-                    <button type="submit" class="bl-btn bl-btn--danger"><i class="bi bi-slash-circle"></i> Void invoice</button>
-                </div>
-            </form>
-        </section>
-    <?php endif; ?>
+                </section>
+            <?php endif; ?>
 
-    <?php if ($invoice['status'] === 'void' && !empty($invoice['void_reason'])): ?>
-        <section class="bl-panel bl-panel--plain">
-            <h3 class="bl-section-title">Void record</h3>
-            <p class="bl-note">
-                Voided by <strong><?= esc($invoice['voided_by'] ?? '—') ?></strong>
-                on <?= esc(date('M j, Y · g:i A', strtotime($invoice['voided_at'] ?? $invoice['updated_at']))) ?>.<br>
-                Reason: <em><?= esc($invoice['void_reason']) ?></em>
-            </p>
-        </section>
-    <?php endif; ?>
+            <?php if ($invoice['status'] === 'void' && !empty($invoice['void_reason'])): ?>
+                <section class="inv-card" aria-labelledby="invVoidRecTitle">
+                    <header class="inv-card-head"><h2 id="invVoidRecTitle">Void record</h2></header>
+                    <dl class="inv-kv">
+                        <div><dt>Voided by</dt><dd><?= esc($invoice['voided_by'] ?? '—') ?></dd></div>
+                        <div><dt>When</dt><dd><?= esc(date('M j, Y · g:i A', strtotime($invoice['voided_at'] ?? $invoice['updated_at']))) ?></dd></div>
+                        <div><dt>Reason</dt><dd><?= esc($invoice['void_reason']) ?></dd></div>
+                    </dl>
+                </section>
+            <?php endif; ?>
+
+            <?php if ($isAdminUser && !$isClosed): ?>
+                <details class="inv-card inv-danger">
+                    <summary>Void this invoice</summary>
+                    <form method="post" action="<?= base_url($routeBase . '/void/' . $invoice['id']) ?>" class="inv-form"
+                          onsubmit="return confirm('Void this invoice? This is a bookkeeping action and cannot be undone.')">
+                        <?= csrf_field() ?>
+                        <p class="inv-text">
+                            <?= $paid > 0
+                                ? 'This invoice holds ' . esc($peso($paid)) . '. Refund the payments first, then void it.'
+                                : 'A void keeps the invoice on record but takes it out of the totals.' ?>
+                        </p>
+                        <label class="inv-field">
+                            <span>Reason <b aria-hidden="true">*</b></span>
+                            <input type="text" id="void_reason" name="reason" required>
+                        </label>
+                        <button type="submit" class="inv-btn inv-btn--danger inv-btn--block"<?= $paid > 0 ? ' disabled' : '' ?>>Void invoice</button>
+                    </form>
+                </details>
+            <?php endif; ?>
+        </aside>
+    </div>
 </div>
 
 <style>
-.bl-ref--lg { font-size:1rem; padding:.35rem .7rem; }
-.bl-summary { display:grid; grid-template-columns:1fr auto; gap:1rem;
-              background:#fff; border:1px solid var(--bl-line); border-radius:12px;
-              padding:1rem 1.1rem; margin-bottom:1rem; }
-.bl-summary-col--right { text-align:right; }
-.bl-summary-title { margin:0 0 .35rem; font-size:.72rem; font-weight:600;
-                    letter-spacing:.06em; text-transform:uppercase; color:var(--bl-muted); }
-.bl-summary-name { font-size:1.05rem; font-weight:650; color:var(--bl-ink); margin-bottom:.25rem; }
-.bl-summary-sub  { font-size:.78rem; color:var(--bl-muted); }
-.bl-summary-status { margin-bottom:.6rem; }
-.bl-summary-totals { display:flex; flex-direction:column; gap:.35rem;
-                     min-width:260px; font-variant-numeric:tabular-nums; }
-.bl-summary-row { display:flex; justify-content:space-between; gap:1rem; font-size:.8125rem; }
-.bl-summary-row--grand { border-top:2px solid var(--bl-ink); margin-top:.35rem; padding-top:.55rem;
-                         font-weight:700; color:var(--bl-ink); font-size:.95rem; }
-.bl-summary-row--due { color:var(--bl-warn); font-weight:600; }
+.inv {
+    --inv-ink:    var(--pm-text, #10202E);
+    --inv-text:   var(--pm-text-soft, #3B4C5E);
+    --inv-muted:  var(--pm-text-muted);
+    --inv-faint:  var(--pm-text-muted);
+    --inv-line:   var(--pm-line, #DDE4EC);
+    --inv-rule:   var(--pm-line);
+    --inv-strong-line: var(--pm-line);
+    --inv-subtle: var(--pm-subtle);
+    --inv-accent: var(--pm-accent, #175563);
+    --inv-accent-dark: var(--pm-accent-text);
+    --inv-mono:   var(--pm-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
 
-.bl-panel--plain { padding:1rem 1.1rem; margin-bottom:1rem; }
-.bl-section-title { margin:0 0 .75rem; font-size:.85rem; font-weight:650; color:var(--bl-ink); }
+    max-width: 1180px;
+    margin: 0 auto;
+    color: var(--inv-text);
+    font-size: 0.875rem;
+}
 
-.bl-lines { width:100%; border-collapse:collapse; font-size:.8125rem; }
-.bl-lines th { padding:.55rem .75rem; text-align:left; font-size:.72rem; font-weight:600;
-               color:var(--bl-muted); background:var(--bl-subtle);
-               border-bottom:1px solid var(--bl-line); }
-.bl-lines td { padding:.65rem .75rem; border-bottom:1px solid var(--bl-line-soft); }
-.bl-lines tbody tr:last-child td { border-bottom:0; }
-.bl-lines .bl-num { text-align:right; font-variant-numeric:tabular-nums; }
-.bl-lines .bl-actions-col { width:1%; }
-.bl-empty-cell { padding:1.4rem; text-align:center; color:var(--bl-muted); font-style:italic; }
+.inv *, .inv *::before, .inv *::after { box-sizing: border-box; }
+.inv *:focus-visible { outline: 2px solid var(--inv-accent); outline-offset: 2px; border-radius: 4px; }
+.inv .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.inv .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.inv-mono { font-family: var(--inv-mono); font-size: 0.78rem; }
+.inv-strong { font-weight: 600; color: var(--inv-ink); }
+.inv dt { font-weight: 400; }
 
-.bl-method { display:inline-flex; padding:.15rem .5rem; font-size:.72rem; font-weight:600;
-             border-radius:6px; background:var(--bl-line-soft); color:var(--bl-text); }
-.bl-method--cash { background:var(--bl-green-soft); color:var(--bl-green); }
-.bl-method--gcash { background:#f3e8ff; color:#6d28d9; }
-.bl-method--paymaya { background:#fff4e5; color:var(--bl-warn); }
-.bl-method--card { background:var(--bl-blue-soft); color:var(--bl-blue); }
-.bl-method--insurance { background:var(--bl-accent-soft); color:var(--bl-accent-dark); }
+.inv-back {
+    display: inline-flex; align-items: center; gap: 0.4rem; margin-bottom: 0.75rem;
+    font-size: 0.8rem; font-weight: 500; color: var(--inv-muted); text-decoration: none;
+}
+.inv-back:hover { color: var(--inv-ink); }
 
-.bl-icon-btn--danger:hover { background:var(--bl-danger-soft); color:var(--bl-danger); border-color:#fecaca; }
+.inv-alert {
+    display: flex; align-items: center; gap: 0.5rem; margin: 0 0 1rem; padding: 0.6rem 0.85rem;
+    font-size: 0.82rem; border: 1px solid; border-radius: 6px;
+}
+.inv-alert--ok  { color: var(--pm-dk-fg-green, #067647); background: var(--pm-dk-bg-green, #ECFDF3); border-color: var(--pm-dk-edge-green, #ABEFC6); }
+.inv-alert--err { color: var(--pm-dk-fg-red, #B42318); background: var(--pm-dk-bg-red, #FEF3F2); border-color: var(--pm-dk-edge-red, #FECDCA); }
 
-.bl-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:.75rem; }
-.bl-grid-3 { display:grid; grid-template-columns:repeat(3,1fr); gap:.75rem; }
-.bl-span-2 { grid-column:span 2; }
-.bl-label { display:block; margin:.4rem 0 .3rem; font-size:.78rem; font-weight:600; color:var(--bl-text); }
-.bl-req { color:var(--bl-danger); }
-.bl-form-actions { display:flex; gap:.5rem; justify-content:flex-end; margin-top:.9rem; }
-.bl-note { margin:0; padding:.75rem .9rem; background:var(--bl-subtle); border:1px solid var(--bl-line);
-           border-radius:8px; font-size:.8125rem; line-height:1.55; }
+/* ---------- Header ---------- */
+.inv-head { margin-bottom: 1rem; }
+.inv-head-main { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.inv-no {
+    margin: 0; font-family: var(--inv-mono); font-size: 1.35rem; font-weight: 600;
+    letter-spacing: -0.01em; color: var(--inv-ink);
+}
+.inv-head-meta { margin: 0.3rem 0 0; font-size: 0.8125rem; color: var(--inv-muted); }
 
-.bl-btn--danger, .bl-btn--danger:hover { color:#fff; }
-.bl-btn--danger { background:var(--bl-danger); border-color:var(--bl-danger); }
-.bl-btn--danger:hover { background:#991b1b; border-color:#991b1b; }
+.inv-status {
+    display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.2rem 0.55rem;
+    font-size: 0.74rem; font-weight: 600; white-space: nowrap; color: var(--fg); background: var(--bg); border-radius: 4px;
+}
+.inv-status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--dot); }
+.inv-status--unpaid   { --bg: #FEF6E7; --fg: #93370D; --dot: #DC6803; }
+.inv-status--partial  { --bg: #EBF2F4; --fg: #10404B; --dot: #175563; }
+.inv-status--paid     { --bg: #ECFDF3; --fg: #067647; --dot: #17B26A; }
+.inv-status--draft,
+.inv-status--void     { --bg: #F2F4F7; --fg: #475467; --dot: #98A2B3; }
+.inv-status--refunded { --bg: #FEF3F2; --fg: #B42318; --dot: #F04438; }
 
-#cash_tendered_wrap { display:none; }
-#cash_tendered_wrap.is-visible { display:block; }
+/* ---------- Layout ---------- */
+.inv-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 1rem; align-items: start; }
+.inv-main, .inv-side { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
 
-@media (max-width:840px) {
-    .bl-summary { grid-template-columns:1fr; }
-    .bl-summary-col--right { text-align:left; }
-    .bl-summary-totals { min-width:0; }
-    .bl-grid-3 { grid-template-columns:1fr; }
-    .bl-span-2 { grid-column:auto; }
+.inv-card { margin: 0; background: var(--pm-surface); border: 1px solid var(--inv-line); border-radius: 8px; overflow: hidden; }
+.inv-card-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+    padding: 0.85rem 1.15rem; border-bottom: 1px solid var(--inv-rule);
+}
+.inv-card-head h2 { margin: 0; font-size: 0.95rem; font-weight: 600; color: var(--inv-ink); }
+.inv-card-body { padding: 0.9rem 1.15rem 1.05rem; }
+.inv-count {
+    min-width: 1.4rem; padding: 0 0.35rem; font-size: 0.72rem; font-weight: 600; line-height: 1.3rem;
+    text-align: center; color: var(--inv-text); background: var(--inv-rule); border-radius: 4px;
+}
+
+.inv-label { margin: 0; font-size: 0.75rem; font-weight: 500; color: var(--inv-muted); }
+.inv-sub   { margin: 0.2rem 0 0; font-size: 0.8rem; color: var(--inv-muted); }
+.inv-text  { margin: 0 0 0.85rem; font-size: 0.82rem; line-height: 1.55; color: var(--inv-text); }
+.inv-text b { color: var(--inv-ink); }
+.inv-none, .inv-empty { padding: 1.2rem 1.15rem; margin: 0; font-size: 0.82rem; color: var(--inv-faint); }
+.inv-none { text-align: center; }
+.inv-link { color: var(--inv-accent); font-weight: 500; text-decoration: none; }
+.inv-link:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+/* ---------- Billed to ---------- */
+.inv-billed {
+    display: flex; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap;
+    padding: 1.05rem 1.15rem; border-bottom: 1px solid var(--inv-rule);
+}
+.inv-patient { margin: 0.25rem 0 0; font-size: 1.1rem; font-weight: 600; color: var(--inv-ink); }
+.inv-links { display: flex; gap: 1.75rem; margin: 0; flex-wrap: wrap; }
+.inv-links dt { font-size: 0.75rem; font-weight: 500; color: var(--inv-muted); }
+.inv-links dd { margin: 0.25rem 0 0; font-size: 0.85rem; color: var(--inv-ink); display: flex; align-items: center; gap: 0.4rem; }
+.inv-chip { padding: 0.05rem 0.4rem; font-size: 0.7rem; font-weight: 600; color: var(--inv-text); background: var(--inv-rule); border-radius: 4px; }
+
+/* ---------- Line items ---------- */
+.inv-table { width: 100%; border-collapse: collapse; }
+.inv-table th {
+    padding: 0.6rem 1.15rem; font-size: 0.75rem; font-weight: 500; text-align: left; color: var(--inv-muted);
+    border-bottom: 1px solid var(--inv-line);
+}
+.inv-table th.num { text-align: right; }
+.inv-table td { padding: 0.7rem 1.15rem; font-size: 0.85rem; color: var(--inv-text); border-bottom: 1px solid var(--inv-rule); vertical-align: middle; }
+.inv-item { font-weight: 500; color: var(--inv-ink); }
+
+.inv-kind {
+    display: inline-flex; align-items: center; gap: 0.3rem; margin-left: 0.45rem; padding: 0.05rem 0.4rem;
+    font-size: 0.68rem; font-weight: 600; border-radius: 4px; vertical-align: 1px;
+}
+.inv-kind::before { content: ""; width: 6px; height: 6px; border-radius: 2px; background: currentColor; }
+.inv-kind--lab   { color: var(--pm-dk-fg-teal, #10404B); background: var(--pm-dk-bg-teal, #EBF2F4); }
+.inv-kind--xray  { color: var(--pm-dk-fg-teal, #0A6E65); background: var(--pm-dk-bg-teal, #E3F4F1); }
+.inv-kind--other { color: var(--pm-text-soft); background: var(--pm-subtle); }
+
+/* ---------- Totals ---------- */
+.inv-totals { margin: 0 0 0 auto; padding: 0.85rem 1.15rem 1rem; width: min(360px, 100%); }
+.inv-totals > div { display: flex; justify-content: space-between; gap: 1rem; padding: 0.25rem 0; font-size: 0.85rem; }
+.inv-totals dt { color: var(--inv-muted); }
+.inv-totals dt small { display: block; font-size: 0.72rem; color: var(--inv-faint); }
+.inv-totals dd { margin: 0; color: var(--inv-ink); font-variant-numeric: tabular-nums; }
+.inv-totals-grand { margin-top: 0.35rem; padding-top: 0.6rem !important; border-top: 1px solid var(--inv-strong-line); }
+.inv-totals-grand dt, .inv-totals-grand dd { font-size: 1rem; font-weight: 600; color: var(--inv-ink); }
+.inv-totals-due dt { color: var(--inv-ink); font-weight: 500; }
+.inv-totals-due dd { font-weight: 600; }
+.inv-totals-due.is-due dd { color: var(--pm-dk-fg-amber, #B54708); }
+
+.inv-notes { margin: 0; padding: 0.75rem 1.15rem; font-size: 0.82rem; color: var(--inv-text); border-top: 1px solid var(--inv-rule); background: var(--inv-subtle); }
+.inv-notes b { margin-right: 0.35rem; color: var(--inv-ink); }
+
+/* ---------- Payments ---------- */
+.inv-payments { margin: 0; padding: 0; list-style: none; }
+.inv-pay {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0.25rem 1rem;
+    padding: 0.8rem 1.15rem; border-top: 1px solid var(--inv-rule);
+}
+.inv-pay:first-child { border-top: 0; }
+.inv-pay-main { display: flex; align-items: center; gap: 0.55rem; flex-wrap: wrap; }
+.inv-pay-amount { font-size: 0.95rem; font-weight: 600; color: var(--inv-ink); font-variant-numeric: tabular-nums; }
+.inv-pay.is-refunded .inv-pay-amount { color: var(--inv-faint); text-decoration: line-through; }
+.inv-method { padding: 0.05rem 0.45rem; font-size: 0.72rem; font-weight: 600; color: var(--inv-text); background: var(--inv-rule); border-radius: 4px; }
+.inv-pay-meta { grid-column: 1; margin: 0; font-size: 0.76rem; color: var(--inv-muted); }
+.inv-pay-actions { grid-column: 2; grid-row: 1 / span 2; display: flex; gap: 0.35rem; }
+
+/* ---------- Balance ---------- */
+.inv-balance { padding: 1rem 1.15rem 1.05rem; }
+.inv-balance-value { margin: 0.25rem 0 0.75rem; font-size: 1.75rem; font-weight: 600; line-height: 1.1; letter-spacing: -0.02em; color: var(--inv-ink); font-variant-numeric: tabular-nums; }
+.inv-balance-value.is-due { color: var(--pm-dk-fg-amber, #B54708); }
+.inv-progress { height: 6px; border-radius: 3px; background: var(--inv-rule); overflow: hidden; }
+.inv-progress span { display: block; height: 100%; border-radius: 3px; background: #17B26A; }
+
+/* ---------- Forms ---------- */
+.inv-form { display: flex; flex-direction: column; gap: 0.75rem; padding: 0.9rem 1.15rem 1.1rem; }
+.inv-danger .inv-form { padding-top: 0.25rem; }
+.inv-field { display: flex; flex-direction: column; gap: 0.3rem; margin: 0; }
+.inv-field > span:first-child { font-size: 0.78rem; font-weight: 500; color: var(--inv-ink); }
+.inv-field b { color: var(--pm-dk-fg-red, #B42318); font-weight: 600; }
+.inv-field input, .inv-field select {
+    width: 100%; height: 36px; padding: 0 0.7rem; font: inherit; font-size: 0.85rem; color: var(--inv-ink);
+    background: var(--pm-surface); border: 1px solid var(--inv-strong-line); border-radius: 6px;
+}
+.inv-field input::placeholder { color: #8496A8; }
+.inv-field input:focus, .inv-field select:focus { outline: none; border-color: var(--inv-accent); box-shadow: 0 0 0 3px rgba(23, 85, 99, 0.14); }
+.inv-field[hidden] { display: none; }
+.inv-money { position: relative; display: block; }
+.inv-money i { position: absolute; left: 0.7rem; top: 50%; transform: translateY(-50%); font-style: normal; font-size: 0.85rem; color: var(--inv-muted); }
+.inv-money input { padding-left: 1.6rem; font-variant-numeric: tabular-nums; }
+.inv-change:empty { display: none; }
+.inv-change { font-size: 0.78rem; font-weight: 600; color: var(--pm-dk-fg-green, #067647); }
+.inv-change.is-short { color: var(--pm-dk-fg-red, #B42318); }
+
+/* ---------- Buttons ---------- */
+.inv-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; height: 36px; padding: 0 0.9rem;
+    font: inherit; font-size: 0.82rem; font-weight: 600; color: var(--inv-ink); background: var(--pm-surface);
+    border: 1px solid var(--inv-line); border-radius: 6px; text-decoration: none; white-space: nowrap; cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.inv-btn:hover { color: var(--inv-ink); background: var(--inv-subtle); border-color: var(--inv-strong-line); }
+.inv-btn--sm { height: 30px; padding: 0 0.65rem; font-size: 0.78rem; }
+.inv-btn--block { width: 100%; }
+.inv-btn--primary { color: #FFFFFF; background: var(--inv-accent); border-color: var(--inv-accent); }
+.inv-btn--primary:hover { color: #FFFFFF; background: var(--inv-accent-dark); border-color: var(--inv-accent-dark); }
+.inv-btn--danger { color: #FFFFFF; background: #B42318; border-color: #B42318; }
+.inv-btn--danger:hover { color: #FFFFFF; background: #912018; border-color: #912018; }
+.inv-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.inv-btn--quiet-danger { color: var(--pm-dk-fg-red, #B42318); border-color: transparent; background: transparent; }
+.inv-btn--quiet-danger:hover { color: var(--pm-dk-fg-red, #B42318); background: var(--pm-dk-bg-red, #FEF3F2); border-color: transparent; }
+
+/* ---------- Danger zone ---------- */
+.inv-danger summary {
+    display: flex; align-items: center; justify-content: space-between; padding: 0.8rem 1.15rem;
+    font-size: 0.82rem; font-weight: 600; color: var(--pm-dk-fg-red, #B42318); cursor: pointer; list-style: none;
+}
+.inv-danger summary::-webkit-details-marker { display: none; }
+.inv-danger summary::after { content: "\F282"; font-family: "bootstrap-icons"; font-size: 0.75rem; transition: transform 0.15s ease; }
+.inv-danger[open] summary::after { transform: rotate(180deg); }
+
+.inv-kv { margin: 0; padding: 0.75rem 1.15rem 0.95rem; }
+.inv-kv > div { display: flex; justify-content: space-between; gap: 1rem; padding: 0.25rem 0; font-size: 0.82rem; }
+.inv-kv dt { color: var(--inv-muted); }
+.inv-kv dd { margin: 0; color: var(--inv-ink); text-align: right; }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1000px) {
+    .inv-grid { grid-template-columns: minmax(0, 1fr); }
+    .inv-side { order: -1; }
+}
+@media (max-width: 560px) {
+    .inv-table th, .inv-table td { padding-left: 0.85rem; padding-right: 0.85rem; }
+    .inv-table th:nth-child(3), .inv-table td:nth-child(3) { display: none; }
+    .inv-pay { grid-template-columns: minmax(0, 1fr); }
+    .inv-pay-actions { grid-column: 1; grid-row: auto; }
 }
 </style>
 
@@ -360,14 +543,36 @@ $canSync = $isAdminUser
 
     var methodSel = document.getElementById('pay_method');
     var cashWrap  = document.getElementById('cash_tendered_wrap');
+    var refWrap   = document.getElementById('pay_ref_wrap');
+    var amount    = document.getElementById('pay_amount');
+    var tendered  = document.getElementById('pay_tendered');
+    var change    = document.getElementById('payChange');
+
+    /* Cash shows "tendered" and the change; other methods show the reference no. */
     function syncMethod() {
-        if (!methodSel || !cashWrap) return;
-        cashWrap.classList.toggle('is-visible', methodSel.value === 'cash');
+        if (!methodSel) return;
+        var isCash = methodSel.value === 'cash';
+        if (cashWrap) cashWrap.hidden = !isCash;
+        if (refWrap)  refWrap.hidden  = isCash;
+        syncChange();
     }
-    if (methodSel) {
-        methodSel.addEventListener('change', syncMethod);
-        syncMethod();
+
+    function syncChange() {
+        if (!change || !amount || !tendered) return;
+        var a = parseFloat(amount.value) || 0, t = parseFloat(tendered.value) || 0;
+        change.classList.remove('is-short');
+        if (!t) { change.textContent = ''; return; }
+        if (t < a) {
+            change.classList.add('is-short');
+            change.textContent = 'Short by ₱' + (a - t).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            return;
+        }
+        change.textContent = 'Change ₱' + (t - a).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
+
+    if (methodSel) { methodSel.addEventListener('change', syncMethod); syncMethod(); }
+    if (amount)    { amount.addEventListener('input', syncChange); }
+    if (tendered)  { tendered.addEventListener('input', syncChange); }
 
     document.querySelectorAll('[data-refund]').forEach(function (btn) {
         btn.addEventListener('click', function () {

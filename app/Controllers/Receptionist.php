@@ -73,6 +73,7 @@ class Receptionist extends BaseController
         $data['weekly_appointments'] = $this->getWeeklyAppointmentData();
         // Rolling 7 days ending today, so the labels cannot be a fixed Mon-Sun.
         $data['weekly_labels'] = array_map(static fn($i) => date('D', strtotime("-$i days")), range(6, 0));
+        $data['appointment_calendar'] = $this->getAppointmentCalendar();
 
         $serviceData = $this->getServiceDistributionData();
         $data['service_labels'] = $serviceData['labels'];
@@ -327,6 +328,9 @@ class Receptionist extends BaseController
             $model->checkLateAppointments();
 
             $data = $this->appointmentStatusCounts();
+            $services = new ServiceModel();
+            $data['labServices']  = $services->getServicesByCategory('laboratory');
+            $data['xrayServices'] = $services->getServicesByCategory('xray');
             $data['appointments'] = $model->orderBy('appointment_date', 'DESC')
                                           ->orderBy('appointment_time', 'ASC')
                                           ->findAll();
@@ -411,7 +415,7 @@ class Receptionist extends BaseController
         $patient = (new PatientModel())->findOrCreateFromAppointment($appointment);
         $notes   = $this->createRequestsFromAppointment($appointment, $patient['patient_code'] ?? null);
 
-        $message = 'Appointment approved successfully!';
+        $message = 'Appointment approved.';
         if ($notes !== []) {
             $message .= ' ' . implode(' ', $notes);
         } else {
@@ -446,7 +450,7 @@ class Receptionist extends BaseController
         $model->update($id, ['status' => 'cancelled']);
 
         return redirect()->to(base_url('receptionist/appointments'))
-                        ->with('success', 'Appointment cancelled successfully!');
+                        ->with('success', 'Appointment cancelled');
     }
 
     public function completeAppointment($id)
@@ -470,7 +474,7 @@ class Receptionist extends BaseController
         $model->update($id, ['status' => 'completed']);
 
         return redirect()->to(base_url('receptionist/appointments'))
-                        ->with('success', 'Appointment marked as completed!');
+                        ->with('success', 'Appointment completed');
     }
 
     public function patients()
@@ -830,37 +834,10 @@ class Receptionist extends BaseController
         try {
             log_message('debug', 'Creating patient: ' . $patientName . ', Age: ' . $age . ', Gender: ' . $gender . ', Phone: ' . $phone);
 
-            $existingPatient = null;
-            if (!empty($email)) {
-                $existingPatient = $patientModel->where('email', $email)->first();
-                if ($existingPatient) {
-                    log_message('debug', 'Found existing patient by email: ' . $email);
-                }
-            }
-
-            if (!$existingPatient) {
-                $existingPatient = $patientModel->where('full_name', $patientName)
-                                                ->where('age', $age)
-                                                ->where('gender', $gender)
-                                                ->first();
-                if ($existingPatient) {
-                    log_message('debug', 'Found existing patient by name/age/gender');
-                }
-            }
-
-            if (!$existingPatient && !empty($phone)) {
-                $existingPatient = $patientModel->where('phone', $phone)->first();
-                if ($existingPatient) {
-                    log_message('debug', 'Found existing patient by phone: ' . $phone);
-
-                    if ($existingPatient['full_name'] !== $patientName ||
-                        $existingPatient['age'] != $age ||
-                        $existingPatient['gender'] !== $gender) {
-
-                        log_message('debug', 'Phone matches but name/age/gender are different. Creating new patient...');
-                        $existingPatient = null;
-                    }
-                }
+            // Same person only when the name matches; a shared email or phone alone is not enough
+            $existingPatient = $patientModel->findSamePerson($patientName, $age, $gender, (string) $email, (string) $phone);
+            if ($existingPatient) {
+                log_message('debug', 'Found existing patient: ' . $existingPatient['patient_code']);
             }
 
             if ($existingPatient) {
@@ -978,11 +955,11 @@ class Receptionist extends BaseController
         }
 
         $what = count($created) > 1
-            ? 'Lab and X-Ray requests (' . implode(', ', array_column($created, 'reference')) . ') created'
+            ? 'Requests created (' . implode(', ', array_column($created, 'reference')) . ')'
             : $labels[array_key_first($created)] . ' request created';
 
         return redirect()->to(base_url('receptionist/diagnostic-requests'))
-                        ->with('success', $what . ' successfully for ' . $patientName . '! Patient Code: ' . $patientCode);
+                        ->with('success', $what . '. ' . $patientName . ' · ' . $patientCode);
     }
 
     public function updateDiagnosticStatus($id, $type, $status)
@@ -1152,7 +1129,7 @@ class Receptionist extends BaseController
         $count = $patientModel->syncWalkInPatients();
 
         return redirect()->to(base_url('receptionist/patients'))
-                        ->with('success', "Synced {$count} walk-in patients to the patients table.");
+                        ->with('success', "Patients synced. {$count} walk-in record(s) added.");
     }
 
     /** Appointments per day for the last 7 days (oldest first), one query. */
@@ -1176,6 +1153,24 @@ class Receptionist extends BaseController
         return $weeklyData;
     }
 
+    /**
+     * Appointments per day from January 1 last year to December 31 this year,
+     * as 'Y-m-d' => count. Days with none are left out. Future dates hold
+     * bookings already made.
+     */
+    private function getAppointmentCalendar(): array
+    {
+        $year = (int) date('Y');
+
+        $rows = db_connect()->table('appointments')
+            ->select('appointment_date AS d, COUNT(*) AS n')
+            ->where('appointment_date >=', ($year - 1) . '-01-01')
+            ->where('appointment_date <=', $year . '-12-31')
+            ->groupBy('appointment_date')
+            ->get()->getResultArray();
+
+        return array_map('intval', array_column($rows, 'n', 'd'));
+    }
     private function getServiceDistributionData()
     {
         $appointmentModel = new AppointmentModel();
@@ -1333,74 +1328,122 @@ class Receptionist extends BaseController
         ]);
     }
 
+    /**
+     * Override booking: the front desk books a patient into a slot the
+     * online form would refuse (full, or blocked for equipment downtime),
+     * e.g. an urgent case, a doctor's referral that can't wait, or a
+     * patient already standing at the counter.
+     *
+     * It skips the capacity check only. Everything else a normal approval
+     * does still happens, in one step: the appointment is saved as
+     * approved, the patient gets (or keeps) their record and code, and
+     * the lab / X-ray requests are created so the departments see them.
+     * Every override records why it was made and by whom.
+     */
     public function overrideBook()
     {
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
 
+        $back = static fn (string $msg) => redirect()->back()->withInput()
+            ->with('error', $msg)->with('reopen_override', true);
+
         $rules = [
-            'appointment_date' => 'required|valid_date',
+            'appointment_date' => 'required|valid_date[Y-m-d]',
             'appointment_time' => 'required|regex_match[/^\d{2}:\d{2}$/]',
             'full_name'        => 'required|min_length[2]|max_length[150]',
-            'age'              => 'required|is_natural_no_zero|less_than_equal_to[130]',
+            'age'              => 'required|is_natural|less_than_equal_to[130]',
             'gender'           => 'required|in_list[Male,Female,Other]',
             'service_type'     => 'required|in_list[laboratory,xray,both]',
             'email'            => 'permit_empty|valid_email',
+            'phone'            => 'permit_empty|max_length[30]',
+            'override_reason'  => 'required|min_length[5]|max_length[255]',
+        ];
+        $labels = [
+            'appointment_date' => 'Date', 'appointment_time' => 'Time', 'full_name' => 'Patient name',
+            'age' => 'Age', 'gender' => 'Gender', 'service_type' => 'Service', 'email' => 'Email',
+            'phone' => 'Phone', 'override_reason' => 'Reason for override',
         ];
 
+        // Readable names in messages ("Reason for override", not "override_reason")
+        foreach ($rules as $field => $rule) {
+            $rules[$field] = ['label' => $labels[$field] ?? $field, 'rules' => $rule];
+        }
+
         if (!$this->validate($rules)) {
-            return redirect()->back()->withInput()
-                ->with('error', 'Please fill in the override form completely.');
+            $first = array_key_first($this->validator->getErrors());
+            return $back($this->validator->getError($first));
         }
 
-        $date    = (string) $this->request->getPost('appointment_date');
-        $time    = (string) $this->request->getPost('appointment_time');
-        $type    = (string) $this->request->getPost('service_type');
-        $lab     = $this->cleanServiceList((array) ($this->request->getPost('lab_services')  ?? []));
-        $xray    = $this->cleanServiceList((array) ($this->request->getPost('xray_services') ?? []));
+        $date = (string) $this->request->getPost('appointment_date');
+        $time = (string) $this->request->getPost('appointment_time');
+        $type = (string) $this->request->getPost('service_type');
 
+        if ($date < date('Y-m-d')) {
+            return $back('Override bookings cannot be made for a past date.');
+        }
+        if (!(new AvailabilityModel())->isWorkingDay($date)) {
+            return $back('The clinic is closed on that date. Overrides skip a full slot, not a closed day.');
+        }
+
+        // Only keep the services for the department(s) chosen
+        $lab  = in_array($type, ['laboratory', 'both'], true)
+            ? $this->cleanServiceList((array) ($this->request->getPost('lab_services') ?? [])) : [];
+        $xray = in_array($type, ['xray', 'both'], true)
+            ? $this->cleanServiceList((array) ($this->request->getPost('xray_services') ?? [])) : [];
+
+        if ($type === 'both' && ($lab === [] || $xray === [])) {
+            return $back('For "Both", pick at least one laboratory test and one X-ray exam.');
+        }
         if ($lab === [] && $xray === []) {
-            return redirect()->back()->withInput()
-                ->with('error', 'Select at least one laboratory or X-ray service.');
+            return $back('Pick at least one ' . ($type === 'xray' ? 'X-ray exam.' : 'laboratory test.'));
         }
 
-        $email   = trim((string) $this->request->getPost('email'));
-        $phone   = trim((string) $this->request->getPost('phone'));
-
-        $reference = 'APPT-' . date('Ymd') . '-' . strtoupper(substr(uniqid(), -6));
+        $email  = trim((string) $this->request->getPost('email'));
+        $phone  = trim((string) $this->request->getPost('phone'));
+        $reason = trim((string) $this->request->getPost('override_reason'));
+        $staff  = PaymentModel::currentCashierName();
 
         $appointmentModel = new AppointmentModel();
-
-        $appointmentData = [
-            'reference_number' => $reference,
+        $appointmentData  = [
+            'reference_number' => 'APPT-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(3))),
             'appointment_date' => $date,
             'appointment_time' => $time,
-            'full_name'        => $this->request->getPost('full_name'),
-            'age'              => $this->request->getPost('age'),
-            'gender'           => $this->request->getPost('gender'),
+            'full_name'        => trim((string) $this->request->getPost('full_name')),
+            'age'              => (int) $this->request->getPost('age'),
+            'gender'           => (string) $this->request->getPost('gender'),
             'email'            => $email !== '' ? $email : null,
             'phone'            => $phone !== '' ? $phone : null,
             'service_type'     => $type,
-            'lab_services'     => !empty($lab)  ? json_encode(array_values($lab))  : null,
-            'xray_services'    => !empty($xray) ? json_encode(array_values($xray)) : null,
-            'other_requests'   => $this->request->getPost('other_requests') ?: null,
+            'lab_services'     => $lab  !== [] ? json_encode(array_values($lab))  : null,
+            'xray_services'    => $xray !== [] ? json_encode(array_values($xray)) : null,
+            'other_requests'   => trim((string) $this->request->getPost('other_requests')) ?: null,
             'status'           => 'approved',
             'is_override'      => 1,
-            'arrival_time'     => date('Y-m-d H:i:s'),
+            'override_reason'  => mb_substr($reason, 0, 255),
+            'override_by'      => $staff,
+            // Arrived only when they are booked for today (usually at the counter)
+            'arrival_time'     => $date === date('Y-m-d') ? date('Y-m-d H:i:s') : null,
         ];
 
-        $appointmentId = $appointmentModel->insert($appointmentData);
-
+        $appointmentId = (int) $appointmentModel->insert($appointmentData);
         if (!$appointmentId) {
-            return redirect()->back()->withInput()
-                ->with('error', 'Could not create the override appointment.');
+            return $back('Could not save the override booking. Please try again.');
+        }
+        $appointmentData['id'] = $appointmentId;
+
+        // Same as Approve: patient record + department requests, so nothing is left hanging
+        $patient = (new PatientModel())->findOrCreateFromAppointment($appointmentData);
+        $notes   = $this->createRequestsFromAppointment($appointmentData, $patient['patient_code'] ?? null);
+
+        log_message('info', "Override booking {$appointmentData['reference_number']} for {$appointmentData['full_name']} "
+            . "on {$date} {$time} by {$staff}: {$reason}");
+
+        $message = 'Override booking ' . $appointmentData['reference_number'] . ' created. ' . implode(' ', $notes);
+        if ($patient) {
+            $message .= ' Patient Code: ' . $patient['patient_code'];
         }
 
-        $patientModel = new PatientModel();
-        $patientModel->findOrCreateFromAppointment($appointmentData);
-
-        return redirect()->to(base_url('receptionist/appointments'))
-            ->with('success', 'Override booking created (' . $reference . '). '
-                . 'Use the Approve button to generate the diagnostic request(s).');
+        return redirect()->to(base_url('receptionist/appointments'))->with('success', trim($message));
     }
 }

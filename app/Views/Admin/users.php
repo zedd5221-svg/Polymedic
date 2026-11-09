@@ -50,31 +50,11 @@ $relativeTime = static function (int $ts): string {
 
 <div class="table-card">
     <div class="page-header">
-        <div class="page-header-text">
-            <h4 class="page-title">User Management</h4>
-            <p class="page-subtitle">Manage system users and their roles</p>
-        </div>
         <button type="button" class="btn btn-primary btn-add-user" data-bs-toggle="modal" data-bs-target="#addUserModal">
             <i class="bi bi-person-plus" aria-hidden="true"></i>
             <span>Add User</span>
         </button>
     </div>
-
-    <?php if (session()->getFlashdata('success')): ?>
-        <div class="alert alert-success alert-dismissible fade show admin-alert" role="alert">
-            <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
-            <span><?= esc(session()->getFlashdata('success')) ?></span>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss message"></button>
-        </div>
-    <?php endif; ?>
-
-    <?php if (session()->getFlashdata('error')): ?>
-        <div class="alert alert-danger alert-dismissible fade show admin-alert" role="alert">
-            <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
-            <span><?= esc(session()->getFlashdata('error')) ?></span>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss message"></button>
-        </div>
-    <?php endif; ?>
 
     <div class="table-toolbar">
         <div class="search-wrapper">
@@ -597,18 +577,18 @@ $relativeTime = static function (int $ts): string {
 
 .table-card,
 .admin-modal {
-    --um-accent:        var(--pm-accent, #0B67B2);
-    --um-accent-soft:   var(--pm-accent-soft, #E8F1FA);
+    --um-accent:        var(--pm-accent, #175563);
+    --um-accent-soft:   var(--pm-accent-soft, #EBF2F4);
     --um-ink:           var(--pm-text, #10202E);
     --um-text:          var(--pm-text-soft, #3B4C5E);
     --um-muted:         var(--pm-text-muted, #5D6E80);
-    --um-faint:         #7A8B9D;
+    --um-faint:         var(--pm-text-muted);
     --um-line:          var(--pm-line, #DDE4EC);
-    --um-line-soft:     #EBF0F5;
-    --um-surface:       #FFFFFF;
-    --um-canvas:        #F8FAFC;
-    --um-row-hover:     #F5F8FB;
-    --um-avatar:        #E3EAF2;
+    --um-line-soft:     var(--pm-line);
+    --um-surface:       var(--pm-surface);
+    --um-canvas:        var(--pm-canvas);
+    --um-row-hover:     var(--pm-subtle);
+    --um-avatar:        var(--pm-subtle);
     --um-danger:        #B42318;
     --um-radius:        8px;
     --um-radius-sm:     8px;
@@ -703,7 +683,7 @@ $relativeTime = static function (int $ts): string {
 
 .search-wrapper:focus-within {
     border-color: var(--um-accent);
-    box-shadow: 0 0 0 3px rgba(11, 103, 178, 0.15);
+    box-shadow: 0 0 0 3px rgba(23, 85, 99, 0.15);
 }
 
 .search-wrapper i { color: var(--um-faint); font-size: 0.8rem; }
@@ -877,9 +857,9 @@ $relativeTime = static function (int $ts): string {
 }
 
 /* Clinical roles use their department colour; desk roles stay neutral */
-.role-label--admin        { --role: var(--pm-ink, #0C2D48); }
+.role-label--admin        { --role: var(--pm-ink, #142D36); }
 .role-label--receptionist { --role: #7C8DA0; }
-.role-label--med_tech     { --role: #0B67B2; }
+.role-label--med_tech     { --role: #175563; }
 .role-label--radiologist  { --role: #0E8A7E; }
 
 .status-text::before {
@@ -919,7 +899,7 @@ $relativeTime = static function (int $ts): string {
 }
 
 .action-icon:hover { color: var(--um-ink); background: var(--um-line-soft); }
-.action-icon.delete-user:hover { color: var(--um-danger); background: #FEF3F2; }
+.action-icon.delete-user:hover { color: var(--um-danger); background: var(--pm-dk-bg-red, #FEF3F2); }
 
 .action-note {
     font-size: 0.74rem;
@@ -1023,7 +1003,7 @@ $relativeTime = static function (int $ts): string {
     margin-bottom: 0.35rem;
 }
 
-.admin-modal .req { color: #b91c1c; font-weight: 700; }
+.admin-modal .req { color: var(--pm-dk-fg-red, #b91c1c); font-weight: 700; }
 
 .admin-modal .form-control,
 .admin-modal .form-select {
@@ -1120,8 +1100,8 @@ $relativeTime = static function (int $ts): string {
     height: 40px;
     font-size: 1rem;
     color: var(--um-accent);
-    background: #eef4fd;
-    border: 1px solid #d6e4fa;
+    background: var(--pm-dk-bg-blue, #eef4fd);
+    border: 1px solid var(--pm-dk-edge-blue, #d6e4fa);
     border-radius: 10px;
 }
 
@@ -1250,8 +1230,8 @@ $relativeTime = static function (int $ts): string {
     height: 40px;
     font-size: 1rem;
     color: var(--um-accent);
-    background: #eef4fd;
-    border: 1px solid #d6e4fa;
+    background: var(--pm-dk-bg-blue, #eef4fd);
+    border: 1px solid var(--pm-dk-edge-blue, #d6e4fa);
     border-radius: 10px;
 }
 

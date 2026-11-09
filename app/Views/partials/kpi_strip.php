@@ -229,8 +229,8 @@ $delta = static function (array $vals, ?string $mode, bool $goodUp, bool $money)
     font-variant-numeric: tabular-nums;
 }
 
-.kpi-strip-delta.is-good    { color: #067647; }
-.kpi-strip-delta.is-bad     { color: #B42318; }
+.kpi-strip-delta.is-good    { color: var(--pm-dk-fg-green, #067647); }
+.kpi-strip-delta.is-bad     { color: var(--pm-dk-fg-red, #B42318); }
 .kpi-strip-delta.is-neutral { color: var(--ks-soft); }
 
 @media (max-width: 768px) {

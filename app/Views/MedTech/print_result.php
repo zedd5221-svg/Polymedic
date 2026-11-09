@@ -161,64 +161,65 @@ html, body {
 
 /* ================= Results table ================= */
 
+/* Analyzer-style results: sans-serif, no grid, flags in their own column */
 table.result {
     width: 100%;
     margin-top: 4mm;
     border-collapse: collapse;
     table-layout: fixed;
+    font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
 }
+col.c-test   { width: 34%; }
+col.c-result { width: 17%; }
+col.c-flag   { width: 9%; }
+col.c-unit   { width: 14%; }
+col.c-range  { width: 26%; }
 
 table.result thead th {
-    padding: 1.8mm 2mm;
+    padding: 1.4mm 1.5mm;
     font-size: 8.5pt;
     font-weight: 700;
     text-align: left;
-    text-transform: uppercase;
-    letter-spacing: 0.3pt;
     vertical-align: bottom;
-    border-top: 1pt solid #000;
-    border-bottom: 1pt solid #000;
+    border-top: 0.8pt solid #000;
+    border-bottom: 0.8pt solid #000;
 }
-
-table.result thead th.c-test   { width: 36%; }
-table.result thead th.c-result { width: 16%; text-align: right; }
-table.result thead th.c-unit   { width: 14%; }
-table.result thead th.c-range  { width: 34%; text-align: right; }
+table.result thead th.c-unit,
+table.result thead th.c-range { text-align: right; }
 
 table.result tbody td {
-    padding: 1.3mm 2mm;
-    font-size: 9.5pt;
+    padding: 0.55mm 1.5mm;
+    font-size: 9pt;
+    line-height: 1.3;
     vertical-align: top;
-    border-bottom: 0.4pt solid #d5d5d5;
 }
+table.result tbody tr:first-child td { padding-top: 1.4mm; }
 
 .c-test   { text-align: left; word-break: break-word; }
-.c-result { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.c-unit   { text-align: left; white-space: nowrap; }
+.c-result { text-align: left; font-variant-numeric: tabular-nums; }
+.c-flag   { text-align: left; white-space: nowrap; }
+.c-unit   { text-align: right; white-space: nowrap; }
 .c-range  { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
+/* Differential counts sit under WBC, as on the analyzer print-out */
+tr.is-sub .c-test { padding-left: 4.5mm; }
+
+/* Out of range: value and flag in red (flag letters still read on mono printers) */
+tr.is-abn .c-result,
+tr.is-abn .c-flag { color: #C8102E; font-weight: 700; }
+
 table.result tr.group-head td {
-    padding: 2mm 2mm 1mm;
+    padding: 2.4mm 1.5mm 0.6mm;
     font-size: 8.5pt;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.4pt;
-    background: #ececec;
-    border-top: 0.6pt solid #000;
-    border-bottom: 0.6pt solid #000;
+    letter-spacing: 0.3pt;
+    border-bottom: 0.4pt solid #888;
 }
+table.result tr.group-head:first-child td { padding-top: 1.4mm; }
+.group-section { float: right; font-weight: 400; font-style: italic; text-transform: none; letter-spacing: 0; color: #444; }
 
-.flag {
-    display: inline-block;
-    min-width: 4mm;
-    margin-right: 1mm;
-    font-weight: 700;
-    text-align: left;
-}
-
-.value-abnormal { font-weight: 700; }
-
-.table-close { border-top: 1pt solid #000; }
+.table-close { border-top: 0.8pt solid #000; }
 
 /* ================= Legend + interpretation ================= */
 
@@ -437,12 +438,33 @@ $isReleased = (($request['status'] ?? '') === 'released');
  * heading, which matches the on-screen grouping.
  */
 $grouped = [];
+$groupSection = [];
 foreach ($results as $row) {
     $svc = trim((string) ($row['service_name'] ?? ''));
     if ($svc === '') { $svc = 'Additional Tests'; }
     if (!isset($grouped[$svc])) { $grouped[$svc] = []; }
+    if (!isset($groupSection[$svc]) && !empty($row['section'])) { $groupSection[$svc] = (string) $row['section']; }
     $grouped[$svc][] = $row;
 }
+
+/*
+ * Analyzer-style layout: the CBC prints WBC first with its differential
+ * indented under it, then platelets, then the red cell line. Other services
+ * keep their own order. Indented rows print with a leading "- ".
+ */
+$printOrder = [
+    'White Blood Cell (WBC)', 'Neutrophils', 'Lymphocytes', 'Monocytes', 'Eosinophils', 'Basophils',
+    'Platelet Count', 'Red Blood Cell (RBC)', 'Hemoglobin (Hgb)', 'Hematocrit (Hct)',
+];
+$subTests = ['Neutrophils', 'Lymphocytes', 'Monocytes', 'Eosinophils', 'Basophils'];
+$orderOf  = array_flip($printOrder);
+foreach ($grouped as $svc => $rows) {
+    $pos = [];
+    foreach ($rows as $i => $r) { $pos[$i] = $orderOf[(string) $r['test_name']] ?? (100 + $i); }
+    uksort($rows, static fn ($a, $b) => $pos[$a] <=> $pos[$b]);
+    $grouped[$svc] = array_values($rows);
+}
+$hasWbc = in_array('White Blood Cell (WBC)', array_column($results, 'test_name'), true);
 
 /* Abnormal / critical tallies drive the legend and the notice. */
 $hasAbnormal = false;
@@ -456,9 +478,9 @@ foreach ($results as $row) {
 /* The section title is the first service name in uppercase. If there
    are several, it falls back to a generic heading. */
 $firstService = $grouped ? array_key_first($grouped) : '';
-$sectionTitle = count($grouped) === 1
+$sectionTitle = (count($grouped) === 1 && strcasecmp($firstService, 'Additional Tests') !== 0)
     ? strtoupper($firstService) . ' RESULT'
-    : 'LABORATORY REPORT';
+    : 'LABORATORY TEST RESULT';
 
 /*
  * Signature data.
@@ -495,7 +517,7 @@ $techPrc  = trim((string) ($technologistUser['prc_license'] ?? ''));
         <div class="letterhead-text">
             <h1 class="clinic-name">PolyMedic Diagnostic Center</h1>
             <p class="clinic-sub">
-                Davao City, Davao del Sur, Philippines<br>
+                Cotabato City Maguindanao, Philippines<br>
                 Tel. (082) 000-0000 &nbsp;·&nbsp; polymedic@example.com
             </p>
             <p class="clinic-accred">Clinical Laboratory &nbsp;·&nbsp; DOH License No. 0000-00-0000</p>
@@ -548,18 +570,22 @@ $techPrc  = trim((string) ($technologistUser['prc_license'] ?? ''));
 
     <!-- ================= RESULTS TABLE ================= -->
     <table class="result">
+        <colgroup>
+            <col class="c-test"><col class="c-result"><col class="c-flag"><col class="c-unit"><col class="c-range">
+        </colgroup>
         <thead>
             <tr>
-                <th class="c-test">Test Name</th>
+                <th class="c-test">Test</th>
                 <th class="c-result">Result</th>
-                <th class="c-unit">Unit</th>
-                <th class="c-range">Reference Range</th>
+                <th class="c-flag">Flag</th>
+                <th class="c-unit">Units</th>
+                <th class="c-range">Ref. Range</th>
             </tr>
         </thead>
         <tbody>
         <?php if (empty($grouped)): ?>
             <tr>
-                <td colspan="4" style="text-align:center; padding:10mm 0;">
+                <td colspan="5" style="text-align:center; padding:10mm 0;">
                     No tests recorded for this report.
                 </td>
             </tr>
@@ -567,7 +593,7 @@ $techPrc  = trim((string) ($technologistUser['prc_license'] ?? ''));
             <?php foreach ($grouped as $svcName => $rows): ?>
                 <?php if (count($grouped) > 1): ?>
                     <tr class="group-head">
-                        <td colspan="4"><?= esc(strtoupper($svcName)) ?></td>
+                        <td colspan="5"><?= esc($svcName) ?><?php if (!empty($groupSection[$svcName])): ?><span class="group-section"><?= esc($groupSection[$svcName]) ?></span><?php endif; ?></td>
                     </tr>
                 <?php endif; ?>
 
@@ -576,37 +602,38 @@ $techPrc  = trim((string) ($technologistUser['prc_license'] ?? ''));
                     $result = trim((string) ($row['result'] ?? ''));
                     $unit   = trim((string) ($row['unit'] ?? ''));
                     $range  = trim((string) ($row['reference_range'] ?? ''));
+                    $name   = (string) $row['test_name'];
+                    $isSub  = $hasWbc && in_array($name, $subTests, true);
 
                     $isHigh     = $flag === 'high';
                     $isLow      = $flag === 'low';
                     $isCritical = $flag === 'critical';
                     $isAbnormal = $isHigh || $isLow || $isCritical;
 
-                    $letter = $isCritical ? '**' : ($isHigh ? 'H' : ($isLow ? 'L' : ''));
+                    $letter = $isCritical ? '(C)' : ($isHigh ? '(H)' : ($isLow ? '(L)' : ''));
                 ?>
-                    <tr>
-                        <td class="c-test"><?= esc($row['test_name']) ?></td>
-                        <td class="c-result<?= $isAbnormal ? ' value-abnormal' : '' ?>">
-                            <?php if ($isAbnormal): ?><span class="flag"><?= esc($letter) ?></span><?php endif; ?><?= esc($result !== '' ? $result : '—') ?>
-                        </td>
-                        <td class="c-unit"><?= esc($unit !== '' ? $unit : '—') ?></td>
-                        <td class="c-range"><?= esc($range !== '' ? $range : '—') ?></td>
+                    <tr class="<?= $isAbnormal ? 'is-abn' : '' ?><?= $isSub ? ' is-sub' : '' ?>">
+                        <td class="c-test"><?= $isSub ? '- ' : '' ?><?= esc($name) ?></td>
+                        <td class="c-result"><?= esc($result !== '' ? $result : '-') ?></td>
+                        <td class="c-flag"><?= esc($letter) ?></td>
+                        <td class="c-unit"><?= esc($unit) ?></td>
+                        <td class="c-range"><?= $range !== '' ? '(' . esc($range) . ')' : '' ?></td>
                     </tr>
                 <?php endforeach; ?>
             <?php endforeach; ?>
         <?php endif; ?>
         </tbody>
         <tfoot>
-            <tr><td colspan="4" class="table-close" style="padding:0; height:0;"></td></tr>
+            <tr><td colspan="5" class="table-close" style="padding:0; height:0;"></td></tr>
         </tfoot>
     </table>
 
     <?php if ($hasAbnormal): ?>
         <p class="legend">
             <strong>Legend:</strong>
-            H = above reference range &nbsp;·&nbsp;
-            L = below reference range &nbsp;·&nbsp;
-            ** = critical value
+            (H) above reference range &nbsp;·&nbsp;
+            (L) below reference range &nbsp;·&nbsp;
+            (C) critical value
         </p>
     <?php endif; ?>
 
@@ -650,13 +677,9 @@ $techPrc  = trim((string) ($technologistUser['prc_license'] ?? ''));
         </div>
     </div>
 
-    <p class="sig-footnote">
-        <?= $isReleased ? '*** Results Electronically Signed ***' : '' ?>
-    </p>
-
     <p class="end-mark">
         <?= $isReleased
-            ? '*** End of Report — Electronically Signed ***'
+            ? '*** End of Report ***'
             : '*** Preliminary — Not Validated ***' ?>
     </p>
 

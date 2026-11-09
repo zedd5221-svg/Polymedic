@@ -643,7 +643,7 @@ class Admin extends BaseController
 
         if ($userModel->createUser($userData)) {
             return redirect()->to(base_url('admin/users'))
-                            ->with('success', 'User created successfully');
+                            ->with('success', 'User created');
         }
 
         return redirect()->to(base_url('admin/users'))
@@ -715,7 +715,7 @@ class Admin extends BaseController
                 session()->set(['full_name' => $full_name, 'email' => $email]);
             }
             return redirect()->to(base_url('admin/users'))
-                            ->with('success', 'User updated successfully');
+                            ->with('success', 'User updated');
         }
 
         return redirect()->to(base_url('admin/users'))
@@ -753,7 +753,7 @@ class Admin extends BaseController
 
         if ($userModel->deleteUser($id)) {
             return redirect()->to(base_url('admin/users'))
-                            ->with('success', 'User deleted successfully');
+                            ->with('success', 'User deleted');
         }
 
         return redirect()->to(base_url('admin/users'))
@@ -782,7 +782,7 @@ class Admin extends BaseController
 
         if ($userModel->updateStatus($id, $newStatus)) {
             return redirect()->to(base_url('admin/users'))
-                            ->with('success', 'User status updated successfully');
+                            ->with('success', 'User status updated');
         }
 
         return redirect()->to(base_url('admin/users'))
@@ -890,7 +890,7 @@ class Admin extends BaseController
         $patient = (new PatientModel())->findOrCreateFromAppointment($appointment);
         $notes   = $this->createRequestsFromAppointment($appointment, $patient['patient_code'] ?? null);
 
-        $message = trim('Appointment approved successfully! ' . implode(' ', $notes));
+        $message = trim('Appointment approved. ' . implode(' ', $notes));
         if ($patient) {
             $message .= ' Patient Code: ' . $patient['patient_code'];
         }
@@ -920,7 +920,7 @@ class Admin extends BaseController
         $model->update($id, ['status' => 'cancelled']);
 
         return redirect()->to(base_url('admin/appointments'))
-                        ->with('success', 'Appointment cancelled successfully!');
+                        ->with('success', 'Appointment cancelled');
     }
 
     public function completeAppointment($id)
@@ -944,7 +944,7 @@ class Admin extends BaseController
         $model->update($id, ['status' => 'completed']);
 
         return redirect()->to(base_url('admin/appointments'))
-                        ->with('success', 'Appointment marked as completed!');
+                        ->with('success', 'Appointment completed');
     }
 
     public function deleteAppointment($id)
@@ -963,7 +963,7 @@ class Admin extends BaseController
         $model->delete($id);
 
         return redirect()->to(base_url('admin/appointments'))
-                        ->with('success', 'Appointment deleted successfully!');
+                        ->with('success', 'Appointment deleted');
     }
 
     /**
@@ -990,7 +990,7 @@ class Admin extends BaseController
         }
 
         return redirect()->to(base_url('admin/appointments'))
-                        ->with('success', "Synced {$created} missing diagnostic request(s).");
+                        ->with('success', "Requests synced. {$created} missing request(s) added.");
     }
 
     // ===== SERVICE MANAGEMENT WITH PAGINATION =====
@@ -1079,7 +1079,7 @@ class Admin extends BaseController
         ]);
 
         return redirect()->to(base_url('admin/services'))
-                        ->with('success', 'Service created successfully!');
+                        ->with('success', 'Service created');
     }
 
     public function updateService($id)
@@ -1116,7 +1116,7 @@ class Admin extends BaseController
         ]);
 
         return redirect()->to(base_url('admin/services'))
-                        ->with('success', 'Service updated successfully!');
+                        ->with('success', 'Service updated');
     }
 
     public function deleteService($id)
@@ -1135,7 +1135,7 @@ class Admin extends BaseController
         $serviceModel->delete($id);
 
         return redirect()->to(base_url('admin/services'))
-                        ->with('success', 'Service deleted successfully!');
+                        ->with('success', 'Service deleted');
     }
 
     public function toggleServiceStatus($id)
@@ -1155,7 +1155,7 @@ class Admin extends BaseController
         $serviceModel->update($id, ['is_active' => $newStatus]);
 
         return redirect()->to(base_url('admin/services'))
-                        ->with('success', 'Service status updated successfully!');
+                        ->with('success', 'Service status updated');
     }
 
     // =============================================
@@ -1306,29 +1306,8 @@ class Admin extends BaseController
     $patientCode  = null;
 
     try {
-        $existingPatient = null;
-
-        if (!empty($email)) {
-            $existingPatient = $patientModel->where('email', $email)->first();
-        }
-
-        if (!$existingPatient) {
-            $existingPatient = $patientModel->where('full_name', $patientName)
-                                            ->where('age', $age)
-                                            ->where('gender', $gender)
-                                            ->first();
-        }
-
-        if (!$existingPatient && !empty($phone)) {
-            $byPhone = $patientModel->where('phone', $phone)->first();
-
-            if ($byPhone
-                && $byPhone['full_name'] === $patientName
-                && (int) $byPhone['age'] === $age
-                && $byPhone['gender'] === $gender) {
-                $existingPatient = $byPhone;
-            }
-        }
+        // Same person only when the name matches; a shared email or phone alone is not enough
+        $existingPatient = $patientModel->findSamePerson($patientName, $age, $gender, $email, $phone);
 
         if ($existingPatient) {
             $updates = [];
@@ -1401,7 +1380,7 @@ class Admin extends BaseController
 
     return redirect()->to(base_url('admin/diagnostic-requests'))
                      ->with('success', count($created) > 1
-                         ? 'Lab and X-Ray requests created (' . implode(', ', array_column($created, 'reference')) . ').'
+                         ? 'Requests created. ' . implode(', ', array_column($created, 'reference'))
                          : 'Diagnostic request created.');
     }
 
@@ -1738,7 +1717,7 @@ class Admin extends BaseController
         ]);
 
         return redirect()->to(base_url('admin/availability'))
-            ->with('success', 'Availability settings saved.');
+            ->with('success', 'Availability saved');
     }
 
     public function blockAvailabilitySlot()

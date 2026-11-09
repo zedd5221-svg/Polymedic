@@ -99,20 +99,6 @@
 ?>
 
 <div class="xv">
-    <?php if (session()->getFlashdata('success')): ?>
-        <div class="xv-alert xv-alert--success" role="status">
-            <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
-            <span><?= esc(session()->getFlashdata('success')) ?></span>
-        </div>
-    <?php endif; ?>
-
-    <?php if (session()->getFlashdata('error')): ?>
-        <div class="xv-alert xv-alert--error" role="alert">
-            <i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i>
-            <span><?= esc(session()->getFlashdata('error')) ?></span>
-        </div>
-    <?php endif; ?>
-
     <?php if (empty($examination)): ?>
         <div class="xv-empty">
             <div class="xv-empty-icon"><i class="bi bi-exclamation-circle" aria-hidden="true"></i></div>
@@ -551,21 +537,21 @@
     --xv-ink:         var(--pm-text, #10202E);
     --xv-text:        var(--pm-text-soft, #3B4C5E);
     --xv-muted:       var(--pm-text-muted, #5D6E80);
-    --xv-faint:       #7A8B9D;
+    --xv-faint:       var(--pm-text-muted);
     --xv-line:        var(--pm-line, #DDE4EC);
     --xv-line-strong: var(--pm-line-strong, #C3CFDB);
-    --xv-line-soft:   #EBF0F5;
-    --xv-surface:     #FFFFFF;
-    --xv-subtle:      #F8FAFC;
-    --xv-accent:      var(--pm-accent, #0B67B2);
-    --xv-accent-dark: var(--pm-accent-hover, #08528F);
-    --xv-accent-soft: var(--pm-accent-soft, #E8F1FA);
+    --xv-line-soft:   var(--pm-line);
+    --xv-surface:     var(--pm-surface);
+    --xv-subtle:      var(--pm-subtle);
+    --xv-accent:      var(--pm-accent, #175563);
+    --xv-accent-dark: var(--pm-accent-hover, #10404B);
+    --xv-accent-soft: var(--pm-accent-soft, #EBF2F4);
     --xv-success:     #067647;
-    --xv-success-soft:#ECFDF3;
+    --xv-success-soft:var(--pm-tint-green);
     --xv-danger:      #B42318;
-    --xv-danger-soft: #FEF3F2;
+    --xv-danger-soft: var(--pm-tint-red);
     --xv-amber:       #93370D;
-    --xv-amber-soft:  #FEF6E7;
+    --xv-amber-soft:  var(--pm-tint-amber);
 
     /* The film area */
     --xv-film:        #0B141C;
@@ -615,7 +601,7 @@
 }
 
 /* STAT: a faint red wash on the identity row only */
-.xv-summary.is-stat .xv-head { background: #FEF6F5; }
+.xv-summary.is-stat .xv-head { background: var(--pm-dk-bg-neutral, #FEF6F5); }
 
 .xv-head-main {
     display: flex;
@@ -634,7 +620,7 @@
     font-weight: 600;
     letter-spacing: 0.03em;
     color: var(--xv-ink);
-    background: #E3EAF2;
+    background: var(--pm-avatar);
     border-radius: 50%;
 }
 
@@ -704,7 +690,7 @@
 .xv-status--pending   { --xv-tone-bg: var(--xv-amber-soft);   --xv-tone-fg: var(--xv-amber);   --xv-tone-dot: #DC6803; }
 .xv-status--progress  { --xv-tone-bg: var(--xv-accent-soft);  --xv-tone-fg: var(--xv-accent-dark); --xv-tone-dot: var(--xv-accent); }
 .xv-status--completed { --xv-tone-bg: var(--xv-success-soft); --xv-tone-fg: var(--xv-success); --xv-tone-dot: #17B26A; }
-.xv-status--released  { --xv-tone-bg: #E6F6F4;               --xv-tone-fg: #0E6E64;           --xv-tone-dot: #0E8A7E; }
+.xv-status--released  { --xv-tone-bg: var(--pm-tint-sea);               --xv-tone-fg: #0E6E64;           --xv-tone-dot: #0E8A7E; }
 
 /* ---------- alerts ---------- */
 
@@ -721,9 +707,9 @@
 }
 
 .xv-alert i { margin-top: 0.15rem; }
-.xv-alert--success { background: var(--xv-success-soft); border-color: #ABEFC6; color: var(--xv-success); }
-.xv-alert--error   { background: var(--xv-danger-soft);  border-color: #FECDCA; color: var(--xv-danger); }
-.xv-alert--warn    { background: var(--xv-amber-soft);   border-color: #FEDF89; color: var(--xv-amber); }
+.xv-alert--success { background: var(--xv-success-soft); border-color: var(--pm-dk-edge-green, #ABEFC6); color: var(--xv-success); }
+.xv-alert--error   { background: var(--xv-danger-soft);  border-color: var(--pm-dk-edge-red, #FECDCA); color: var(--xv-danger); }
+.xv-alert--warn    { background: var(--xv-amber-soft);   border-color: var(--pm-dk-edge-amber, #FEDF89); color: var(--xv-amber); }
 .xv-alert--inset   { margin: 1rem 1.1rem 0; }
 
 /* ---------- buttons ---------- */
@@ -867,8 +853,8 @@
     font-size: 0.875rem;
     font-weight: 500;
     color: #FFFFFF;
-    background: rgba(11, 103, 178, 0.28);
-    border: 2px dashed var(--pm-accent-on-ink, #6FB8EE);
+    background: rgba(23, 85, 99, 0.28);
+    border: 2px dashed var(--pm-accent-on-ink, #9CD0D8);
     border-radius: inherit;
     opacity: 0;
     pointer-events: none;
@@ -886,10 +872,10 @@
     background: var(--xv-surface);
     border: 1px solid var(--xv-line);
     border-radius: 12px;
-    box-shadow: 0 24px 48px -16px rgba(12, 45, 72, 0.35);
+    box-shadow: 0 24px 48px -16px rgba(20, 45, 54, 0.35);
 }
 
-.xv-dialog::backdrop { background: rgba(12, 45, 72, 0.45); }
+.xv-dialog::backdrop { background: rgba(20, 45, 54, 0.45); }
 
 .xv-dialog-inner { margin: 0; }
 
@@ -1088,7 +1074,7 @@
 }
 
 .xv-tool:hover { color: #FFFFFF; background: rgba(255, 255, 255, .08); }
-.xv-tool:focus-visible { outline: 2px solid var(--pm-accent-on-ink, #6FB8EE); outline-offset: 1px; }
+.xv-tool:focus-visible { outline: 2px solid var(--pm-accent-on-ink, #9CD0D8); outline-offset: 1px; }
 .xv-tool[aria-pressed="true"] { color: #FFFFFF; background: rgba(111, 184, 238, .22); }
 .xv-tool-sep { width: 1px; height: 18px; margin: 0 2px; background: var(--xv-film-line); }
 .xv-tool--zoom { min-width: 52px; }
@@ -1185,7 +1171,7 @@
 
 .xv-thumb.is-active {
     opacity: 1;
-    border-color: var(--pm-accent-on-ink, #6FB8EE);
+    border-color: var(--pm-accent-on-ink, #9CD0D8);
 }
 
 .xv-thumb-remove {
@@ -1323,7 +1309,7 @@
 .xv-textarea:focus {
     outline: none;
     border-color: var(--xv-accent);
-    box-shadow: 0 0 0 3px rgba(11, 103, 178, 0.15);
+    box-shadow: 0 0 0 3px rgba(23, 85, 99, 0.15);
 }
 
 .xv-textarea:disabled,

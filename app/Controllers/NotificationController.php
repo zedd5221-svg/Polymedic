@@ -111,12 +111,12 @@ class NotificationController extends BaseController
             return $this->response->setJSON([
                 'status'       => 'success',
                 'unread_count' => 0,
-                'message'      => 'All notifications marked as read',
+                'message'      => 'All marked as read',
             ]);
         }
 
         return redirect()->to($this->notificationModel->notificationsPageFor($role))
-                         ->with('success', 'All notifications marked as read');
+                         ->with('success', 'All marked as read');
     }
 
     private function deleteFor(string $role, $id)

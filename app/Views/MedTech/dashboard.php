@@ -22,6 +22,7 @@ $mtCount = static fn($k) => (int) ($counts[$k] ?? 0);
 $mtActive = $mtCount('pending') + $mtCount('in_progress_only') + $mtCount('draft');
 
 $kpiBoard = [
+    'featured' => true,
     'trends' => $kpiTrends ?? [],
     'cards'  => [
         [
@@ -256,6 +257,26 @@ $catalog = $serviceCatalog ?? [
                         </li>
                     <?php endforeach; ?>
                 </ul>
+                <script>
+                (function () {
+                    var list = document.currentScript.previousElementSibling;
+                    if (!list || list.children.length <= 4) return;
+                    function fit() {
+                        var fourth = list.children[3];
+                        list.style.setProperty('--mt-visible', (fourth.offsetTop - list.children[0].offsetTop + fourth.offsetHeight + 2) + 'px');
+                        edge();
+                    }
+                    function edge() {
+                        list.classList.toggle('is-end', list.scrollTop + list.clientHeight >= list.scrollHeight - 2);
+                    }
+                    list.classList.add('is-capped');
+                    list.setAttribute('tabindex', '0');
+                    list.addEventListener('scroll', edge, { passive: true });
+                    fit();
+                    window.addEventListener('resize', fit);
+                    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+                })();
+                </script>
 
                 <p class="mt-key"><span class="mt-key-tick" aria-hidden="true"></span>Target</p>
             <?php else: ?>
@@ -440,8 +461,8 @@ $catalog = $serviceCatalog ?? [
 
 .dashboard-wrapper {
     --db-accent:        #0D9488;
-    --db-accent-soft:   #E6F7F7;
-    --db-surface:       #FFFFFF;
+    --db-accent-soft:   var(--pm-tint-sea);
+    --db-surface:       var(--pm-surface);
     --db-canvas:        var(--pm-canvas, #F3F6F9);
     --db-subtle:        var(--pm-subtle, #EBF0F5);
     --db-border:        var(--pm-line, #DDE4EC);
@@ -522,7 +543,7 @@ $catalog = $serviceCatalog ?? [
 }
 
 .service-list::-webkit-scrollbar { width: 6px; }
-.service-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+.service-list::-webkit-scrollbar-thumb { background: var(--pm-dk-bg-blue, #cbd5e1); border-radius: 3px; }
 .service-list::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 .service-list::-webkit-scrollbar-track { background: transparent; }
 
@@ -538,7 +559,7 @@ $catalog = $serviceCatalog ?? [
     transition: background-color 0.15s ease;
 }
 
-.service-list-item:hover { background: #eef2f7; }
+.service-list-item:hover { background: var(--pm-dk-bg-neutral, #eef2f7); }
 
 .service-list-name {
     font-size: 0.8125rem;
@@ -694,11 +715,11 @@ $catalog = $serviceCatalog ?? [
     gap: 0.35rem;
 }
 
-.status-badge.pending     { background: #FFF1E6; color: #C2410C; }
-.status-badge.in_progress { background: #E8EFFE; color: #1D4ED8; }
+.status-badge.pending     { background: var(--pm-dk-bg-amber, #FFF1E6); color: var(--pm-dk-fg-amber, #C2410C); }
+.status-badge.in_progress { background: var(--pm-dk-bg-blue, #E8EFFE); color: var(--pm-dk-fg-blue, #1D4ED8); }
 .status-badge.draft       { background: var(--db-subtle); color: var(--db-text-muted); }
-.status-badge.completed   { background: #E7F6EC; color: #15803D; }
-.status-badge.released    { background: #ccfbf1; color: #0d9488; }
+.status-badge.completed   { background: var(--pm-dk-bg-green, #E7F6EC); color: var(--pm-dk-fg-green, #15803D); }
+.status-badge.released    { background: var(--pm-dk-bg-teal, #ccfbf1); color: #0d9488; }
 
 .action-icons {
     color: var(--db-text-muted);
@@ -721,9 +742,9 @@ $catalog = $serviceCatalog ?? [
 
 /* ============================================
    CHARTS — intake, turnaround, sections
-   One measure, one colour (#0B67B2). Turnaround states use
+   One measure, one colour (#175563). Turnaround states use
    the status set, validated together and always shown with
-   an icon and words: on time #0B67B2, near #DC6803, over #B42318.
+   an icon and words: on time #175563, near #DC6803, over #B42318.
    ============================================ */
 
 .mt-row {
@@ -777,7 +798,7 @@ $catalog = $serviceCatalog ?? [
 .mt-seg-btn.is-active {
     color: var(--db-text);
     background: var(--db-surface);
-    box-shadow: 0 1px 2px rgba(12, 45, 72, 0.12);
+    box-shadow: 0 1px 2px rgba(20, 45, 54, 0.12);
 }
 
 /* ---- intake summary ---- */
@@ -830,13 +851,13 @@ $catalog = $serviceCatalog ?? [
     padding: 0.15rem 0.5rem;
     font-size: 0.72rem;
     font-weight: 600;
-    color: #067647;
-    background: #ECFDF3;
+    color: var(--pm-dk-fg-green, #067647);
+    background: var(--pm-dk-bg-green, #ECFDF3);
     border-radius: 4px;
     white-space: nowrap;
 }
 
-.mt-chip--over { color: #B42318; background: #FEF3F2; }
+.mt-chip--over { color: var(--pm-dk-fg-red, #B42318); background: var(--pm-dk-bg-red, #FEF3F2); }
 
 .mt-bullets {
     display: flex;
@@ -847,7 +868,26 @@ $catalog = $serviceCatalog ?? [
     list-style: none;
 }
 
-.mt-bullet { --state: #0B67B2; }
+/* More than four sections: show four, scroll the rest. Height is measured
+   in JS (--mt-visible) so exactly four rows fit at any font size. */
+.mt-bullets.is-capped {
+    max-height: var(--mt-visible, 17rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 0.6rem;
+    margin-right: -0.6rem;
+    scrollbar-width: thin;
+    scrollbar-color: var(--pm-line-strong) transparent;
+    /* Fade the last row while more is below; JS drops it at the end */
+    -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 2.25rem), transparent);
+            mask-image: linear-gradient(180deg, #000 calc(100% - 2.25rem), transparent);
+}
+.mt-bullets.is-capped.is-end { -webkit-mask-image: none; mask-image: none; }
+.mt-bullets.is-capped::-webkit-scrollbar { width: 6px; }
+.mt-bullets.is-capped::-webkit-scrollbar-thumb { background: var(--pm-line-strong); border-radius: 3px; }
+.mt-bullets.is-capped::-webkit-scrollbar-track { background: transparent; }
+
+.mt-bullet { --state: #175563; }
 .mt-bullet--near { --state: #DC6803; }
 .mt-bullet--over { --state: #B42318; }
 
@@ -922,8 +962,8 @@ $catalog = $serviceCatalog ?? [
     white-space: nowrap;
 }
 
-.mt-bullet--near .mt-bullet-state { color: #B54708; }
-.mt-bullet--over .mt-bullet-state { color: #B42318; }
+.mt-bullet--near .mt-bullet-state { color: var(--pm-dk-fg-amber, #B54708); }
+.mt-bullet--over .mt-bullet-state { color: var(--pm-dk-fg-red, #B42318); }
 
 .mt-key {
     display: inline-flex;
@@ -986,7 +1026,7 @@ $catalog = $serviceCatalog ?? [
 .mt-hbar-fill {
     display: block;
     height: 100%;
-    background: #0B67B2;
+    background: #175563;
     border-radius: 4px;
 }
 
@@ -1077,8 +1117,8 @@ $catalog = $serviceCatalog ?? [
     };
 
     /* One hue: the current hour/day is the darker step; both clear 3:1 on white */
-    var BAR   = '#08528F';
-    var SOFT  = '#3D8FD1';
+    var BAR   = '#10404B';
+    var SOFT  = '#4C8D9B';
     var INK   = '#10202E';
     var MUTED = '#5D6E80';
     var FAINT = '#8496A8';

@@ -55,9 +55,6 @@ $tabUrl = static function (string $key): string {
 
     <!-- ===== PAGE HEADER ===== -->
     <header class="sv-head">
-        <div>
-            <h2 class="sv-title">Service management</h2>
-        </div>
 
         <div class="sv-head-actions">
             <button type="button" class="sv-btn" id="svExport">
@@ -579,26 +576,26 @@ $tabUrl = static function (string $key): string {
     --sv-ink:         var(--pm-text, #10202E);
     --sv-text:        var(--pm-text-soft, #3B4C5E);
     --sv-muted:       var(--pm-text-muted, #5D6E80);
-    --sv-faint:       #7A8B9D;
+    --sv-faint:       var(--pm-text-muted);
     --sv-line:        var(--pm-line, #DDE4EC);
-    --sv-line-soft:   #EBF0F5;
-    --sv-surface:     #ffffff;
-    --sv-subtle:      #f8fafc;
+    --sv-line-soft:   var(--pm-line);
+    --sv-surface:     var(--pm-surface);
+    --sv-subtle:      var(--pm-subtle);
 
     /* === Aligned with layout blue === */
-    --sv-accent:      #0B67B2;
-    --sv-accent-dark: #08528F;
-    --sv-accent-soft: #E8F1FA;
+    --sv-accent:      var(--pm-accent);
+    --sv-accent-dark: var(--pm-accent-text);
+    --sv-accent-soft: var(--pm-accent-soft);
 
-    --sv-lab:         #0B67B2;
-    --sv-lab-soft:    #E8F1FA;
+    --sv-lab:         #175563;
+    --sv-lab-soft:    var(--pm-accent-soft);
     --sv-xray:         #0E8A7E;
-    --sv-xray-soft:    #E6F6F4;
-    --sv-row-hover:    #F5F8FB;
+    --sv-xray-soft:    var(--pm-tint-sea);
+    --sv-row-hover:    var(--pm-subtle);
 
     --sv-danger:      #B42318;
     --sv-danger-dark: #912018;
-    --sv-danger-soft: #fef2f2;
+    --sv-danger-soft: var(--pm-tint-red);
 
     --sv-radius:      8px;
     --sv-radius-sm:   8px;
@@ -664,7 +661,7 @@ $tabUrl = static function (string $key): string {
     transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.sv-btn:hover { background: var(--sv-subtle); border-color: #cbd5e1; color: var(--sv-ink); }
+.sv-btn:hover { background: var(--sv-subtle); border-color: var(--pm-line); color: var(--sv-ink); }
 .sv-btn i { font-size: 0.9em; }
 
 .sv-btn--primary,
@@ -779,7 +776,7 @@ $tabUrl = static function (string $key): string {
 .sv-input:focus {
     outline: none;
     border-color: var(--sv-accent);
-    box-shadow: 0 0 0 3px rgba(11, 103, 178, 0.14);
+    box-shadow: 0 0 0 3px rgba(23, 85, 99, 0.14);
 }
 
 .sv-search-clear {
@@ -912,7 +909,7 @@ $tabUrl = static function (string $key): string {
     background: var(--cat, var(--sv-faint));
 }
 
-.sv-cat--lab  { --cat: #0B67B2; }
+.sv-cat--lab  { --cat: #175563; }
 .sv-cat--xray { --cat: #0E8A7E; }
 
 /* ---- price ---- */
@@ -1073,8 +1070,8 @@ $tabUrl = static function (string $key): string {
     transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.sv-page:hover { background: var(--sv-subtle); border-color: #cbd5e1; color: var(--sv-ink); }
-.sv-page.is-active { color: var(--sv-accent); background: var(--sv-accent-soft); border-color: #bcd6f3; }
+.sv-page:hover { background: var(--sv-subtle); border-color: var(--pm-line); color: var(--sv-ink); }
+.sv-page.is-active { color: var(--sv-accent); background: var(--sv-accent-soft); border-color: var(--pm-dk-edge-blue, #bcd6f3); }
 .sv-page.is-disabled { opacity: 0.45; cursor: not-allowed; }
 .sv-page--gap { border: none; background: transparent; cursor: default; color: var(--sv-faint); }
 
@@ -1106,11 +1103,11 @@ $tabUrl = static function (string $key): string {
     font-size: 1rem;
     color: var(--sv-accent);
     background: var(--sv-accent-soft);
-    border: 1px solid #cfe3f7;
+    border: 1px solid var(--pm-dk-edge-blue, #cfe3f7);
     border-radius: 10px;
 }
 
-.sv-modal-icon--edit { color: #b45309; background: #fff4e5; border-color: #f4e2c4; }
+.sv-modal-icon--edit { color: var(--pm-dk-fg-amber, #b45309); background: var(--pm-dk-bg-amber, #fff4e5); border-color: var(--pm-dk-edge-amber, #f4e2c4); }
 
 .sv-modal .modal-title {
     font-size: 1rem;
@@ -1161,7 +1158,7 @@ $tabUrl = static function (string $key): string {
     margin-bottom: 0.35rem;
 }
 
-.sv-modal .req { color: #b91c1c; font-weight: 700; }
+.sv-modal .req { color: var(--pm-dk-fg-red, #b91c1c); font-weight: 700; }
 
 .sv-modal .form-control,
 .sv-modal .form-select {
@@ -1175,7 +1172,7 @@ $tabUrl = static function (string $key): string {
 .sv-modal .form-control:focus,
 .sv-modal .form-select:focus {
     border-color: var(--sv-accent);
-    box-shadow: 0 0 0 3px rgba(11, 103, 178, 0.12);
+    box-shadow: 0 0 0 3px rgba(23, 85, 99, 0.12);
 }
 
 .field-hint {

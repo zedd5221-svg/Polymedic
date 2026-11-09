@@ -2,6 +2,7 @@
 <html lang="en">
 
 <head>
+<?= view('partials/theme_boot') ?>
 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
@@ -84,15 +85,15 @@
         --sidebar-collapsed-width: 84px;
         --header-height: 64px;
 
-        --active-blue: #0B67B2;
-        --active-blue-dark: #08528F;
-        --active-blue-light: #E8F1FA;
+        --active-blue: #175563;
+        --active-blue-dark: #10404B;
+        --active-blue-light: var(--pm-accent-soft);
         --text-blue: #1e40af;
         --icon-gray: #9ca3af;
-        --bg-light: #f4f7fb;
+        --bg-light: var(--pm-subtle);
 
-        --sb-bg-top: #123566;
-        --sb-bg-bottom: #0a1f3d;
+        --sb-bg-top: #2A5261;
+        --sb-bg-bottom: #163642;
         --sb-text: #cddcef;
         --sb-text-dim: #8aa4c4;
         --sb-heading: #6e8bb0;
@@ -100,9 +101,9 @@
         --sb-hover-text: #ffffff;
         --sb-border: rgba(255, 255, 255, 0.10);
 
-        --sb-active-from: #0B67B2;
-        --sb-active-to: #3D8FD1;
-        --sb-active-glow: rgba(11, 103, 178, 0.45);
+        --sb-active-from: #175563;
+        --sb-active-to: #4C8D9B;
+        --sb-active-glow: rgba(23, 85, 99, 0.45);
 
         --sidebar-ease: cubic-bezier(0.4, 0, 0.2, 1);
         --sidebar-spring: cubic-bezier(0.22, 1, 0.36, 1);
@@ -180,7 +181,7 @@
         height: 44px;
         flex-shrink: 0;
         border-radius: 13px;
-        background: #ffffff;
+        background: var(--pm-surface);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -501,7 +502,7 @@
 
     .menu-item.active .menu-btn::before {
         height: 60%;
-        background: #ffffff;
+        background: var(--pm-surface);
         opacity: 0.9;
     }
 
@@ -790,10 +791,10 @@
         height: 38px;
         align-items: center;
         justify-content: center;
-        border: 1px solid #e5e7eb;
+        border: 1px solid var(--pm-line);
         border-radius: 10px;
-        background: #ffffff;
-        color: #1f2937;
+        background: var(--pm-surface);
+        color: var(--pm-text);
         font-size: 1.15rem;
         cursor: pointer;
         transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
@@ -925,9 +926,9 @@
        ========================================================= */
 
     .admin-header {
-        background: #ffffff !important;
+        background: var(--pm-surface) !important;
         padding: 0.75rem 2rem;
-        border-bottom: 1px solid #e5e7eb !important;
+        border-bottom: 1px solid var(--pm-line) !important;
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -963,7 +964,7 @@
     .page-title-header {
         font-size: 1rem;
         font-weight: 600;
-        color: #111827 !important;
+        color: var(--pm-text) !important;
         margin: 0;
         white-space: nowrap;
         overflow: hidden;
@@ -991,7 +992,7 @@
         display: flex;
         align-items: center;
         gap: 0.3rem;
-        color: #6b7280 !important;
+        color: var(--pm-text-muted) !important;
         font-size: 0.78rem;
         font-weight: 500;
         white-space: nowrap;
@@ -1015,7 +1016,7 @@
         background: transparent;
         border: none;
         font-size: 1.2rem;
-        color: #6b7280 !important;
+        color: var(--pm-text-muted) !important;
         cursor: pointer;
         padding: 0.35rem 0.6rem;
         border-radius: 50%;
@@ -1056,13 +1057,13 @@
         padding: 0;
         margin-top: 10px !important;
         overflow: hidden;
-        border: 1px solid #e5e7eb !important;
+        border: 1px solid var(--pm-line) !important;
     }
 
     .notif-dropdown-header {
         padding: 0.85rem 1rem;
-        background: #f8fafc !important;
-        border-bottom: 1px solid #e5e7eb !important;
+        background: var(--pm-subtle) !important;
+        border-bottom: 1px solid var(--pm-line) !important;
     }
 
     .notif-dropdown-body {
@@ -1072,27 +1073,27 @@
 
     .notif-dropdown-footer {
         padding: 0.75rem 1rem;
-        background: #f8fafc !important;
-        border-top: 1px solid #e5e7eb !important;
+        background: var(--pm-subtle) !important;
+        border-top: 1px solid var(--pm-line) !important;
     }
 
     .notif-item {
         display: flex;
         gap: 0.75rem;
         padding: 0.85rem 1rem;
-        border-bottom: 1px solid #f3f4f6 !important;
+        border-bottom: 1px solid var(--pm-dk-edge-neutral, #f3f4f6) !important;
         text-decoration: none !important;
-        color: #374151 !important;
+        color: var(--pm-text-soft) !important;
         transition: background 0.15s ease;
         position: relative;
     }
 
     .notif-item:hover {
-        background: #f8fafc !important;
+        background: var(--pm-subtle) !important;
     }
 
     .notif-item.unread {
-        background: #f8fafc !important;
+        background: var(--pm-subtle) !important;
     }
 
     .notif-item.unread::before {
@@ -1110,21 +1111,21 @@
     /* Leading pictures, matched to the notifications page tiles */
     .notif-dropdown-menu .notif-icon-box.is-avatar,
     .notif-dropdown-menu .notif-icon-box.is-initials { border-radius: 50%; overflow: hidden; }
-    .notif-dropdown-menu .notif-icon-box.is-avatar { background: #eaf2fe !important; }
+    .notif-dropdown-menu .notif-icon-box.is-avatar { background: var(--pm-dk-bg-blue, #eaf2fe) !important; }
     .notif-dropdown-menu .notif-icon-box.is-png { background: transparent !important; }
     .notif-dropdown-menu .notif-icon-box img { width: 100%; height: 100%; display: block; }
     .notif-dropdown-menu .notif-icon-box.is-avatar img { object-fit: cover; }
     .notif-dropdown-menu .notif-icon-box.is-png img { object-fit: contain; }
     .notif-dropdown-menu .notif-icon-box.is-initials {
-        background: #f1f5f9 !important; color: #334155 !important;
+        background: var(--pm-subtle) !important; color: var(--pm-text-soft) !important;
         font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em;
     }
-    .notif-dropdown-menu .notif-icon-box.appointment { background: #ccfbf1 !important; color: #0d9488 !important; }
-    .notif-dropdown-menu .notif-icon-box.xray        { background: #ede9fe !important; color: #6d28d9 !important; }
-    .notif-dropdown-menu .notif-icon-box.lab         { background: #dcfce7 !important; color: #15803d !important; }
+    .notif-dropdown-menu .notif-icon-box.appointment { background: var(--pm-dk-bg-teal, #ccfbf1) !important; color: #0d9488 !important; }
+    .notif-dropdown-menu .notif-icon-box.xray        { background: var(--pm-dk-bg-blue, #ede9fe) !important; color: var(--pm-dk-fg-violet, #6d28d9) !important; }
+    .notif-dropdown-menu .notif-icon-box.lab         { background: var(--pm-dk-bg-green, #dcfce7) !important; color: var(--pm-dk-fg-green, #15803d) !important; }
     .notif-dropdown-menu .notif-icon-box.billing,
-    .notif-dropdown-menu .notif-icon-box.payment     { background: #ffe4e6 !important; color: #be123c !important; }
-    .notif-dropdown-menu .notif-icon-box.system      { background: #fef3c7 !important; color: #b45309 !important; }
+    .notif-dropdown-menu .notif-icon-box.payment     { background: var(--pm-dk-bg-red, #ffe4e6) !important; color: var(--pm-dk-fg-red, #be123c) !important; }
+    .notif-dropdown-menu .notif-icon-box.system      { background: var(--pm-dk-bg-amber, #fef3c7) !important; color: var(--pm-dk-fg-amber, #b45309) !important; }
 
     .notif-icon-box {
         width: 34px;
@@ -1137,32 +1138,32 @@
     }
 
     .notif-icon-box.appointment {
-        background: #E8F1FA !important;
-        color: #0B67B2 !important;
+        background: var(--pm-dk-bg-teal, #EBF2F4) !important;
+        color: var(--pm-dk-fg-teal, #175563) !important;
     }
 
     .notif-icon-box.xray {
-        background: #E8F1FA !important;
-        color: #0B67B2 !important;
+        background: var(--pm-dk-bg-teal, #EBF2F4) !important;
+        color: var(--pm-dk-fg-teal, #175563) !important;
     }
 
     .notif-icon-box.system {
-        background: #fef3c7 !important;
+        background: var(--pm-dk-bg-amber, #fef3c7) !important;
         color: #d97706 !important;
     }
 
     .notif-icon-box.lab {
-        background: #e8f5e9 !important;
+        background: var(--pm-dk-bg-green, #e8f5e9) !important;
         color: #28a745 !important;
     }
 
     .notif-icon-box.billing {
-        background: #fff3e0 !important;
+        background: var(--pm-dk-bg-amber, #fff3e0) !important;
         color: #ff6b00 !important;
     }
 
     .notif-icon-box.payment {
-        background: #ccfbf1 !important;
+        background: var(--pm-dk-bg-teal, #ccfbf1) !important;
         color: #0d9488 !important;
     }
 
@@ -1174,7 +1175,7 @@
     .notif-title {
         font-size: 0.82rem;
         font-weight: 600;
-        color: #111827 !important;
+        color: var(--pm-text) !important;
         margin-bottom: 2px;
         white-space: nowrap;
         overflow: hidden;
@@ -1183,13 +1184,13 @@
 
     .notif-msg {
         font-size: 0.75rem;
-        color: #6b7280 !important;
+        color: var(--pm-text-muted) !important;
         margin-bottom: 4px;
     }
 
     .notif-time {
         font-size: 0.68rem;
-        color: #9ca3af !important;
+        color: var(--pm-text-muted) !important;
     }
 
     /* =========================================================
@@ -1224,12 +1225,12 @@
     .user-name-header {
         font-size: 0.78rem;
         font-weight: 600;
-        color: #111827 !important;
+        color: var(--pm-text) !important;
     }
 
     .user-role-header {
         font-size: 0.58rem;
-        color: #6b7280 !important;
+        color: var(--pm-text-muted) !important;
     }
 
     /* =========================================================
@@ -1404,7 +1405,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link href="<?= base_url() ?>assets/css/pm-theme.css" rel="stylesheet">
+    <link href="<?= base_url() ?>assets/css/pm-theme.css?v=<?= @filemtime(FCPATH . 'assets/css/pm-theme.css') ?: '1' ?>" rel="stylesheet">
 
 </head>
 
@@ -1476,7 +1477,7 @@
 
             <a class="sidebar-logo" href="<?= base_url('admin/dashboard') ?>">
                 <span class="logo-badge">
-                    <img src="<?= base_url() ?>assets/images/logo4.png"
+                    <img src="<?= base_url() ?>assets/images/cotabato-polymedic-logo-mark.svg"
                          alt=""
                          width="30"
                          height="30"
@@ -1603,7 +1604,10 @@
                         'Service Management'   => 'view-list.png',
                         'Availability'         => 'calendar.png',
                         'Payments'             => 'wallet.png',
-                        'Billing'              => 'wallet.png',
+                        'Billing'              => 'bill.png',
+                        'New Invoice'          => 'bill.png',
+                        'Invoice'              => 'bill.png',
+                        'Billing Reports'      => 'bill.png',
                     ];
 
                     if (strpos($pageTitle, 'Radiologist') !== false) {
@@ -1640,6 +1644,8 @@
                 <div class="header-info-group">
 
                     <!-- DATE/TIME -->
+                    <?= view('partials/theme_switch') ?>
+
                     <div class="header-datetime">
                         <i class="bi bi-clock"></i>
                         <span><?= date('D, M j · h:i:s A') ?></span>
@@ -1800,9 +1806,10 @@
     }
 
     function openDrawer() {
+        /* Un-hide the backdrop and let it lay out once, so its fade-in runs on the first open too */
+        if (backdrop) { backdrop.removeAttribute('hidden'); void backdrop.offsetWidth; }
         document.body.classList.add('sidebar-open');
         if (menuBtn) menuBtn.setAttribute('aria-expanded', 'true');
-        if (backdrop) backdrop.removeAttribute('hidden');
         if (closeBtn) closeBtn.focus();
     }
 
@@ -2336,6 +2343,8 @@
 
 
 <?= view('partials/postLinks') ?>
+<?= view('partials/flash_toasts') ?>
+<?= view('partials/sidebar_tab') ?>
 </body>
 
 </html>

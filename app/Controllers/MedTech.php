@@ -463,6 +463,12 @@ class MedTech extends BaseController
         // find(null) would return every appointment, so walk-ins get null.
         $data['appointment'] = !empty($request['appointment_id']) ? $appointmentModel->find($request['appointment_id']) : null;
         $data['results']     = $rows;
+
+        // What the patient was ordered, each with its lab section (Chemistry, Hematology…)
+        $data['orderedServices'] = array_map(
+            static fn (string $s) => ['name' => $s, 'section' => $labResultModel->sectionFor($s)],
+            array_values(array_filter(array_map('trim', explode(',', (string) ($request['lab_services'] ?? ''))), 'strlen'))
+        );
         $data['statusClass'] = [
             'pending'     => 'warning',
             'in_progress' => 'primary',
@@ -559,7 +565,7 @@ class MedTech extends BaseController
         }
 
         return redirect()->to(base_url('medtech/request/view/' . $id))
-                        ->with('success', 'Results saved successfully!');
+                        ->with('success', 'Results saved');
     }
 
     // =============================================
@@ -603,8 +609,8 @@ class MedTech extends BaseController
         ]));
 
         $message = $action === 'complete'
-            ? 'Laboratory findings completed!'
-            : 'Findings saved as draft!';
+            ? 'Findings completed'
+            : 'Draft saved';
 
         return redirect()->to(base_url('medtech/request/view/' . $id))
                         ->with('success', $message);
@@ -654,7 +660,7 @@ class MedTech extends BaseController
         );
 
         return redirect()->to(base_url('medtech/request/view/' . $id))
-                        ->with('success', 'Result released successfully!');
+                        ->with('success', 'Result released');
     }
 
     // =============================================
@@ -719,12 +725,7 @@ class MedTech extends BaseController
                     if (empty($results[$index]) && $results[$index] !== '0') {
                         $errors[] = "Result for '{$testName}' is required";
                     }
-                    if (empty($units[$index])) {
-                        $errors[] = "Unit for '{$testName}' is required";
-                    }
-                    if (empty($ranges[$index])) {
-                        $errors[] = "Reference range for '{$testName}' is required";
-                    }
+                    // unit and reference range stay optional: qualitative tests (blood type, urinalysis colour…) have neither
                 }
             }
 
@@ -783,16 +784,16 @@ class MedTech extends BaseController
             );
 
             return redirect()->to(base_url('medtech/request/view/' . $id))
-                            ->with('success', 'Result released successfully!');
+                            ->with('success', 'Result released');
         }
 
         if ($action === 'complete') {
             return redirect()->to(base_url('medtech/request/view/' . $id))
-                            ->with('success', 'Laboratory findings completed!');
+                            ->with('success', 'Findings completed');
         }
 
         return redirect()->to(base_url('medtech/request/view/' . $id))
-                        ->with('success', 'Saved as draft.');
+                        ->with('success', 'Draft saved');
     }
 
     // =============================================
@@ -814,7 +815,10 @@ class MedTech extends BaseController
         $data['appointment'] = !empty($data['request']['appointment_id'])
             ? (new AppointmentModel())->find($data['request']['appointment_id'])
             : null;
-        $data['results']     = (new LabResultModel())->getByRequest($id);
+        $data['results']     = (new LabResultModel())->getForPrint(
+            (int) $id,
+            (string) ($data['request']['lab_services'] ?? $data['request']['services'] ?? '')
+        );
 
         // Sign with the technologist who processed the request; fall back
         // to the one printing it for requests saved before this was tracked.

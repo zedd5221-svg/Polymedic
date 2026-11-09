@@ -13,24 +13,24 @@
     --nc-ink:         var(--pm-text, #10202E);
     --nc-text:        var(--pm-text-soft, #3B4C5E);
     --nc-muted:       var(--pm-text-muted, #5D6E80);
-    --nc-faint:       #7A8B9D;
+    --nc-faint:       var(--pm-text-muted);
     --nc-line:        var(--pm-line, #DDE4EC);
-    --nc-line-soft:   #EBF0F5;
-    --nc-surface:     #FFFFFF;
-    --nc-canvas:      #F8FAFC;
-    --nc-rail:        #F5F8FB;
-    --nc-unread:      #F7FAFE;
+    --nc-line-soft:   var(--pm-line);
+    --nc-surface:     var(--pm-surface);
+    --nc-canvas:      var(--pm-canvas);
+    --nc-rail:        var(--pm-subtle);
+    --nc-unread:      var(--pm-tint-unread);
 
-    --nc-accent:      var(--pm-accent, #0B67B2);
-    --nc-accent-dark: var(--pm-accent-hover, #08528F);
-    --nc-accent-soft: var(--pm-accent-soft, #E8F1FA);
+    --nc-accent:      var(--pm-accent, #175563);
+    --nc-accent-dark: var(--pm-accent-hover, #10404B);
+    --nc-accent-soft: var(--pm-accent-soft, #EBF2F4);
 
     --nc-danger:      #B42318;
-    --nc-danger-soft: #FEF3F2;
+    --nc-danger-soft: var(--pm-tint-red);
 
     /* Notification types: same colours as the worklists */
     --nc-t-appointment: #5D6E80;
-    --nc-t-lab:         #0B67B2;
+    --nc-t-lab:         #175563;
     --nc-t-xray:        #0E8A7E;
     --nc-t-billing:     #D0654A;
     --nc-t-system:      #D29A1E;
@@ -101,8 +101,8 @@
 .nc-alert > span { flex: 1; min-width: 0; }
 .nc-alert.alert-dismissible { padding-right: 0.75rem; }
 .nc-alert .btn-close { position: static; padding: 0.5rem; margin-left: auto; font-size: 0.7rem; }
-.nc-alert--success { background: #ECFDF3; border-color: #ABEFC6; color: #067647; }
-.nc-alert--error   { background: #FEF3F2; border-color: #FECDCA; color: #B42318; }
+.nc-alert--success { background: var(--pm-dk-bg-green, #ECFDF3); border-color: var(--pm-dk-edge-green, #ABEFC6); color: var(--pm-dk-fg-green, #067647); }
+.nc-alert--error   { background: var(--pm-dk-bg-red, #FEF3F2); border-color: var(--pm-dk-edge-red, #FECDCA); color: var(--pm-dk-fg-red, #B42318); }
 
 /* ---------- Buttons ---------- */
 
@@ -148,7 +148,7 @@
 .nc-btn--sm:hover {
     color: var(--nc-accent-dark);
     background: var(--nc-accent-soft);
-    border-color: var(--pm-accent-line, #C6DCF1);
+    border-color: var(--pm-accent-line, #C5DCE0);
 }
 
 .nc-link {
@@ -284,7 +284,7 @@
 
 .nc-search-input:focus {
     border-color: var(--nc-accent);
-    box-shadow: 0 0 0 3px rgba(11, 103, 178, 0.15);
+    box-shadow: 0 0 0 3px rgba(23, 85, 99, 0.15);
 }
 
 .nc-search-input::-webkit-search-cancel-button { display: none; }
@@ -439,7 +439,7 @@
 .nc-card mark {
     padding: 0 0.1em;
     color: inherit;
-    background: #FEF0C7;
+    background: var(--pm-dk-bg-amber, #FEF0C7);
     border-radius: 2px;
 }
 
@@ -471,7 +471,7 @@
 }
 
 .nc-avatar--male,
-.nc-avatar--female { background: #F2F4F7; }
+.nc-avatar--female { background: var(--pm-subtle); }
 
 .nc-avatar-img {
     width: 100%;
@@ -490,7 +490,7 @@
     border-radius: var(--nc-radius-md);
     font-size: 1rem;
     color: var(--tone, var(--nc-muted));
-    background: color-mix(in srgb, var(--tone, var(--nc-muted)) 10%, #FFFFFF);
+    background: color-mix(in srgb, var(--tone, var(--nc-muted)) 10%, var(--pm-surface));
 }
 
 .nc-tile--appointment { --tone: var(--nc-t-appointment); }

@@ -23,6 +23,8 @@ class AppointmentModel extends Model
         'other_requests',
         'status',
         'is_override',
+        'override_reason',
+        'override_by',
         'arrival_time'
     ];
     protected $useTimestamps = true;

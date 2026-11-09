@@ -41,9 +41,6 @@
 
     <!-- PAGE HEADER -->
     <header class="pt-head">
-        <div>
-            <h2 class="pt-title">Patient management</h2>
-        </div>
 
         <div class="pt-head-actions">
             <button type="button" class="pt-btn" onclick="exportPatients()">
@@ -71,22 +68,6 @@
 
 
     <!-- ALERTS -->
-    <?php if (session()->getFlashdata('success')): ?>
-        <div class="pt-alert pt-alert--success alert alert-dismissible fade show" role="status">
-            <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
-            <span><?= esc(session()->getFlashdata('success')) ?></span>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss"></button>
-        </div>
-    <?php endif; ?>
-
-    <?php if (session()->getFlashdata('error')): ?>
-        <div class="pt-alert pt-alert--error alert alert-dismissible fade show" role="alert">
-            <i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i>
-            <span><?= esc(session()->getFlashdata('error')) ?></span>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss"></button>
-        </div>
-    <?php endif; ?>
-
 
     <!-- TABLE -->
     <section class="pt-panel">
@@ -301,23 +282,23 @@
     --pt-ink:         var(--pm-text, #10202E);
     --pt-text:        var(--pm-text-soft, #3B4C5E);
     --pt-muted:       var(--pm-text-muted, #5D6E80);
-    --pt-faint:       #7A8B9D;
+    --pt-faint:       var(--pm-text-muted);
     --pt-line:        var(--pm-line, #DDE4EC);
-    --pt-line-soft:   #EBF0F5;
-    --pt-surface:     #FFFFFF;
-    --pt-subtle:      #F8FAFC;
-    --pt-row-hover:   #F5F8FB;
+    --pt-line-soft:   var(--pm-line);
+    --pt-surface:     var(--pm-surface);
+    --pt-subtle:      var(--pm-subtle);
+    --pt-row-hover:   var(--pm-subtle);
 
-    --pt-accent:      var(--pm-accent, #0B67B2);
-    --pt-accent-dark: var(--pm-accent-hover, #08528F);
-    --pt-accent-soft: var(--pm-accent-soft, #E8F1FA);
+    --pt-accent:      var(--pm-accent, #175563);
+    --pt-accent-dark: var(--pm-accent-hover, #10404B);
+    --pt-accent-soft: var(--pm-accent-soft, #EBF2F4);
 
     --pt-gold:        #93370D;
-    --pt-gold-soft:   #FEF6E7;
+    --pt-gold-soft:   var(--pm-tint-amber);
 
     --pt-radius:      8px;
     --pt-radius-sm:   6px;
-    --pt-ring:        0 0 0 3px rgba(11, 103, 178, 0.18);
+    --pt-ring:        0 0 0 3px rgba(23, 85, 99, 0.18);
     --pt-mono:        var(--pm-mono, ui-monospace, monospace);
 
     color: var(--pt-text);
@@ -371,8 +352,8 @@
 .pt-alert > span { flex: 1; min-width: 0; }
 .pt-alert.alert-dismissible { padding-right: 0.75rem; }
 .pt-alert .btn-close { position: static; padding: 0.5rem; margin-left: auto; font-size: 0.7rem; }
-.pt-alert--success { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
-.pt-alert--error   { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+.pt-alert--success { background: var(--pm-dk-bg-green, #f0fdf4); border-color: var(--pm-dk-edge-green, #bbf7d0); color: var(--pm-dk-fg-green, #166534); }
+.pt-alert--error   { background: var(--pm-dk-bg-red, #fef2f2); border-color: var(--pm-dk-edge-red, #fecaca); color: var(--pm-dk-fg-red, #991b1b); }
 
 /* ---------- Buttons ---------- */
 
@@ -396,7 +377,7 @@
     transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.pt-btn:hover { background: var(--pt-subtle); border-color: #cbd5e1; color: var(--pt-ink); }
+.pt-btn:hover { background: var(--pt-subtle); border-color: var(--pm-line); color: var(--pt-ink); }
 .pt-btn i { font-size: 0.9em; }
 
 .pt-btn--primary,
@@ -655,7 +636,7 @@
     background: var(--src, var(--pt-faint));
 }
 
-.pt-source--online  { --src: #0B67B2; }
+.pt-source--online  { --src: #175563; }
 .pt-source--walk-in { --src: #D29A1E; }
 
 /* ---- contact ---- */
@@ -801,9 +782,9 @@
     cursor: pointer;
 }
 
-.pt-page:hover:not(:disabled) { background: var(--pt-subtle); border-color: #cbd5e1; }
+.pt-page:hover:not(:disabled) { background: var(--pt-subtle); border-color: var(--pm-line); }
 .pt-page:disabled { opacity: 0.45; cursor: not-allowed; }
-.pt-page[aria-current="page"] { color: var(--pt-accent); background: var(--pt-accent-soft); border-color: #bcd6f3; }
+.pt-page[aria-current="page"] { color: var(--pt-accent); background: var(--pt-accent-soft); border-color: var(--pm-dk-edge-blue, #bcd6f3); }
 .pt-page-gap { min-width: 20px; text-align: center; color: var(--pt-faint); }
 
 /* ---------- Responsive ---------- */

@@ -635,7 +635,7 @@ $imageCount = count($imageUrls);
 
     <p class="end-mark">
         <?= $isReleased
-            ? '*** End of Report — Electronically Signed ***'
+            ? '*** End of Report ***'
             : '*** Preliminary — Not Validated ***' ?>
     </p>
 

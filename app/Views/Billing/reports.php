@@ -88,9 +88,6 @@ $chartLabels  = array_map(fn($d) => date('M j', strtotime($d['d'])), $daily);
 $chartValues  = array_map(fn($d) => (float) $d['collected'], $daily);
 $chartCounts  = array_map(fn($d) => (int) $d['n'], $daily);
 
-$topServices  = array_slice($rankedServices, 0, 8, true);
-$svcLabels    = array_keys($topServices);
-$svcValues    = array_map(fn($r) => (float) ($r['revenue'] ?? 0), $topServices);
 
 $rangeLabel = ($from && $to)
     ? date('M j, Y', strtotime($from)) . ' – ' . date('M j, Y', strtotime($to))
@@ -165,11 +162,6 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
 
     <!-- ─── FILTERS ───────────────────────────────────────────── -->
     <form class="bl-filters rep-filters" method="get" action="<?= base_url($routeBase . '/reports') ?>">
-        <div class="rep-filters-label">
-            <i class="bi bi-calendar3"></i>
-            <span>Range</span>
-        </div>
-
         <div class="bl-date-range">
             <i class="bi bi-calendar-event bl-date-icon"></i>
             <label class="visually-hidden" for="rep_from">From</label>
@@ -196,94 +188,61 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
         </div>
     </form>
 
-    <!-- ─── HERO ──────────────────────────────────────────────── -->
-    <section class="rep-hero">
-
-        <div class="rep-hero-main">
-            <span class="rep-hero-label">Collected in range</span>
-            <div class="rep-hero-value">₱<?= number_format($dailyCollected, 2) ?></div>
-
-            <div class="rep-hero-meta">
-                <?= number_format($dailyPayments) ?> payment<?= $dailyPayments === 1 ? '' : 's' ?>
-                <?php if ($activeDays > 0): ?>
-                    <span class="bl-dot">·</span> <?= number_format($activeDays) ?> active day<?= $activeDays === 1 ? '' : 's' ?>
-                    <span class="bl-dot">·</span> avg ₱<?= number_format($avgTicket, 2) ?> per payment
+    <!-- ─── FIGURES — one strip, the money collected leads ───── -->
+    <dl class="rep-kpis">
+        <div class="rep-kpi rep-kpi--lead">
+            <dt>Collected</dt>
+            <dd class="rep-kpi-value">₱<?= number_format($dailyCollected, 2) ?></dd>
+            <dd class="rep-kpi-note">
+                <?php if ($trendPct !== null): ?>
+                    <span class="rep-delta rep-delta--<?= $trendPct >= 0 ? 'up' : 'down' ?>"><?= $trendPct >= 0 ? '+' : '−' ?><?= number_format(abs($trendPct), 1) ?>%</span>
+                    <?= esc($trendLabel) ?>
+                <?php else: ?>
+                    <?= esc($rangeLabel) ?>
                 <?php endif; ?>
-            </div>
-
-            <?php if ($trendPct !== null): ?>
-                <span class="rep-trend rep-trend--<?= $trendPct >= 0 ? 'up' : 'down' ?>">
-                    <i class="bi bi-arrow-<?= $trendPct >= 0 ? 'up' : 'down' ?>-right"></i>
-                    <?= number_format(abs($trendPct), 1) ?>%
-                    <small><?= esc($trendLabel) ?></small>
-                </span>
-            <?php endif; ?>
-
-            <?php if ($spark !== ''): ?>
-                <svg class="rep-spark" viewBox="0 0 240 44" preserveAspectRatio="none" aria-hidden="true">
-                    <polyline points="<?= esc($spark, 'attr') ?>" fill="none" stroke="currentColor"
-                              stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-            <?php endif; ?>
+            </dd>
         </div>
-
-        <div class="rep-hero-side">
-            <div class="rep-mini">
-                <span class="rep-mini-label"><i class="bi bi-exclamation-triangle"></i> Outstanding</span>
-                <span class="rep-mini-value">₱<?= number_format($outstanding, 2) ?></span>
-                <span class="rep-mini-sub">
-                    <?= $overduePct > 0
-                        ? number_format($overduePct, 0) . '% is 61+ days old'
-                        : 'Nothing past 60 days' ?>
-                </span>
-            </div>
-
-            <div class="rep-mini">
-                <span class="rep-mini-label"><i class="bi bi-calendar-check"></i> Best day</span>
-                <span class="rep-mini-value">₱<?= number_format($bestDayValue, 2) ?></span>
-                <span class="rep-mini-sub"><?= $bestDay ? esc(date('D, M j', strtotime($bestDay))) : 'No activity' ?></span>
-            </div>
-
-            <div class="rep-mini">
-                <span class="rep-mini-label"><i class="bi bi-tags"></i> Services billed</span>
-                <span class="rep-mini-value"><?= number_format($serviceCount) ?></span>
-                <span class="rep-mini-sub"><?= $topService ? 'Top: ' . esc($topService) : 'No services yet' ?></span>
-            </div>
+        <div class="rep-kpi">
+            <dt>Payments</dt>
+            <dd class="rep-kpi-value"><?= number_format($dailyPayments) ?></dd>
+            <dd class="rep-kpi-note"><?= $activeDays > 0 ? 'on ' . number_format($activeDays) . ' day' . ($activeDays === 1 ? '' : 's') : 'None in range' ?></dd>
         </div>
-    </section>
+        <div class="rep-kpi">
+            <dt>Average payment</dt>
+            <dd class="rep-kpi-value"><?= $dailyPayments > 0 ? '₱' . number_format($avgTicket, 2) : '<span class="rep-none">&mdash;</span>' ?></dd>
+            <dd class="rep-kpi-note"><?= $activeDays > 0 ? '₱' . number_format($avgPerActiveDay, 2) . ' per active day' : 'No payments yet' ?></dd>
+        </div>
+        <div class="rep-kpi">
+            <dt>Outstanding</dt>
+            <dd class="rep-kpi-value<?= (float) ($aging['61+'] ?? 0) > 0 ? ' is-bad' : '' ?>">₱<?= number_format($outstanding, 2) ?></dd>
+            <dd class="rep-kpi-note"><?= $overduePct > 0 ? number_format($overduePct, 0) . '% is over 60 days old' : ($outstanding > 0 ? 'All within 60 days' : 'Every invoice settled') ?></dd>
+        </div>
+        <div class="rep-kpi">
+            <dt>Best day</dt>
+            <dd class="rep-kpi-value"><?= $bestDay ? '₱' . number_format($bestDayValue, 2) : '<span class="rep-none">&mdash;</span>' ?></dd>
+            <dd class="rep-kpi-note"><?= $bestDay ? esc(date('D, M j', strtotime($bestDay))) : 'No activity' ?></dd>
+        </div>
+    </dl>
 
-    <!-- ─── AT A GLANCE ───────────────────────────────────────── -->
-    <?php if ($dailyCollected > 0 || $outstanding > 0): ?>
-    <aside class="rep-insights">
-        <span class="rep-insights-label"><i class="bi bi-lightbulb"></i> At a glance</span>
-        <ul>
-            <?php if ($bestDay): ?>
-                <li>
-                    Strongest day was <strong><?= esc(date('l, M j', strtotime($bestDay))) ?></strong>
-                    at ₱<?= number_format($bestDayValue, 2) ?><?php
-                        echo $dailyCollected > 0
-                            ? ', ' . number_format(($bestDayValue / $dailyCollected) * 100, 0) . '% of the range.'
-                            : '.'; ?>
-                </li>
-            <?php endif; ?>
-
-            <?php if ($topService && $topThreeShare > 0): ?>
-                <li>
-                    The top three services carry <strong><?= number_format($topThreeShare, 0) ?>%</strong>
-                    of revenue, led by <strong><?= esc($topService) ?></strong>.
-                </li>
-            <?php endif; ?>
-
-            <?php if ((float) ($aging['61+'] ?? 0) > 0): ?>
-                <li class="is-warn">
-                    <strong>₱<?= number_format((float) $aging['61+'], 2) ?></strong>
-                    has been outstanding more than 60 days — chase these first.
-                </li>
-            <?php elseif ($outstanding > 0): ?>
-                <li>All ₱<?= number_format($outstanding, 2) ?> outstanding is still within 60 days.</li>
-            <?php endif; ?>
-        </ul>
-    </aside>
+    <?php
+        /* One plain summary line, built from the same figures */
+        $summary = [];
+        if ($bestDay && $dailyCollected > 0) {
+            $summary[] = esc(date('l, M j', strtotime($bestDay))) . ' was the strongest day at <b>₱' . number_format($bestDayValue, 2) . '</b>, '
+                       . number_format(($bestDayValue / $dailyCollected) * 100, 0) . '% of the range.';
+        }
+        if ($topService && $topThreeShare > 0) {
+            $summary[] = 'The top three services bring in <b>' . number_format($topThreeShare, 0) . '%</b> of revenue, led by <b>' . esc($topService) . '</b>.';
+        }
+        $summaryWarn = (float) ($aging['61+'] ?? 0) > 0
+            ? '<b>₱' . number_format((float) $aging['61+'], 2) . '</b> has been unpaid for more than 60 days. Follow these up first.'
+            : '';
+    ?>
+    <?php if ($summary || $summaryWarn): ?>
+        <p class="rep-summary">
+            <?= implode(' ', $summary) ?>
+            <?php if ($summaryWarn): ?><span class="rep-summary-warn"><?= $summaryWarn ?></span><?php endif; ?>
+        </p>
     <?php endif; ?>
 
     <!-- ─── MAIN GRID — collections (wide) + aging rail ───────── -->
@@ -293,7 +252,7 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
         <section class="bl-panel rep-panel">
             <header class="rep-panel-head">
                 <div>
-                    <h3 class="rep-panel-title"><i class="bi bi-graph-up-arrow"></i> Daily collections</h3>
+                    <h3 class="rep-panel-title">Daily collections</h3>
                     <p class="rep-panel-sub">
                         <?= $dailyCollected > 0
                             ? '₱' . number_format($dailyCollected, 2) . ' across ' . $activeDays . ' active day' . ($activeDays === 1 ? '' : 's')
@@ -303,11 +262,9 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
 
                 <?php if (!empty($daily)): ?>
                     <div class="rep-toggle" role="tablist" aria-label="View">
-                        <button type="button" id="viewChart" role="tab" aria-selected="true" aria-controls="panelChart">
-                            <i class="bi bi-bar-chart-line"></i> Chart
+                        <button type="button" id="viewChart" role="tab" aria-selected="true" aria-controls="panelChart">Chart
                         </button>
-                        <button type="button" id="viewTable" role="tab" aria-selected="false" aria-controls="panelTable">
-                            <i class="bi bi-table"></i> Table
+                        <button type="button" id="viewTable" role="tab" aria-selected="false" aria-controls="panelTable">Table
                         </button>
                     </div>
                 <?php endif; ?>
@@ -397,7 +354,7 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
         <section class="bl-panel rep-panel">
             <header class="rep-panel-head">
                 <div>
-                    <h3 class="rep-panel-title"><i class="bi bi-hourglass-split"></i> Receivables aging</h3>
+                    <h3 class="rep-panel-title">Receivables aging</h3>
                     <p class="rep-panel-sub">₱<?= number_format($outstanding, 2) ?> outstanding</p>
                 </div>
             </header>
@@ -460,19 +417,51 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
         </section>
     </div>
 
-    <!-- ─── REVENUE BY SERVICE ────────────────────────────────── -->
-    <section class="bl-panel rep-panel">
+    <!-- ─── REVENUE BY SERVICE — a compact ranked list, filterable by department ── -->
+    <?php
+        /* Per-department totals for the filter and the subtitle */
+        $svcTypeName = ['lab' => 'Laboratory', 'xray' => 'X-ray', 'other' => 'Other'];
+        $svcTypes    = ['all' => ['n' => 0, 'rev' => 0.0, 'billed' => 0], 'lab' => ['n' => 0, 'rev' => 0.0, 'billed' => 0], 'xray' => ['n' => 0, 'rev' => 0.0, 'billed' => 0]];
+        foreach ($rankedServices as $row) {
+            $t = $row['type'] ?? 'other';
+            foreach (array_unique(['all', $t]) as $k) {
+                if (!isset($svcTypes[$k])) { continue; }
+                $svcTypes[$k]['n']++;
+                $svcTypes[$k]['rev']    += (float) ($row['revenue'] ?? 0);
+                $svcTypes[$k]['billed'] += (int) ($row['count'] ?? 0);
+            }
+        }
+        $svcShown = 6;
+    ?>
+    <section class="bl-panel rep-panel rep-svc">
         <header class="rep-panel-head">
             <div>
-                <h3 class="rep-panel-title"><i class="bi bi-tags"></i> Revenue by service</h3>
-                <p class="rep-panel-sub">
-                    <?= number_format(count($rankedServices)) ?> service<?= count($rankedServices) === 1 ? '' : 's' ?>
-                    <span class="bl-dot">·</span> ₱<?= number_format($serviceTotal, 2) ?> total
+                <h3 class="rep-panel-title">Revenue by service</h3>
+                <p class="rep-panel-sub" id="repSvcSub">
+                    <?= number_format($svcTypes['all']['n']) ?> service<?= $svcTypes['all']['n'] === 1 ? '' : 's' ?>
+                    <span class="bl-dot">·</span> ₱<?= number_format($svcTypes['all']['rev'], 2) ?> from <?= number_format($svcTypes['all']['billed']) ?> billing<?= $svcTypes['all']['billed'] === 1 ? '' : 's' ?>
                     <?php if ($topThreeShare > 0): ?>
-                        <span class="bl-dot">·</span> top 3 = <?= number_format($topThreeShare, 0) ?>%
+                        <span class="bl-dot">·</span> top 3 bring in <?= number_format($topThreeShare, 0) ?>%
                     <?php endif; ?>
                 </p>
             </div>
+
+            <?php if (!empty($rankedServices)): ?>
+                <div class="rep-svc-filter" role="tablist" aria-label="Filter by department">
+                    <?php foreach (['all' => 'All', 'lab' => 'Laboratory', 'xray' => 'X-ray'] as $key => $label):
+                        $t = $svcTypes[$key]; ?>
+                        <button type="button" role="tab" class="rep-svc-filter-btn<?= $key === 'all' ? ' is-active' : '' ?>"
+                                aria-selected="<?= $key === 'all' ? 'true' : 'false' ?>" data-type="<?= $key ?>"
+                                data-n="<?= $t['n'] ?>" data-billed="<?= $t['billed'] ?>"
+                                data-rev="<?= esc('₱' . number_format($t['rev'], 2), 'attr') ?>"
+                                data-share="<?= $svcTypes['all']['rev'] > 0 ? number_format($t['rev'] / $svcTypes['all']['rev'] * 100, 0) : 0 ?>"
+                                <?= $t['n'] === 0 && $key !== 'all' ? 'disabled' : '' ?>>
+                            <?php if ($key !== 'all'): ?><i class="rep-svc-dot rep-svc-dot--<?= $key ?>" aria-hidden="true"></i><?php endif; ?>
+                            <?= esc($label) ?> <span><?= number_format($t['n']) ?></span>
+                        </button>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
         </header>
 
         <?php if (empty($rankedServices)): ?>
@@ -484,71 +473,35 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
                 </div>
             </div>
         <?php else: ?>
+            <ol class="rep-svc-list" id="repSvcList" data-shown="<?= $svcShown ?>">
+                <?php $rank = 0; foreach ($rankedServices as $name => $row):
+                    $rank++;
+                    $rev   = (float) ($row['revenue'] ?? 0);
+                    $cnt   = (int)   ($row['count']   ?? 0);
+                    $type  = $row['type'] ?? 'other';
+                    $share = $serviceTotal  > 0 ? ($rev / $serviceTotal) * 100 : 0;
+                    $barW  = $maxServiceRev > 0 ? ($rev / $maxServiceRev) * 100 : 0;
+                ?>
+                    <li class="rep-svc-row rep-svc-row--<?= esc($type, 'attr') ?><?= $rank <= 3 ? ' is-top' : '' ?>" data-type="<?= esc($type, 'attr') ?>"
+                        <?= $rank > $svcShown ? 'hidden' : '' ?>
+                        title="<?= esc($name . ' · ' . ($svcTypeName[$type] ?? 'Other') . ' · ₱' . number_format($rev, 2) . ' · ' . $cnt . ' billed · avg ₱' . number_format($cnt > 0 ? $rev / $cnt : 0, 2), 'attr') ?>">
+                        <span class="rep-svc-rank"><?= $rank ?></span>
+                        <span class="rep-svc-name">
+                            <span class="rep-svc-name-text"><?= esc($name) ?></span>
+                            <span class="rep-svc-type rep-svc-type--<?= esc($type, 'attr') ?>"><?= $type === 'xray' ? 'X-ray' : ($type === 'lab' ? 'Lab' : 'Other') ?></span>
+                        </span>
+                        <span class="rep-svc-count"><?= number_format($cnt) ?>&times;</span>
+                        <span class="rep-svc-rev">₱<?= number_format($rev, 2) ?></span>
+                        <span class="rep-svc-pct"><?= number_format($share, 1) ?>%</span>
+                        <span class="rep-svc-bar" aria-hidden="true"><span style="width: <?= round($barW, 2) ?>%"></span></span>
+                    </li>
+                <?php endforeach; ?>
+            </ol>
 
-            <div class="rep-panel-body">
-                <div class="rep-chart rep-chart--bar">
-                    <canvas id="repServiceChart" aria-label="Revenue by service chart"></canvas>
-                    <div class="rep-chart-fallback" id="serviceFallback" hidden>
-                        <i class="bi bi-wifi-off"></i>
-                        <p>Charts need an internet connection. The figures are in the table below.</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="rep-panel-body rep-panel-body--flush">
-                <table class="bl-lines rep-lines">
-                    <caption class="visually-hidden">Revenue by service in the selected range</caption>
-                    <thead>
-                        <tr>
-                            <th class="rep-rank-col">#</th>
-                            <th>Service</th>
-                            <th class="bl-num">Times billed</th>
-                            <th class="bl-num rep-hide-sm">Avg / billing</th>
-                            <th class="bl-num">Revenue</th>
-                            <th class="rep-hide-sm">Share</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php $rank = 0; foreach ($rankedServices as $name => $row):
-                            $rank++;
-                            $rev   = (float) ($row['revenue'] ?? 0);
-                            $cnt   = (int)   ($row['count']   ?? 0);
-                            $share = $serviceTotal  > 0 ? ($rev / $serviceTotal) * 100 : 0;
-                            $barW  = $maxServiceRev > 0 ? ($rev / $maxServiceRev) * 100 : 0;
-                            $avg   = $cnt > 0 ? $rev / $cnt : 0;
-                        ?>
-                            <tr<?= $rank <= 3 ? ' class="is-top"' : '' ?>>
-                                <td class="rep-rank-col"><span class="rep-rank"><?= $rank ?></span></td>
-                                <td class="bl-strong"><?= esc($name) ?></td>
-                                <td class="bl-num"><?= number_format($cnt) ?></td>
-                                <td class="bl-num rep-hide-sm rep-dim">₱<?= number_format($avg, 2) ?></td>
-                                <td class="bl-num bl-strong">₱<?= number_format($rev, 2) ?></td>
-                                <td class="rep-hide-sm">
-                                    <div class="rep-share">
-                                        <div class="rep-share-bar" role="progressbar"
-                                             aria-label="<?= round($share, 1) ?>% of total revenue"
-                                             aria-valuenow="<?= round($share, 1) ?>"
-                                             aria-valuemin="0" aria-valuemax="100">
-                                            <span style="width: <?= round($barW, 2) ?>%"></span>
-                                        </div>
-                                        <span class="rep-share-pct"><?= round($share, 1) ?>%</span>
-                                    </div>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                    <tfoot>
-                        <tr>
-                            <td class="rep-rank-col"></td>
-                            <td>Total</td>
-                            <td class="bl-num"><?= number_format($serviceCount) ?></td>
-                            <td class="bl-num rep-hide-sm"></td>
-                            <td class="bl-num">₱<?= number_format($serviceTotal, 2) ?></td>
-                            <td class="rep-hide-sm"></td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
+            <button type="button" class="rep-svc-more" id="repSvcMore" aria-expanded="false" aria-controls="repSvcList"
+                    <?= count($rankedServices) <= $svcShown ? 'hidden' : '' ?>>
+                Show all <?= count($rankedServices) ?> services
+            </button>
         <?php endif; ?>
     </section>
 
@@ -571,22 +524,22 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
 
 .bl {
     /* Neutrals — unchanged from the billing stylesheet */
-    --bl-ink:#0f172a; --bl-text:#334155; --bl-muted:#64748b; --bl-faint:#94a3b8;
-    --bl-line:#e2e8f0; --bl-line-soft:#f1f5f9; --bl-surface:#fff; --bl-subtle:#f8fafc;
+    --bl-ink:var(--pm-text); --bl-text:var(--pm-text-soft); --bl-muted:var(--pm-text-muted); --bl-faint:var(--pm-text-muted);
+    --bl-line:var(--pm-line); --bl-line-soft:var(--pm-subtle); --bl-surface:var(--pm-surface); --bl-subtle:var(--pm-subtle);
 
     /* Accent — matched to the layout's --active-blue / --sb-active-* */
-    --bl-accent:#0B67B2;
-    --bl-accent-dark:#08528F;
-    --bl-accent-soft:#E8F1FA;
-    --bl-accent-glow:rgba(11,103,178,.45);
+    --bl-accent:var(--pm-accent);
+    --bl-accent-dark:var(--pm-accent-text);
+    --bl-accent-soft:var(--pm-accent-soft);
+    --bl-accent-glow:rgba(23, 85, 99,.45);
 
-    --bl-warn:#b45309; --bl-warn-soft:#fff7ed;
-    --bl-danger:#b91c1c; --bl-danger-soft:#fef2f2;
-    --bl-green:#047857; --bl-green-soft:#ecfdf5;
-    --bl-blue:#1d4ed8; --bl-blue-soft:#eaf2fe;
+    --bl-warn:#b45309; --bl-warn-soft:var(--pm-tint-amber);
+    --bl-danger:#b91c1c; --bl-danger-soft:var(--pm-tint-red);
+    --bl-green:#047857; --bl-green-soft:var(--pm-tint-green);
+    --bl-blue:#1d4ed8; --bl-blue-soft:var(--pm-tint-blue);
     --bl-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-    --bl-radius:14px;
-    --bl-shadow:0 1px 2px rgba(15,23,42,.04), 0 1px 3px rgba(15,23,42,.03);
+    --bl-radius:8px;
+    --bl-shadow:none;
     color:var(--bl-text); font-size:.875rem; line-height:1.55;
 }
 
@@ -607,18 +560,16 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
 .bl-btn { display:inline-flex; align-items:center; justify-content:center; gap:.4rem;
           height:36px; padding:0 .9rem; font-family:inherit; font-size:.8125rem;
           font-weight:600; line-height:1; color:var(--bl-text); background:var(--bl-surface);
-          border:1px solid var(--bl-line); border-radius:9px; text-decoration:none;
+          border:1px solid var(--bl-line); border-radius:6px; text-decoration:none;
           white-space:nowrap; cursor:pointer;
           transition:background .15s, border-color .15s, color .15s, box-shadow .15s; }
-.bl-btn:hover { background:var(--bl-subtle); border-color:#cbd5e1; color:var(--bl-ink); }
+.bl-btn:hover { background:var(--bl-subtle); border-color:var(--pm-line); color:var(--bl-ink); }
 .bl-btn--primary, .bl-btn--primary:hover { color:#fff; }
-.bl-btn--primary { background:var(--bl-accent); border-color:var(--bl-accent);
-                   box-shadow:0 1px 2px var(--bl-accent-glow); }
-.bl-btn--primary:hover { background:var(--bl-accent-dark); border-color:var(--bl-accent-dark);
-                         box-shadow:0 4px 12px var(--bl-accent-glow); }
+.bl-btn--primary { background:var(--bl-accent); border-color:var(--bl-accent); }
+.bl-btn--primary:hover { background:var(--bl-accent-dark); border-color:var(--bl-accent-dark); }
 
 .bl-input { height:36px; font-family:inherit; font-size:.8125rem; color:var(--bl-ink);
-            background:var(--bl-surface); border:1px solid var(--bl-line); border-radius:9px;
+            background:var(--bl-surface); border:1px solid var(--bl-line); border-radius:6px;
             padding:0 .75rem; transition:border-color .15s, box-shadow .15s; }
 .bl-input:focus { outline:none; border-color:var(--bl-accent);
                   box-shadow:0 0 0 3px color-mix(in srgb, var(--bl-accent) 18%, transparent); }
@@ -638,130 +589,65 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
    HEADER
    ========================================================= */
 
-.rep-range {
-    display:inline-block;
-    font-family:var(--bl-mono);
-    font-size:.75rem;
-    padding:.1rem .5rem;
-    border-radius:6px;
-    background:var(--bl-accent-soft);
-    color:var(--bl-accent-dark);
-}
+.rep-range { font-weight:600; color:var(--bl-ink); }
 
 /* ---- Sticky filters ---- */
 .rep-filters {
     position:sticky; top:0; z-index:5;
     display:flex; align-items:center; gap:.6rem; flex-wrap:wrap;
-    background:rgba(255,255,255,.93);
-    backdrop-filter:blur(8px);
+    background:var(--bl-surface);
     border:1px solid var(--bl-line);
     border-radius:var(--bl-radius);
-    padding:.7rem .9rem;
-    box-shadow:0 4px 16px -10px rgba(15,23,42,.18);
+    padding:.65rem .8rem;
     margin-bottom:1.1rem;
 }
-.rep-filters-label {
-    display:inline-flex; align-items:center; gap:.4rem;
-    font-size:.72rem; font-weight:600; letter-spacing:.06em;
-    text-transform:uppercase; color:var(--bl-muted);
-    padding-right:.25rem;
-}
-.rep-filters-label i { color:var(--bl-accent); }
-
 .rep-quick {
     display:inline-flex; gap:2px; padding:3px;
     background:var(--bl-subtle); border:1px solid var(--bl-line);
-    border-radius:99px;
+    border-radius:8px;
 }
 .rep-quick-btn {
-    border:none; background:transparent; border-radius:99px;
+    border:none; background:transparent; border-radius:6px;
     padding:.28rem .7rem; font-size:.74rem; font-weight:600;
     font-family:inherit; color:var(--bl-muted); cursor:pointer;
     white-space:nowrap; transition:background .15s, color .15s;
 }
 .rep-quick-btn:hover { color:var(--bl-ink); }
-.rep-quick-btn.is-active {
-    background:#fff; color:var(--bl-accent-dark);
-    box-shadow:0 1px 2px rgba(15,23,42,.1);
-}
+.rep-quick-btn.is-active { background:#142D36; color:#fff; }
 .rep-filters-actions { display:inline-flex; gap:.5rem; margin-left:auto; }
 
 /* =========================================================
-   HERO
+   FIGURES — one hairline strip, five equal cells
    ========================================================= */
 
-.rep-hero {
-    display:grid;
-    grid-template-columns:minmax(0,1.15fr) minmax(0,1.85fr);
-    gap:1rem;
-    margin-bottom:1rem;
+.rep-kpis {
+    display:grid; grid-template-columns:repeat(5, minmax(0,1fr));
+    margin:0 0 .75rem; background:var(--bl-surface);
+    border:1px solid var(--bl-line); border-radius:var(--bl-radius); overflow:hidden;
 }
-
-.rep-hero-main {
-    position:relative; overflow:hidden;
-    padding:1.3rem 1.4rem 1.1rem;
-    border-radius:var(--bl-radius);
-    /* Matches the sidebar gradient — navy → blue, same two-stop rhythm */
-    background:linear-gradient(145deg,#123566 0%,#0B67B2 60%,#3D8FD1 100%);
-    color:#fff;
-    box-shadow:0 10px 24px -14px var(--bl-accent-glow);
+.rep-kpi { min-width:0; padding:1rem 1.15rem 1.05rem; }
+.rep-kpi + .rep-kpi { border-left:1px solid var(--bl-line-soft); }
+.rep-kpi dt { font-size:.78rem; font-weight:500; color:var(--bl-muted); }
+.rep-kpi dd { margin:0; }
+.rep-kpi-value {
+    margin-top:.3rem !important; font-size:1.35rem; font-weight:600; line-height:1.2;
+    letter-spacing:-.015em; color:var(--bl-ink); font-variant-numeric:tabular-nums; white-space:nowrap;
 }
+.rep-kpi--lead .rep-kpi-value { font-size:1.7rem; }
+.rep-kpi-value.is-bad { color:var(--pm-dk-fg-red, #B42318); }
+.rep-kpi-note {
+    margin-top:.25rem !important; font-size:.74rem; color:var(--bl-muted);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.rep-none { color:var(--bl-faint); font-weight:400; }
+.rep-delta { font-weight:600; font-variant-numeric:tabular-nums; }
+.rep-delta--up   { color:var(--pm-dk-fg-green, #067647); }
+.rep-delta--down { color:var(--pm-dk-fg-red, #B42318); }
 
-.rep-hero-label { font-size:.7rem; font-weight:700; letter-spacing:.09em;
-                  text-transform:uppercase; color:rgba(255,255,255,.75); }
-
-.rep-hero-value { margin-top:.25rem; font-size:2rem; font-weight:750;
-                  letter-spacing:-.03em; font-variant-numeric:tabular-nums; line-height:1.1; }
-
-.rep-hero-meta { margin-top:.3rem; font-size:.76rem; color:rgba(255,255,255,.82); }
-.rep-hero-meta .bl-dot { color:rgba(255,255,255,.45); }
-
-.rep-trend { display:inline-flex; align-items:baseline; gap:.3rem;
-             margin-top:.7rem; padding:.2rem .55rem; border-radius:99px;
-             font-size:.75rem; font-weight:700; background:rgba(255,255,255,.18); }
-.rep-trend small { font-weight:500; opacity:.82; font-size:.68rem; }
-.rep-trend--down { background:rgba(15,23,42,.22); }
-
-.rep-spark { position:absolute; right:0; bottom:0; width:62%; height:46px;
-             color:rgba(255,255,255,.4); pointer-events:none; }
-
-.rep-hero-side { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1rem; }
-
-.rep-mini { display:flex; flex-direction:column; gap:.15rem;
-            padding:1rem 1.05rem; background:var(--bl-surface);
-            border:1px solid var(--bl-line); border-radius:var(--bl-radius);
-            box-shadow:var(--bl-shadow); }
-
-.rep-mini-label { display:flex; align-items:center; gap:.35rem;
-                  font-size:.7rem; font-weight:700; letter-spacing:.07em;
-                  text-transform:uppercase; color:var(--bl-faint); }
-.rep-mini-label i { color:var(--bl-accent); font-size:.95em; }
-
-.rep-mini-value { font-size:1.3rem; font-weight:700; color:var(--bl-ink);
-                  font-variant-numeric:tabular-nums; letter-spacing:-.02em; line-height:1.2; }
-
-.rep-mini-sub { font-size:.74rem; color:var(--bl-muted);
-                overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-
-/* =========================================================
-   INSIGHTS
-   ========================================================= */
-
-.rep-insights { display:flex; align-items:flex-start; gap:1rem;
-                padding:.85rem 1.1rem; margin-bottom:1rem;
-                background:var(--bl-accent-soft);
-                border:1px solid color-mix(in srgb, var(--bl-accent) 25%, #ffffff);
-                border-radius:var(--bl-radius); }
-
-.rep-insights-label { display:inline-flex; align-items:center; gap:.35rem; flex-shrink:0;
-                      font-size:.68rem; font-weight:700; letter-spacing:.08em;
-                      text-transform:uppercase; color:var(--bl-accent-dark); padding-top:.15rem; }
-
-.rep-insights ul { margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:.25rem; }
-.rep-insights li { font-size:.8125rem; color:#063F6E; }
-.rep-insights li strong { color:var(--bl-accent-dark); }
-.rep-insights li.is-warn { color:var(--bl-warn); }
-.rep-insights li.is-warn strong { color:#92400e; }
+.rep-summary { margin:0 0 1rem; padding:0 .15rem; font-size:.82rem; line-height:1.6; color:var(--bl-text); }
+.rep-summary b { font-weight:600; color:var(--bl-ink); }
+.rep-summary-warn { display:block; color:var(--pm-dk-fg-amber, #93370D); }
+.rep-summary-warn b { color:var(--pm-dk-fg-amber, #93370D); }
 
 /* =========================================================
    GRID + PANELS
@@ -775,13 +661,9 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
 
 .rep-panel-head { display:flex; align-items:center; justify-content:space-between;
                   gap:1rem; flex-wrap:wrap; padding:.95rem 1.2rem;
-                  border-bottom:1px solid var(--bl-line-soft);
-                  background:linear-gradient(180deg,#fcfdfe,#fff); }
+                  border-bottom:1px solid var(--bl-line-soft); }
 
-.rep-panel-title { display:flex; align-items:center; gap:.5rem; margin:0;
-                   font-size:.8125rem; font-weight:700; letter-spacing:.05em;
-                   text-transform:uppercase; color:var(--bl-ink); }
-.rep-panel-title i { color:var(--bl-accent); font-size:1.05em; }
+.rep-panel-title { margin:0; font-size:.95rem; font-weight:600; letter-spacing:-.005em; color:var(--bl-ink); }
 .rep-panel-sub { margin:.2rem 0 0; font-size:.76rem; color:var(--bl-muted); }
 
 .rep-panel-body { padding:1.1rem 1.2rem; }
@@ -789,29 +671,26 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
 
 /* Chart / Table toggle */
 .rep-toggle { display:inline-flex; gap:2px; padding:3px;
-              background:var(--bl-subtle); border:1px solid var(--bl-line); border-radius:99px; }
+              background:var(--bl-subtle); border:1px solid var(--bl-line); border-radius:8px; }
 
 .rep-toggle button { display:inline-flex; align-items:center; gap:.3rem;
-                     border:none; background:transparent; border-radius:99px;
+                     border:none; background:transparent; border-radius:6px;
                      padding:.3rem .75rem; font-family:inherit; font-size:.74rem;
                      font-weight:650; color:var(--bl-muted); cursor:pointer;
                      transition:background .15s, color .15s; }
 .rep-toggle button:hover { color:var(--bl-ink); }
-.rep-toggle button[aria-selected="true"] {
-    background:#fff; color:var(--bl-accent-dark);
-    box-shadow:0 1px 2px rgba(15,23,42,.12);
-}
+.rep-toggle button[aria-selected="true"] { background:#142D36; color:#fff; }
 
 /* =========================================================
    AGING RAIL
    ========================================================= */
 
-.rep-stack { display:flex; height:12px; border-radius:99px; overflow:hidden;
+.rep-stack { display:flex; gap:2px; height:10px; border-radius:4px; overflow:hidden;
              background:var(--bl-line-soft); margin-bottom:1rem; }
 .rep-stack-seg { display:block; height:100%; }
-.rep-stack-seg--green  { background:#10b981; }
+.rep-stack-seg--green  { background:#17B26A; }
 .rep-stack-seg--blue   { background:var(--bl-accent); }
-.rep-stack-seg--danger { background:#dc2626; }
+.rep-stack-seg--danger { background:#D92D20; }
 
 .rep-aging-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; }
 
@@ -820,13 +699,13 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
 .rep-aging-row:last-child { border-bottom:0; }
 
 .rep-aging-dot { width:9px; height:9px; border-radius:3px; flex-shrink:0; background:var(--tone,#cbd5e1); }
-.rep-aging-row--green  { --tone:#10b981; }
+.rep-aging-row--green  { --tone:#17B26A; }
 .rep-aging-row--blue   { --tone:var(--bl-accent); }
-.rep-aging-row--danger { --tone:#dc2626; }
+.rep-aging-row--danger { --tone:#D92D20; }
 
 .rep-aging-text { display:flex; flex-direction:column; min-width:0; }
 .rep-aging-label { font-size:.8125rem; font-weight:600; color:var(--bl-ink); }
-.rep-aging-note { font-size:.68rem; letter-spacing:.05em; text-transform:uppercase; color:var(--bl-faint); }
+.rep-aging-note { font-size:.74rem; color:var(--bl-muted); }
 
 .rep-aging-figures { margin-left:auto; text-align:right; }
 .rep-aging-value { display:block; font-size:.9rem; font-weight:700; color:var(--bl-ink);
@@ -835,7 +714,7 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
 
 .rep-aging-flag { display:flex; align-items:flex-start; gap:.45rem;
                   margin:1rem 0 0; padding:.6rem .75rem; border-radius:9px;
-                  background:var(--bl-warn-soft); border:1px solid #fed7aa;
+                  background:var(--bl-warn-soft); border:1px solid var(--pm-dk-edge-amber, #fed7aa);
                   font-size:.76rem; color:var(--bl-warn); }
 
 .rep-foot { margin:0; padding-top:.25rem; font-size:.72rem;
@@ -844,7 +723,6 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
 /* ---- Charts ---- */
 .rep-chart { position:relative; }
 .rep-chart--line { height:268px; }
-.rep-chart--bar  { height:320px; }
 
 .rep-chart-fallback {
     position:absolute; inset:0;
@@ -865,6 +743,55 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
 .rep-empty p { margin:0 0 .2rem; font-size:.875rem; font-weight:600; color:var(--bl-ink); }
 .rep-empty span { font-size:.78rem; color:var(--bl-muted); }
 
+/* ---- Revenue by service: two columns of ranked rows ---- */
+.rep-svc-list {
+    columns:2; column-gap:2.25rem; margin:0; padding:.35rem 1.2rem .5rem; list-style:none;
+}
+.rep-svc-row {
+    display:grid; grid-template-columns:1.4rem minmax(0,1fr) auto auto 3.2rem;
+    grid-template-rows:auto 3px; align-items:center; column-gap:.6rem; row-gap:.35rem;
+    padding:.6rem 0 .55rem; border-bottom:1px solid var(--bl-line-soft);
+    break-inside:avoid;
+}
+.rep-svc-row[hidden] { display:none; }
+.rep-svc-rank  { font-size:.75rem; color:var(--bl-faint); font-variant-numeric:tabular-nums; }
+.rep-svc-name  { display:flex; align-items:center; gap:.45rem; min-width:0; }
+.rep-svc-name-text { font-size:.82rem; font-weight:500; color:var(--bl-ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+/* Department tag: the same blue / teal the worklists use for Lab and X-ray */
+.rep-svc-type  { flex:none; display:inline-flex; align-items:center; gap:.3rem; padding:.05rem .4rem; font-size:.68rem; font-weight:600; border-radius:4px; }
+.rep-svc-type::before { content:""; width:6px; height:6px; border-radius:2px; background:currentColor; }
+.rep-svc-type--lab   { color:var(--pm-dk-fg-teal, #10404B); background:var(--pm-dk-bg-teal, #EBF2F4); }
+.rep-svc-type--xray  { color:var(--pm-dk-fg-teal, #0A6E65); background:var(--pm-dk-bg-teal, #E3F4F1); }
+.rep-svc-type--other { color:var(--pm-text-soft); background:var(--pm-subtle); }
+.rep-svc-count { font-size:.75rem; color:var(--bl-muted); font-variant-numeric:tabular-nums; }
+.rep-svc-rev   { font-size:.82rem; font-weight:600; color:var(--bl-ink); font-variant-numeric:tabular-nums; text-align:right; }
+.rep-svc-pct   { font-size:.74rem; color:var(--bl-muted); font-variant-numeric:tabular-nums; text-align:right; }
+.rep-svc-row.is-top .rep-svc-rank { color:var(--bl-ink); font-weight:600; }
+.rep-svc-bar   { grid-column:2 / -1; height:3px; border-radius:2px; background:var(--bl-line-soft); overflow:hidden; }
+.rep-svc-bar > span { display:block; height:100%; border-radius:2px; background:var(--kind, #98A2B3); opacity:.45; }
+.rep-svc-row.is-top .rep-svc-bar > span { opacity:1; }
+.rep-svc-row--lab  { --kind:#175563; }
+.rep-svc-row--xray { --kind:#0E8A7E; }
+
+.rep-svc-filter { display:inline-flex; gap:2px; padding:3px; background:var(--bl-subtle); border:1px solid var(--bl-line); border-radius:8px; }
+.rep-svc-filter-btn { display:inline-flex; align-items:center; gap:.4rem; height:28px; padding:0 .7rem; font:inherit; font-size:.75rem; font-weight:600;
+    color:var(--bl-muted); background:transparent; border:0; border-radius:6px; cursor:pointer; transition:background .15s, color .15s; }
+.rep-svc-filter-btn span { min-width:1.1rem; padding:0 .3rem; font-size:.68rem; line-height:1.1rem; text-align:center; color:var(--bl-muted); background:var(--bl-line-soft); border-radius:4px; font-variant-numeric:tabular-nums; }
+.rep-svc-filter-btn:hover { color:var(--bl-ink); }
+.rep-svc-filter-btn:disabled { opacity:.45; cursor:not-allowed; }
+.rep-svc-filter-btn.is-active { color:#fff; background:#142D36; }
+.rep-svc-filter-btn.is-active span { color:#fff; background:rgba(255,255,255,.18); }
+.rep-svc-dot { width:7px; height:7px; border-radius:2px; flex:none; }
+.rep-svc-dot--lab  { background:#175563; }
+.rep-svc-dot--xray { background:#0E8A7E; }
+
+.rep-svc-more {
+    display:block; width:calc(100% - 2.4rem); height:32px; margin:.35rem 1.2rem 1rem;
+    font:inherit; font-size:.78rem; font-weight:600; color:var(--bl-ink);
+    background:var(--bl-surface); border:1px solid var(--bl-line); border-radius:6px; cursor:pointer;
+}
+.rep-svc-more:hover { background:var(--bl-subtle); }
+
 /* ---- Share bars inside tables ---- */
 .rep-share {
     display:grid; grid-template-columns:minmax(60px,1fr) auto;
@@ -876,7 +803,7 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
 }
 .rep-share-bar > span {
     display:block; height:100%; border-radius:99px;
-    background:linear-gradient(90deg,#9DC4E8,var(--bl-accent));
+    background:var(--bl-accent);
     transition:width .4s ease;
 }
 .rep-share-pct {
@@ -887,40 +814,34 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
 /* ---- Tables ---- */
 .rep-lines th {
     padding:.6rem 1.2rem; text-align:left;
-    font-size:.68rem; font-weight:700; letter-spacing:.06em;
-    text-transform:uppercase; color:var(--bl-faint);
-    background:var(--bl-subtle); border-bottom:1px solid var(--bl-line);
+    font-size:.75rem; font-weight:500; color:var(--bl-muted);
+    background:var(--bl-surface); border-bottom:1px solid var(--bl-line);
     white-space:nowrap; position:sticky; top:0; z-index:1;
 }
+
+.rep-lines th.bl-num { text-align:right; }
 
 .rep-lines td { padding:.7rem 1.2rem; border-bottom:1px solid var(--bl-line-soft); }
 .rep-lines tbody tr:last-child td { border-bottom:0; }
 .rep-lines tbody tr { transition:background .12s; }
-.rep-lines tbody tr:hover { background:#fafbfd; }
-.rep-lines tbody tr.is-best { background:#f0f7ff; }
-.rep-lines tbody tr.is-top .rep-rank { background:var(--bl-accent); color:#fff; }
+.rep-lines tbody tr:hover { background:var(--pm-subtle); }
+.rep-lines tbody tr.is-best { background:var(--pm-dk-bg-blue, #f0f7ff); }
 
 .rep-lines tfoot td {
-    padding:.7rem 1.2rem; background:var(--bl-subtle);
-    border-top:2px solid var(--bl-ink);
+    padding:.75rem 1.2rem; background:var(--bl-subtle);
+    border-top:1px solid var(--bl-line);
     font-weight:700; color:var(--bl-ink); font-variant-numeric:tabular-nums;
 }
 
 .rep-dim { color:var(--bl-muted); font-weight:400; }
-.rep-rank-col { width:1%; }
 
-.rep-rank {
-    display:grid; place-items:center; width:20px; height:20px; border-radius:6px;
-    font-size:.68rem; font-weight:700; color:var(--bl-muted);
-    background:var(--bl-line-soft); font-variant-numeric:tabular-nums;
-}
 
 .rep-date-main { display:block; font-weight:600; color:var(--bl-ink); }
 .rep-date-sub  { display:block; font-size:.72rem; color:var(--bl-faint); }
 
 .rep-best-tag {
     display:inline-block; margin-left:.25rem; padding:0 .3rem; border-radius:4px;
-    font-size:.62rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+    font-size:.68rem; font-weight:600;
     color:var(--bl-accent-dark); background:var(--bl-accent-soft);
 }
 
@@ -930,28 +851,30 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
 
 /* ---- Responsive ---- */
 @media (max-width:1180px) {
-    .rep-hero { grid-template-columns:minmax(0,1fr); }
+    .rep-kpis { grid-template-columns:repeat(3, minmax(0,1fr)); }
+    .rep-kpi:nth-child(4) { border-left:0; }
+    .rep-kpi:nth-child(n+4) { border-top:1px solid var(--bl-line-soft); }
     .rep-grid { grid-template-columns:minmax(0,1fr); }
 }
 @media (max-width:900px) {
-    .rep-hero-side { gap:.75rem; }
-    .rep-mini { padding:.85rem .9rem; }
-    .rep-mini-value { font-size:1.1rem; }
     .rep-section-sub { max-width:100%; }
     .rep-chart--line { height:224px; }
-    .rep-chart--bar  { height:280px; }
 }
 @media (max-width:640px) {
-    .rep-hero-side { grid-template-columns:minmax(0,1fr); }
-    .rep-hero-value { font-size:1.7rem; }
+    .rep-kpis { grid-template-columns:repeat(2, minmax(0,1fr)); }
+    .rep-kpi--lead { grid-column:1 / -1; }
+    .rep-kpi:nth-child(n) { border-left:0; border-top:1px solid var(--bl-line-soft); }
+    .rep-kpi:nth-child(even) { border-left:0; }
+    .rep-kpi:nth-child(odd):not(.rep-kpi--lead) { border-left:1px solid var(--bl-line-soft); }
+    .rep-kpi--lead { border-top:0 !important; }
     .rep-filters { position:static; }
     .rep-quick { order:3; }
     .rep-filters-actions { margin-left:0; width:100%; }
     .rep-filters-actions .bl-btn { flex:1; justify-content:center; }
     .rep-hide-sm { display:none; }
+    .rep-svc-list { columns:1; padding:.25rem .85rem .5rem; }
+    .rep-svc-more { width:calc(100% - 1.7rem); margin:.35rem .85rem 1rem; }
     .rep-chart--line { height:200px; }
-    .rep-chart--bar  { height:260px; }
-    .rep-insights { flex-direction:column; gap:.5rem; }
     .rep-lines th, .rep-lines td { padding-left:.85rem; padding-right:.85rem; }
 }
 @media (prefers-reduced-motion:reduce) {
@@ -978,26 +901,21 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
         border-bottom:2px solid #0f172a; font-size:10pt;
     }
     .rep-print-head strong { display:block; font-size:12pt; letter-spacing:.02em; }
-    .rep-print-head span { color:#475569; }
+    .rep-print-head span { color:var(--pm-text-soft); }
 
-    .bl-panel, .rep-mini, .rep-insights {
-        box-shadow:none !important; border-color:#cbd5e1 !important; break-inside:avoid;
+    .bl-panel, .rep-kpis {
+        box-shadow:none !important; border-color:var(--pm-line) !important; break-inside:avoid;
     }
 
-    /* The gradient would drink a cartridge; print it as paper */
-    .rep-hero-main {
-        background:#fff !important; color:#0f172a !important;
-        border:1px solid #cbd5e1; box-shadow:none !important;
-    }
-    .rep-hero-label, .rep-hero-meta { color:#475569 !important; }
-    .rep-trend { background:#f1f5f9 !important; color:#0f172a !important; }
-    .rep-spark { color:#94a3b8 !important; }
 
     #panelTable[hidden] { display:block !important; }
     .rep-hide-sm { display:table-cell !important; }
     .rep-chart { break-inside:avoid; page-break-inside:avoid; }
     .rep-grid { grid-template-columns:1fr; }
     .rep-lines thead th { position:static; }
+    .rep-svc-row[hidden] { display:grid !important; }
+    .rep-svc-filter { display:none !important; }
+    .rep-svc-more { display:none !important; }
 }
 </style>
 
@@ -1010,8 +928,6 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
     var DAILY_LABELS  = <?= json_encode($chartLabels, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     var DAILY_VALUES  = <?= json_encode($chartValues, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     var DAILY_COUNTS  = <?= json_encode($chartCounts, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-    var SVC_LABELS    = <?= json_encode($svcLabels,   JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-    var SVC_VALUES    = <?= json_encode($svcValues,   JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 
     var CSV_ROWS      = <?= json_encode($csvRows, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 
@@ -1024,10 +940,10 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
     };
 
     /* Accent colour, matched to the layout's --active-blue */
-    var ACCENT       = '#0B67B2';
-    var ACCENT_DARK  = '#08528F';
-    var ACCENT_SOFT  = 'rgba(11,103,178,.28)';
-    var ACCENT_FADE  = 'rgba(11,103,178,0)';
+    var ACCENT       = '#175563';
+    var ACCENT_DARK  = '#10404B';
+    var ACCENT_SOFT  = 'rgba(23, 85, 99,.28)';
+    var ACCENT_FADE  = 'rgba(23, 85, 99,0)';
     var BAR_MUTED    = 'rgba(148,163,184,.30)';
 
     var TOOLTIP = {
@@ -1052,40 +968,24 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
             return;
         }
 
-        var ctx = canvas.getContext('2d');
-        var gradient = ctx.createLinearGradient(0, 0, 0, 260);
-        gradient.addColorStop(0, ACCENT_SOFT);
-        gradient.addColorStop(1, ACCENT_FADE);
+        /* One series: money collected per day; the best day in the darker blue.
+           Payment counts ride in the tooltip instead of a second axis. */
+        var best = DAILY_VALUES.indexOf(Math.max.apply(null, DAILY_VALUES));
 
-        new Chart(ctx, {
-            type: 'line',
+        new Chart(canvas.getContext('2d'), {
+            type: 'bar',
             data: {
                 labels: DAILY_LABELS,
                 datasets: [{
                     label: 'Collected',
                     data: DAILY_VALUES,
-                    borderColor: ACCENT,
-                    backgroundColor: gradient,
-                    fill: true,
-                    tension: 0.35,
-                    borderWidth: 2.4,
-                    pointRadius: 0,
-                    pointHoverRadius: 6,
-                    pointHoverBackgroundColor: ACCENT,
-                    pointHoverBorderColor: '#ffffff',
-                    pointHoverBorderWidth: 2.5,
-                    yAxisID: 'y',
-                }, {
-                    label: 'Payments',
-                    data: DAILY_COUNTS,
-                    backgroundColor: BAR_MUTED,
-                    type: 'bar',
-                    borderWidth: 0,
-                    borderRadius: 4,
-                    barPercentage: 0.55,
-                    categoryPercentage: 0.8,
-                    maxBarThickness: 22,
-                    yAxisID: 'y1',
+                    backgroundColor: DAILY_VALUES.map(function (v, i) { return i === best && v > 0 ? ACCENT_DARK : ACCENT; }),
+                    hoverBackgroundColor: ACCENT_DARK,
+                    borderRadius: { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 },
+                    borderSkipped: false,
+                    barPercentage: 0.7,
+                    categoryPercentage: 0.82,
+                    maxBarThickness: 36,
                 }],
             },
             options: {
@@ -1093,126 +993,95 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
                 maintainAspectRatio: false,
                 interaction: { mode: 'index', intersect: false },
                 plugins: {
-                    legend: {
-                        display: true, position: 'top', align: 'end',
-                        labels: {
-                            usePointStyle: true, pointStyle: 'circle',
-                            boxWidth: 8, boxHeight: 8, padding: 14,
-                            font: { size: 11 }, color: '#64748b',
-                        },
-                    },
-                    tooltip: Object.assign({}, TOOLTIP, {
-                        callbacks: {
-                            label: function (c) {
-                                if (c.dataset.yAxisID === 'y') {
-                                    return 'Collected: ' + peso(c.parsed.y);
-                                }
-                                var n = c.parsed.y || 0;
-                                return 'Payments: ' + n + (n === 1 ? ' payment' : ' payments');
-                            },
-                        },
-                    }),
-                },
-                scales: {
-                    x: {
-                        grid: { display: false, drawBorder: false },
-                        border: { display: false },
-                        ticks: { color: '#94a3b8', font: { size: 11 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 10 },
-                    },
-                    y: {
-                        beginAtZero: true,
-                        position: 'left',
-                        grid: { color: '#f1f5f9', drawBorder: false, drawTicks: false },
-                        border: { display: false },
-                        ticks: {
-                            color: '#94a3b8', font: { size: 11 }, padding: 8, maxTicksLimit: 6,
-                            callback: function (v) {
-                                if (v >= 1000) return '₱' + (v / 1000).toLocaleString('en-PH', { maximumFractionDigits: 1 }) + 'k';
-                                return '₱' + v;
-                            },
-                        },
-                    },
-                    y1: {
-                        beginAtZero: true, position: 'right',
-                        grid: { display: false },
-                        border: { display: false },
-                        ticks: { color: '#cbd5e1', font: { size: 11 }, precision: 0, maxTicksLimit: 5, padding: 8 },
-                    },
-                },
-            },
-        });
-    }
-
-    function drawServiceChart() {
-        var canvas = $('repServiceChart');
-        if (!canvas || !SVC_LABELS.length) { return; }
-
-        if (!hasChart()) {
-            canvas.hidden = true;
-            if ($('serviceFallback')) { $('serviceFallback').hidden = false; }
-            return;
-        }
-
-        /* Sequential blue shades, darkest = highest revenue. */
-        var shades = ['#0b3d91', '#08528F', '#0B67B2', '#2196f3',
-                      '#3D8FD1', '#64b5f6', '#9DC4E8', '#C6DCF1'];
-
-        new Chart(canvas.getContext('2d'), {
-            type: 'bar',
-            data: {
-                labels: SVC_LABELS,
-                datasets: [{
-                    label: 'Revenue',
-                    data: SVC_VALUES,
-                    backgroundColor: SVC_LABELS.map(function (_, i) {
-                        return shades[i] || '#C6DCF1';
-                    }),
-                    borderRadius: 6,
-                    borderSkipped: false,
-                    barPercentage: 0.75,
-                    categoryPercentage: 0.85,
-                    maxBarThickness: 26,
-                }],
-            },
-            options: {
-                indexAxis: 'y',
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
                     legend: { display: false },
                     tooltip: Object.assign({}, TOOLTIP, {
                         callbacks: {
-                            label: function (c) {
-                                var total = SVC_VALUES.reduce(function (a, b) { return a + b; }, 0);
-                                var pct = total ? Math.round((c.parsed.x / total) * 1000) / 10 : 0;
-                                return peso(c.parsed.x) + ' · ' + pct + '% of revenue';
+                            label: function (c) { return 'Collected: ' + peso(c.parsed.y); },
+                            afterLabel: function (c) {
+                                var n = DAILY_COUNTS[c.dataIndex] || 0;
+                                return n + (n === 1 ? ' payment' : ' payments');
                             },
                         },
                     }),
                 },
                 scales: {
                     x: {
+                        grid: { display: false },
+                        border: { display: false },
+                        ticks: { color: '#64748b', font: { size: 11 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 10 },
+                    },
+                    y: {
                         beginAtZero: true,
-                        grid: { color: '#f1f5f9', drawBorder: false, drawTicks: false },
+                        grace: '8%',
+                        grid: { color: '#EEF2F6', drawTicks: false },
                         border: { display: false },
                         ticks: {
-                            color: '#94a3b8', font: { size: 11 }, padding: 8, maxTicksLimit: 6,
+                            color: '#64748b', font: { size: 11 }, padding: 8, maxTicksLimit: 5,
                             callback: function (v) {
                                 if (v >= 1000) return '₱' + (v / 1000).toLocaleString('en-PH', { maximumFractionDigits: 1 }) + 'k';
                                 return '₱' + v;
                             },
                         },
                     },
-                    y: {
-                        grid: { display: false },
-                        border: { display: false },
-                        ticks: { color: '#334155', font: { size: 11.5, weight: '600' } },
-                    },
                 },
             },
         });
     }
+    /* Revenue by service: filter by department, then show the top rows or all of them */
+    function setupServiceMore() {
+        var list = $('repSvcList');
+        if (!list) { return; }
+        var rows    = Array.prototype.slice.call(list.querySelectorAll('.rep-svc-row'));
+        var more    = $('repSvcMore');
+        var sub     = $('repSvcSub');
+        var allSub  = sub ? sub.innerHTML : '';
+        var shown   = parseInt(list.dataset.shown, 10) || 6;
+        var NAMES   = { lab: 'laboratory', xray: 'X-ray' };
+        var state   = { type: 'all', open: false };
 
+        function render() {
+            var k = 0;
+            rows.forEach(function (row) {
+                var match = state.type === 'all' || row.dataset.type === state.type;
+                if (match) { k++; }
+                row.hidden = !match || (!state.open && k > shown);
+                row.querySelector('.rep-svc-rank').textContent = match ? k : '';
+                row.classList.toggle('is-top', match && k <= 3);
+            });
+            if (more) {
+                var label = state.type === 'all' ? 'services' : NAMES[state.type] + ' services';
+                more.hidden = k <= shown;
+                more.setAttribute('aria-expanded', state.open ? 'true' : 'false');
+                more.textContent = state.open ? 'Show top ' + shown : 'Show all ' + k + ' ' + label;
+            }
+        }
+
+        document.querySelectorAll('.rep-svc-filter-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                state.type = btn.dataset.type;
+                state.open = false;
+                document.querySelectorAll('.rep-svc-filter-btn').forEach(function (b) {
+                    var on = b === btn;
+                    b.classList.toggle('is-active', on);
+                    b.setAttribute('aria-selected', on ? 'true' : 'false');
+                });
+                if (sub) {
+                    if (state.type === 'all') {
+                        sub.innerHTML = allSub;
+                    } else {
+                        var n = Number(btn.dataset.n), billed = Number(btn.dataset.billed);
+                        sub.textContent = n + ' ' + NAMES[state.type] + ' service' + (n === 1 ? '' : 's')
+                            + ' · ' + btn.dataset.rev + ' from ' + billed + ' billing' + (billed === 1 ? '' : 's')
+                            + ' · ' + btn.dataset.share + '% of revenue';
+                    }
+                }
+                render();
+            });
+        });
+
+        if (more) { more.addEventListener('click', function () { state.open = !state.open; render(); }); }
+        render();
+    }
     function setupToggle() {
         var chartBtn = $('viewChart');
         var tableBtn = $('viewTable');
@@ -1299,7 +1168,7 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
         if (exportBtn) { exportBtn.addEventListener('click', exportCsv); }
 
         drawDailyChart();
-        drawServiceChart();
+        setupServiceMore();
     });
 })();
 </script>

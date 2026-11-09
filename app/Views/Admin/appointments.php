@@ -87,28 +87,9 @@ foreach ($appointmentList as $appt) {
 
 <div class="dx">
 
-    <?php if (session()->getFlashdata('success')): ?>
-        <div class="dx-alert dx-alert--success alert alert-dismissible fade show" role="status">
-            <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
-            <span><?= esc(session()->getFlashdata('success')) ?></span>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss"></button>
-        </div>
-    <?php endif; ?>
-
-    <?php if (session()->getFlashdata('error')): ?>
-        <div class="dx-alert dx-alert--error alert alert-dismissible fade show" role="alert">
-            <i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i>
-            <span><?= esc(session()->getFlashdata('error')) ?></span>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss"></button>
-        </div>
-    <?php endif; ?>
-
 
     <!-- PAGE HEADER -->
     <header class="dx-head">
-        <div>
-            <h2 class="dx-title">Appointments</h2>
-        </div>
 
         <div class="dx-head-actions">
             <button type="button" class="dx-btn" id="dxExport">
@@ -406,23 +387,23 @@ foreach ($appointmentList as $appt) {
     --dx-ink:         var(--pm-text, #10202E);
     --dx-text:        var(--pm-text-soft, #3B4C5E);
     --dx-muted:       var(--pm-text-muted, #5D6E80);
-    --dx-faint:       #7A8B9D;
+    --dx-faint:       var(--pm-text-muted);
     --dx-line:        var(--pm-line, #DDE4EC);
     --dx-line-strong: var(--pm-line-strong, #C3CFDB);
-    --dx-line-soft:   #EBF0F5;
-    --dx-surface:     #FFFFFF;
-    --dx-subtle:      #F8FAFC;
-    --dx-row-hover:   #F5F8FB;
-    --dx-accent:      var(--pm-accent, #0B67B2);
-    --dx-accent-dark: var(--pm-accent-hover, #08528F);
-    --dx-accent-soft: var(--pm-accent-soft, #E8F1FA);
+    --dx-line-soft:   var(--pm-line);
+    --dx-surface:     var(--pm-surface);
+    --dx-subtle:      var(--pm-subtle);
+    --dx-row-hover:   var(--pm-subtle);
+    --dx-accent:      var(--pm-accent, #175563);
+    --dx-accent-dark: var(--pm-accent-hover, #10404B);
+    --dx-accent-soft: var(--pm-accent-soft, #EBF2F4);
     --dx-success:     #067647;
     --dx-success-dark:#055C38;
     --dx-danger:      #B42318;
     --dx-danger-dark: #912018;
     --dx-radius:      8px;
     --dx-radius-sm:   6px;
-    --dx-ring:        0 0 0 3px rgba(11, 103, 178, 0.2);
+    --dx-ring:        0 0 0 3px rgba(23, 85, 99, 0.2);
     --dx-mono:        var(--pm-mono, ui-monospace, monospace);
 
     color: var(--dx-text);
@@ -451,8 +432,8 @@ foreach ($appointmentList as $appt) {
 .dx-alert > span { flex: 1; min-width: 0; }
 .dx-alert.alert-dismissible { padding-right: 0.75rem; }
 .dx-alert .btn-close { position: static; padding: 0.5rem; margin-left: auto; font-size: 0.7rem; }
-.dx-alert--success { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
-.dx-alert--error   { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+.dx-alert--success { background: var(--pm-dk-bg-green, #f0fdf4); border-color: var(--pm-dk-edge-green, #bbf7d0); color: var(--pm-dk-fg-green, #166534); }
+.dx-alert--error   { background: var(--pm-dk-bg-red, #fef2f2); border-color: var(--pm-dk-edge-red, #fecaca); color: var(--pm-dk-fg-red, #991b1b); }
 
 /* ---------- Page header ---------- */
 
@@ -503,7 +484,7 @@ foreach ($appointmentList as $appt) {
     transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.dx-btn:hover { background: var(--dx-subtle); border-color: #cbd5e1; color: var(--dx-ink); }
+.dx-btn:hover { background: var(--dx-subtle); border-color: var(--pm-line); color: var(--dx-ink); }
 .dx-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .dx-btn i { font-size: 0.9em; }
 
@@ -853,7 +834,7 @@ foreach ($appointmentList as $appt) {
     background: var(--kind, var(--dx-faint));
 }
 
-.dx-kind--lab  { --kind: #0B67B2; }
+.dx-kind--lab  { --kind: #175563; }
 .dx-kind--xray { --kind: #0E8A7E; }
 .dx-kind--both { --kind: #D29A1E; }
 
@@ -943,7 +924,7 @@ foreach ($appointmentList as $appt) {
 
 .dx-menu .dx-menu-danger:hover,
 .dx-menu .dx-menu-danger:focus {
-    background: #fef2f2;
+    background: var(--pm-dk-bg-red, #fef2f2);
     color: var(--dx-danger-dark);
 }
 
@@ -990,9 +971,9 @@ foreach ($appointmentList as $appt) {
 }
 
 .dx-status--pending   { --tone-bg: #FEF6E7; --tone-fg: #93370D; --tone-dot: #DC6803; }
-.dx-status--approved  { --tone-bg: #E8F1FA; --tone-fg: #08528F; --tone-dot: #0B67B2; }
+.dx-status--approved  { --tone-bg: #EBF2F4; --tone-fg: #10404B; --tone-dot: #175563; }
 .dx-status--completed { --tone-bg: #ECFDF3; --tone-fg: #067647; --tone-dot: #17B26A; }
-.dx-status--cancelled { --tone-bg: #F2F4F7; --tone-fg: #475467; --tone-dot: #98A2B3; }
+.dx-status--cancelled { --tone-bg: var(--pm-subtle); --tone-fg: #475467; --tone-dot: #98A2B3; }
 .dx-status--late      { --tone-bg: #FEF3F2; --tone-fg: #B42318; --tone-dot: #F04438; }
 
 /* ---------- Empty states and footer ---------- */
@@ -1047,9 +1028,9 @@ foreach ($appointmentList as $appt) {
     cursor: pointer;
 }
 
-.dx-page:hover:not(:disabled) { background: var(--dx-subtle); border-color: #cbd5e1; }
+.dx-page:hover:not(:disabled) { background: var(--dx-subtle); border-color: var(--pm-line); }
 .dx-page:disabled { opacity: 0.45; cursor: not-allowed; }
-.dx-page[aria-current="page"] { color: var(--dx-accent); background: var(--dx-accent-soft); border-color: #bcd6f3; }
+.dx-page[aria-current="page"] { color: var(--dx-accent); background: var(--dx-accent-soft); border-color: var(--pm-dk-edge-blue, #bcd6f3); }
 .dx-page-gap { min-width: 20px; text-align: center; color: var(--dx-faint); }
 
 /* ---------- Toast ---------- */
@@ -1066,7 +1047,7 @@ foreach ($appointmentList as $appt) {
     padding: 0.7rem 1rem;
     font-size: 0.8125rem;
     color: #f8fafc;
-    background: var(--pm-ink, #0C2D48);
+    background: var(--pm-ink, #142D36);
     border-radius: 9px;
     box-shadow: 0 12px 28px -8px rgba(15, 23, 42, 0.45);
 }

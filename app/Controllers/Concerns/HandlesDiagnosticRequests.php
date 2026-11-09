@@ -4,6 +4,7 @@ namespace App\Controllers\Concerns;
 
 use App\Models\AppointmentModel;
 use App\Models\DiagnosticRequestModel;
+use App\Models\InvoiceModel;
 use App\Models\LabResultModel;
 use App\Models\NotificationModel;
 use App\Models\PatientModel;
@@ -200,7 +201,7 @@ trait HandlesDiagnosticRequests
             // reference must be the new request id, not the appointment id.
             NotificationModel::dispatch(
                 $type,
-                'New ' . $cfg['label'] . ' Request (Online Booking)',
+                'New ' . $cfg['label'] . ' Request (' . (empty($appointment['is_override']) ? 'Online Booking' : 'Front Desk') . ')',
                 'New ' . strtolower($cfg['label']) . ' request for ' . $appointment['full_name'],
                 (int) $model->getInsertID(),
                 null,
@@ -486,6 +487,7 @@ trait HandlesDiagnosticRequests
             $payment = $paymentModel->getByRequest($id, $type);
             if ($payment) {
                 $db->transCommit();
+                $this->invoicePayment((int) $payment['id']);
                 return [
                     'success'          => true,
                     'message'          => 'Assigned to ' . $assignee['name'] . '. Payment already recorded.',
@@ -527,6 +529,8 @@ trait HandlesDiagnosticRequests
             throw $e;
         }
 
+        $this->invoicePayment((int) $paymentId);
+
         return [
             'success'          => true,
             'message'          => 'Assigned to ' . $assignee['name'] . '. Payment recorded: ₱' . number_format($totalAmount, 2),
@@ -536,6 +540,27 @@ trait HandlesDiagnosticRequests
             'amount'           => $totalAmount,
             'patient_code'     => $patientCode,
         ];
+    }
+
+    /**
+     * Bill the request: every payment taken at Start gets an invoice, with the
+     * tests as line items at the prices just charged (frozen on the invoice).
+     * Reuses the request's invoice if one already exists. Runs after the
+     * payment is committed, and never blocks Start: a failure is logged and
+     * `php spark invoices:backfill` creates the invoice later.
+     */
+    private function invoicePayment(int $paymentId): void
+    {
+        if ($paymentId <= 0) {
+            return;
+        }
+        try {
+            if (! (new InvoiceModel())->syncFromDiagnosticPayment($paymentId)) {
+                log_message('error', "Start: no invoice could be created for payment #{$paymentId}.");
+            }
+        } catch (\Throwable $e) {
+            log_message('error', "Start: invoicing payment #{$paymentId} failed: " . $e->getMessage());
+        }
     }
 
     /** @return array{0: array<int,array{name:string,charge:float}>, 1: float} */
@@ -574,18 +599,14 @@ trait HandlesDiagnosticRequests
             return (string) $row['patient_code'];
         }
 
-        $patients = new PatientModel();
-        $patient  = $patients->where('full_name', $row['patient_name'])
-                             ->where('age', $row['age'])
-                             ->where('gender', $row['gender'])
-                             ->first();
-
-        if (! $patient && ! empty($row['email'])) {
-            $patient = $patients->where('email', $row['email'])->first();
-        }
-        if (! $patient) {
-            $patient = $patients->where('full_name', $row['patient_name'])->first();
-        }
+        // Name must match: a shared email (family inbox) or a bare common name is not the same person
+        $patient = (new PatientModel())->findSamePerson(
+            (string) ($row['patient_name'] ?? ''),
+            $row['age'] ?? null,
+            (string) ($row['gender'] ?? ''),
+            trim((string) ($row['email'] ?? '')),
+            trim((string) ($row['phone'] ?? ''))
+        );
 
         return $patient['patient_code'] ?? 'N/A';
     }
@@ -643,7 +664,10 @@ trait HandlesDiagnosticRequests
 
     private function printLabResult(array $request, array $back = [])
     {
-        $results = (new LabResultModel())->getByRequest((int) $request['id']);
+        $results = (new LabResultModel())->getForPrint(
+            (int) $request['id'],
+            (string) ($request['lab_services'] ?? $request['services'] ?? '')
+        );
 
         return view('MedTech/print_result', [
             'request'          => $request,
@@ -850,27 +874,18 @@ trait HandlesDiagnosticRequests
 
     /**
      * The patient record behind an appointment, found the same way booking
-     * matches patients (email, phone, then name + age). Read-only: never
+     * matches patients (findSamePerson: name must match). Read-only: never
      * creates a record. Appointments do not store a patient id.
      */
     protected function patientForAppointment(array $appointment): ?array
     {
-        $model = new PatientModel();
-        $email = trim((string) ($appointment['email'] ?? ''));
-        $phone = trim((string) ($appointment['phone'] ?? ''));
-        $name  = trim((string) ($appointment['full_name'] ?? ''));
-
-        $patient = null;
-        if ($email !== '') {
-            $patient = $model->where('email', $email)->first();
-        }
-        if (!$patient && $phone !== '') {
-            $patient = $model->where('phone', $phone)->first();
-        }
-        if (!$patient && $name !== '') {
-            $patient = $model->where('full_name', $name)->where('age', $appointment['age'] ?? null)->first();
-        }
-        return $patient ?: null;
+        return (new PatientModel())->findSamePerson(
+            trim((string) ($appointment['full_name'] ?? '')),
+            $appointment['age'] ?? null,
+            (string) ($appointment['gender'] ?? ''),
+            trim((string) ($appointment['email'] ?? '')),
+            trim((string) ($appointment['phone'] ?? ''))
+        );
     }
 
     /**

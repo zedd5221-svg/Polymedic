@@ -61,28 +61,9 @@ $filterTabs = [
 
 <div class="dx">
 
-    <?php if (session()->getFlashdata('success')): ?>
-        <div class="dx-alert dx-alert--success alert alert-dismissible fade show" role="status">
-            <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
-            <span><?= esc(session()->getFlashdata('success')) ?></span>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss"></button>
-        </div>
-    <?php endif; ?>
-
-    <?php if (session()->getFlashdata('error')): ?>
-        <div class="dx-alert dx-alert--error alert alert-dismissible fade show" role="alert">
-            <i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i>
-            <span><?= esc(session()->getFlashdata('error')) ?></span>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss"></button>
-        </div>
-    <?php endif; ?>
-
 
     <!-- PAGE HEADER -->
     <header class="dx-head">
-        <div>
-            <h2 class="dx-title">Laboratory Requests</h2>
-        </div>
 
         <div class="dx-head-actions">
             <button type="button" class="dx-btn" id="dxExport">
@@ -151,8 +132,6 @@ $filterTabs = [
                     $services = isset($request['lab_services'])
                         ? array_values(array_filter(array_map('trim', explode(',', (string) $request['lab_services'])), 'strlen'))
                         : [];
-                    $shown = array_slice($services, 0, 4);
-                    $extra = count($services) - count($shown);
 
                     /*
                      * Turnaround from real timestamps (this used to be rand()):
@@ -235,13 +214,12 @@ $filterTabs = [
                                 <span class="dx-tests-count"><?= count($services) ?></span>
                             </div>
                             <?php if ($services): ?>
-                                <ul class="dx-tests-list" title="<?= esc(implode(', ', $services), 'attr') ?>">
-                                    <?php foreach ($shown as $service): ?>
+                                <ul class="dx-tests-list<?= count($services) > 3 ? ' is-scroll' : '' ?>"
+                                    title="<?= esc(implode(', ', $services), 'attr') ?>"
+                                    <?= count($services) > 3 ? 'tabindex="0" aria-label="' . count($services) . ' ordered tests, scroll for more"' : '' ?>>
+                                    <?php foreach ($services as $service): ?>
                                         <li><?= esc($service) ?></li>
                                     <?php endforeach; ?>
-                                    <?php if ($extra > 0): ?>
-                                        <li class="dx-tests-more">+ <?= $extra ?> more</li>
-                                    <?php endif; ?>
                                 </ul>
                             <?php else: ?>
                                 <p class="dx-tests-empty">No tests listed</p>
@@ -362,20 +340,20 @@ $filterTabs = [
     --dx-ink:         var(--pm-text, #10202E);
     --dx-text:        var(--pm-text-soft, #3B4C5E);
     --dx-muted:       var(--pm-text-muted, #5D6E80);
-    --dx-faint:       #7A8B9D;
+    --dx-faint:       var(--pm-text-muted);
     --dx-line:        var(--pm-line, #DDE4EC);
     --dx-line-strong: var(--pm-line-strong, #C3CFDB);
-    --dx-line-soft:   #EBF0F5;
-    --dx-surface:     #FFFFFF;
-    --dx-subtle:      #F8FAFC;
-    --dx-accent:      var(--pm-accent, #0B67B2);
-    --dx-accent-dark: var(--pm-accent-hover, #08528F);
-    --dx-accent-soft: var(--pm-accent-soft, #E8F1FA);
+    --dx-line-soft:   var(--pm-line);
+    --dx-surface:     var(--pm-surface);
+    --dx-subtle:      var(--pm-subtle);
+    --dx-accent:      var(--pm-accent, #175563);
+    --dx-accent-dark: var(--pm-accent-hover, #10404B);
+    --dx-accent-soft: var(--pm-accent-soft, #EBF2F4);
     --dx-danger:      #B42318;
     --dx-danger-dark: #912018;
     --dx-radius:      8px;
     --dx-radius-sm:   6px;
-    --dx-ring:        0 0 0 3px rgba(11, 103, 178, 0.18);
+    --dx-ring:        0 0 0 3px rgba(23, 85, 99, 0.18);
     --dx-mono:        var(--pm-mono, ui-monospace, monospace);
 
     color: var(--dx-text);
@@ -404,8 +382,8 @@ $filterTabs = [
 .dx-alert > span { flex: 1; min-width: 0; }
 .dx-alert.alert-dismissible { padding-right: 0.75rem; }
 .dx-alert .btn-close { position: static; padding: 0.5rem; margin-left: auto; font-size: 0.7rem; }
-.dx-alert--success { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
-.dx-alert--error   { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+.dx-alert--success { background: var(--pm-dk-bg-green, #f0fdf4); border-color: var(--pm-dk-edge-green, #bbf7d0); color: var(--pm-dk-fg-green, #166534); }
+.dx-alert--error   { background: var(--pm-dk-bg-red, #fef2f2); border-color: var(--pm-dk-edge-red, #fecaca); color: var(--pm-dk-fg-red, #991b1b); }
 
 /* ---------- Page header ---------- */
 
@@ -450,7 +428,7 @@ $filterTabs = [
     transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.dx-btn:hover { background: var(--dx-subtle); border-color: #cbd5e1; color: var(--dx-ink); }
+.dx-btn:hover { background: var(--dx-subtle); border-color: var(--pm-line); color: var(--dx-ink); }
 .dx-btn i { font-size: 0.9em; }
 
 .dx-btn--primary,
@@ -633,11 +611,11 @@ $filterTabs = [
 
 .dx-card:hover {
     border-color: var(--dx-line-strong);
-    box-shadow: 0 8px 20px -14px rgba(12, 45, 72, 0.35);
+    box-shadow: 0 8px 20px -14px rgba(20, 45, 54, 0.35);
 }
 
-.dx-card.is-stat { border-color: #F4C7C2; }
-.dx-card.is-stat:hover { border-color: #EAA29A; }
+.dx-card.is-stat { border-color: var(--pm-dk-edge-red, #F4C7C2); }
+.dx-card.is-stat:hover { border-color: var(--pm-dk-edge-red, #EAA29A); }
 
 .dx-card.is-hidden { display: none; }
 
@@ -773,8 +751,23 @@ $filterTabs = [
     background: var(--dx-accent);
 }
 
-.dx-tests-list .dx-tests-more { color: var(--dx-muted); font-size: 0.76rem; }
-.dx-tests-list .dx-tests-more::before { background: transparent; }
+/* Four or more tests: three rows show, the rest scroll inside the box.
+   Height = 3 rows (0.8rem x 1.4 line-height) + 2 gaps + a peek of the 4th. */
+.dx-tests-list.is-scroll {
+    max-height: calc(3 * 1.12rem + 2 * 0.25rem + 0.55rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 0.4rem;
+    margin-right: -0.4rem;
+    scrollbar-width: thin;
+    scrollbar-color: var(--pm-line-strong) transparent;
+    -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 1.1rem), transparent);
+            mask-image: linear-gradient(180deg, #000 calc(100% - 1.1rem), transparent);
+}
+.dx-tests-list.is-scroll.is-end { -webkit-mask-image: none; mask-image: none; }
+.dx-tests-list.is-scroll::-webkit-scrollbar { width: 5px; }
+.dx-tests-list.is-scroll::-webkit-scrollbar-thumb { background: var(--pm-line-strong); border-radius: 3px; }
+.dx-tests-list.is-scroll:focus-visible { outline: 2px solid var(--dx-accent); outline-offset: 2px; border-radius: 4px; }
 
 .dx-tests-empty { margin: 0; font-size: 0.78rem; color: var(--dx-faint); }
 
@@ -861,11 +854,11 @@ $filterTabs = [
 }
 
 .dx-status--pending   { --tone-bg: #FEF6E7; --tone-fg: #93370D; --tone-dot: #DC6803; }
-.dx-status--progress  { --tone-bg: #E8F1FA; --tone-fg: #08528F; --tone-dot: #0B67B2; }
+.dx-status--progress  { --tone-bg: #EBF2F4; --tone-fg: #10404B; --tone-dot: #175563; }
 .dx-status--completed { --tone-bg: #ECFDF3; --tone-fg: #067647; --tone-dot: #17B26A; }
 .dx-status--released  { --tone-bg: #E6F6F4; --tone-fg: #0E6E64; --tone-dot: #009A85; }
-.dx-status--draft     { --tone-bg: #F2F4F7; --tone-fg: #475467; --tone-dot: #98A2B3; }
-.dx-status--cancelled { --tone-bg: #F2F4F7; --tone-fg: #475467; --tone-dot: #98A2B3; }
+.dx-status--draft     { --tone-bg: var(--pm-subtle); --tone-fg: #475467; --tone-dot: #98A2B3; }
+.dx-status--cancelled { --tone-bg: var(--pm-subtle); --tone-fg: #475467; --tone-dot: #98A2B3; }
 
 /* ---- row menu ---- */
 
@@ -943,9 +936,9 @@ $filterTabs = [
     cursor: pointer;
 }
 
-.dx-page:hover:not(:disabled) { background: var(--dx-subtle); border-color: #cbd5e1; }
+.dx-page:hover:not(:disabled) { background: var(--dx-subtle); border-color: var(--pm-line); }
 .dx-page:disabled { opacity: 0.45; cursor: not-allowed; }
-.dx-page[aria-current="page"] { color: var(--dx-accent); background: var(--dx-accent-soft); border-color: #bcd6f3; }
+.dx-page[aria-current="page"] { color: var(--dx-accent); background: var(--dx-accent-soft); border-color: var(--pm-dk-edge-blue, #bcd6f3); }
 .dx-page-gap { min-width: 20px; text-align: center; color: var(--dx-faint); }
 
 /* ---------- Toast ---------- */
@@ -962,7 +955,7 @@ $filterTabs = [
     padding: 0.7rem 1rem;
     font-size: 0.8125rem;
     color: #f8fafc;
-    background: var(--pm-ink, #0C2D48);
+    background: var(--pm-ink, #142D36);
     border-radius: 9px;
     box-shadow: 0 12px 28px -8px rgba(15, 23, 42, 0.45);
 }
@@ -1003,6 +996,15 @@ $filterTabs = [
 </style>
 
 <script>
+/* Ordered-tests lists that scroll: drop the bottom fade once the end is reached */
+if (!window.__dxTestsScroll) {
+    window.__dxTestsScroll = true;
+    document.addEventListener('scroll', function (e) {
+        var el = e.target;
+        if (!el.classList || !el.classList.contains('dx-tests-list')) return;
+        el.classList.toggle('is-end', el.scrollTop + el.clientHeight >= el.scrollHeight - 2);
+    }, true);
+}
 (function () {
     'use strict';
 

@@ -501,7 +501,7 @@ class Billing extends BaseController
         }
 
         return redirect()->to(base_url($this->routeBase() . '/view/' . $id))
-            ->with('success', 'Diagnostic request updated to match the invoice.');
+            ->with('success', 'Request updated. It now matches the invoice.');
     }
 
     // =============================================================
@@ -574,8 +574,9 @@ class Billing extends BaseController
 
         $paymentId = $paymentModel->recordPayment([
             'invoice_id'     => $id,
-            'request_id'     => $invoice['request_id'] ?? 0,
-            'request_type'   => $invoice['request_type'] ?? 'lab',
+            // An invoice made on the Billing page may have no request: store NULL, never 0
+            'request_id'     => !empty($invoice['request_id']) ? (int) $invoice['request_id'] : null,
+            'request_type'   => !empty($invoice['request_id']) ? ($invoice['request_type'] ?? null) : null,
             'patient_name'   => $invoice['patient_name'],
             'patient_code'   => $invoice['patient_code'],
             'appointment_id' => $invoice['appointment_id'],
@@ -596,7 +597,7 @@ class Billing extends BaseController
         $invoiceModel->recalculate($id);
 
         return redirect()->to(base_url($this->routeBase() . '/view/' . $id))
-                         ->with('success', 'Payment recorded: ₱' . number_format($amount, 2));
+                         ->with('success', 'Payment recorded. ₱' . number_format($amount, 2));
     }
 
     // =============================================================
@@ -614,6 +615,14 @@ class Billing extends BaseController
         $reason = trim((string) $this->request->getPost('reason'));
         if ($reason === '') {
             return redirect()->back()->with('error', 'A void reason is required.');
+        }
+
+        $invoice = $invoiceModel->recalculate($id);
+        if (!$invoice) {
+            return redirect()->back()->with('error', 'Invoice not found.');
+        }
+        if ((float) $invoice['amount_paid'] > 0) {
+            return redirect()->back()->with('error', 'This invoice has payments on it. Refund them first, then void the invoice.');
         }
 
         $ok = $invoiceModel->voidInvoice($id, $reason, PaymentModel::currentCashierName());
@@ -759,9 +768,15 @@ class Billing extends BaseController
             ->orderBy('d', 'ASC')
             ->get()->getResultArray();
 
+        /* Each service's department: the catalog's category, else the payment's own type */
+        $catalogType = [];
+        foreach ($db->table('services')->select('service_name, category')->get()->getResultArray() as $svc) {
+            $catalogType[mb_strtolower(trim((string) $svc['service_name']))] = $svc['category'] === 'xray' ? 'xray' : 'lab';
+        }
+
         $serviceRevenue = [];
         $rawPayments = $db->table('payments')
-            ->select('services, amount_paid')
+            ->select('services, amount_paid, request_type')
             ->where('payment_status', PaymentModel::STATUS_PAID)
             ->where('payment_date >=', $from . ' 00:00:00')
             ->where('payment_date <=', $to   . ' 23:59:59')
@@ -780,7 +795,12 @@ class Billing extends BaseController
                 }
                 if ($name === '') continue;
                 if (!isset($serviceRevenue[$name])) {
-                    $serviceRevenue[$name] = ['count' => 0, 'revenue' => 0.0];
+                    $serviceRevenue[$name] = [
+                        'count'   => 0,
+                        'revenue' => 0.0,
+                        'type'    => $catalogType[mb_strtolower($name)]
+                                     ?? (in_array($p['request_type'] ?? '', ['lab', 'xray'], true) ? $p['request_type'] : 'other'),
+                    ];
                 }
                 $serviceRevenue[$name]['count']++;
                 $serviceRevenue[$name]['revenue'] += $charge;

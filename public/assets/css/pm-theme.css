@@ -4,7 +4,7 @@
    MedTech, Radiologist). It overrides the per-layout styles
    with one restrained, brand-derived system:
 
-   - Medical navy structure, clinical blue for actions,
+   - Slate-teal structure, deep teal for actions,
      logo red reserved for the brand mark and unread counts.
    - Hairline borders instead of floating shadows.
    - Motion only where it carries meaning (state changes),
@@ -12,27 +12,27 @@
    ========================================================= */
 
 :root {
-    /* Medical navy (sidebar, strongest surfaces) */
-    --pm-ink:          #0C2D48;
-    --pm-ink-2:        #123A5A;
-    --pm-ink-line:     rgba(255, 255, 255, 0.08);
+    /* Slate teal (sidebar, strongest surfaces) */
+    --pm-ink:          #1F4250;
+    --pm-ink-2:        #2A5260;
+    --pm-ink-line:     rgba(255, 255, 255, 0.10);
 
     /* Neutrals (cool, clinical) */
-    --pm-canvas:       #F3F6F9;
+    --pm-canvas:       #F6F7F9;
     --pm-surface:      #FFFFFF;
-    --pm-subtle:       #EBF0F5;
-    --pm-line:         #DDE4EC;
-    --pm-line-strong:  #C3CFDB;
-    --pm-text:         #10202E;
-    --pm-text-soft:    #3B4C5E;
-    --pm-text-muted:   #5D6E80;
+    --pm-subtle:       #EEF0F3;
+    --pm-line:         #E2E5EA;
+    --pm-line-strong:  #CBD1D8;
+    --pm-text:         #141C24;
+    --pm-text-soft:    #3D4752;
+    --pm-text-muted:   #5E6873;
 
     /* Accent (medical blue) */
-    --pm-accent:       #0B67B2;
-    --pm-accent-hover: #08528F;
-    --pm-accent-soft:  #E8F1FA;
-    --pm-accent-line:  #C6DCF1;
-    --pm-accent-on-ink:#6FB8EE;
+    --pm-accent:       #175563;
+    --pm-accent-hover: #10404B;
+    --pm-accent-soft:  #EBF2F4;
+    --pm-accent-line:  #C5DCE0;
+    --pm-accent-on-ink:#9CD0D8;
 
     /* Brand red (logo sash) */
     --pm-brand-red:    #D7262E;
@@ -41,6 +41,19 @@
     --pm-danger:       #B42318;
     --pm-warning:      #B54708;
     --pm-success:      #067647;
+
+    /* Pale tinted fills for chips, notes and soft highlights (follow dark mode) */
+    --pm-surface-top:  #FCFDFE;
+    --pm-table-head:   #F8FAFC;
+    --pm-table-hover:  #F5F8FB;
+    --pm-accent-text:  #10404B;   /* teal text on pale teal fills */
+    --pm-avatar:       #E3EAF2;
+    --pm-tint-unread:  #F7FAFE;
+    --pm-tint-amber:   #FEF6E7;
+    --pm-tint-red:     #FEF3F2;
+    --pm-tint-green:   #ECFDF3;
+    --pm-tint-blue:    #EEF4FF;
+    --pm-tint-sea:     #E6F6F4;
 
     --pm-radius:       8px;
     --pm-radius-sm:    6px;
@@ -56,18 +69,20 @@
     --active-blue-light: var(--pm-accent-soft);
     --text-blue:       var(--pm-accent-hover);
 
-    --sb-bg-top:       var(--pm-ink);
-    --sb-bg-bottom:    var(--pm-ink);
-    --sb-text:         #C5D3E0;
-    --sb-text-dim:     #8496A8;
-    --sb-heading:      #8DA2B7;
-    --sb-hover-bg:     rgba(255, 255, 255, 0.06);
+    --sb-bg-top:       #2A5261;
+    --sb-bg-bottom:    #163642;
+    --sb-text:         #DCE8EA;
+    --sb-text-dim:     #A6BFC5;
+    --sb-heading:      #A9C3C9;
+    --sb-hover-bg:     rgba(255, 255, 255, 0.09);
     --sb-hover-text:   #FFFFFF;
     --sb-border:       var(--pm-ink-line);
     --sb-active-from:  var(--pm-ink-2);
     --sb-active-to:    var(--pm-accent-on-ink);
     --sb-active-glow:  transparent;
-    --sidebar-speed:   0.2s;
+    /* Sidebar open/close: long enough to follow, on a curve that settles softly */
+    --sidebar-speed:   0.34s;
+    --sidebar-ease:    cubic-bezier(0.32, 0.72, 0, 1);
 
     /* Bootstrap 5.3 */
     --bs-body-font-family: var(--pm-font);
@@ -78,17 +93,17 @@
     --bs-border-radius-lg: var(--pm-radius);
     --bs-border-radius-xl: 10px;
     --bs-border-radius-pill: 999px;
-    --bs-primary:      #0B67B2;
-    --bs-primary-rgb:  11, 103, 178;
-    --bs-primary-bg-subtle: #E8F1FA;
-    --bs-primary-border-subtle: #C6DCF1;
-    --bs-primary-text-emphasis: #08528F;
-    --bs-link-color:   #0B67B2;
-    --bs-link-color-rgb: 11, 103, 178;
-    --bs-link-hover-color: #08528F;
-    --bs-link-hover-color-rgb: 8, 82, 143;
-    --bs-focus-ring-color: rgba(11, 103, 178, 0.25);
-    --bs-box-shadow-sm: 0 1px 2px rgba(12, 45, 72, 0.04);
+    --bs-primary:      #175563;
+    --bs-primary-rgb:  23, 85, 99;
+    --bs-primary-bg-subtle: #EBF2F4;
+    --bs-primary-border-subtle: #C5DCE0;
+    --bs-primary-text-emphasis: #10404B;
+    --bs-link-color:   #175563;
+    --bs-link-color-rgb: 23, 85, 99;
+    --bs-link-hover-color: #10404B;
+    --bs-link-hover-color-rgb: 16, 64, 75;
+    --bs-focus-ring-color: rgba(23, 85, 99, 0.25);
+    --bs-box-shadow-sm: 0 1px 2px rgba(20, 45, 54, 0.04);
 }
 
 /* =========================================================
@@ -128,7 +143,7 @@ html body .font-monospace {
    ========================================================= */
 
 html body .admin-sidebar {
-    background: var(--pm-ink) !important;
+    background: linear-gradient(180deg, var(--sb-bg-top) 0%, var(--pm-ink) 45%, var(--sb-bg-bottom) 100%) !important;
     border-right: 0 !important;
     box-shadow: none;
 }
@@ -141,14 +156,28 @@ html body .sidebar-header {
     padding: 0 1rem;
 }
 
+/* Same mark as the login page: the clinic seal (cotabato-polymedic-logo-mark.svg,
+   transparent) drawn in white on a clinical-blue tile */
 html body .logo-badge {
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    box-shadow: none;
+    width: 40px;
+    height: 40px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 11px;
+    background: rgba(255, 255, 255, 0.12) !important;
+    border: 1px solid rgba(255,255,255,.22);
+    box-shadow: 0 1px 2px rgba(0,0,0,.18);
 }
 
-html body .logo-badge img { width: 24px; height: 24px; }
+html body .logo-badge img {
+    width: 30px;
+    height: auto;
+    object-fit: contain;
+    display: block;
+    filter: brightness(0) invert(1);
+}
 
 html body .sidebar-logo:hover .logo-badge {
     transform: none;
@@ -244,22 +273,144 @@ html body .menu-btn::before {
 html body .menu-item:not(.active) .menu-btn:hover::before,
 html body .menu-item.is-navigating .menu-btn::before { height: 0; }
 
-html body .menu-item.active .menu-btn {
-    background: rgba(255, 255, 255, 0.08) !important;
+/* Current page: a tab cut from the page canvas. It runs to the sidebar's
+   right edge and curves into the content, so the page reads as an
+   extension of the item that opened it. With JS (partials/sidebar_tab)
+   one .pm-navtab glides between items; these per-item rules are the
+   no-JS fallback. The pseudo-elements draw the inverted corners. */
+html body:not(.has-navtab) .menu-item.active .menu-btn {
+    --tab-r: 10px;
+    background: var(--pm-canvas) !important;
+    color: var(--pm-text) !important;
     box-shadow: none !important;
     font-weight: 600;
+    margin-right: -0.625rem;
+    width: calc(100% + 0.625rem);
+    border-radius: var(--tab-r) 0 0 var(--tab-r) !important;
 }
 
-html body .menu-item.active .menu-btn::before {
-    height: 20px;
-    background: var(--pm-accent-on-ink);
+html body:not(.has-navtab) .menu-item.active .menu-btn::before,
+html body:not(.has-navtab) .menu-item.active .menu-btn::after {
+    content: '';
+    display: block;
+    position: absolute;
+    left: auto;
+    right: 0;
+    width: var(--tab-r);
+    height: var(--tab-r);
     opacity: 1;
+    border-radius: 0;
+    pointer-events: none;
+    animation: none;
 }
 
-html body .menu-item.active .menu-icon { color: var(--pm-accent-on-ink) !important; }
+html body:not(.has-navtab) .menu-item.active .menu-btn::before {
+    top: calc(var(--tab-r) * -1);
+    background: radial-gradient(circle at 0 0, transparent var(--tab-r), var(--pm-canvas) calc(var(--tab-r) + 0.5px));
+}
 
-/* Looping shine sweep on the active item */
-html body .menu-item.active .menu-btn::after { display: none; }
+html body:not(.has-navtab) .menu-item.active .menu-btn::after {
+    top: auto;
+    bottom: calc(var(--tab-r) * -1);
+    background: radial-gradient(circle at 0 100%, transparent var(--tab-r), var(--pm-canvas) calc(var(--tab-r) + 0.5px));
+}
+
+html body .menu-item.active .menu-btn span { color: var(--pm-text) !important; }
+html body .menu-item.active .menu-icon { color: var(--pm-accent) !important; }
+
+/* ----- Gliding tab (partials/sidebar_tab.php) -----
+   The menu scrolls, but a visible scrollbar would leave a gutter between
+   the tab and the page, so the scrollbar is hidden (wheel/touch still work). */
+html body .sidebar-nav {
+    position: relative;
+    scrollbar-width: none;
+}
+html body .sidebar-nav::-webkit-scrollbar { width: 0; height: 0; }
+
+html body .pm-navtab {
+    --tab-r: 10px;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 0;
+    width: var(--tab-w, 0);
+    height: var(--tab-h, 0);
+    transform: translate(var(--tab-x, 0), var(--tab-y, 0));
+    background: var(--pm-canvas);
+    border-radius: var(--tab-r) 0 0 var(--tab-r);
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Inverted corners: the canvas curving out above and below the tab.
+   1px of overlap with the tab hides the seam between them. */
+html body .pm-navtab::before,
+html body .pm-navtab::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    width: var(--tab-r);
+    height: calc(var(--tab-r) + 1px);
+}
+html body .pm-navtab::before {
+    bottom: calc(100% - 1px);
+    background: radial-gradient(circle at 0 0, transparent var(--tab-r), var(--pm-canvas) calc(var(--tab-r) + 0.6px));
+}
+html body .pm-navtab::after {
+    top: calc(100% - 1px);
+    background: radial-gradient(circle at 0 100%, transparent var(--tab-r), var(--pm-canvas) calc(var(--tab-r) + 0.6px));
+}
+
+html body .pm-navtab.is-on { opacity: 1; }
+
+/* Movement: a quick start that settles softly, like a sheet sliding into place */
+html body .pm-navtab.is-ready {
+    transition: transform 0.42s cubic-bezier(0.32, 0.72, 0, 1),
+                height 0.42s cubic-bezier(0.32, 0.72, 0, 1),
+                width var(--sidebar-speed) var(--sidebar-ease),
+                opacity 0.2s ease;
+}
+
+/* First appearance on page load: the tab slides out from the left */
+html body .pm-navtab.is-enter {
+    animation: pmTabIn 0.38s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+@keyframes pmTabIn {
+    from { clip-path: inset(-12px 100% -12px 0); }
+    to   { clip-path: inset(-12px 0 -12px 0); }
+}
+
+html body.has-navtab .sidebar-nav .menu-item { position: relative; z-index: 1; }
+
+html body.has-navtab .menu-item.active .menu-btn {
+    background: transparent !important;
+    box-shadow: none !important;
+    color: var(--pm-text) !important;
+    font-weight: 600;
+}
+html body.has-navtab .menu-item.active .menu-btn::before,
+html body.has-navtab .menu-item.active .menu-btn::after { display: none; }
+
+/* Labels change colour as the tab passes under them, not before it arrives */
+html body.has-navtab .menu-btn,
+html body.has-navtab .menu-btn span,
+html body.has-navtab .menu-icon {
+    transition: background-color 0.15s ease, color 0.3s ease 0.06s;
+}
+
+/* The icon gives a small nudge when the tab lands on its item */
+html body .menu-btn.is-tab-arrive .menu-icon { animation: pmTabLand 0.42s cubic-bezier(0.32, 0.72, 0, 1); }
+@keyframes pmTabLand {
+    0%   { transform: translateX(0); }
+    45%  { transform: translateX(2px); }
+    100% { transform: translateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html body .pm-navtab.is-ready { transition: opacity 0.15s ease; }
+    html body .pm-navtab.is-enter { animation: none; }
+    html body .menu-btn.is-tab-arrive .menu-icon { animation: none; }
+}
 
 html body .badge-notif,
 html body .menu-item.active .badge-notif {
@@ -284,7 +435,7 @@ html body .sb-tooltip {
     background: var(--pm-ink);
     border-radius: var(--pm-radius-sm);
     font-weight: 500;
-    box-shadow: 0 4px 12px rgba(12, 45, 72, 0.2);
+    box-shadow: 0 4px 12px rgba(20, 45, 54, 0.2);
 }
 
 @media (min-width: 993px) {
@@ -293,8 +444,8 @@ html body .sb-tooltip {
 }
 
 @media (max-width: 992px) {
-    html body.sidebar-open .admin-sidebar { box-shadow: 8px 0 24px rgba(12, 45, 72, 0.2); }
-    html body .sidebar-backdrop { background: rgba(12, 45, 72, 0.45); backdrop-filter: none; }
+    html body.sidebar-open .admin-sidebar { box-shadow: 8px 0 24px rgba(20, 45, 54, 0.2); }
+    html body .sidebar-backdrop { background: rgba(20, 45, 54, 0.45); backdrop-filter: none; }
 }
 
 /* =========================================================
@@ -356,7 +507,7 @@ html body .notif-dropdown-menu {
     background: var(--pm-surface) !important;
     border: 1px solid var(--pm-line) !important;
     border-radius: 10px !important;
-    box-shadow: 0 18px 40px -16px rgba(12, 45, 72, 0.28), 0 2px 6px rgba(12, 45, 72, 0.06) !important;
+    box-shadow: 0 18px 40px -16px rgba(20, 45, 54, 0.28), 0 2px 6px rgba(20, 45, 54, 0.06) !important;
 }
 
 html body .notif-dropdown-header {
@@ -445,16 +596,16 @@ html body .notif-item {
     padding: 0.75rem 1rem 0.75rem 1.6rem !important;
     color: var(--pm-text-soft) !important;
     background: var(--pm-surface) !important;
-    border-bottom: 1px solid #EBF0F5 !important;
+    border-bottom: 1px solid var(--pm-line) !important;
     text-decoration: none !important;
     transition: background-color 0.12s ease;
 }
 
 html body .notif-item:last-child { border-bottom: 0 !important; }
-html body a.notif-item:hover { background: #F5F8FB !important; }
+html body a.notif-item:hover { background: var(--pm-dk-bg-neutral, #F5F8FB) !important; }
 
-html body .notif-item.unread { background: #F7FAFE !important; }
-html body a.notif-item.unread:hover { background: #F0F6FD !important; }
+html body .notif-item.unread { background: var(--pm-tint-unread) !important; }
+html body a.notif-item.unread:hover { background: var(--pm-dk-bg-neutral, #F0F6FD) !important; }
 
 html body .notif-item.unread::before {
     left: 0.65rem !important;
@@ -474,13 +625,13 @@ html body .notif-dropdown-menu .notif-icon-box {
     margin-top: 0.05rem;
     font-size: 0.95rem;
     color: var(--tone) !important;
-    background: color-mix(in srgb, var(--tone) 10%, #FFFFFF) !important;
+    background: color-mix(in srgb, var(--tone) 10%, var(--pm-surface)) !important;
     border-radius: 8px;
     overflow: hidden;
 }
 
-html body .notif-dropdown-menu .notif-icon-box.appointment { --tone: #5D6E80; }
-html body .notif-dropdown-menu .notif-icon-box.lab         { --tone: #0B67B2; }
+html body .notif-dropdown-menu .notif-icon-box.appointment { --tone: #5E6873; }
+html body .notif-dropdown-menu .notif-icon-box.lab         { --tone: #175563; }
 html body .notif-dropdown-menu .notif-icon-box.xray        { --tone: #0E8A7E; }
 html body .notif-dropdown-menu .notif-icon-box.billing,
 html body .notif-dropdown-menu .notif-icon-box.payment     { --tone: #D0654A; }
@@ -490,7 +641,7 @@ html body .notif-dropdown-menu .notif-icon-box.is-avatar,
 html body .notif-dropdown-menu .notif-icon-box.is-initials {
     border-radius: 50% !important;
     color: var(--pm-text) !important;
-    background: #E3EAF2 !important;
+    background: var(--pm-avatar) !important;
     font-size: 0.7rem;
     font-weight: 600;
 }
@@ -610,7 +761,7 @@ html body .admin-content.is-entering { animation-duration: 0.15s; }
 html body .btn {
     --bs-btn-font-weight: 500;
     --bs-btn-border-radius: var(--pm-radius-sm);
-    --bs-btn-focus-box-shadow: 0 0 0 3px rgba(11, 103, 178, 0.25);
+    --bs-btn-focus-box-shadow: 0 0 0 3px rgba(23, 85, 99, 0.25);
     box-shadow: none;
 }
 
@@ -681,7 +832,7 @@ html body .form-control:focus,
 html body .form-select:focus,
 html body .form-check-input:focus {
     border-color: var(--pm-accent);
-    box-shadow: 0 0 0 3px rgba(11, 103, 178, 0.18);
+    box-shadow: 0 0 0 3px rgba(23, 85, 99, 0.18);
 }
 
 html body .form-check-input:checked {
@@ -698,8 +849,8 @@ html body .form-label {
 html body .table {
     --bs-table-color: var(--pm-text);
     --bs-table-border-color: var(--pm-line);
-    --bs-table-hover-bg: #F5F8FB;
-    --bs-table-striped-bg: #F8FAFC;
+    --bs-table-hover-bg: var(--pm-table-hover);
+    --bs-table-striped-bg: var(--pm-table-head);
 }
 
 html body .table > thead > tr > th {
@@ -708,7 +859,7 @@ html body .table > thead > tr > th {
     letter-spacing: 0.04em;
     text-transform: uppercase;
     color: var(--pm-text-muted);
-    background: #F8FAFC;
+    background: var(--pm-table-head);
     border-bottom-color: var(--pm-line);
 }
 
@@ -723,7 +874,7 @@ html body .badge.rounded-pill { border-radius: 999px; }
 html body .modal-content {
     border: 1px solid var(--pm-line);
     border-radius: 10px;
-    box-shadow: 0 16px 40px rgba(12, 45, 72, 0.18);
+    box-shadow: 0 16px 40px rgba(20, 45, 54, 0.18);
 }
 
 html body .modal-backdrop.show { opacity: 0.45; }
@@ -731,7 +882,7 @@ html body .modal-backdrop.show { opacity: 0.45; }
 html body .dropdown-menu {
     border-color: var(--pm-line);
     border-radius: var(--pm-radius);
-    box-shadow: 0 8px 24px rgba(12, 45, 72, 0.12);
+    box-shadow: 0 8px 24px rgba(20, 45, 54, 0.12);
 }
 
 html body .dropdown-item:active { background-color: var(--pm-accent); }
@@ -767,4 +918,485 @@ html body .alert {
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
     }
+}
+
+/* ==========================================================
+   SIDEBAR OPEN / CLOSE (all staff layouts)
+   Labels never squash while the width moves: on collapse they
+   fade out first, on expand they fade in once there is room.
+   The page content follows on the same curve.
+   ========================================================= */
+html body .admin-sidebar .menu-btn > span,
+html body .admin-sidebar .logo-text,
+html body .admin-sidebar .sidebar-toggle-btn span,
+html body .admin-sidebar .nav-section span {
+    transition: opacity 0.2s ease 0.12s,
+                max-width var(--sidebar-speed) var(--sidebar-ease);
+}
+
+html body .admin-sidebar.collapsed .menu-btn > span,
+html body .admin-sidebar.collapsed .logo-text,
+html body .admin-sidebar.collapsed .sidebar-toggle-btn span,
+html body .admin-sidebar.collapsed .nav-section span {
+    transition: opacity 0.1s ease,
+                max-width var(--sidebar-speed) var(--sidebar-ease);
+}
+
+html body .admin-sidebar {
+    transition: width var(--sidebar-speed) var(--sidebar-ease),
+                transform var(--sidebar-speed) var(--sidebar-ease),
+                box-shadow var(--sidebar-speed) var(--sidebar-ease);
+}
+
+html body .admin-main {
+    transition: margin-left var(--sidebar-speed) var(--sidebar-ease),
+                width var(--sidebar-speed) var(--sidebar-ease);
+}
+
+/* Phone drawer: the backdrop fades on the same timing as the slide */
+@media (max-width: 992px) {
+    html body .sidebar-backdrop {
+        transition: opacity var(--sidebar-speed) ease, visibility 0s linear var(--sidebar-speed);
+    }
+    html body.sidebar-open .sidebar-backdrop {
+        transition: opacity var(--sidebar-speed) ease, visibility 0s;
+    }
+}
+
+/* =========================================================
+   DARK MODE
+   Set on <html data-theme="dark"> by partials/theme_boot and
+   partials/theme_switch. Screen only: anything printed from a
+   dark-mode session still comes out on white paper.
+   ========================================================= */
+
+@media screen {
+    html[data-theme="dark"] {
+        color-scheme: dark;
+
+        /* Sidebar sinks a step deeper so the page still reads as the lit surface */
+        --pm-ink:          #0F2027;
+        --pm-ink-2:        #18303A;
+        --pm-ink-line:     rgba(255, 255, 255, 0.07);
+        --sb-bg-top:       #15303A;
+        --sb-bg-bottom:    #0A161B;
+        --sb-text:         #C9D6DB;
+        --sb-text-dim:     #8DA2AA;
+        --sb-heading:      #7F969E;
+        --sb-hover-bg:     rgba(255, 255, 255, 0.06);
+
+        /* Neutrals: blue-black, not pure black, so lines and depth stay visible */
+        --pm-canvas:       #0C1216;
+        --pm-surface:      #131B20;
+        --pm-subtle:       #19232A;
+        --pm-line:         #24313A;
+        --pm-line-strong:  #33434E;
+        --pm-text:         #E3E9EC;
+        --pm-text-soft:    #B4C0C6;
+        --pm-text-muted:   #85949C;
+
+        /* Mid teal fills buttons (white text stays readable); links use the brighter --bs-link-color */
+        --pm-accent:       #2F8FA0;
+        --pm-accent-hover: #3AA0B2;
+        --pm-accent-soft:  rgba(93, 183, 199, 0.12);
+        --pm-accent-line:  rgba(93, 183, 199, 0.32);
+        --pm-accent-on-ink:#8FD3DE;
+
+        --pm-danger:       #F97066;
+        --pm-warning:      #FDB022;
+        --pm-success:      #47CD89;
+
+        --pm-surface-top:  #161F25;
+        --pm-table-head:   #10181C;
+        --pm-table-hover:  rgba(255, 255, 255, 0.03);
+        --pm-accent-text:  #8AD6E2;
+        --pm-avatar:       #22303A;
+
+        /* Dark-only overrides for colours pages hard-code. Views write
+           var(--pm-dk-bg-red, #fef2f2): undefined in light mode, so the
+           original colour is used there unchanged. */
+        --pm-dk-surface:     var(--pm-surface);
+        --pm-dk-bg-neutral:  #1C272E;
+        --pm-dk-bg-teal:     rgba(93, 183, 199, 0.12);
+        --pm-dk-bg-blue:     rgba(128, 152, 249, 0.12);
+        --pm-dk-bg-violet:   rgba(155, 138, 251, 0.14);
+        --pm-dk-bg-green:    rgba(71, 205, 137, 0.10);
+        --pm-dk-bg-amber:    rgba(253, 176, 34, 0.10);
+        --pm-dk-bg-red:      rgba(249, 112, 102, 0.10);
+        --pm-dk-edge-neutral:#33434E;
+        --pm-dk-edge-teal:   rgba(93, 183, 199, 0.30);
+        --pm-dk-edge-blue:   rgba(128, 152, 249, 0.30);
+        --pm-dk-edge-green:  rgba(71, 205, 137, 0.28);
+        --pm-dk-edge-amber:  rgba(253, 176, 34, 0.28);
+        --pm-dk-edge-red:    rgba(249, 112, 102, 0.30);
+        --pm-dk-fg-teal:     #8AD6E2;
+        --pm-dk-fg-blue:     #A4BCFD;
+        --pm-dk-fg-violet:   #BDB4FE;
+        --pm-dk-fg-green:    #75E0A7;
+        --pm-dk-fg-amber:    #FEC84B;
+        --pm-dk-fg-red:      #FDA29B;
+        --pm-tint-unread:  rgba(93, 183, 199, 0.05);
+        --pm-tint-amber:   rgba(253, 176, 34, 0.10);
+        --pm-tint-red:     rgba(249, 112, 102, 0.10);
+        --pm-tint-green:   rgba(71, 205, 137, 0.10);
+        --pm-tint-blue:    rgba(128, 152, 249, 0.12);
+        --pm-tint-sea:     rgba(46, 211, 183, 0.10);
+
+        --bs-body-bg:      var(--pm-canvas);
+        --bs-body-color:   var(--pm-text);
+        --bs-secondary-color: var(--pm-text-muted);
+        --bs-tertiary-bg:  var(--pm-subtle);
+        --bs-secondary-bg: var(--pm-subtle);
+        --bs-border-color: var(--pm-line);
+        --bs-border-color-translucent: rgba(255, 255, 255, 0.08);
+        --bs-emphasis-color: #FFFFFF;
+        --bs-heading-color: var(--pm-text);
+        --bs-primary-bg-subtle: rgba(93, 183, 199, 0.12);
+        --bs-primary-border-subtle: rgba(93, 183, 199, 0.32);
+        --bs-primary-text-emphasis: #8FD3DE;
+        --bs-link-color:   #5DB7C7;
+        --bs-link-color-rgb: 93, 183, 199;
+        --bs-link-hover-color: #7FCAD6;
+        --bs-link-hover-color-rgb: 127, 202, 214;
+        --bs-box-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+
+    html[data-theme="dark"] body { background: var(--pm-canvas); color: var(--pm-text); }
+
+    /* Surfaces Bootstrap paints from its own variables */
+    html[data-theme="dark"] body .card,
+    html[data-theme="dark"] body .modal-content,
+    html[data-theme="dark"] body .dropdown-menu,
+    html[data-theme="dark"] body .offcanvas,
+    html[data-theme="dark"] body .list-group-item,
+    html[data-theme="dark"] body .admin-header {
+        background-color: var(--pm-surface);
+        border-color: var(--pm-line);
+        color: var(--pm-text);
+    }
+    html[data-theme="dark"] body .table {
+        --bs-table-bg: transparent;
+        --bs-table-color: var(--pm-text);
+        --bs-table-border-color: var(--pm-line);
+        --bs-table-striped-bg: rgba(255, 255, 255, 0.025);
+        --bs-table-hover-bg: rgba(255, 255, 255, 0.04);
+        --bs-table-hover-color: var(--pm-text);
+    }
+    html[data-theme="dark"] body .table > thead th { color: var(--pm-text-muted); }
+    :where(html[data-theme="dark"]) .form-control,
+    :where(html[data-theme="dark"]) .form-select {
+        background-color: var(--pm-subtle);
+        border-color: var(--pm-line-strong);
+        color: var(--pm-text);
+    }
+    html[data-theme="dark"] body .form-control::placeholder { color: #66757E; }
+    :where(html[data-theme="dark"]) .form-control:focus,
+    :where(html[data-theme="dark"]) .form-select:focus { background-color: var(--pm-surface); border-color: var(--pm-accent); }
+    html[data-theme="dark"] body .text-dark { color: var(--pm-text) !important; }
+    html[data-theme="dark"] body .bg-white,
+    html[data-theme="dark"] body .bg-light { background-color: var(--pm-surface) !important; }
+    html[data-theme="dark"] body .btn-light,
+    html[data-theme="dark"] body .btn-outline-secondary {
+        --bs-btn-bg: var(--pm-subtle); --bs-btn-color: var(--pm-text); --bs-btn-border-color: var(--pm-line-strong);
+        --bs-btn-hover-bg: #212D35; --bs-btn-hover-color: #FFFFFF; --bs-btn-hover-border-color: var(--pm-line-strong);
+    }
+    html[data-theme="dark"] body .btn-close { filter: invert(1) grayscale(1) brightness(1.6); }
+
+    html[data-theme="dark"] body ::selection { background: rgba(93, 183, 199, 0.35); color: #FFFFFF; }
+
+    /* Lead KPI card keeps its role as the one lit figure */
+    html[data-theme="dark"] .kpi-board .kpi-card.is-featured {
+        background: linear-gradient(135deg, #1D4A57 0%, #12313B 100%);
+        border-color: #22525F;
+    }
+}
+
+/* ----- Theme change motion -----
+   Circular reveal of the new theme from the switch (View Transitions API);
+   a short colour cross-fade where that isn't supported. */
+html.pm-vt::view-transition-old(root),
+html.pm-vt::view-transition-new(root) {
+    animation: none;
+    mix-blend-mode: normal;
+}
+html.pm-vt::view-transition-new(root) {
+    animation: pmReveal 0.62s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+@keyframes pmReveal {
+    from { clip-path: circle(0 at var(--vt-x, 50%) var(--vt-y, 0)); }
+    to   { clip-path: circle(var(--vt-r, 150vmax) at var(--vt-x, 50%) var(--vt-y, 0)); }
+}
+html.pm-theme-fading,
+html.pm-theme-fading body,
+html.pm-theme-fading body * {
+    transition: background-color 0.36s ease, color 0.36s ease, border-color 0.36s ease, fill 0.36s ease !important;
+}
+
+/* =========================================================
+   THEME SWITCH (partials/theme_switch.php)
+   Segmented pill: an ink thumb slides under the chosen side.
+   ========================================================= */
+
+html body .pm-theme-switch {
+    --pts-h: 34px;
+    --pts-pad: 3px;
+    --pts-bg: var(--pm-surface);
+    --pts-border: var(--pm-line-strong);
+    --pts-ink: #0E1418;
+    --pts-ink-text: #F3F6F8;
+    --pts-text: var(--pm-text-soft);
+    position: relative;
+    display: inline-grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+    flex: none;
+    height: var(--pts-h);
+    padding: var(--pts-pad);
+    margin: 0 0.4rem 0 0;
+    border: 1px solid var(--pts-border);
+    border-radius: 999px;
+    background: var(--pts-bg);
+    box-shadow: inset 0 1px 2px rgba(16, 24, 32, 0.06);
+    font-family: var(--pm-mono);
+    font-size: 0.68rem;
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    isolation: isolate;
+    transition: border-color 0.2s ease, background-color 0.3s ease;
+}
+html body .pm-theme-switch:hover { border-color: var(--pm-text-muted); }
+html body .pm-theme-switch:focus-visible { outline: 2px solid var(--pm-accent); outline-offset: 3px; }
+
+html body .pts-opt {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    padding: 0 0.8rem;
+    color: var(--pts-text);
+    white-space: nowrap;
+    transition: color 0.32s ease;
+}
+html body .pts-ic { flex: none; display: block; transition: transform 0.55s cubic-bezier(0.32, 0.72, 0, 1); }
+
+/* Light selected (default): the thumb sits under the right half */
+html body .pts-thumb {
+    position: absolute;
+    z-index: 0;
+    top: var(--pts-pad);
+    bottom: var(--pts-pad);
+    left: 50%;
+    width: calc(50% - var(--pts-pad));
+    border-radius: 999px;
+    background: var(--pts-ink);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18), 0 2px 6px rgba(0, 0, 0, 0.12);
+    transform: translateX(0);
+    transition: transform 0.48s cubic-bezier(0.32, 0.72, 0, 1), background-color 0.3s ease;
+}
+html body .pm-theme-switch .pts-light { color: var(--pts-ink-text); }
+html body .pm-theme-switch .pts-sun { transform: rotate(90deg); }
+
+/* Dark selected: the thumb travels left and the moon takes the ink */
+html body .pm-theme-switch[aria-checked="true"] .pts-thumb { transform: translateX(-100%); }
+html body .pm-theme-switch[aria-checked="true"] .pts-dark { color: var(--pts-ink-text); }
+html body .pm-theme-switch[aria-checked="true"] .pts-light { color: var(--pts-text); }
+html body .pm-theme-switch[aria-checked="true"] .pts-sun { transform: rotate(0deg); }
+html body .pm-theme-switch[aria-checked="true"] .pts-moon { transform: rotate(-20deg); }
+
+/* While travelling the thumb stretches a little and settles, like a physical slide */
+html body .pm-theme-switch.is-switching .pts-thumb { animation: ptsStretch 0.48s cubic-bezier(0.32, 0.72, 0, 1); }
+@keyframes ptsStretch {
+    0%   { scale: 1 1; }
+    40%  { scale: 1.14 0.92; }
+    100% { scale: 1 1; }
+}
+html body .pm-theme-switch:active .pts-thumb { scale: 0.97; }
+
+/* Dark mode inverts the ink: a pale thumb on a deep track */
+@media screen {
+    html[data-theme="dark"] body .pm-theme-switch {
+        --pts-bg: #0E151A;
+        --pts-border: #2C3A43;
+        --pts-ink: #E6ECEF;
+        --pts-ink-text: #0E1418;
+        --pts-text: #8A9AA3;
+        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+    }
+    html[data-theme="dark"] body .pm-theme-switch:hover { border-color: #3D4D58; }
+}
+
+@media (max-width: 768px) {
+    html body .pts-label { display: none; }
+    html body .pts-opt { padding: 0 0.55rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html body .pts-thumb,
+    html body .pts-ic,
+    html body .pts-opt { transition: none; }
+    html body .pm-theme-switch.is-switching .pts-thumb { animation: none; }
+}
+
+/* Black PNG glyphs (header title icon) turned light for dark mode */
+@media screen {
+    html[data-theme="dark"] body .header-title-icon { filter: invert(1) brightness(0.92); }
+}
+
+/* Dashboard data surfaces whose empty states are hard-coded pale greys */
+@media screen {
+    html[data-theme="dark"] body .cal-cell { background: #1A252C; }
+    html[data-theme="dark"] body .pie-track { fill: #1A252C; }
+    html[data-theme="dark"] body .rev-cell:not(.is-on) { background: #1C272E; }
+    html[data-theme="dark"] body .rev-col:hover .rev-cell:not(.is-on) { background: #26343C; }
+    html[data-theme="dark"] body .rev-range { background-color: var(--pm-subtle); color: var(--pm-text); border-color: var(--pm-line-strong); }
+}
+/* Heatmap on dark: busier days glow brighter (the light scale would invert the meaning) */
+@media screen {
+    html[data-theme="dark"] body .cal-cell.l1 { background: #1D4650; }
+    html[data-theme="dark"] body .cal-cell.l2 { background: #2A6E7D; }
+    html[data-theme="dark"] body .cal-cell.l3 { background: #3E9BAD; }
+    html[data-theme="dark"] body .cal-cell.l4 { background: #8AD6E2; }
+}
+
+/* =========================================================
+   DARK MODE · STATUS BADGES
+   Pale tinted chips glare on a dark table, so in dark mode
+   every status badge drops its fill and border and keeps only
+   the dot and a light, tone-coloured label.
+   ========================================================= */
+@media screen {
+    html[data-theme="dark"] body :is(.dx-status, .av-status, .lab-status, .inv-status, .pm-status,
+        .bl-status, .xv-status, .status-badge, .today-status, .rp-pill) {
+        --dk-fg: #B4C0C6;
+        --dk-dot: #7D8A92;
+        background: transparent !important;
+        border-color: transparent !important;
+        box-shadow: none !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        color: var(--dk-fg) !important;
+        --tone-dot: var(--dk-dot);
+        --dot: var(--dk-dot);
+        --pm-tone-dot: var(--dk-dot);
+        --xv-tone-dot: var(--dk-dot);
+    }
+    /* Dots drawn with currentColor would otherwise match the label exactly */
+    html[data-theme="dark"] body :is(.status-badge, .today-status)::before { background: var(--dk-dot) !important; opacity: 1 !important; }
+
+    /* Amber: waiting on someone */
+    html[data-theme="dark"] body :is(.dx-status--pending, .av-status--pending, .lab-status--pending,
+        .inv-status--unpaid, .pm-status--pending, .bl-status--unpaid, .xv-status--pending,
+        .status-badge.pending, .today-status--pending, .rp-pill--amber) { --dk-fg: #FEC84B; --dk-dot: #FDB022; }
+    /* Teal: approved / in progress */
+    html[data-theme="dark"] body :is(.dx-status--approved, .dx-status--progress, .av-status--approved,
+        .lab-status--progress, .inv-status--partial, .bl-status--partial, .xv-status--progress,
+        .status-badge.progress, .today-status--approved, .rp-pill--teal) { --dk-fg: #8AD6E2; --dk-dot: #4FB3C4; }
+    /* Blue / indigo: queued */
+    html[data-theme="dark"] body :is(.dx-status--queued, .status-badge.in_progress, .rp-pill--blue) { --dk-fg: #A4BCFD; --dk-dot: #8098F9; }
+    /* Green: done */
+    html[data-theme="dark"] body :is(.dx-status--completed, .av-status--completed, .lab-status--completed,
+        .inv-status--paid, .pm-status--paid, .bl-status--paid, .xv-status--completed,
+        .status-badge.completed, .today-status--completed, .rp-pill--green) { --dk-fg: #75E0A7; --dk-dot: #47CD89; }
+    /* Sea-green: released to patient */
+    html[data-theme="dark"] body :is(.dx-status--released, .lab-status--released, .xv-status--released,
+        .status-badge.released) { --dk-fg: #5FE9D0; --dk-dot: #2ED3B7; }
+    /* Red: late, refunded, STAT */
+    html[data-theme="dark"] body :is(.dx-status--late, .av-status--late, .inv-status--refunded,
+        .pm-status--refunded, .bl-status--refunded, .status-badge.stat, .today-status--late,
+        .rp-pill--red) { --dk-fg: #FDA29B; --dk-dot: #F97066; }
+}
+
+/* Payment-method chips follow the same dark-mode treatment: no fill, icon + tinted label */
+@media screen {
+    html[data-theme="dark"] body .pm-method {
+        background: transparent !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        color: #B4C0C6 !important;
+    }
+    html[data-theme="dark"] body .pm-method--cash      { color: #75E0A7 !important; }
+    html[data-theme="dark"] body .pm-method--card      { color: #A4BCFD !important; }
+    html[data-theme="dark"] body .pm-method--gcash     { color: #BDB4FE !important; }
+    html[data-theme="dark"] body .pm-method--paymaya   { color: #FEC84B !important; }
+    html[data-theme="dark"] body .pm-method--insurance { color: #8AD6E2 !important; }
+}
+
+/* =========================================================
+   PANEL SHAPE (both themes) · BORDERLESS PANELS (dark)
+   Panels and cards use soft 16px corners; items nested inside
+   a panel use 12px. Light mode keeps the hairline outlines;
+   dark mode drops them, so panels separate from the canvas by
+   surface tone alone and nested items sit on a lighter step.
+   ========================================================= */
+@media screen {
+    html body :is(
+        .card, .table-card, .today-card, .modal-content,
+        .av-card, .av-summary, .bl-panel, .chart-card, .appointments-card, .queue-card,
+        .dx-card, .dx-panel, .inv-card, .kpi-board .kpi-card, .kpi-board .pipeline-card,
+        .lab-card, .nc-panel, .ni-card, .ni-results, .pf-card, .pm-panel, .pt-panel, .sv-panel,
+        .rep-filters, .rep-kpis, .rp-card, .rp-filters, .rp-kpis, .tx-bar, .tx-card,
+        .xv-card, .xv-dialog, .xv-empty, .bulk-modal
+    ) {
+        border-radius: 16px !important;
+    }
+    html body :is(.pending-item, .lab-row, .lab-ordered-item, .ni-choice, .dx-assign-opt, .av-day,
+        .kpi-board .stage, .av-fieldset) {
+        border-radius: 12px !important;
+    }
+
+    html[data-theme="dark"] body :is(
+        .card, .table-card, .today-card, .modal-content,
+        .av-card, .av-summary, .bl-panel, .chart-card, .appointments-card, .queue-card,
+        .dx-card, .dx-panel, .inv-card, .kpi-board .kpi-card, .kpi-board .pipeline-card,
+        .lab-card, .nc-panel, .ni-card, .ni-results, .pf-card, .pm-panel, .pt-panel, .sv-panel,
+        .rep-filters, .rep-kpis, .rp-card, .rp-filters, .rp-kpis, .tx-bar, .tx-card,
+        .xv-card, .xv-dialog, .xv-empty, .bulk-modal
+    ) {
+        border-color: transparent !important;
+        box-shadow: none !important;
+    }
+
+    /* Nested items: a lighter step, no outline */
+    html[data-theme="dark"] body :is(.pending-item, .lab-row, .lab-ordered-item, .ni-choice, .dx-assign-opt,
+        .kpi-board .stage, .av-fieldset) {
+        background: var(--pm-subtle) !important;
+        border-color: transparent !important;
+    }
+    html[data-theme="dark"] body .kpi-board a.stage:hover { background: #1F2B33 !important; }
+    /* Without a border the legend can't sit on the edge; it becomes the group's heading */
+    html[data-theme="dark"] body .av-fieldset > legend { float: left; width: 100%; margin: 0 0 .55rem; padding: 0; }
+    html[data-theme="dark"] body .av-fieldset > legend + * { clear: both; }
+}
+
+/* Dark mode: coloured avatars and notification icon tiles become tinted, not pale */
+@media screen {
+    html[data-theme="dark"] body .pm-avatar--male   { background: rgba(128, 152, 249, 0.16) !important; color: #A4BCFD !important; }
+    html[data-theme="dark"] body .pm-avatar--female { background: rgba(246, 112, 152, 0.16) !important; color: #FDA4BC !important; }
+    html[data-theme="dark"] body .notif-dropdown-menu .notif-icon-box.is-avatar   { background: rgba(128, 152, 249, 0.16) !important; }
+    html[data-theme="dark"] body .notif-dropdown-menu .notif-icon-box.appointment { background: rgba(46, 211, 183, 0.14) !important; color: #5FE9D0 !important; }
+    html[data-theme="dark"] body .notif-dropdown-menu .notif-icon-box.xray        { background: rgba(155, 138, 251, 0.16) !important; color: #BDB4FE !important; }
+    html[data-theme="dark"] body .notif-dropdown-menu .notif-icon-box.lab         { background: rgba(71, 205, 137, 0.14) !important; color: #75E0A7 !important; }
+}
+@media screen {
+    html[data-theme="dark"] body .av-day:not(.is-holiday):not(.is-today) { background: var(--pm-subtle); border-color: transparent; }
+    html[data-theme="dark"] body .av-day.is-holiday { border-color: transparent; }
+    html[data-theme="dark"] body :is(.av-day-tag--closed, .av-day-tag--holiday, .av-day-tag--full) { background: transparent !important; padding-left: 0; }
+    html[data-theme="dark"] body .av-day-tag--holiday { color: #FDA29B !important; }
+    html[data-theme="dark"] body .av-day-tag--full    { color: #FEC84B !important; }
+}
+
+/* Dark mode: booking-source chips (Online / Walk-in) read like status badges */
+@media screen {
+    html[data-theme="dark"] body .dx-src { background: transparent !important; padding-left: 0 !important; padding-right: 0 !important; }
+    html[data-theme="dark"] body .dx-src--online { color: #8AD6E2 !important; }
+    html[data-theme="dark"] body .dx-src--walkin { color: #FEC84B !important; }
+    html[data-theme="dark"] body .pt-source--online  { --src: #4FB3C4; }
+    html[data-theme="dark"] body .pt-source--walk-in { --src: #FDB022; }
 }

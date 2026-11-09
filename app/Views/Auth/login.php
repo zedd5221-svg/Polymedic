@@ -50,8 +50,8 @@ $roles = [
            ========================================================= */
         :root {
             --blue-700: #063F6E;
-            --blue-600: #08528F;
-            --blue-500: #0B67B2;
+            --blue-600: #10404B;
+            --blue-500: #175563;
             --blue-400: #3c9bf0;
             --blue-200: #9DC4E8;
             --blue-50:  #e8f1fc;
@@ -143,7 +143,7 @@ $roles = [
            LEFT PANEL
            ========================================================= */
         .left-panel {
-            background: linear-gradient(150deg, #1c7ed6 0%, #08528F 46%, #0b3f8f 100%);
+            background: linear-gradient(150deg, #1c7ed6 0%, #10404B 46%, #0b3f8f 100%);
             padding: 2.9rem 2.6rem;
             display: flex;
             flex-direction: column;
@@ -410,7 +410,7 @@ $roles = [
         .form-select:focus {
             border-color: var(--blue-500);
             background: #ffffff;
-            box-shadow: 0 0 0 4px rgba(11, 103, 178, 0.13);
+            box-shadow: 0 0 0 4px rgba(23, 85, 99, 0.13);
             outline: none;
         }
 
@@ -533,13 +533,13 @@ $roles = [
             gap: 0.55rem;
             cursor: pointer;
             overflow: hidden;
-            box-shadow: 0 8px 20px rgba(11, 103, 178, 0.30);
+            box-shadow: 0 8px 20px rgba(23, 85, 99, 0.30);
             transition: transform 0.25s var(--spring), box-shadow 0.25s ease, filter 0.2s ease;
         }
 
         .btn-login:hover {
             transform: translateY(-2px);
-            box-shadow: 0 12px 26px rgba(11, 103, 178, 0.38);
+            box-shadow: 0 12px 26px rgba(23, 85, 99, 0.38);
             filter: saturate(1.08);
         }
 
@@ -695,7 +695,7 @@ $roles = [
             align-items: center;
             justify-content: center;
             margin-bottom: 1rem;
-            box-shadow: 0 0 0 10px rgba(11, 103, 178, 0.10);
+            box-shadow: 0 0 0 10px rgba(23, 85, 99, 0.10);
             transform: scale(0.4);
         }
 

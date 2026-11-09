@@ -78,6 +78,65 @@ class PatientModel extends Model
     }
     
     /**
+     * Find the patient on file who is the same person, or null.
+     *
+     * The name must match (case and spacing ignored). Email and phone are
+     * NOT identity on their own: families share one phone or inbox, and a
+     * parent books for a child, so "same phone" alone used to hand one
+     * person another person's patient code and medical records.
+     *
+     * With the name matching, the first of these wins:
+     *   1. same age and gender
+     *   2. same age
+     *   3. same email or phone (age may have moved on since the last visit)
+     * A bare name match with nothing else agreeing is treated as a
+     * different person (common names), and a new record is created.
+     */
+    public function findSamePerson(string $fullName, $age, string $gender, string $email = '', string $phone = ''): ?array
+    {
+        $norm = static fn ($s) => preg_replace('/\s+/', ' ', strtolower(trim((string) $s)));
+        $name = $norm($fullName);
+        if ($name === '') {
+            return null;
+        }
+
+        $candidates = array_values(array_filter(
+            $this->where('LOWER(TRIM(full_name))', $name)->findAll(),
+            static fn ($p) => $norm($p['full_name'] ?? '') === $name
+        ));
+        if ($candidates === []) {
+            // Same name with odd internal spacing ("Juan  Cruz") still counts
+            $first = strtok($name, ' ');
+            $candidates = array_values(array_filter(
+                $this->like('full_name', $first, 'after')->findAll(),
+                static fn ($p) => $norm($p['full_name'] ?? '') === $name
+            ));
+        }
+        if ($candidates === []) {
+            return null;
+        }
+
+        $sameAge    = static fn ($p) => $age !== null && $age !== '' && (string) ($p['age'] ?? '') === (string) $age;
+        $sameGender = static fn ($p) => $gender !== '' && strcasecmp((string) ($p['gender'] ?? ''), $gender) === 0;
+        $sameReach  = static fn ($p) => ($email !== '' && strcasecmp(trim((string) ($p['email'] ?? '')), $email) === 0)
+                                     || ($phone !== '' && trim((string) ($p['phone'] ?? '')) === $phone);
+
+        foreach ([
+            static fn ($p) => $sameAge($p) && $sameGender($p),
+            $sameAge,
+            $sameReach,
+        ] as $test) {
+            foreach ($candidates as $p) {
+                if ($test($p)) {
+                    return $p;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Find existing patient or create from appointment data (Online Booking)
      * FIXED: Properly creates patient records from online appointments
      */
@@ -94,32 +153,9 @@ class PatientModel extends Model
             return null;
         }
         
-        // ---- STEP 1: Try to find existing by email ----
-        $patient = null;
-        if (!empty($email)) {
-            $patient = $this->where('email', $email)->first();
-        }
-        
-        // ---- STEP 2: Try by phone ----
-        if (!$patient && !empty($phone)) {
-            $patient = $this->where('phone', $phone)->first();
-        }
-        
-        // ---- STEP 3: Try by name + age + gender ----
-        if (!$patient) {
-            $patient = $this->where('full_name', $fullName)
-                           ->where('age', $age)
-                           ->where('gender', $gender)
-                           ->first();
-        }
-        
-        // ---- STEP 4: Try by name + age only (fallback) ----
-        if (!$patient) {
-            $patient = $this->where('full_name', $fullName)
-                           ->where('age', $age)
-                           ->first();
-        }
-        
+        // ---- STEPS 1-4: same person already on file? (name must match) ----
+        $patient = $this->findSamePerson($fullName, $age, $gender, $email, $phone);
+
         // ---- STEP 5: If patient exists, update and return ----
         if ($patient) {
             $update = [];
@@ -198,32 +234,9 @@ class PatientModel extends Model
             return null;
         }
         
-        // ---- STEP 1: Try to find existing by email ----
-        $patient = null;
-        if (!empty($email)) {
-            $patient = $this->where('email', $email)->first();
-        }
-        
-        // ---- STEP 2: Try by phone ----
-        if (!$patient && !empty($phone)) {
-            $patient = $this->where('phone', $phone)->first();
-        }
-        
-        // ---- STEP 3: Try by name + age + gender ----
-        if (!$patient) {
-            $patient = $this->where('full_name', $fullName)
-                           ->where('age', $age)
-                           ->where('gender', $gender)
-                           ->first();
-        }
-        
-        // ---- STEP 4: Try by name + age only (fallback) ----
-        if (!$patient) {
-            $patient = $this->where('full_name', $fullName)
-                           ->where('age', $age)
-                           ->first();
-        }
-        
+        // ---- STEPS 1-4: same person already on file? (name must match) ----
+        $patient = $this->findSamePerson($fullName, $age, $gender, $email, $phone);
+
         // ---- STEP 5: If patient exists, update source to walk-in ----
         if ($patient) {
             $update = [];

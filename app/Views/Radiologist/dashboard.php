@@ -74,6 +74,7 @@ foreach ($pendingExaminations as $exam) {
    KPI BOARD (shared partial: partials/kpi_board, same as Admin)
    ------------------------------------------------------------------ */
 $kpiBoard = [
+    'featured' => true,
     'trends' => $kpiTrends ?? [],
     'cards'  => [
         [
@@ -508,20 +509,20 @@ $kpiBoard = [
    ========================================================= */
 
 .dashboard-container {
-    --db-accent:      var(--pm-accent, #0B67B2);
-    --db-accent-dark: var(--pm-accent-hover, #08528F);
-    --db-accent-soft: var(--pm-accent-soft, #E8F1FA);
+    --db-accent:      var(--pm-accent, #175563);
+    --db-accent-dark: var(--pm-accent-hover, #10404B);
+    --db-accent-soft: var(--pm-accent-soft, #EBF2F4);
 
     --db-ink:         var(--pm-text, #10202E);
     --db-ink-soft:    var(--pm-text-soft, #3B4C5E);
     --db-ink-mute:    var(--pm-text-muted, #5D6E80);
-    --db-ink-faint:   #8496A8;
+    --db-ink-faint:   var(--pm-text-muted);
 
     --db-line:        var(--pm-line, #DDE4EC);
-    --db-line-soft:   #EBF0F5;
-    --db-surface:     #ffffff;
+    --db-line-soft:   var(--pm-line);
+    --db-surface:     var(--pm-surface);
     --db-canvas:      var(--pm-canvas, #F3F6F9);
-    --db-rail:        #F8FAFC;
+    --db-rail:        var(--pm-subtle);
 
     --db-amber:       #b45309;
     --db-green:       #067a55;
@@ -671,7 +672,7 @@ $kpiBoard = [
 
 .dashboard-container .service-list::-webkit-scrollbar { width: 6px; }
 .dashboard-container .service-list::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
+    background: var(--pm-dk-bg-blue, #cbd5e1);
     border-radius: 3px;
 }
 .dashboard-container .service-list::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
@@ -689,7 +690,7 @@ $kpiBoard = [
     transition: background-color 0.15s ease;
 }
 
-.dashboard-container .service-list-item:hover { background: #eef2f7; }
+.dashboard-container .service-list-item:hover { background: var(--pm-dk-bg-neutral, #eef2f7); }
 
 .dashboard-container .service-list-name {
     font-size: 0.8125rem;
@@ -896,11 +897,11 @@ $kpiBoard = [
     flex-shrink: 0;
 }
 
-.dashboard-container .status-badge.pending   { background: #fdf6ec; color: var(--db-amber); border-color: #f4e2c4; }
-.dashboard-container .status-badge.progress  { background: var(--db-accent-soft); color: var(--db-accent); border-color: #d3e0fb; }
-.dashboard-container .status-badge.completed { background: #eefaf4; color: var(--db-green); border-color: #c6ebda; }
-.dashboard-container .status-badge.released  { background: #f0fdfa; color: var(--db-teal); border-color: #cdeae4; }
-.dashboard-container .status-badge.stat      { background: #fdeef0; color: var(--db-red); border-color: #f4d2d5; }
+.dashboard-container .status-badge.pending   { background: var(--pm-dk-bg-amber, #fdf6ec); color: var(--db-amber); border-color: var(--pm-dk-edge-amber, #f4e2c4); }
+.dashboard-container .status-badge.progress  { background: var(--db-accent-soft); color: var(--db-accent); border-color: var(--pm-dk-edge-blue, #d3e0fb); }
+.dashboard-container .status-badge.completed { background: var(--pm-dk-bg-green, #eefaf4); color: var(--db-green); border-color: var(--pm-dk-edge-green, #c6ebda); }
+.dashboard-container .status-badge.released  { background: var(--pm-dk-bg-teal, #f0fdfa); color: var(--db-teal); border-color: var(--pm-dk-edge-teal, #cdeae4); }
+.dashboard-container .status-badge.stat      { background: var(--pm-dk-bg-red, #fdeef0); color: var(--db-red); border-color: var(--pm-dk-edge-red, #f4d2d5); }
 
 .dashboard-container .action-cell {
     display: flex;
@@ -925,8 +926,8 @@ $kpiBoard = [
 }
 
 .dashboard-container .action-icon-btn:hover          { background: var(--db-line-soft); color: var(--db-ink); }
-.dashboard-container .action-icon-btn.view:hover     { background: var(--db-accent-soft); color: var(--db-accent); border-color: #d3e0fb; }
-.dashboard-container .action-icon-btn.complete:hover { background: #eefaf4; color: var(--db-green); border-color: #c6ebda; }
+.dashboard-container .action-icon-btn.view:hover     { background: var(--db-accent-soft); color: var(--db-accent); border-color: var(--pm-dk-edge-blue, #d3e0fb); }
+.dashboard-container .action-icon-btn.complete:hover { background: var(--pm-dk-bg-green, #eefaf4); color: var(--db-green); border-color: var(--pm-dk-edge-green, #c6ebda); }
 
 .dashboard-container .table-filter-footer {
     display: flex;
@@ -987,7 +988,7 @@ $kpiBoard = [
 
 .dashboard-container .refresh-btn:hover {
     background: var(--db-canvas);
-    border-color: #cbd5e1;
+    border-color: var(--pm-line);
     color: var(--db-ink);
 }
 
@@ -1096,7 +1097,7 @@ $kpiBoard = [
 }
 
 @media print {
-    .dashboard-container { background: #ffffff; padding: 0; min-height: 0; }
+    .dashboard-container { background: var(--pm-surface); padding: 0; min-height: 0; }
     .dashboard-container .charts-row,
     .dashboard-container .action-cell,
     .dashboard-container .table-filter-footer,
@@ -1106,11 +1107,11 @@ $kpiBoard = [
 /* =========================================================
    CHARTS — throughput, turnaround, catalogue
    Series colours are validated as a pair (dataviz validator,
-   light surface): requested #0B67B2, released #009A85.
+   light surface): requested #175563, released #009A85.
    ========================================================= */
 
 .dashboard-container {
-    --tp-req: #0B67B2;
+    --tp-req: #175563;
     --tp-rel: #009A85;
 }
 
@@ -1323,7 +1324,7 @@ $kpiBoard = [
             data: {
                 labels: tpLabels,
                 datasets: [
-                    Object.assign({ label: 'Requested', data: tpRequested, backgroundColor: '#0B67B2', hoverBackgroundColor: '#08528F' }, bar),
+                    Object.assign({ label: 'Requested', data: tpRequested, backgroundColor: '#175563', hoverBackgroundColor: '#10404B' }, bar),
                     Object.assign({ label: 'Released',  data: tpReleased,  backgroundColor: '#009A85', hoverBackgroundColor: '#007D6C' }, bar)
                 ]
             },

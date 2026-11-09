@@ -87,27 +87,11 @@ foreach ($appointmentList as $appt) {
 
 <div class="dx">
 
-    <?php if (session()->getFlashdata('success')): ?>
-        <div class="dx-alert dx-alert--success alert alert-dismissible fade show" role="status">
-            <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
-            <span><?= esc(session()->getFlashdata('success')) ?></span>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss"></button>
-        </div>
-    <?php endif; ?>
-
-    <?php if (session()->getFlashdata('error')): ?>
-        <div class="dx-alert dx-alert--error alert alert-dismissible fade show" role="alert">
-            <i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i>
-            <span><?= esc(session()->getFlashdata('error')) ?></span>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss"></button>
-        </div>
-    <?php endif; ?>
-
 
     <!-- PAGE HEADER -->
     <header class="dx-head">
         <div>
-            <h2 class="dx-title">Appointments</h2>
+          
         </div>
 
         <div class="dx-head-actions">
@@ -448,64 +432,116 @@ foreach ($appointmentList as $appt) {
             </header>
             <form method="post" action="<?= base_url('receptionist/appointment/override-book') ?>" class="ovr-modal__body">
                 <?= csrf_field() ?>
-                <p class="ovr-warn">
-                    <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
-                    Override booking creates an <strong>approved</strong> appointment only.
-                    It does <strong>not</strong> create diagnostic requests or payments — use the
-                    normal Approve button afterwards to generate them.
+                <?php
+                    $oldLab  = (array) (old('lab_services')  ?? []);
+                    $oldXray = (array) (old('xray_services') ?? []);
+                    $oldType = old('service_type') ?: 'laboratory';
+                ?>
+                <p class="ovr-note">
+                    <i class="bi bi-info-circle" aria-hidden="true"></i>
+                    <span>Books the patient even when the slot is <strong>full or blocked</strong>.
+                    The booking is approved straight away and the lab / X-ray requests are created,
+                    so the department sees the patient right away. Closed days and past dates still can't be booked.</span>
                 </p>
 
-                <div class="ovr-grid">
-                    <div class="ovr-row">
-                        <label for="ovrDate">Date</label>
-                        <input type="date" id="ovrDate" name="appointment_date" class="dx-input" required>
+                <fieldset class="ovr-section">
+                    <legend>When</legend>
+                    <div class="ovr-grid">
+                        <div class="ovr-row">
+                            <label for="ovrType">Department</label>
+                            <select id="ovrType" name="service_type" class="dx-select" required>
+                                <option value="laboratory" <?= $oldType === 'laboratory' ? 'selected' : '' ?>>Laboratory</option>
+                                <option value="xray" <?= $oldType === 'xray' ? 'selected' : '' ?>>X-Ray</option>
+                                <option value="both" <?= $oldType === 'both' ? 'selected' : '' ?>>Both</option>
+                            </select>
+                        </div>
+                        <div class="ovr-row">
+                            <label for="ovrDate">Date</label>
+                            <input type="date" id="ovrDate" name="appointment_date" class="dx-input" value="<?= esc(old('appointment_date') ?? '', 'attr') ?>" min="<?= date('Y-m-d') ?>" required>
+                        </div>
+                        <div class="ovr-row ovr-row--wide">
+                            <label for="ovrTime">Time</label>
+                            <select id="ovrTime" name="appointment_time" class="dx-select" data-old="<?= esc(old('appointment_time') ?? '', 'attr') ?>" required>
+                                <option value="">Pick a date first</option>
+                            </select>
+                            <small class="ovr-hint" id="ovrTimeHint">Full and blocked times are listed too. That's what the override is for.</small>
+                        </div>
                     </div>
-                    <div class="ovr-row">
-                        <label for="ovrTime">Time</label>
-                        <select id="ovrTime" name="appointment_time" class="dx-select" required>
-                            <option value="">Select time</option>
-                        </select>
+                </fieldset>
+
+                <fieldset class="ovr-section">
+                    <legend>Patient</legend>
+                    <div class="ovr-grid">
+                        <div class="ovr-row ovr-row--wide">
+                            <label for="ovrName">Full name</label>
+                            <input type="text" id="ovrName" name="full_name" class="dx-input" value="<?= esc(old('full_name') ?? '', 'attr') ?>" autocomplete="off" required>
+                        </div>
+                        <div class="ovr-row">
+                            <label for="ovrAge">Age</label>
+                            <input type="number" id="ovrAge" name="age" class="dx-input" min="0" max="130" value="<?= esc(old('age') ?? '', 'attr') ?>" required>
+                        </div>
+                        <div class="ovr-row">
+                            <label for="ovrGender">Sex</label>
+                            <select id="ovrGender" name="gender" class="dx-select" required>
+                                <option value="">Select</option>
+                                <?php foreach (['Male', 'Female', 'Other'] as $g): ?>
+                                    <option value="<?= $g ?>" <?= old('gender') === $g ? 'selected' : '' ?>><?= $g ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="ovr-row">
+                            <label for="ovrPhone">Phone <span class="ovr-opt">optional</span></label>
+                            <input type="tel" id="ovrPhone" name="phone" class="dx-input" value="<?= esc(old('phone') ?? '', 'attr') ?>" inputmode="tel">
+                        </div>
+                        <div class="ovr-row">
+                            <label for="ovrEmail">Email <span class="ovr-opt">optional</span></label>
+                            <input type="email" id="ovrEmail" name="email" class="dx-input" value="<?= esc(old('email') ?? '', 'attr') ?>">
+                        </div>
                     </div>
-                    <div class="ovr-row">
-                        <label for="ovrType">Service</label>
-                        <select id="ovrType" name="service_type" class="dx-select" required>
-                            <option value="laboratory">Laboratory</option>
-                            <option value="xray">X-Ray</option>
-                            <option value="both">Both</option>
-                        </select>
+                </fieldset>
+
+                <fieldset class="ovr-section">
+                    <legend>Tests</legend>
+                    <div class="ovr-svc" data-dept="laboratory">
+                        <p class="ovr-svc-title"><i class="bi bi-droplet" aria-hidden="true"></i> Laboratory</p>
+                        <div class="ovr-svc-grid">
+                            <?php foreach ($labServices ?? [] as $svc): $n = (string) $svc['service_name']; ?>
+                                <label class="ovr-check">
+                                    <input type="checkbox" name="lab_services[]" value="<?= esc($n, 'attr') ?>" <?= in_array($n, $oldLab, true) ? 'checked' : '' ?>>
+                                    <span><?= esc($n) ?></span>
+                                </label>
+                            <?php endforeach; ?>
+                        </div>
                     </div>
-                    <div class="ovr-row">
-                        <label for="ovrName">Patient name</label>
-                        <input type="text" id="ovrName" name="full_name" class="dx-input" required>
+                    <div class="ovr-svc" data-dept="xray">
+                        <p class="ovr-svc-title"><i class="bi bi-radioactive" aria-hidden="true"></i> X-Ray</p>
+                        <div class="ovr-svc-grid">
+                            <?php foreach ($xrayServices ?? [] as $svc): $n = (string) $svc['service_name']; ?>
+                                <label class="ovr-check">
+                                    <input type="checkbox" name="xray_services[]" value="<?= esc($n, 'attr') ?>" <?= in_array($n, $oldXray, true) ? 'checked' : '' ?>>
+                                    <span><?= esc($n) ?></span>
+                                </label>
+                            <?php endforeach; ?>
+                        </div>
                     </div>
-                    <div class="ovr-row">
-                        <label for="ovrAge">Age</label>
-                        <input type="number" id="ovrAge" name="age" class="dx-input" min="0" max="120" required>
+                    <p class="ovr-hint" id="ovrSvcCount" aria-live="polite">No tests picked yet</p>
+                </fieldset>
+
+                <fieldset class="ovr-section">
+                    <legend>Why override?</legend>
+                    <div class="ovr-row ovr-row--wide">
+                        <label for="ovrReason" class="visually-hidden">Reason for override</label>
+                        <textarea id="ovrReason" name="override_reason" class="dx-input ovr-reason" rows="2" minlength="5" maxlength="255"
+                                  placeholder="e.g. Urgent referral from Dr. Santos, patient already at the counter" required><?= esc(old('override_reason') ?? '') ?></textarea>
+                        <small class="ovr-hint">Saved on the booking with your name, so the slot overbooking can be traced.</small>
                     </div>
-                    <div class="ovr-row">
-                        <label for="ovrGender">Gender</label>
-                        <select id="ovrGender" name="gender" class="dx-select" required>
-                            <option value="">Select</option>
-                            <option value="Male">Male</option>
-                            <option value="Female">Female</option>
-                            <option value="Other">Other</option>
-                        </select>
-                    </div>
-                    <div class="ovr-row">
-                        <label for="ovrPhone">Phone</label>
-                        <input type="text" id="ovrPhone" name="phone" class="dx-input">
-                    </div>
-                    <div class="ovr-row">
-                        <label for="ovrEmail">Email</label>
-                        <input type="email" id="ovrEmail" name="email" class="dx-input">
-                    </div>
-                </div>
+                </fieldset>
 
                 <div class="ovr-actions">
                     <button type="button" class="dx-btn" data-close="ovrBookModal">Cancel</button>
                     <button type="submit" class="dx-btn dx-btn--primary">
-                        <i class="bi bi-shield-exclamation" aria-hidden="true"></i>
-                        Create override
+                        <i class="bi bi-shield-check" aria-hidden="true"></i>
+                        Book and approve
                     </button>
                 </div>
             </form>
@@ -528,23 +564,23 @@ foreach ($appointmentList as $appt) {
     --dx-ink:         var(--pm-text, #10202E);
     --dx-text:        var(--pm-text-soft, #3B4C5E);
     --dx-muted:       var(--pm-text-muted, #5D6E80);
-    --dx-faint:       #7A8B9D;
+    --dx-faint:       var(--pm-text-muted);
     --dx-line:        var(--pm-line, #DDE4EC);
     --dx-line-strong: var(--pm-line-strong, #C3CFDB);
-    --dx-line-soft:   #EBF0F5;
-    --dx-surface:     #FFFFFF;
-    --dx-subtle:      #F8FAFC;
-    --dx-row-hover:   #F5F8FB;
-    --dx-accent:      var(--pm-accent, #0B67B2);
-    --dx-accent-dark: var(--pm-accent-hover, #08528F);
-    --dx-accent-soft: var(--pm-accent-soft, #E8F1FA);
+    --dx-line-soft:   var(--pm-line);
+    --dx-surface:     var(--pm-surface);
+    --dx-subtle:      var(--pm-subtle);
+    --dx-row-hover:   var(--pm-subtle);
+    --dx-accent:      var(--pm-accent, #175563);
+    --dx-accent-dark: var(--pm-accent-hover, #10404B);
+    --dx-accent-soft: var(--pm-accent-soft, #EBF2F4);
     --dx-success:     #067647;
     --dx-success-dark:#055C38;
     --dx-danger:      #B42318;
     --dx-danger-dark: #912018;
     --dx-radius:      8px;
     --dx-radius-sm:   6px;
-    --dx-ring:        0 0 0 3px rgba(11, 103, 178, 0.2);
+    --dx-ring:        0 0 0 3px rgba(23, 85, 99, 0.2);
     --dx-mono:        var(--pm-mono, ui-monospace, monospace);
 
     color: var(--dx-text);
@@ -573,8 +609,8 @@ foreach ($appointmentList as $appt) {
 .dx-alert > span { flex: 1; min-width: 0; }
 .dx-alert.alert-dismissible { padding-right: 0.75rem; }
 .dx-alert .btn-close { position: static; padding: 0.5rem; margin-left: auto; font-size: 0.7rem; }
-.dx-alert--success { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
-.dx-alert--error   { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+.dx-alert--success { background: var(--pm-dk-bg-green, #f0fdf4); border-color: var(--pm-dk-edge-green, #bbf7d0); color: var(--pm-dk-fg-green, #166534); }
+.dx-alert--error   { background: var(--pm-dk-bg-red, #fef2f2); border-color: var(--pm-dk-edge-red, #fecaca); color: var(--pm-dk-fg-red, #991b1b); }
 
 /* ---------- Page header ---------- */
 
@@ -625,7 +661,7 @@ foreach ($appointmentList as $appt) {
     transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.dx-btn:hover { background: var(--dx-subtle); border-color: #cbd5e1; color: var(--dx-ink); }
+.dx-btn:hover { background: var(--dx-subtle); border-color: var(--pm-line); color: var(--dx-ink); }
 .dx-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .dx-btn i { font-size: 0.9em; }
 
@@ -974,7 +1010,7 @@ foreach ($appointmentList as $appt) {
     background: var(--kind, var(--dx-faint));
 }
 
-.dx-kind--lab  { --kind: #0B67B2; }
+.dx-kind--lab  { --kind: #175563; }
 .dx-kind--xray { --kind: #0E8A7E; }
 .dx-kind--both { --kind: #D29A1E; }
 
@@ -1063,7 +1099,7 @@ foreach ($appointmentList as $appt) {
 
 .dx-menu .dx-menu-danger:hover,
 .dx-menu .dx-menu-danger:focus {
-    background: #fef2f2;
+    background: var(--pm-dk-bg-red, #fef2f2);
     color: var(--dx-danger-dark);
 }
 
@@ -1109,9 +1145,9 @@ foreach ($appointmentList as $appt) {
 }
 
 .dx-status--pending   { --tone-bg: #FEF6E7; --tone-fg: #93370D; --tone-dot: #DC6803; }
-.dx-status--approved  { --tone-bg: #E8F1FA; --tone-fg: #08528F; --tone-dot: #0B67B2; }
+.dx-status--approved  { --tone-bg: #EBF2F4; --tone-fg: #10404B; --tone-dot: #175563; }
 .dx-status--completed { --tone-bg: #ECFDF3; --tone-fg: #067647; --tone-dot: #17B26A; }
-.dx-status--cancelled { --tone-bg: #F2F4F7; --tone-fg: #475467; --tone-dot: #98A2B3; }
+.dx-status--cancelled { --tone-bg: var(--pm-subtle); --tone-fg: #475467; --tone-dot: #98A2B3; }
 .dx-status--late      { --tone-bg: #FEF3F2; --tone-fg: #B42318; --tone-dot: #F04438; }
 
 /* ---------- Empty states and footer ---------- */
@@ -1166,9 +1202,9 @@ foreach ($appointmentList as $appt) {
     cursor: pointer;
 }
 
-.dx-page:hover:not(:disabled) { background: var(--dx-subtle); border-color: #cbd5e1; }
+.dx-page:hover:not(:disabled) { background: var(--dx-subtle); border-color: var(--pm-line); }
 .dx-page:disabled { opacity: 0.45; cursor: not-allowed; }
-.dx-page[aria-current="page"] { color: var(--dx-accent); background: var(--dx-accent-soft); border-color: #C6DCF1; }
+.dx-page[aria-current="page"] { color: var(--dx-accent); background: var(--dx-accent-soft); border-color: var(--pm-dk-edge-teal, #C5DCE0); }
 .dx-page-gap { min-width: 20px; text-align: center; color: var(--dx-faint); }
 
 /* ---------- Toast ---------- */
@@ -1185,7 +1221,7 @@ foreach ($appointmentList as $appt) {
     padding: 0.7rem 1rem;
     font-size: 0.8125rem;
     color: #f8fafc;
-    background: var(--pm-ink, #0C2D48);
+    background: var(--pm-ink, #142D36);
     border-radius: 9px;
     box-shadow: 0 12px 28px -8px rgba(15, 23, 42, 0.45);
 }
@@ -1254,6 +1290,110 @@ foreach ($appointmentList as $appt) {
 
     .dx-panel { border: 0; }
     .dx-card.is-hidden { display: grid; }
+}
+
+/* ===================== OVERRIDE / AVAILABILITY MODALS ===================== */
+.ovr-modal {
+    position: fixed; inset: 0; z-index: 1080;
+    display: grid; place-items: center;
+    padding: 1rem;
+    background: rgba(10, 18, 24, 0.5);
+    -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+    animation: ovrFade 0.18s ease-out;
+}
+.ovr-modal[hidden] { display: none; }
+.ovr-modal__dialog {
+    display: flex; flex-direction: column;
+    width: 100%; max-width: 640px; max-height: calc(100vh - 2rem);
+    background: var(--pm-surface); color: var(--pm-text);
+    border-radius: 16px;
+    box-shadow: 0 24px 60px -12px rgba(10, 18, 24, 0.35), 0 2px 6px rgba(10, 18, 24, 0.08);
+    animation: ovrRise 0.22s cubic-bezier(0.23, 1, 0.32, 1);
+    overflow: hidden;
+}
+#ovrCheckModal .ovr-modal__dialog { max-width: 520px; }
+.ovr-modal__head {
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    padding: 1rem 1.25rem; border-bottom: 1px solid var(--pm-line);
+}
+.ovr-modal__head h3 { margin: 0; font-size: 1.0625rem; font-weight: 700; color: var(--pm-text); }
+.ovr-modal__close {
+    display: grid; place-items: center; width: 34px; height: 34px;
+    border: 0; border-radius: 8px; background: transparent; color: var(--pm-text-muted);
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+.ovr-modal__close:hover { background: var(--pm-subtle); color: var(--pm-text); }
+.ovr-modal__body { padding: 1.1rem 1.25rem 1.25rem; overflow-y: auto; overscroll-behavior: contain; }
+
+.ovr-note {
+    display: flex; gap: 0.6rem; margin: 0 0 1rem; padding: 0.7rem 0.85rem;
+    font-size: 0.8125rem; line-height: 1.5; color: var(--pm-text-soft);
+    background: var(--pm-accent-soft); border-radius: 10px;
+}
+.ovr-note i { color: var(--pm-accent); margin-top: 0.1rem; }
+
+.ovr-section { margin: 0 0 1.1rem; padding: 0; border: 0; min-width: 0; }
+.ovr-section > legend {
+    float: left; width: 100%; margin: 0 0 0.55rem; padding: 0;
+    font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
+    color: var(--pm-text-muted);
+}
+.ovr-section > legend + * { clear: both; }
+
+.ovr-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem 0.85rem; }
+.ovr-row { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
+.ovr-row--wide { grid-column: 1 / -1; }
+.ovr-row label { font-size: 0.78rem; font-weight: 600; color: var(--pm-text-soft); }
+.ovr-opt { font-weight: 400; color: var(--pm-text-muted); }
+.ovr-hint { font-size: 0.74rem; color: var(--pm-text-muted); }
+.ovr-hint.is-error { color: var(--pm-danger); font-weight: 600; }
+.ovr-reason { resize: vertical; min-height: 64px; }
+#ovrCheckModal .ovr-row { margin-bottom: 0.75rem; }
+
+.ovr-svc + .ovr-svc { margin-top: 0.85rem; }
+.ovr-svc[hidden] { display: none; }
+.ovr-svc-title { display: flex; align-items: center; gap: 0.4rem; margin: 0 0 0.45rem; font-size: 0.8rem; font-weight: 700; color: var(--pm-text); }
+.ovr-svc-title i { color: var(--pm-accent); }
+.ovr-svc-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 0.35rem;
+    max-height: 190px; overflow-y: auto; overscroll-behavior: contain;
+    padding: 0.2rem; scrollbar-width: thin; scrollbar-color: var(--pm-line-strong) transparent;
+}
+.ovr-check {
+    display: flex; align-items: flex-start; gap: 0.5rem;
+    padding: 0.45rem 0.6rem; border: 1px solid var(--pm-line); border-radius: 8px;
+    font-size: 0.8rem; line-height: 1.3; color: var(--pm-text-soft); cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.ovr-check input { margin-top: 0.12rem; accent-color: var(--pm-accent); flex: none; }
+.ovr-check:has(input:checked) { border-color: var(--pm-accent); background: var(--pm-accent-soft); color: var(--pm-text); }
+.ovr-check:has(input:focus-visible) { outline: 2px solid var(--pm-accent); outline-offset: 1px; }
+
+.ovr-actions {
+    position: sticky; bottom: -1.25rem;
+    display: flex; justify-content: flex-end; gap: 0.5rem;
+    margin: 0 -1.25rem -1.25rem; padding: 0.85rem 1.25rem;
+    background: var(--pm-surface); border-top: 1px solid var(--pm-line);
+}
+
+.ovr-slots { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.ovr-slot {
+    padding: 0.3rem 0.6rem; border-radius: 999px;
+    font-size: 0.75rem; font-weight: 600; border: 1px solid var(--pm-line);
+}
+.ovr-slot--free  { color: var(--pm-dk-fg-green, #067647); background: var(--pm-tint-green); border-color: transparent; }
+.ovr-slot--full  { color: var(--pm-dk-fg-amber, #93370D); background: var(--pm-tint-amber); border-color: transparent; }
+.ovr-slot--block { color: var(--pm-text-muted); background: var(--pm-subtle); text-decoration: line-through; }
+
+@keyframes ovrFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ovrRise { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+    .ovr-modal, .ovr-modal__dialog { animation: none; }
+}
+@media (max-width: 575.98px) {
+    .ovr-modal { padding: 0; place-items: end stretch; }
+    .ovr-modal__dialog { max-width: none; max-height: 92vh; border-radius: 16px 16px 0 0; }
+    .ovr-grid { grid-template-columns: 1fr; }
 }
 </style>
 
@@ -1442,7 +1582,7 @@ foreach ($appointmentList as $appt) {
         var blob = new Blob([String.fromCharCode(0xFEFF) + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
         var link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
-        link.download = 'appointments-' + new Date().toISOString().slice(0, 10) + '.csv';
+        link.download = 'appointments-' + todayLocal() + '.csv';
         document.body.appendChild(link);
         link.click();
         link.remove();
@@ -1551,7 +1691,7 @@ foreach ($appointmentList as $appt) {
     if (byId('dxCheckAvail')) {
         byId('dxCheckAvail').addEventListener('click', function () {
             openModal('ovrCheckModal');
-            var today = new Date().toISOString().slice(0, 10);
+            var today = todayLocal();
             if (!cDate.value) cDate.value = today;
             loadCheck();
         });
@@ -1564,42 +1704,111 @@ foreach ($appointmentList as $appt) {
     var oDate = byId('ovrDate');
     var oType = byId('ovrType');
     var oTime = byId('ovrTime');
+    var oHint = byId('ovrTimeHint');
+    var oForm = oDate ? oDate.form : null;
+
+    /* Local date, not UTC: before 8 AM in Manila, toISOString() is still yesterday */
+    function todayLocal() {
+        var d = new Date();
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
 
     function loadOverrideTimes() {
         if (!oDate.value) return;
+        var keep = oTime.value || oTime.getAttribute('data-old') || '';
         oTime.innerHTML = '<option value="">Loading…</option>';
+        oTime.disabled = true;
 
         fetchSlots(oDate.value, oType.value).then(function (data) {
             oTime.innerHTML = '';
+            oTime.disabled = false;
             var head = document.createElement('option');
             head.value = '';
             head.textContent = 'Select time';
             oTime.appendChild(head);
 
-            if (!data || !data.ok || !data.working || !data.slots) {
+            if (!data || !data.ok) {
+                oHint.textContent = 'Could not load times. Try again.';
                 return;
             }
-            data.slots.forEach(function (s) {
+            if (!data.working) {
+                head.textContent = 'Clinic closed';
+                oTime.disabled = true;
+                oHint.textContent = 'The clinic is closed on that date. Pick another day.';
+                return;
+            }
+            var now = new Date(), isToday = oDate.value === todayLocal();
+            (data.slots || []).forEach(function (s) {
                 var opt = document.createElement('option');
                 opt.value = s.time;
-                opt.textContent = s.label + (s.available ? '' : ' — full');
+                var tag = s.blocked ? ' · blocked' + (s.reason ? ' (' + s.reason + ')' : '') : (s.available ? ' · free' : ' · full');
+                opt.textContent = s.label + tag;
+                if (isToday) {
+                    var p = s.time.split(':');
+                    var at = new Date(); at.setHours(+p[0], +p[1], 0, 0);
+                    if (at < now) opt.textContent += ' · passed';
+                }
                 oTime.appendChild(opt);
             });
+            if (keep) oTime.value = keep;
+            oTime.setAttribute('data-old', '');
+            oHint.textContent = "Full and blocked times are listed too. That's what the override is for.";
+        }).catch(function () {
+            oTime.disabled = false;
+            oHint.textContent = 'Could not load times. Try again.';
         });
     }
 
-    if (byId('dxOverrideOpen')) {
-        byId('dxOverrideOpen').addEventListener('click', function () {
-            openModal('ovrBookModal');
-            var today = new Date().toISOString().slice(0, 10);
-            if (!oDate.value) {
-                oDate.value = today;
-                loadOverrideTimes();
-            }
+    /* Show only the test list(s) for the chosen department; hidden ones are unchecked so they aren't sent */
+    function syncDepartments() {
+        var t = oType.value;
+        document.querySelectorAll('#ovrBookModal .ovr-svc').forEach(function (box) {
+            var on = t === 'both' || box.getAttribute('data-dept') === t;
+            box.hidden = !on;
+            box.querySelectorAll('input').forEach(function (i) { i.disabled = !on; });
         });
+        countServices();
     }
+    function countServices() {
+        var n = document.querySelectorAll('#ovrBookModal .ovr-svc:not([hidden]) input:checked').length;
+        byId('ovrSvcCount').textContent = n === 0 ? 'No tests picked yet' : n + (n === 1 ? ' test' : ' tests') + ' picked';
+    }
+
+    function openOverride() {
+        openModal('ovrBookModal');
+        if (!oDate.value) oDate.value = todayLocal();
+        oDate.min = todayLocal();
+        syncDepartments();
+        loadOverrideTimes();
+        setTimeout(function () { (oDate.value ? byId('ovrName') : oDate).focus(); }, 30);
+    }
+
+    if (byId('dxOverrideOpen')) byId('dxOverrideOpen').addEventListener('click', openOverride);
     if (oDate) oDate.addEventListener('change', loadOverrideTimes);
-    if (oType) oType.addEventListener('change', loadOverrideTimes);
+    if (oType) oType.addEventListener('change', function () { syncDepartments(); loadOverrideTimes(); });
+    document.querySelectorAll('#ovrBookModal .ovr-svc input').forEach(function (i) { i.addEventListener('change', countServices); });
+
+    /* Catch "no tests" before the round-trip */
+    if (oForm) oForm.addEventListener('submit', function (e) {
+        var t = oType.value;
+        var lab  = document.querySelectorAll('#ovrBookModal [data-dept="laboratory"] input:checked').length;
+        var xray = document.querySelectorAll('#ovrBookModal [data-dept="xray"] input:checked').length;
+        var msg = '';
+        if (t === 'both' && (!lab || !xray)) msg = 'For "Both", pick at least one laboratory test and one X-ray exam.';
+        else if (t === 'laboratory' && !lab) msg = 'Pick at least one laboratory test.';
+        else if (t === 'xray' && !xray) msg = 'Pick at least one X-ray exam.';
+        if (msg) {
+            e.preventDefault();
+            var c = byId('ovrSvcCount');
+            c.textContent = msg; c.classList.add('is-error');
+            c.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+    });
+
+    /* The server sent the form back with an error: reopen it with what was typed */
+    <?php if (session()->getFlashdata('reopen_override')): ?>
+    openOverride();
+    <?php endif; ?>
 
 
     /* =====================================================

@@ -21,7 +21,11 @@
                  exclusive, so draw the share bar and percentages),
                  stages => list of [key, color, label, hint, count, today, link]
                ]
+     $chart    'bars' (default) or 'spike': one thin line per day with a dot on top
+     $featured true: the first card is the lead figure, filled in the accent
    ------------------------------------------------------------------ */
+$chartStyle = ($chart ?? 'bars') === 'spike' ? 'spike' : 'bars';
+$featured   = !empty($featured);
 $cards    = $cards ?? [];
 $trends   = $trends ?? [];
 $pipeline = $pipeline ?? null;
@@ -107,7 +111,7 @@ $iconMap = [
          aria-labelledby="kpiHeading">
     <h2 id="kpiHeading" class="visually-hidden">Key metrics</h2>
 
-    <?php foreach ($cards as $card): ?>
+    <?php foreach ($cards as $cardIx => $card): ?>
         <?php
             $isMoney = !empty($card['money']);
             $vals    = array_map('floatval', $trends[$card['key']] ?? []);
@@ -124,7 +128,7 @@ $iconMap = [
             $tag = !empty($card['link']) ? 'a' : 'div';
         ?>
         <?php /* Headline cards share one accent; per-card rainbow colours carried no meaning. */ ?>
-        <<?= $tag ?> class="kpi-card"<?= !empty($card['link']) ? ' href="' . esc($card['link'], 'attr') . '"' : '' ?>>
+        <<?= $tag ?> class="kpi-card<?= $featured && $cardIx === 0 ? ' is-featured' : '' ?>"<?= !empty($card['link']) ? ' href="' . esc($card['link'], 'attr') . '"' : '' ?>>
             <div class="kpi-head">
                 <?php $iconClass = strpos($card['icon'], 'bi-') === 0 ? $card['icon'] : ($iconMap[$card['icon']] ?? null); ?>
                 <?php if ($iconClass !== null): ?>
@@ -157,14 +161,42 @@ $iconMap = [
                 <span class="kpi-context"><?= esc($card['context']) ?></span>
             </div>
 
-            <div class="kpi-chart" role="img" aria-label="<?= esc($chartLabel, 'attr') ?>">
-                <div class="kpi-bars" aria-hidden="true">
-                    <?php foreach ($vals as $i => $v): ?>
-                        <span class="kpi-bar<?= $i === $nVals - 1 ? ' is-today' : '' ?>"
-                              style="height:<?= $peak > 0 ? max(4, round($v / $peak * 100, 1)) : 4 ?>%"
-                              title="<?= esc(trim($dayLabel($i) . ': ' . $fmt($v), ': '), 'attr') ?>"></span>
-                    <?php endforeach; ?>
-                </div>
+            <?php $hasSeries = !empty($trends[$card['key']]); ?>
+            <div class="kpi-chart<?= $hasSeries ? '' : ' is-blank' ?>"<?= $hasSeries ? ' role="img" aria-label="' . esc($chartLabel, 'attr') . '"' : ' aria-hidden="true"' ?>>
+                <?php if ($chartStyle === 'spike'): ?>
+                    <?php
+                        /* Line graph: straight segments through each day, a soft fill under it,
+                           today's dot on the end. 100 x 40 user units, stretched to the card. */
+                        $pts = [];
+                        foreach ($vals as $i => $v) {
+                            $x = $nVals > 1 ? $i / ($nVals - 1) * 100 : 50;
+                            $y = $peak > 0 ? 38 - ($v / $peak) * 34 : 38;
+                            $pts[] = round($x, 2) . ',' . round($y, 2);
+                        }
+                        $lastX = $nVals > 1 ? 100 : 50;
+                        $lastY = $peak > 0 ? 38 - (end($vals) / $peak) * 34 : 38;
+                    ?>
+                    <div class="kpi-line" aria-hidden="true">
+                        <svg viewBox="0 0 100 40" preserveAspectRatio="none" focusable="false">
+                            <polygon class="kpi-line-area" points="0,40 <?= implode(' ', $pts) ?> <?= $lastX ?>,40"/>
+                            <polyline class="kpi-line-path" points="<?= implode(' ', $pts) ?>"/>
+                        </svg>
+                        <span class="kpi-line-dot" style="left:<?= $lastX ?>%;top:<?= round($lastY / 40 * 100, 2) ?>%"></span>
+                        <div class="kpi-line-hits">
+                            <?php foreach ($vals as $i => $v): ?>
+                                <span title="<?= esc(trim($dayLabel($i) . ': ' . $fmt($v), ': '), 'attr') ?>"></span>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                <?php else: ?>
+                    <div class="kpi-bars" aria-hidden="true">
+                        <?php foreach ($vals as $i => $v): ?>
+                            <span class="kpi-bar<?= $i === $nVals - 1 ? ' is-today' : '' ?>"
+                                  style="height:<?= $peak > 0 ? max(4, round($v / $peak * 100, 1)) : 4 ?>%"
+                                  title="<?= esc(trim($dayLabel($i) . ': ' . $fmt($v), ': '), 'attr') ?>"></span>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
                 <div class="kpi-axis" aria-hidden="true">
                     <span><?= esc($dayLabel(0)) ?></span>
                     <span>Today</span>
@@ -196,21 +228,6 @@ $iconMap = [
                 <?php endif; ?>
             </header>
 
-            <?php if ($split): ?>
-                <?php
-                    $barLabel = implode(', ', array_map(
-                        static fn($s) => $s['label'] . ' ' . number_format($s['count']),
-                        $stages
-                    ));
-                ?>
-                <div class="pipeline-bar" role="img" aria-label="<?= esc('Status split: ' . $barLabel, 'attr') ?>">
-                    <?php foreach ($stages as $stage): ?>
-                        <?php if ($sum > 0 && $stage['count'] > 0): ?>
-                            <span style="flex-grow:<?= (int) $stage['count'] ?>;background:<?= esc($stage['color'], 'attr') ?>"></span>
-                        <?php endif; ?>
-                    <?php endforeach; ?>
-                </div>
-            <?php endif; ?>
 
             <div class="pipeline-stages" style="--stages:<?= max(1, count($stages)) ?>">
                 <?php foreach ($stages as $stage): ?>
@@ -243,8 +260,9 @@ $iconMap = [
     --kb-text:        var(--pm-text, #10202E);
     --kb-text-soft:   var(--pm-text-soft, #3B4C5E);
     --kb-text-muted:  var(--pm-text-muted, #5D6E80);
-    --kb-accent:      var(--pm-accent, #0B67B2);
-    --kb-accent-dark: var(--pm-accent-hover, #08528F);
+    --kb-accent:      var(--pm-accent, #175563);
+    --kb-accent-dark: var(--pm-accent-hover, #10404B);
+    --kb-feature:     #163642;
     --kb-radius:      8px;
     --kb-radius-sm:   6px;
     --kb-shadow:      none;
@@ -267,7 +285,7 @@ $iconMap = [
     display: flex;
     flex-direction: column;
     min-width: 0;
-    padding: 18px;
+    padding: 14px 16px;
     background: var(--kb-surface);
     border: 1px solid var(--kb-border);
     border-radius: var(--kb-radius);
@@ -378,8 +396,8 @@ $iconMap = [
 }
 
 /* Coloured text + arrow is enough; filled pills competed with the value. */
-.kpi-board .kpi-delta.is-good    { color: #067647; }
-.kpi-board .kpi-delta.is-bad     { color: #B42318; }
+.kpi-board .kpi-delta.is-good    { color: var(--pm-dk-fg-green, #067647); }
+.kpi-board .kpi-delta.is-bad     { color: var(--pm-dk-fg-red, #B42318); }
 .kpi-board .kpi-delta.is-neutral { color: var(--kb-text-soft); }
 
 .kpi-board .kpi-context {
@@ -393,14 +411,17 @@ $iconMap = [
 /* 14-day bar chart; today's bar is solid, earlier days are tinted. */
 .kpi-board .kpi-chart {
     margin-top: auto;
-    padding-top: 14px;
+    padding-top: 10px;
 }
+
+/* No daily series for this figure: keep the space so the row stays level */
+.kpi-board .kpi-chart.is-blank { visibility: hidden; }
 
 .kpi-board .kpi-bars {
     display: flex;
     align-items: flex-end;
     gap: 3px;
-    height: 44px;
+    height: 34px;
     border-bottom: 1px solid var(--kb-border);
 }
 
@@ -408,7 +429,7 @@ $iconMap = [
     flex: 1 1 0;
     min-width: 0;
     border-radius: 1px 1px 0 0;
-    background: color-mix(in srgb, var(--kpi) 22%, #FFFFFF);
+    background: color-mix(in srgb, var(--kpi) 22%, var(--pm-surface));
     transition: background-color 0.15s ease;
 }
 
@@ -416,6 +437,94 @@ $iconMap = [
 .kpi-board .kpi-bar.is-today {
     background: var(--kpi);
 }
+
+/* Line graph (admin): straight segments, a soft fill, today as the end dot */
+.kpi-board .kpi-line {
+    position: relative;
+    height: 34px;
+    border-bottom: 1px solid var(--kb-border);
+}
+
+.kpi-board .kpi-line svg { display: block; width: 100%; height: 100%; overflow: visible; }
+
+.kpi-board .kpi-line-area { fill: color-mix(in srgb, var(--kpi) 12%, transparent); stroke: none; }
+
+.kpi-board .kpi-line-path {
+    fill: none;
+    stroke: var(--kpi);
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+}
+
+.kpi-board .kpi-line-dot {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    margin: -4px 0 0 -4px;
+    border-radius: 50%;
+    background: var(--kpi);
+    box-shadow: 0 0 0 2px #FFFFFF;
+    pointer-events: none;
+}
+
+/* One invisible column per day, so each day still shows its figure on hover */
+.kpi-board .kpi-line-hits { position: absolute; inset: 0; display: flex; }
+.kpi-board .kpi-line-hits span { flex: 1 1 0; }
+.kpi-board .kpi-line-hits span:hover { background: color-mix(in srgb, var(--kpi) 8%, transparent); }
+
+/* ----- Featured card: the lead figure, filled in the clinic blue -----
+   Everything on it turns white; the change keeps its arrow for direction
+   and sits on a soft white tint, since green or red would not read on blue. */
+.kpi-board .kpi-card.is-featured {
+    --kpi: #FFFFFF;
+    color: #FFFFFF;
+    background: linear-gradient(135deg, #224B58 0%, var(--kb-feature) 100%);
+    border-color: var(--kb-feature);
+}
+
+.kpi-board a.kpi-card.is-featured:hover,
+.kpi-board a.kpi-card.is-featured:focus-visible {
+    background: #102B34;
+    border-color: #102B34;
+    color: #FFFFFF;
+}
+
+.kpi-board .kpi-card.is-featured .kpi-icon,
+.kpi-board .kpi-card.is-featured .kpi-label,
+.kpi-board .kpi-card.is-featured .kpi-value,
+.kpi-board .kpi-card.is-featured .kpi-cents,
+.kpi-board .kpi-card.is-featured .kpi-unit { color: #FFFFFF; }
+
+.kpi-board .kpi-card.is-featured .kpi-label { font-weight: 600; }
+.kpi-board .kpi-card.is-featured .kpi-cents,
+.kpi-board .kpi-card.is-featured .kpi-unit { opacity: 0.75; }
+
+.kpi-board .kpi-card.is-featured .kpi-go { color: rgba(255, 255, 255, 0.6); }
+.kpi-board .kpi-card.is-featured:hover .kpi-go,
+.kpi-board .kpi-card.is-featured:focus-visible .kpi-go { color: #FFFFFF; }
+
+.kpi-board .kpi-card.is-featured .kpi-delta {
+    padding: 1px 7px;
+    color: #FFFFFF;
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+}
+
+.kpi-board .kpi-card.is-featured .kpi-context { color: rgba(255, 255, 255, 0.8); }
+.kpi-board .kpi-card.is-featured .kpi-axis    { color: rgba(255, 255, 255, 0.7); }
+
+.kpi-board .kpi-card.is-featured .kpi-bars,
+.kpi-board .kpi-card.is-featured .kpi-line { border-bottom-color: rgba(255, 255, 255, 0.25); }
+
+.kpi-board .kpi-card.is-featured .kpi-bar { background: rgba(255, 255, 255, 0.35); }
+.kpi-board .kpi-card.is-featured .kpi-bar:hover,
+.kpi-board .kpi-card.is-featured .kpi-bar.is-today { background: #FFFFFF; }
+
+.kpi-board .kpi-card.is-featured .kpi-line-area { fill: rgba(255, 255, 255, 0.16); }
+.kpi-board .kpi-card.is-featured .kpi-line-dot { box-shadow: 0 0 0 2px var(--kb-feature); }
+.kpi-board .kpi-card.is-featured .kpi-line-hits span:hover { background: rgba(255, 255, 255, 0.1); }
 
 .kpi-board .kpi-axis {
     display: flex;
@@ -431,7 +540,7 @@ $iconMap = [
     display: flex;
     flex-direction: column;
     min-width: 0;
-    padding: 18px;
+    padding: 14px 16px;
     background: var(--kb-surface);
     border: 1px solid var(--kb-border);
     border-radius: var(--kb-radius);
@@ -473,22 +582,6 @@ $iconMap = [
 
 .kpi-board .pipeline-link:hover { color: var(--kb-accent-dark); text-decoration: none; }
 
-/* Status split; segments get a 2px gap so small shares stay visible. */
-.kpi-board .pipeline-bar {
-    display: flex;
-    gap: 2px;
-    height: 6px;
-    border-radius: 2px;
-    overflow: hidden;
-    background: var(--kb-subtle);
-    margin-bottom: 14px;
-}
-
-.kpi-board .pipeline-bar span {
-    flex-basis: 0;
-    min-width: 6px;
-}
-
 .kpi-board .pipeline-stages {
     display: grid;
     grid-template-columns: repeat(var(--stages, 3), minmax(0, 1fr));
@@ -513,7 +606,7 @@ $iconMap = [
 .kpi-board a.stage:hover,
 .kpi-board a.stage:focus-visible {
     border-color: var(--kb-border-hi);
-    background: #F8FAFC;
+    background: var(--pm-subtle);
     color: inherit;
     text-decoration: none;
 }
@@ -584,7 +677,7 @@ $iconMap = [
 }
 
 @media (max-width: 768px) {
-    .kpi-board .kpi-card          { padding: 16px; }
+    .kpi-board .kpi-card          { padding: 12px 14px; }
     .kpi-board .kpi-value         { font-size: 1.5rem; }
     .kpi-board .kpi-value.is-money { font-size: 1.3rem; }
 }

@@ -233,7 +233,13 @@
                 <?php if (!$isPatientView): ?>
                     <?php
                         /* Steps: done / current / upcoming / stopped */
-                        $steps = [[$sourceKey === 'override' ? 'Booked at the front desk' : 'Booked online', $fmt($appointment['created_at'] ?? null), 'done']];
+                        $bookedLabel = 'Booked online';
+                        if ($sourceKey === 'override') {
+                            $bookedLabel = 'Override booking'
+                                . (!empty($appointment['override_by']) ? ' by ' . $appointment['override_by'] : '')
+                                . (!empty($appointment['override_reason']) ? ' · ' . $appointment['override_reason'] : '');
+                        }
+                        $steps = [[$bookedLabel, $fmt($appointment['created_at'] ?? null), 'done']];
                         if ($statusKey === 'cancelled' || $statusKey === 'no_show') {
                             $steps[] = [$statusKey === 'no_show' ? 'Did not show up' : 'Cancelled', $fmt($appointment['updated_at'] ?? null), 'stopped'];
                         } elseif ($statusKey === 'late') {
@@ -272,13 +278,13 @@
     --av-ink:    var(--pm-text, #10202E);
     --av-text:   var(--pm-text-soft, #3B4C5E);
     --av-muted:  var(--pm-text-muted, #5D6E80);
-    --av-faint:  #7A8B9D;
+    --av-faint:  var(--pm-text-muted);
     --av-line:   var(--pm-line, #DDE4EC);
     --av-strong: var(--pm-line-strong, #C3CFDB);
-    --av-soft:   #EBF0F5;
-    --av-subtle: #F8FAFC;
-    --av-accent: var(--pm-accent, #0B67B2);
-    --av-accent-dark: var(--pm-accent-hover, #08528F);
+    --av-soft:   var(--pm-subtle);
+    --av-subtle: var(--pm-subtle);
+    --av-accent: var(--pm-accent, #175563);
+    --av-accent-dark: var(--pm-accent-hover, #10404B);
     --av-mono:   var(--pm-mono, ui-monospace, monospace);
 
     max-width: 1120px;
@@ -306,7 +312,7 @@
 .av-back:hover { color: var(--av-ink); }
 
 .av-card {
-    background: #FFFFFF;
+    background: var(--pm-surface);
     border: 1px solid var(--av-line);
     border-radius: 10px;
 }
@@ -336,7 +342,7 @@
     font-weight: 600;
     letter-spacing: 0.03em;
     color: var(--av-ink);
-    background: #E3EAF2;
+    background: var(--pm-avatar);
     border-radius: 50%;
 }
 
@@ -375,9 +381,9 @@
 }
 
 .av-src i { font-size: 0.75rem; }
-.av-src--online   { color: #08528F; background: #E8F1FA; }
-.av-src--walkin   { color: #8A5A00; background: #FDF3DC; }
-.av-src--override { color: #475467; background: #F2F4F7; }
+.av-src--online   { color: var(--pm-dk-fg-teal, #10404B); background: var(--pm-dk-bg-teal, #EBF2F4); }
+.av-src--walkin   { color: var(--pm-dk-fg-amber, #8A5A00); background: var(--pm-dk-bg-amber, #FDF3DC); }
+.av-src--override { color: var(--pm-text-soft); background: var(--pm-subtle); }
 
 .av-head-side { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 
@@ -398,7 +404,7 @@
 .av-status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--dot); }
 
 .av-status--pending   { --bg: #FEF6E7; --fg: #93370D; --dot: #DC6803; }
-.av-status--approved  { --bg: #E8F1FA; --fg: #08528F; --dot: #0B67B2; }
+.av-status--approved  { --bg: #EBF2F4; --fg: #10404B; --dot: #175563; }
 .av-status--completed { --bg: #ECFDF3; --fg: #067647; --dot: #17B26A; }
 .av-status--cancelled { --bg: #F2F4F7; --fg: #475467; --dot: #98A2B3; }
 .av-status--late      { --bg: #FEF3F2; --fg: #B42318; --dot: #F04438; }
@@ -412,7 +418,7 @@
     font-size: 0.8rem;
     font-weight: 600;
     color: var(--av-ink);
-    background: #FFFFFF;
+    background: var(--pm-surface);
     border: 1px solid var(--av-line);
     border-radius: 6px;
     text-decoration: none;
@@ -426,7 +432,7 @@
 .av-btn--primary:hover { color: #FFFFFF; background: var(--av-accent-dark); border-color: var(--av-accent-dark); }
 
 .av-btn--quiet { color: var(--av-muted); border-color: transparent; background: transparent; }
-.av-btn--quiet:hover { color: #B42318; background: #FEF3F2; border-color: transparent; }
+.av-btn--quiet:hover { color: var(--pm-dk-fg-red, #B42318); background: var(--pm-dk-bg-red, #FEF3F2); border-color: transparent; }
 
 .av-icon-btn {
     display: inline-grid;
@@ -439,7 +445,7 @@
     text-decoration: none;
 }
 
-.av-icon-btn--danger:hover { color: #B42318; background: #FEF3F2; }
+.av-icon-btn--danger:hover { color: var(--pm-dk-fg-red, #B42318); background: var(--pm-dk-bg-red, #FEF3F2); }
 
 /* Request facts: one row, hairline cells, wraps on small screens */
 .av-facts {
@@ -555,7 +561,7 @@
     background: var(--kind);
 }
 
-.av-svc-head--lab  { --kind: #0B67B2; }
+.av-svc-head--lab  { --kind: #175563; }
 .av-svc-head--xray { --kind: #0E8A7E; }
 
 .av-svc-head span {
@@ -653,13 +659,13 @@
     width: 12px;
     height: 12px;
     border-radius: 50%;
-    background: #FFFFFF;
+    background: var(--pm-surface);
     border: 2px solid var(--av-strong);
 }
 
 .av-step--done::before     { background: var(--av-accent); border-color: var(--av-accent); }
 .av-step--done::after      { background: var(--av-accent); }
-.av-step--current::before  { border-color: var(--av-accent); box-shadow: 0 0 0 3px var(--pm-accent-soft, #E8F1FA); }
+.av-step--current::before  { border-color: var(--av-accent); box-shadow: 0 0 0 3px var(--pm-accent-soft, #EBF2F4); }
 .av-step--warn::before     { background: #F04438; border-color: #F04438; }
 .av-step--stopped::before  { background: #98A2B3; border-color: #98A2B3; }
 

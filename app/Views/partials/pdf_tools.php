@@ -79,7 +79,7 @@ $config = [
         border: 1px solid #cbd5e1; border-radius: 7px; background: #fff;
     }
     .pdfx-form textarea { resize: vertical; }
-    .pdfx-form input:focus, .pdfx-form textarea:focus { outline: none; border-color: #0B67B2; box-shadow: 0 0 0 3px rgba(11, 103, 178, 0.2); }
+    .pdfx-form input:focus, .pdfx-form textarea:focus { outline: none; border-color: #175563; box-shadow: 0 0 0 3px rgba(23, 85, 99, 0.2); }
     .pdfx-status { margin: 12px 0 0; padding: 8px 10px; font-size: 13px; border-radius: 7px; background: #eff6ff; color: #1e3a8a; }
     .pdfx-status.is-error { background: #fef2f2; color: #991b1b; }
     .pdfx-status.is-ok { background: #f0fdf4; color: #166534; }
@@ -88,7 +88,7 @@ $config = [
         height: 36px; padding: 0 16px; font: 600 13px system-ui, sans-serif; color: #334155;
         background: #fff; border: 1px solid #cbd5e1; border-radius: 7px; cursor: pointer;
     }
-    .pdfx-btn--primary { color: #fff; background: #0B67B2; border-color: #0B67B2; }
+    .pdfx-btn--primary { color: #fff; background: #175563; border-color: #175563; }
     .pdfx-btn:disabled, [data-pdfx]:disabled { opacity: 0.6; cursor: wait; }
 
     /* The off-screen copy the PDF is drawn from: A4 wide, paper only. */

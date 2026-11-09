@@ -807,6 +807,59 @@ trait HandlesDiagnosticRequests
     }
 
     /** Add each payment's patient gender (for the avatar) in one query. */
+    /**
+     * Each payment's bill: invoice number, status, total and balance, so
+     * the Payments list can tell a fully settled bill from a partial one.
+     * One query.
+     */
+    protected function attachInvoiceState(array &$payments): void
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', array_column($payments, 'invoice_id')))));
+        $byId = [];
+        if ($ids !== []) {
+            foreach (db_connect()->table('invoices')
+                         ->select('id, invoice_no, status, total, balance')
+                         ->whereIn('id', $ids)
+                         ->get()->getResultArray() as $inv) {
+                $byId[(int) $inv['id']] = $inv;
+            }
+        }
+
+        foreach ($payments as &$p) {
+            $inv = $byId[(int) ($p['invoice_id'] ?? 0)] ?? null;
+            $p['invoice_no']      = $inv['invoice_no'] ?? null;
+            $p['invoice_status']  = $inv['status'] ?? null;
+            $p['invoice_total']   = $inv !== null ? (float) $inv['total'] : null;
+            $p['invoice_balance'] = $inv !== null ? (float) $inv['balance'] : null;
+        }
+        unset($p);
+    }
+
+    /**
+     * Bills with nothing paid yet (invoice status "unpaid"), newest first,
+     * with their service names. Shown on the Payments list as "Unpaid".
+     */
+    protected function openUnpaidBills(): array
+    {
+        $rows = db_connect()->table('invoices i')
+            ->select("i.id, i.invoice_no, i.patient_name, i.patient_code, i.total, i.balance, i.created_at, i.created_by,
+                      GROUP_CONCAT(ii.service_name ORDER BY ii.id SEPARATOR '\n') AS service_list", false)
+            ->join('invoice_items ii', 'ii.invoice_id = i.id', 'left')
+            ->where('i.status', 'unpaid')
+            ->where('i.balance >', 0)
+            ->groupBy('i.id')
+            ->orderBy('i.created_at', 'DESC')
+            ->get()->getResultArray();
+
+        foreach ($rows as &$r) {
+            $r['services'] = array_values(array_filter(explode("\n", (string) ($r['service_list'] ?? ''))));
+            unset($r['service_list']);
+        }
+        unset($r);
+
+        return $rows;
+    }
+
     protected function attachPatientGender(array &$payments): void
     {
         $codes = [];
@@ -852,6 +905,38 @@ trait HandlesDiagnosticRequests
         return $counts;
     }
 
+    /* ---------------------------------------------------------
+       REFUNDS (Payments page + notifications)
+       --------------------------------------------------------- */
+
+    /**
+     * The refund forms send confirmed=1 only when the "I confirm" box is
+     * ticked. Checked here too, so the rule holds without the browser.
+     */
+    protected function refundConfirmed(): bool
+    {
+        return $this->request->getPost('confirmed') === '1';
+    }
+
+    /** JSON for the Payments page, or redirect-with-flash for plain forms. */
+    protected function refundResponse(array $result, string $fallbackUrl)
+    {
+        if ($this->request->isAJAX()) {
+            return $this->response->setJSON([
+                'success' => (bool) $result['ok'],
+                'message' => $result['message'],
+            ]);
+        }
+
+        $back = previous_url() ?: $fallbackUrl;
+        return redirect()->to($back)->with($result['ok'] ? 'success' : 'error', $result['message']);
+    }
+
+    protected function refundNotConfirmed(): array
+    {
+        return ['ok' => false, 'message' => 'Tick the confirmation box before continuing.', 'payment' => null];
+    }
+
     /** Appointment totals per status in one grouped query. */
     protected function appointmentStatusCounts(): array
     {
@@ -862,7 +947,6 @@ trait HandlesDiagnosticRequests
             'total'     => array_sum($counts),
             'pending'   => $counts['pending']   ?? 0,
             'approved'  => $counts['approved']  ?? 0,
-            'completed' => $counts['completed'] ?? 0,
             'cancelled' => $counts['cancelled'] ?? 0,
             'late'      => $counts['late']      ?? 0,
         ];

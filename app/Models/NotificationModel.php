@@ -47,6 +47,7 @@ class NotificationModel extends Model
         'lab'         => ['admin' => 'notify', 'med_tech'     => 'open'],
         'billing'     => ['admin' => 'notify', 'receptionist' => 'open'],
         'payment'     => ['admin' => 'notify', 'receptionist' => 'open'],
+        'refund'      => ['admin' => 'open'],   // receptionist asks, an admin decides
         'system'      => ['admin' => 'open'],
     ];
 
@@ -58,11 +59,13 @@ class NotificationModel extends Model
     public const LINK_MAP = [
         'admin' => [
             'appointment' => 'admin/appointment/view/{id}',
+            'refund'      => 'admin/payments?review={id}',
         ],
         'receptionist' => [
             'appointment' => 'receptionist/appointment/view/{id}',
             'billing'     => 'receptionist/billing',
             'payment'     => 'receptionist/payments',
+            'refund'      => 'receptionist/payments?payment={id}',
         ],
         'radiologist' => [
             'xray'     => 'radiologist/examination/view/{id}',
@@ -581,6 +584,7 @@ class NotificationModel extends Model
             'billing'     => 'bi-receipt',
             'payment'     => 'bi-credit-card',
             'transfer'    => 'bi-arrow-left-right',
+            'refund'      => 'bi-arrow-counterclockwise',
             'system'      => 'bi-bell-fill',
         ];
         return $icons[$type] ?? 'bi-bell-fill';
@@ -588,7 +592,7 @@ class NotificationModel extends Model
 
     public function getTypeColor($type): string
     {
-        $colors = ['appointment', 'xray', 'lab', 'billing', 'payment', 'system'];
+        $colors = ['appointment', 'xray', 'lab', 'billing', 'payment', 'refund', 'system'];
         return in_array($type, $colors, true) ? $type : 'system';
     }
 

@@ -634,7 +634,8 @@ html body .notif-dropdown-menu .notif-icon-box.appointment { --tone: #5E6873; }
 html body .notif-dropdown-menu .notif-icon-box.lab         { --tone: #175563; }
 html body .notif-dropdown-menu .notif-icon-box.xray        { --tone: #0E8A7E; }
 html body .notif-dropdown-menu .notif-icon-box.billing,
-html body .notif-dropdown-menu .notif-icon-box.payment     { --tone: #D0654A; }
+html body .notif-dropdown-menu .notif-icon-box.payment,
+html body .notif-dropdown-menu .notif-icon-box.refund      { --tone: #D0654A; }
 html body .notif-dropdown-menu .notif-icon-box.system      { --tone: #D29A1E; }
 
 html body .notif-dropdown-menu .notif-icon-box.is-avatar,

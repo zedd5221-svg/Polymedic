@@ -195,7 +195,7 @@ $kpiBoard = [
         'split'  => false,
         'stages' => [
             ['key' => 'pending',     'color' => '#f59e0b', 'label' => 'Pending Appts',       'hint' => 'Awaiting approval',     'count' => (int) ($pending_appointments ?? 0), 'today' => 'new today',  'link' => base_url('receptionist/appointments')],
-            ['key' => 'completed',   'color' => '#10b981', 'label' => 'Completed Today',     'hint' => 'Appointments done',     'count' => (int) ($today_completed ?? 0),      'today' => 'done today', 'link' => base_url('receptionist/appointments')],
+            ['key' => 'arrived',     'color' => '#10b981', 'label' => 'Arrived Today',       'hint' => 'Approved and checked in', 'count' => (int) ($today_arrived ?? 0),     'today' => 'checked in today', 'link' => base_url('receptionist/appointments')],
             ['key' => 'diagnostics', 'color' => '#3b82f6', 'label' => 'Pending Diagnostics', 'hint' => 'Waiting to be started', 'count' => (int) ($pending_diagnostic ?? 0),   'today' => 'new today',  'link' => base_url('receptionist/diagnostic-requests')],
         ],
     ],
@@ -408,14 +408,13 @@ $kpiBoard = [
         }
 
         $statusText = [
-            'pending' => 'Pending', 'approved' => 'Approved', 'completed' => 'Completed',
+            'pending' => 'Pending', 'approved' => 'Approved',
             'cancelled' => 'Cancelled', 'late' => 'Late', 'no_show' => 'No show',
         ];
         $filters = [
             'all'       => ['All', count($schedule)],
             'pending'   => ['Pending', (int) ($statusCounts['pending'] ?? 0)],
             'approved'  => ['Approved', (int) ($statusCounts['approved'] ?? 0)],
-            'completed' => ['Completed', (int) ($statusCounts['completed'] ?? 0)],
         ];
     ?>
     <section class="today-card" aria-labelledby="todayTitle">
@@ -1136,12 +1135,10 @@ $kpiBoard = [
     border: 2px solid var(--tone, #98A2B3);
 }
 
-.dashboard-container .today-row.is-completed .today-rail::after { background: var(--tone); }
 .dashboard-container .today-row.is-next .today-rail::after { box-shadow: 0 0 0 4px #EBF2F4; }
 
 .dashboard-container .today-row.is-pending   { --tone: #DC6803; }
 .dashboard-container .today-row.is-approved  { --tone: #175563; }
-.dashboard-container .today-row.is-completed { --tone: #17B26A; }
 .dashboard-container .today-row.is-late      { --tone: #F04438; }
 .dashboard-container .today-row.is-cancelled,
 .dashboard-container .today-row.is-no_show   { --tone: #98A2B3; }
@@ -1248,7 +1245,6 @@ $kpiBoard = [
 .dashboard-container .today-status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.85; }
 .dashboard-container .today-status--pending   { color: var(--pm-dk-fg-amber, #93370D); background: var(--pm-dk-bg-amber, #FEF6E7); }
 .dashboard-container .today-status--approved  { color: var(--pm-dk-fg-teal, #10404B); background: var(--pm-dk-bg-teal, #EBF2F4); }
-.dashboard-container .today-status--completed { color: var(--pm-dk-fg-green, #067647); background: var(--pm-dk-bg-green, #ECFDF3); }
 .dashboard-container .today-status--late      { color: var(--pm-dk-fg-red, #B42318); background: var(--pm-dk-bg-red, #FEF3F2); }
 .dashboard-container .today-status--cancelled,
 .dashboard-container .today-status--no_show,

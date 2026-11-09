@@ -48,7 +48,7 @@ class NotificationController extends BaseController
 
     private function listFor(string $role, string $view)
     {
-        $notifications = $this->notificationModel->getAllForRole($role);
+        $notifications = $this->attachRefundState($this->notificationModel->getAllForRole($role));
 
         return view($view, [
             'notifications' => $notifications,
@@ -57,6 +57,41 @@ class NotificationController extends BaseController
             'total_count'   => count($notifications),
             'notif_base'    => NotificationModel::NOTIFICATION_PAGES[$role] ?? '',
         ]);
+    }
+
+    /**
+     * Refund notifications show the payment's current refund state, so a
+     * request that was already confirmed or rejected no longer offers the
+     * buttons. One query for all of them.
+     */
+    private function attachRefundState(array $rows): array
+    {
+        $ids = [];
+        foreach ($rows as $r) {
+            if (($r['type'] ?? '') === 'refund' && (int) ($r['reference_id'] ?? 0) > 0) {
+                $ids[(int) $r['reference_id']] = true;
+            }
+        }
+        if ($ids === []) {
+            return $rows;
+        }
+
+        $payments = [];
+        foreach (db_connect()->table('payments')
+                     ->select('id, reference_number, patient_name, amount_paid, payment_status, refund_status, refund_reason, refund_requested_by, refund_requested_at, refund_reviewed_by, refund_reviewed_at')
+                     ->whereIn('id', array_keys($ids))
+                     ->get()->getResultArray() as $p) {
+            $payments[(int) $p['id']] = $p;
+        }
+
+        foreach ($rows as &$r) {
+            if (($r['type'] ?? '') === 'refund') {
+                $r['refund'] = $payments[(int) ($r['reference_id'] ?? 0)] ?? null;
+            }
+        }
+        unset($r);
+
+        return $rows;
     }
 
     private function fetchFor(string $role)

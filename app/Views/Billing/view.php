@@ -252,6 +252,7 @@ $requestStatus = is_array($request) ? (string) ($request['status'] ?? '') : '';
                                 <input type="number" id="pay_tendered" name="cash_tendered" step="0.01" min="0" placeholder="0.00">
                             </span>
                             <small class="inv-change" id="payChange" aria-live="polite"></small>
+                            <button type="button" class="inv-partial" id="payPartial" hidden></button>
                         </label>
                         <label class="inv-field" id="pay_ref_wrap">
                             <span>Reference no.</span>
@@ -261,7 +262,7 @@ $requestStatus = is_array($request) ? (string) ($request['status'] ?? '') : '';
                             <span>Notes</span>
                             <input type="text" id="pay_notes" name="notes" placeholder="Optional">
                         </label>
-                        <button type="submit" class="inv-btn inv-btn--primary inv-btn--block">
+                        <button type="submit" class="inv-btn inv-btn--primary inv-btn--block" id="paySubmit">
                             <i class="bi bi-check2" aria-hidden="true"></i>Record payment
                         </button>
                     </form>
@@ -491,6 +492,20 @@ $requestStatus = is_array($request) ? (string) ($request['status'] ?? '') : '';
 .inv-change:empty { display: none; }
 .inv-change { font-size: 0.78rem; font-weight: 600; color: var(--pm-dk-fg-green, #067647); }
 .inv-change.is-short { color: var(--pm-dk-fg-red, #B42318); }
+.inv-partial {
+    align-self: flex-start;
+    margin-top: 0.35rem;
+    padding: 0.3rem 0.7rem;
+    border: 1px solid var(--pm-accent-line);
+    border-radius: 999px;
+    background: var(--pm-accent-soft);
+    color: var(--pm-accent-text);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+.inv-partial:hover { background: var(--pm-surface); }
+#paySubmit:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ---------- Buttons ---------- */
 .inv-btn {
@@ -557,43 +572,74 @@ $requestStatus = is_array($request) ? (string) ($request['status'] ?? '') : '';
         syncChange();
     }
 
+    var submit  = document.getElementById('paySubmit');
+    var partial = document.getElementById('payPartial');
+    var money   = function (v) { return '₱' + v.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+
+    // Cash short of the amount: the payment can't be recorded as is.
+    // Either collect the rest, or record what was handed over as a
+    // partial payment (the invoice then stays Partial with a balance).
     function syncChange() {
         if (!change || !amount || !tendered) return;
+        var isCash = !methodSel || methodSel.value === 'cash';
         var a = parseFloat(amount.value) || 0, t = parseFloat(tendered.value) || 0;
-        change.classList.remove('is-short');
-        if (!t) { change.textContent = ''; return; }
-        if (t < a) {
-            change.classList.add('is-short');
-            change.textContent = 'Short by ₱' + (a - t).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            return;
+        var short = isCash && t > 0 && t + 0.005 < a;
+
+        change.classList.toggle('is-short', short);
+        if (submit)  { submit.disabled = short; }
+        if (partial) {
+            partial.hidden = !short;
+            if (short) { partial.textContent = 'Record ' + money(t) + ' as partial payment'; }
         }
-        change.textContent = 'Change ₱' + (t - a).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        if (!isCash || !t) { change.textContent = ''; return; }
+        change.textContent = short
+            ? 'Short by ' + money(a - t) + ' — collect the rest or record a partial payment'
+            : 'Change ' + money(t - a);
+    }
+
+    if (partial) {
+        partial.addEventListener('click', function () {
+            amount.value = (parseFloat(tendered.value) || 0).toFixed(2);
+            syncChange();
+            amount.focus();
+        });
     }
 
     if (methodSel) { methodSel.addEventListener('change', syncMethod); syncMethod(); }
     if (amount)    { amount.addEventListener('input', syncChange); }
     if (tendered)  { tendered.addEventListener('input', syncChange); }
 
+    // Refund: the shared refund window (reason + confirmation box)
     document.querySelectorAll('[data-refund]').forEach(function (btn) {
         btn.addEventListener('click', function () {
-            var reason = prompt('Reason for refunding this payment:');
-            if (reason === null) return;
-            var form = document.createElement('form');
-            form.method = 'POST';
-            form.action = <?= json_encode(base_url($routeBase . '/refund/')) ?> + btn.dataset.refund;
-            var csrfName = <?= json_encode(csrf_token()) ?>;
-            var csrfHash = <?= json_encode(csrf_hash()) ?>;
-            var input = document.createElement('input');
-            input.type = 'hidden'; input.name = csrfName; input.value = csrfHash;
-            form.appendChild(input);
-            var r = document.createElement('input');
-            r.type = 'hidden'; r.name = 'reason'; r.value = reason;
-            form.appendChild(r);
-            document.body.appendChild(form);
-            form.submit();
+            if (window.pmRefund) { window.pmRefund.refund(Number(btn.dataset.refund)); }
         });
     });
 })();
 </script>
+
+<?php if ($isAdminUser): ?>
+    <?php
+    // Payment data for the refund window (same shape as the Payments page)
+    $refundData = [];
+    foreach ($payments as $p) {
+        $refundData[(int) $p['id']] = [
+            'id'                  => (int) $p['id'],
+            'ref'                 => (string) ($p['reference_number'] ?? ''),
+            'name'                => (string) ($p['patient_name'] ?? ''),
+            'paid'                => (float) ($p['amount_paid'] ?? 0),
+            'date'                => (string) ($p['payment_date'] ?? ''),
+            'status'              => (string) ($p['payment_status'] ?? ''),
+            'refund_status'       => (string) ($p['refund_status'] ?? ''),
+            'refund_reason'       => (string) ($p['refund_reason'] ?? ''),
+            'refund_requested_by' => (string) ($p['refund_requested_by'] ?? ''),
+            'refund_requested_at' => (string) ($p['refund_requested_at'] ?? ''),
+        ];
+    }
+    ?>
+    <script type="application/json" id="pmReceipts"><?= json_encode($refundData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?></script>
+    <?= view('partials/refund_ui', ['role' => 'admin']) ?>
+<?php endif; ?>
 
 <?= $this->endSection() ?>

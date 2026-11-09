@@ -34,7 +34,6 @@ $routes->group('admin', ['filter' => 'auth:admin'], function ($routes) {
     $routes->get('appointment/view/(:num)', 'Admin::appointmentView/$1');
     $routes->post('appointment/approve/(:num)', 'Admin::approveAppointment/$1');
     $routes->post('appointment/cancel/(:num)', 'Admin::cancelAppointment/$1');
-    $routes->post('appointment/complete/(:num)', 'Admin::completeAppointment/$1');
     $routes->post('appointment/delete/(:num)', 'Admin::deleteAppointment/$1');
 
     // Diagnostic requests
@@ -51,6 +50,8 @@ $routes->group('admin', ['filter' => 'auth:admin'], function ($routes) {
     $routes->get('get-payment-details/(:num)', 'Admin::getPaymentDetails/$1');
     $routes->get('print-receipt/(:num)',       'Admin::printReceipt/$1');
     $routes->post('refund-payment/(:num)',     'Admin::refundPayment/$1');
+    $routes->post('refund-approve/(:num)',     'Admin::approveRefund/$1');
+    $routes->post('refund-reject/(:num)',      'Admin::rejectRefund/$1');
 
     // Notifications
     $routes->get('notifications', 'NotificationController::index');
@@ -90,7 +91,6 @@ $routes->group('receptionist', ['filter' => 'auth:receptionist'], function ($rou
     $routes->get('appointment/view/(:num)', 'Receptionist::appointmentView/$1');
     $routes->post('appointment/approve/(:num)', 'Receptionist::approveAppointment/$1');
     $routes->post('appointment/cancel/(:num)', 'Receptionist::cancelAppointment/$1');
-    $routes->post('appointment/complete/(:num)', 'Receptionist::completeAppointment/$1');
 
     // ⬅ EDIT #1 — the old placeholder route pointed at Receptionist::billing.
     //            Now it points at the shared Billing controller so this URL
@@ -121,7 +121,8 @@ $routes->group('receptionist', ['filter' => 'auth:receptionist'], function ($rou
     // Payments AJAX
     $routes->get('get-payment-details/(:num)', 'Receptionist::getPaymentDetails/$1');
     $routes->get('print-receipt/(:num)',       'Receptionist::printReceipt/$1');
-    // Refunds are admin-only (see the billing block below)
+    // A receptionist's refund is a request; an administrator confirms it
+    $routes->post('refund-request/(:num)',     'Receptionist::requestRefund/$1');
 
     // Patient sync (manual tool, POST only)
     $routes->post('sync-walk-in-patients', 'Receptionist::syncWalkInPatients');

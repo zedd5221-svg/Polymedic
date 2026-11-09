@@ -23,7 +23,8 @@
     ];
     $status = $statusMeta[$statusKey] ?? ['label' => ucfirst($statusKey), 'tone' => 'pending'];
 
-    $radiologistName = trim((string) ($examination['radiologist_name'] ?? ''));
+    // The assignee, else whoever worked it — same rule as the worklist.
+    $radiologistName = \App\Models\DiagnosticRequestModel::handlerName($examination);
     if ($radiologistName === '') {
         $radiologistName = trim((string) (session()->get('full_name') ?? ''));
     }
@@ -165,13 +166,10 @@
                     <dt>Priority</dt>
                     <dd><?= $isStat ? '<span class="xv-priority-stat">Urgent</span>' : 'Routine' ?></dd>
                 </div>
-                <div class="xv-fact">
-                    <dt>Referred by</dt>
-                    <dd title="<?= esc($examination['doctor_name'] ?? '', 'attr') ?>"><?= !empty($examination['doctor_name']) ? esc($examination['doctor_name']) : $dash ?></dd>
-                </div>
+
                 <div class="xv-fact">
                     <dt>Radiologist</dt>
-                    <dd title="<?= esc($radiologistName, 'attr') ?>"><?= $radiologistName !== '' ? esc($radiologistName) : $dash ?></dd>
+                    <dd title="<?= esc($radiologistName, 'attr') ?>"><?= $radiologistName !== '' ? esc($radiologistName) : 'Unassigned' ?></dd>
                 </div>
                 <?php if ($isReleased && !empty($examination['released_at'])): ?>
                     <div class="xv-fact">

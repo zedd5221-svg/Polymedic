@@ -71,7 +71,8 @@ Add a note box beside step 3: "Each page group allows exactly one role. Administ
 - The slot check covers working day, booking window, valid slot time, past time today, blocked slot and capacity (default 1 per department). The caption simplified this.
 - Patient matching uses the **same name** first, then age + sex, then age only, then email or phone.
 - **Override booking is Receptionist-only.** It skips the slot-capacity check but **not** the closed-day or past-date check. It saves directly as **approved**, not pending.
-- Approve, cancel and complete each have their own status rule (details in the prompt). **Delete is Admin-only.**
+- Appointments have **no "completed" status and no Complete action** (removed 2026-11-09). Approval is the last step; test progress is tracked on the diagnostic requests.
+- Approve and cancel each have their own status rule (details in the prompt). **Delete is Admin-only.**
 
 ### Prompt 4.2(a)
 
@@ -100,7 +101,7 @@ Draw a top-to-bottom flowchart titled "Figure 4.2(a) Online Booking (Public Visi
 ### Prompt 4.2(b)
 
 ```
-Draw a flowchart titled "Figure 4.2(b) Appointment Review, Approval and Override (Front Desk)" with standard symbols. Use three columns for the three actions (Approve / Cancel / Complete) under one shared start, plus a separate lane for Override Booking.
+Draw a flowchart titled "Figure 4.2(b) Appointment Review, Approval and Override (Front Desk)" with standard symbols. Use two columns for the two actions (Approve / Cancel) under one shared start, plus a separate lane for Override Booking.
 
 Main path:
 1. Start: "Receptionist or Administrator opens an appointment"
@@ -108,19 +109,17 @@ Main path:
 3. Decision: "Action chosen?" → three branches:
 
 APPROVE branch:
- A1. Decision "Status is completed, cancelled or no_show?" — Yes → Output "This appointment cannot be approved" → End.
+ A1. Decision "Status is cancelled or no_show?" — Yes → Output "This appointment cannot be approved" → End.
  A2. Process "Set status = approved, arrival_time = now" (appointments)
  A3. Process "Find or create patient record" (patients)
  A4. Loop for each department (Laboratory, X-ray): Decision "Appointment has services for this department?" — No → skip. Decision "Request already exists for this appointment and department?" — Yes → note "request already exists", skip. Otherwise Process "Create diagnostic request, status = pending, reference LAB-YY-XXXXXX or XR-YY-XXXXXX" (diagnostic_requests) → Process "Notify Admin and the department (Med Techs or Radiologists)" (notifications).
  A5. Output "Appointment approved + patient code" → End.
 
 CANCEL branch:
- C1. Decision "Status = completed?" — Yes → Output "Completed appointments cannot be cancelled" → End.
+ C1. Decision "Status = cancelled?" — Yes → Output "This appointment is already cancelled" → End.
  C2. Process "Set status = cancelled" → End.
 
-COMPLETE branch:
- K1. Decision "Status = approved?" — No → Output "Only approved appointments can be marked as completed" → End.
- K2. Process "Set status = completed" → End.
+Note box: "Appointment statuses: pending → approved (final) or cancelled; late may still be approved. There is no Complete action."
 
 Side note box: "Delete appointment — Administrator only."
 
@@ -322,7 +321,8 @@ Draw a flowchart titled "Figure 4.6(b) Answering the Transfer" with standard sym
 - **Refund marks the payment "refunded".** The current figure says "voided".
 - Void **requires** a reason and **no paid amount** on the invoice, then **sets** the balance to 0. Balance 0 is the result, not a precondition.
 - A payment amount cannot be more than the remaining balance. Cash tendered is entered separately to compute change.
-- **Refund, Void and Sync are Administrator-only.** The Receptionist can create invoices, take payments and print or email receipts.
+- **Void and Sync are Administrator-only.** The Receptionist can create invoices, take payments and print or email receipts.
+- **Refunds (changed 2026-11-09):** every refund needs a **reason** and a ticked **confirmation box**; the reason is printed on the receipt. A **Receptionist can only request** a refund; an **Administrator confirms or rejects** it from the notification or the Payments page (Flow E). An **Administrator's own refund needs no approval**. While a request is pending, the payment stays **paid**.
 
 ### Prompt 4.7(a)
 
@@ -385,11 +385,15 @@ Draw a flowchart titled "Figure 4.7(d) Flow D — Corrections by the Administrat
 1. Start: "Administrator opens an invoice"
 2. Decision: "Correction?" → REFUND / VOID / SYNC
 
-REFUND branch:
- R1. Input "Select payment; reason (default 'Refunded by admin')"
- R2. Decision "Payment found and not already refunded?" — No → Output "Payment could not be refunded" → End.
- R3. Process "Set payment status = refunded; record void_reason, voided_by, voided_at" (payments)
- R4. Process "Recalculate invoice (refunded amount no longer counts as paid)" → End.
+REFUND branch (Administrator refunds directly — no approval needed):
+ R1. Input "Select payment; type the refund reason; tick 'I confirm … will be refunded. This cannot be undone.'"
+ R2. Decision "Box ticked?" — No → Output "Confirm and Cancel stay disabled" → back to R1.
+ R3. Decision "Reason at least 5 characters?" — No → Output "Please give the reason for the refund" → back to R1.
+ R4. Decision "Payment status = paid?" — No → Output "Only paid payments can be refunded" → End.
+ R5. Process "Set payment status = refunded, refund status = approved; record refund reason, refunded by, time" (payments)
+ R6. Process "Recalculate invoice (refunded amount no longer counts as paid)" (invoices)
+ R7. Decision "Was a Receptionist's request pending for this payment?" — Yes → Process "Notify that Receptionist: refund approved" (notifications).
+ R8. End "Refund printed on the receipt with its reason".
 
 VOID branch:
  V1. Input "Void reason"
@@ -402,6 +406,40 @@ SYNC branch:
  S1. Decision "Invoice linked to a diagnostic request and has line items?" — No → Output "Could not sync" → End.
  S2. Decision "Request still pending?" — No → Output "The request may already be in progress" → End.
  S3. Process "Rewrite the request's tests to match the invoice" (diagnostic_requests) → Output "Request updated. It now matches the invoice." → End.
+```
+
+### Prompt 4.7(e)
+
+```
+Draw a swimlane flowchart titled "Figure 4.7(e) Flow E — Refund Request and Approval" with standard flowchart symbols (oval start/end, parallelogram input/output, rectangle process, diamond decision with Yes/No labels, cylinder for database). Three vertical lanes, left to right: "Receptionist", "System", "Administrator". Cylinders: payments, notifications, invoices.
+
+Receptionist lane:
+1. Start: "Receptionist clicks Refund on a paid payment (Payments page)"
+2. Input: "Refund window: payment summary (amount, patient, receipt no.); type the reason (or pick a common reason: Test was not performed, Duplicate payment, Overcharged / wrong amount, Patient cancelled the request); tick 'I confirm the customer is asking for a refund…'"
+3. Decision: "Box ticked?" — No → Output "Confirm and Cancel stay disabled" → back to step 2.
+4. Decision: "Button pressed?" — Cancel → End "Window closed, nothing saved". Confirm → step 5 (System lane).
+
+System lane:
+5. Decision: "Reason at least 5 characters AND payment status = paid AND no request already pending?" — No → Output "Reason required / Only paid payments can be refunded / A refund for this payment is already waiting for approval" → back to step 2.
+6. Process: "Save refund request: refund status = pending, reason, requested by, time. Payment stays PAID." (payments)
+7. Process: "Notify every Administrator: 'Refund request: PAY-…' with amount, patient and the reason" (notifications)
+8. Output (to Receptionist lane): "Refund request sent. The row shows 'Waiting for admin approval'; the receipt shows 'Refund requested — awaiting approval' with the reason."
+
+Administrator lane:
+9. Start: "Administrator opens the refund notification (or Payments → Refund requests → Review)"
+10. Output: "Request shows amount, patient, receipt no., requested by, and the REASON"
+11. Input: "Tick 'I have checked this request and the reason above'"
+12. Decision: "Box ticked?" — No → Output "Confirm refund and Reject stay disabled" → back to step 11.
+13. Decision: "Decision?" — Confirm refund → step 14. Reject → step 17.
+
+System lane (decision):
+14. Decision: "Request still pending AND payment still paid?" — No → Output "This refund request has already been handled" → End.
+15. Process: "Set payment status = refunded, refund status = approved; record approved by, time" (payments) → Process "Recalculate invoice" (invoices)
+16. Process: "Notify the requesting Receptionist: 'Refund approved' with the reason" (notifications) → End "Refunded; receipt shows reason, requested by, approved by".
+17. Process: "Set refund status = rejected; record rejected by, time. Payment stays paid." (payments)
+18. Process: "Notify the requesting Receptionist: 'Refund rejected' with the reason" (notifications) → End "Payment stays paid; receipt shows 'Refund request rejected'".
+
+Add a note box beside step 6: "An Administrator's own refund skips this lane and is applied at once (Flow D, Refund branch)."
 ```
 
 ---
@@ -426,12 +464,12 @@ Six external entities (rectangles) placed around it, each with labelled arrows:
    ← System: available time slots, booking errors, booking confirmation with reference number (APPT-…)
 
 2. Receptionist
-   → System: login credentials, appointment decisions (approve / cancel / complete), override booking with reason, walk-in registration, Start + staff selection, invoice details, payment details, print/email requests
-   ← System: dashboard and monitoring screen, appointment list, notifications, patient codes, invoices, receipts, printed request/results, front-desk and revenue reports
+   → System: login credentials, appointment decisions (approve / cancel), override booking with reason, walk-in registration, Start + staff selection, invoice details, payment details, refund requests with reason, print/email requests
+   ← System: dashboard and monitoring screen, appointment list, notifications (incl. refund approved / rejected), patient codes, invoices, receipts (with refund reason), printed request/results, front-desk and revenue reports
 
 3. Administrator
-   → System: login credentials, user accounts, services and prices, clinic hours / closed days / holidays / blocked slots, appointment decisions, walk-in registration, Start + staff selection, refunds, voids, invoice sync
-   ← System: dashboard KPIs, notifications, patient and request lists, payment records, billing and revenue reports
+   → System: login credentials, user accounts, services and prices, clinic hours / closed days / holidays / blocked slots, appointment decisions, walk-in registration, Start + staff selection, refunds with reason, refund request decisions (confirm / reject), voids, invoice sync
+   ← System: dashboard KPIs, notifications (incl. refund requests with reason), patient and request lists, payment records, billing and revenue reports
 
 4. Medical Technologist
    → System: login credentials, lab results (test, result, unit, reference range, flag), findings, save/complete/release actions, transfer requests and responses
@@ -479,7 +517,7 @@ External entities: Public Visitor, Receptionist, Administrator, Medical Technolo
 
 PANEL (a) "Figure 4.9(a) Front Office — Processes 1.0 to 4.0"
 - 1.0 Authenticate User: all staff → credentials; reads D1; writes last login to D1; → staff: dashboard / error.
-- 2.0 Book and Manage Appointments: Public Visitor → booking details; reads D9, D12, D13, D3; writes D3, D2; writes D10 (new-appointment notice); Receptionist/Administrator → approve/cancel/complete; Receptionist → override booking; writes D4 (pending requests on approval) and D10 (department notice); → Visitor: slots, reference number.
+- 2.0 Book and Manage Appointments: Public Visitor → booking details; reads D9, D12, D13, D3; writes D3, D2; writes D10 (new-appointment notice); Receptionist/Administrator → approve/cancel; Receptionist → override booking; writes D4 (pending requests on approval) and D10 (department notice); → Visitor: slots, reference number.
 - 3.0 Register Walk-in Patient: Receptionist/Administrator → walk-in details; reads/writes D2; writes D4; writes D10.
 - 4.0 Start and Assign Request: Receptionist/Administrator → Start + staff choice; reads D1 (active staff), D4, D9 (prices); writes D4 (in_progress + assignee), D6 (payment), D7/D8 (invoice).
 
@@ -489,7 +527,7 @@ PANEL (b) "Figure 4.9(b) Departments — Processes 5.0 to 7.0"
 - 7.0 Transfer Patients: Med Tech / Radiologist → transfer request, accept/decline/cancel; reads D1, D4; writes D11, D4 (re-assignment), D10.
 
 PANEL (c) "Figure 4.9(c) Billing and Administration — Processes 8.0 and 9.0"
-- 8.0 Manage Billing: Receptionist/Administrator → invoice and payment details; Administrator → refund, void, sync; reads/writes D7, D8, D6; reads D2, D9; writes D4 (sync, pending only); → receipts; → Email Recipient: emailed receipt PDF.
+- 8.0 Manage Billing: Receptionist/Administrator → invoice and payment details; Receptionist → refund request with reason; Administrator → refund with reason, confirm/reject refund request, void, sync; reads/writes D7, D8, D6; reads D2, D9; writes D4 (sync, pending only); writes D10 (refund request → Administrators; decision → requesting Receptionist); → receipts (with refund reason); → Email Recipient: emailed receipt PDF.
 - 9.0 Administer System and Reports: Administrator → users, services, clinic hours/holidays/blocked slots; writes D1, D9, D12, D13; reads D3, D4, D6, D7 for reports; all staff → report requests, Email PDF; → staff: reports; → Email Recipient: emailed report/result PDF.
 
 Number every flow label briefly, avoid crossing lines, keep each panel on its own page.
@@ -516,7 +554,7 @@ Processes and flows:
 - 2.1 Validate Booking Form: Public Visitor → booking details (services, date, time, name, age, sex, email, phone, notes); reads D9 (lab and X-ray service list); → 2.2 valid booking; → Visitor: field errors.
 - 2.2 Check and Lock Slot: reads D13 (clinic hours, lunch break, slot interval, closed days, holidays, booking window), D12 (blocked slots, capacity), D3 (bookings at that slot); locks the slot rows; → 2.3 confirmed slot; → Visitor: "slot unavailable"; also → Visitor: available time slots (slot lookup).
 - 2.3 Save Appointment and Patient: writes D3 (status pending, APPT reference); reads/writes D2 (find or create patient); writes D10 (New Appointment Request → Administrator and Receptionist); → Visitor: confirmation with reference number.
-- 2.4 Review Appointment: Receptionist/Administrator → approve, cancel, complete; Administrator → delete; Receptionist → override booking with reason; reads/writes D3; reads D12/D13 (override: open day, not past); → 2.5 approved appointment.
+- 2.4 Review Appointment: Receptionist/Administrator → approve, cancel; Administrator → delete; Receptionist → override booking with reason; reads/writes D3; reads D12/D13 (override: open day, not past); → 2.5 approved appointment.
 - 2.5 Create Diagnostic Requests: reads D3 services; reads/writes D2 (patient code); writes D4 (one pending request per department, skip if exists); writes D10 (Admin + Med Techs or Radiologists).
 ```
 
@@ -573,12 +611,13 @@ Data stores: D2 patients, D4 diagnostic_requests, D6 payments, D7 invoices, D8 i
 Draw a Level 1 Data Flow Diagram (Gane-Sarson notation) titled "Figure 4.12(b) Level 1 DFD of Process 8.0 — Payments and Corrections".
 
 External entities: Receptionist, Administrator, Email Recipient.
-Data stores: D6 payments, D7 invoices, D8 invoice_items.
+Data stores: D6 payments, D7 invoices, D8 invoice_items, D10 notifications.
 
 - 8.4 Record Payment: Receptionist/Administrator → amount, method (cash, card, GCash, PayMaya, insurance), reference no., cash tendered; reads D7 (status not void/refunded, balance); reads D8; writes D6 (paid, change amount); → 8.5.
 - 8.5 Recalculate Invoice (same process as in panel a): reads D6; writes D7.
-- 8.6 Refund Payment / Void Invoice (Administrator only): refund → writes D6 (status refunded, reason, by, time) → 8.5; void → reads D7 (reason required, amount paid must be 0) → writes D7 (status void, balance 0, reason, by, time).
-- 8.7 Issue Receipt: reads D6, D7, D8; → Receptionist/Administrator: printed receipt; → Email Recipient: receipt PDF (when "Email PDF" is used).
+- 8.6 Refund Payment / Void Invoice (Administrator only): refund → Administrator → reason + confirmation; reads D6 (must be paid); writes D6 (status refunded, refund status approved, reason, refunded by, time) → 8.5; void → reads D7 (reason required, amount paid must be 0) → writes D7 (status void, balance 0, reason, by, time).
+- 8.9 Request and Review Refund: Receptionist → refund request (reason + confirmation); reads D6 (paid, none pending); writes D6 (refund status pending, reason, requested by, time — payment stays paid); writes D10 (request with reason → every Administrator). Administrator → confirm or reject (+ confirmation); confirm → writes D6 (refunded, approved by) → 8.5; reject → writes D6 (refund status rejected, rejected by); both → writes D10 (decision → requesting Receptionist).
+- 8.7 Issue Receipt: reads D6 (incl. refund status, reason, requested/approved by), D7, D8; → Receptionist/Administrator: printed receipt showing the refund reason; → Email Recipient: receipt PDF (when "Email PDF" is used).
 - 8.8 Produce Billing Reports (Administrator): reads D6, D7; → Administrator: billing and revenue reports (refunds shown separately).
 ```
 
@@ -603,7 +642,7 @@ Draw an Entity Relationship Diagram in crow's-foot notation titled "Figure 4.13(
 
 Entities:
 - PATIENTS: id PK, patient_code (unique), full_name, email, phone, age, gender, source (online / walk-in / referral), address, created_at
-- APPOINTMENTS: id PK, reference_number (unique), appointment_date, appointment_time, full_name, age, gender, email, phone, service_type (laboratory / xray / both), lab_services (JSON), xray_services (JSON), other_requests, status (pending / approved / completed / cancelled), is_override, override_reason, override_by, arrival_time
+- APPOINTMENTS: id PK, reference_number (unique), appointment_date, appointment_time, full_name, age, gender, email, phone, service_type (laboratory / xray / both), lab_services (JSON), xray_services (JSON), other_requests, status (pending / approved / late / cancelled), is_override, override_reason, override_by, arrival_time
 - DIAGNOSTIC_REQUESTS: id PK, reference_number (unique), type (lab / xray), appointment_id FK, patient_code, patient_name, age, gender, services (text list), request_date, doctor_name, priority, status (pending / in_progress / draft / completed / released / cancelled), assigned_to_id, assigned_to_name, assigned_at, med_tech_id, med_tech_name, radiologist_id, radiologist_name, findings, interpretation, remarks, image_paths (JSON, max 5), released_at
 - LAB_RESULTS: id PK, lab_request_id FK, test_name, result, unit, reference_range, flag (normal / high / low / critical)
 - SERVICES: id PK, service_code (unique), service_name, category (laboratory / xray / other), charge, is_active
@@ -649,7 +688,7 @@ Draw an Entity Relationship Diagram in crow's-foot notation titled "Figure 4.13(
 Entities:
 - INVOICES: id PK, invoice_no (unique, INV-YYYY-NNNNNN), patient_code, patient_name, appointment_id, request_id, request_type (lab / xray), subtotal, discount_type (none / percent / fixed), discount_value, discount_reason, tax, total, amount_paid, balance, status (draft / unpaid / partial / paid / void / refunded), created_by, created_by_id, voided_by, voided_at, void_reason
 - INVOICE_ITEMS: id PK, invoice_id, service_name, category, qty, unit_price, line_total
-- PAYMENTS: id PK, reference_number (unique), invoice_id, request_id FK, request_type, appointment_id FK, patient_code, patient_name, services (JSON), total_amount, amount_paid, change_amount, payment_method (cash / card / gcash / paymaya / insurance), reference_no, payment_status (paid / pending / refunded / failed), payment_date, received_by, received_by_id, void_reason, voided_at, voided_by
+- PAYMENTS: id PK, reference_number (unique), invoice_id, request_id FK, request_type, appointment_id FK, patient_code, patient_name, services (JSON), total_amount, amount_paid, change_amount, payment_method (cash / card / gcash / paymaya / insurance), reference_no, payment_status (paid / pending / refunded / failed), payment_date, received_by, received_by_id, void_reason, voided_at, voided_by, refund_status (pending / approved / rejected, nullable), refund_reason, refund_requested_by, refund_requested_by_id, refund_requested_at, refund_reviewed_by, refund_reviewed_by_id, refund_reviewed_at
 - APPOINTMENTS: id PK, reference_number (show only these)
 - DIAGNOSTIC_REQUESTS: id PK, reference_number, type (show only these)
 - PATIENTS: id PK, patient_code (show only these)
@@ -664,6 +703,7 @@ Relationships:
 - APPOINTMENTS 1 —— 0..* INVOICES (appointment_id) — dashed.
 - PATIENTS 1 —— 0..* INVOICES and PAYMENTS (patient_code) — dashed.
 - USERS 1 —— 0..* PAYMENTS ("received by", received_by_id) and INVOICES ("created by", created_by_id) — dashed.
+- USERS 1 —— 0..* PAYMENTS ("refund requested by", refund_requested_by_id) and ("refund reviewed by", refund_reviewed_by_id) — dashed.
 ```
 
 ---
@@ -674,7 +714,7 @@ Relationships:
 - **Override booking is Receptionist-only.** **Delete appointment is Administrator-only.**
 - Administrators **can't** enter the Med Tech or Radiologist pages. They can register walk-ins and press Start.
 - Med Tech and Radiologist each have a **department workload report**, which the current figure is missing.
-- Billing: the Receptionist has **create invoice, record payment, print/email receipt, search invoices**. **Refund, void, sync and billing reports are Administrator-only.**
+- Billing: the Receptionist has **create invoice, record payment, print/email receipt, search invoices, request refund**. **Refund, review refund request, void, sync and billing reports are Administrator-only.**
 - Printing a result is available to the Receptionist, Administrator and the department that released it.
 
 ### Prompt 4.14(a)
@@ -686,7 +726,7 @@ Use cases and associations:
 1. Check Available Slots — Public Visitor
 2. Book Appointment Online — Public Visitor («include» Check Available Slots)
 3. View Booking Confirmation — Public Visitor
-4. Approve / Cancel / Complete Appointment — Receptionist, Administrator
+4. Approve / Cancel Appointment — Receptionist, Administrator
 5. Delete Appointment — Administrator
 6. Override-Book a Full Slot — Receptionist (standalone use case; requires a reason)
 7. Register Walk-in Patient — Receptionist, Administrator
@@ -711,10 +751,14 @@ Use cases and associations:
 2. Create Invoice (with discount: None, Senior 20%, PWD 20%, Other) — Receptionist, Administrator
 3. Record Payment — Receptionist, Administrator
 4. Print or Email Receipt — Receptionist, Administrator («extend» Record Payment)
-5. Refund Payment — Administrator
-6. Void Invoice — Administrator
-7. Sync Invoice to Request — Administrator
-8. View Billing and Revenue Reports — Administrator
+5. Refund Payment — Administrator (applied at once, no approval) («include» Give Refund Reason and Confirm)
+6. Request Refund — Receptionist («include» Give Refund Reason and Confirm; the payment stays paid until reviewed)
+7. Give Refund Reason and Confirm — (included only: reason printed on the receipt + "I confirm" checkbox)
+8. Review Refund Request (Confirm / Reject) — Administrator (from the notification or the Payments page; needs the "I have checked" checkbox)
+9. Void Invoice — Administrator
+10. Sync Invoice to Request — Administrator
+11. View Billing and Revenue Reports — Administrator
+Draw a dependency note between 6 and 8: "Request Refund notifies the Administrator, who reviews it".
 ```
 
 ### Prompt 4.14(c)
@@ -747,4 +791,172 @@ Common Module (associated with All staff only):
 9. Email document as PDF
 
 Keep lines from crossing where possible: Administrator lines go left into the Administration Module; Receptionist line goes right into the Front Desk Module; All staff lines go right into the Common Module.
+```
+
+---
+
+## Change 2026-11-09 — "Mark as completed" removed from appointments
+
+The **Complete** action and the **"completed" appointment status** were removed for both the Receptionist and the Administrator.
+
+- **Appointment statuses now:** `pending → approved` (final), or `cancelled`. `late` can still be approved.
+- **Cancel** is refused only when the appointment is already cancelled.
+- **Approve** is refused when the appointment is cancelled or no_show.
+- All 54 old "completed" appointments were converted to **approved**.
+- The Receptionist dashboard card **"Completed Today"** is now **"Arrived Today"**, which counts appointments approved and checked in today.
+- Lab and X-ray **diagnostic requests still use "completed"** (Complete → Release). That part didn't change.
+
+The full prompts above are already updated. To fix a diagram you have **already drawn**, upload or paste it into your AI diagram tool together with the matching prompt below.
+
+### Update prompt — Figure 4.2(b) Appointment Review flowchart
+
+```
+Update the attached flowchart "Figure 4.2(b) Appointment Review, Approval and Override". Keep the same layout, symbols and style. Make only these changes:
+1. Delete the whole "Complete" branch: the "Status = approved?" decision, the "Only approved appointments can be marked as completed" output, the "Set status = completed" process, and both of its End ovals ("Completed", "Not completed").
+2. On the "Action chosen?" decision, keep only two branches: Approve and Cancel.
+3. Approve branch: change the decision text to "Status is cancelled or no_show?" (remove "completed").
+4. Cancel branch: change the decision text to "Status = cancelled?" and the Yes-output to "This appointment is already cancelled". Keep "Set status = cancelled" → End "Cancelled" on the No path.
+5. Add a note box next to "Action chosen?": "Appointment statuses: pending → approved (final) or cancelled. There is no Complete action."
+6. Remove the empty space left by the deleted branch so the chart stays compact.
+```
+
+### Update prompt — Figure 4.8 Context Level Diagram
+
+```
+Update the attached context diagram. Keep everything else the same. On the arrow from Receptionist to the system, change "appointment decisions (approve / cancel / complete)" to "appointment decisions (approve / cancel)". If the Administrator arrow mentions "complete", remove it there too.
+```
+
+### Update prompt — Figures 4.9 and 4.10 Data Flow Diagrams
+
+```
+Update the attached data flow diagram. Keep all processes, data stores and numbering. On every flow from Receptionist or Administrator into process 2.0 (Level 0) or process 2.4 Review Appointment (Level 1), change the label "approve, cancel, complete" (or "approve/cancel/complete") to "approve, cancel". Remove any flow labelled "mark completed" or "completed appointment".
+```
+
+### Update prompt — Figure 4.13(a) ERD
+
+```
+Update the attached ERD. In the APPOINTMENTS entity, change the status attribute to "status (pending / approved / late / cancelled)". Do not change DIAGNOSTIC_REQUESTS — its status keeps "completed" (pending / in_progress / draft / completed / released / cancelled). Change nothing else.
+```
+
+### Update prompt — Figure 4.14(a) Use Case Diagram
+
+```
+Update the attached use case diagram. Rename the use case "Approve / Cancel / Complete Appointment" to "Approve / Cancel Appointment" (still associated with Receptionist and Administrator). If there is a separate "Complete appointment" or "Mark as completed" use case, delete it and its association lines. Change nothing else.
+```
+
+### Update prompt — Chapter 4 documentation text
+
+```
+Revise the attached Chapter 4 text of the Polymedic Clinic System documentation to match this change. Keep the writing style, tense and formatting; change only what this affects:
+- Appointments no longer have a "completed" status, and neither the Receptionist nor the Administrator can mark an appointment as completed. Remove every sentence, table row or list item describing a "Complete" / "Mark as completed" action for appointments.
+- Appointment statuses are: pending, approved, late and cancelled. Approval is the final step of an appointment: it records the patient's arrival time and creates one diagnostic request per department. From that point, progress is tracked on the diagnostic requests (pending → in progress → draft → completed → released).
+- An appointment can be cancelled unless it is already cancelled. It can be approved unless it is cancelled or marked no-show.
+- On the Receptionist dashboard, the "Completed Today" figure is replaced by "Arrived Today" (appointments approved and checked in today).
+- Do NOT change any text about laboratory or X-ray results being completed or released — that still exists.
+List every place you changed at the end, as "Section — old text → new text".
+```
+
+---
+
+## Change 2026-11-09 — Refund reason and refund approval
+
+The refund feature on the **Payments** pages (Administrator and Receptionist) and on the invoice page changed.
+
+- **Every refund needs a reason** (at least 5 characters, quick-pick reasons available). The reason is **printed on the receipt**, with who requested it and who approved or rejected it.
+- **Confirmation checkbox:** the refund window shows the amount, patient and receipt number, and a checkbox "I confirm …". **Both buttons (Confirm and Cancel) stay disabled until the box is ticked.** The × still closes the window.
+- **Receptionist → request only.** Confirming creates a **refund request** (refund status *pending*). The payment stays **paid**. **Every Administrator gets a notification** that shows the reason.
+- **Administrator → review.** The notification (and Payments → *Refund requests* → Review) shows the reason, an "I have checked this request" checkbox, and **Confirm refund** / **Reject** buttons, which are disabled until the box is ticked. Confirm → payment *refunded*. Reject → payment stays *paid*, refund status *rejected*. The receptionist who asked gets a notification either way.
+- **Administrator's own refund needs no approval** — it is applied at once.
+- **Database:** new columns on `payments`: `refund_status` (pending / approved / rejected), `refund_reason`, `refund_requested_by`, `refund_requested_by_id`, `refund_requested_at`, `refund_reviewed_by`, `refund_reviewed_by_id`, `refund_reviewed_at`. New notification type **refund**.
+
+The full prompts above (4.7, 4.8, 4.9, 4.12(b), 4.13(c), 4.14(b)) are already updated, and **Prompt 4.7(e)** is new. To fix a diagram you have **already drawn**, upload it to your AI diagram tool together with the matching prompt below.
+
+### New figure — Figure 4.7(e) Refund Request and Approval
+
+Use **Prompt 4.7(e)** above as-is (it is a new figure, not an update).
+
+### Update prompt — Figure 4.7(d) Corrections by the Administrator
+
+```
+Update the attached flowchart "Figure 4.7(d) Flow D — Corrections by the Administrator". Keep the VOID and SYNC branches, layout, symbols and style exactly as they are. Replace only the REFUND branch with these steps, titled "REFUND branch (Administrator refunds directly — no approval needed)":
+ R1. Input "Select payment; type the refund reason; tick 'I confirm … will be refunded. This cannot be undone.'"
+ R2. Decision "Box ticked?" — No → Output "Confirm and Cancel stay disabled" → back to R1.
+ R3. Decision "Reason at least 5 characters?" — No → Output "Please give the reason for the refund" → back to R1.
+ R4. Decision "Payment status = paid?" — No → Output "Only paid payments can be refunded" → End.
+ R5. Process "Set payment status = refunded, refund status = approved; record refund reason, refunded by, time" (cylinder: payments)
+ R6. Process "Recalculate invoice (refunded amount no longer counts as paid)" (cylinder: invoices)
+ R7. Decision "Was a Receptionist's request pending for this payment?" — Yes → Process "Notify that Receptionist: refund approved" (cylinder: notifications).
+ R8. End "Refund printed on the receipt with its reason".
+Remove the old text "reason (default 'Refunded by admin')" — a reason is now required. Add the cylinder "notifications" if the figure does not have it.
+```
+
+### Update prompt — Figure 4.8 Context Level Diagram
+
+```
+Update the attached context diagram. Keep every entity, the process and all other labels. Make only these label changes:
+1. Receptionist → System: add "refund requests with reason".
+2. System → Receptionist: change "notifications" to "notifications (incl. refund approved / rejected)" and "receipts" to "receipts (with refund reason)".
+3. Administrator → System: change "refunds" to "refunds with reason, refund request decisions (confirm / reject)".
+4. System → Administrator: change "notifications" to "notifications (incl. refund requests with reason)".
+```
+
+### Update prompt — Figure 4.9 Level 0 DFD
+
+```
+Update the attached Level 0 data flow diagram. Keep all processes, numbering and data stores. Change only process 8.0 Manage Billing:
+1. Add a flow Receptionist → 8.0 labelled "refund request + reason".
+2. Change the Administrator → 8.0 flow label "refund, void, sync" to "refund + reason, confirm/reject refund request, void, sync".
+3. Add a flow 8.0 → D10 notifications labelled "refund request (to Administrators) / refund decision (to the requesting Receptionist)".
+4. Change the 8.0 → receipts label to "receipts (with refund reason)".
+```
+
+### Update prompt — Figure 4.12(b) Level 1 DFD of 8.0 (Payments and Corrections)
+
+```
+Update the attached Level 1 DFD "Figure 4.12(b) … Payments and Corrections". Keep 8.4, 8.5, 8.7 and 8.8 and the existing data stores. Make these changes:
+1. Add data store "D10 notifications".
+2. Process 8.6 Refund Payment / Void Invoice (Administrator only): the refund input from Administrator is now "reason + confirmation"; it reads D6 "must be paid" and writes D6 "status refunded, refund status approved, reason, refunded by, time" → 8.5. The void part is unchanged.
+3. Add a new process "8.9 Request and Review Refund":
+   - Receptionist → 8.9: "refund request (reason + confirmation)"
+   - 8.9 reads D6: "paid, no request pending"
+   - 8.9 → D6: "refund status pending, reason, requested by, time (payment stays paid)"
+   - 8.9 → D10: "request with reason → every Administrator"
+   - Administrator → 8.9: "confirm or reject (+ confirmation)"
+   - 8.9 → D6: "confirm: refunded, approved by" / "reject: refund status rejected, rejected by"
+   - 8.9 → 8.5: "recalculate after confirm"
+   - 8.9 → D10: "decision → requesting Receptionist"
+4. Change 8.7 Issue Receipt's read from D6 to "payment incl. refund status, reason, requested/approved by" and its output to "printed receipt showing the refund reason".
+```
+
+### Update prompt — Figure 4.13(c) ERD (Billing)
+
+```
+Update the attached ERD "Figure 4.13(c) Billing". Change nothing except:
+1. In PAYMENTS, add these attributes after voided_by: refund_status (pending / approved / rejected, nullable), refund_reason, refund_requested_by, refund_requested_by_id, refund_requested_at, refund_reviewed_by, refund_reviewed_by_id, refund_reviewed_at.
+2. Add two dashed relationship lines USERS 1 —— 0..* PAYMENTS labelled "refund requested by (refund_requested_by_id)" and "refund reviewed by (refund_reviewed_by_id)".
+```
+
+### Update prompt — Figure 4.14(b) Use Case Diagram (Billing)
+
+```
+Update the attached use case diagram "Figure 4.14(b) Billing Module". Keep the actors, boundary and the other use cases. Make these changes:
+1. Keep "Refund Payment" associated with Administrator only, and add the note "applied at once, no approval".
+2. Add use case "Request Refund" associated with Receptionist.
+3. Add use case "Give Refund Reason and Confirm" (no actor line). Draw «include» arrows to it from "Refund Payment" and from "Request Refund".
+4. Add use case "Review Refund Request (Confirm / Reject)" associated with Administrator.
+5. Add a note connecting "Request Refund" and "Review Refund Request": "Request Refund notifies the Administrator, who reviews it. The payment stays paid until then."
+```
+
+### Update prompt — Chapter 4 documentation text
+
+```
+Revise the attached Chapter 4 text of the Polymedic Clinic System documentation to match this change. Keep the writing style, tense and formatting; change only what this affects:
+- Refunds now always require a reason (at least 5 characters). The reason is printed on the official receipt, together with who requested the refund and who approved or rejected it.
+- The refund window shows the amount, patient and receipt number and a confirmation checkbox. The Confirm and Cancel buttons stay disabled until the checkbox is ticked.
+- A Receptionist can no longer refund directly: confirming creates a refund request (status pending). The payment stays paid, and every Administrator receives a notification that shows the reason.
+- An Administrator reviews the request from the notification or from Payments → Refund requests: after ticking "I have checked this request", they choose Confirm refund (the payment becomes refunded and the invoice is recalculated) or Reject (the payment stays paid). The requesting Receptionist is notified of the decision.
+- An Administrator's own refund needs no approval and is applied immediately.
+- The payments table has new columns: refund_status (pending, approved, rejected), refund_reason, refund_requested_by, refund_requested_by_id, refund_requested_at, refund_reviewed_by, refund_reviewed_by_id, refund_reviewed_at. Notifications have a new type, "refund".
+- Update any sentence that says refunds are "Administrator-only" to: "Administrators refund directly; Receptionists can request a refund, which an Administrator must confirm."
+List every place you changed at the end, as "Section — old text → new text".
 ```

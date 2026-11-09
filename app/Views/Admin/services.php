@@ -572,7 +572,12 @@ $tabUrl = static function (string $key): string {
    Theme aligned with AdminLayout blue palette.
    ========================================================= */
 
-.sv {
+/* The modals and toast live outside .sv, so they need the tokens too
+   (without them every var(--sv-*) in the modal was empty: no input
+   borders, no focus ring, no footer background). */
+.sv,
+.sv-modal,
+.sv-toast {
     --sv-ink:         var(--pm-text, #10202E);
     --sv-text:        var(--pm-text-soft, #3B4C5E);
     --sv-muted:       var(--pm-text-muted, #5D6E80);
@@ -1103,11 +1108,11 @@ $tabUrl = static function (string $key): string {
     font-size: 1rem;
     color: var(--sv-accent);
     background: var(--sv-accent-soft);
-    border: 1px solid var(--pm-dk-edge-blue, #cfe3f7);
+    border: 1px solid var(--pm-accent-line);
     border-radius: 10px;
 }
 
-.sv-modal-icon--edit { color: var(--pm-dk-fg-amber, #b45309); background: var(--pm-dk-bg-amber, #fff4e5); border-color: var(--pm-dk-edge-amber, #f4e2c4); }
+.sv-modal-icon--edit { color: var(--sv-accent); background: var(--sv-accent-soft); border-color: var(--pm-accent-line); }
 
 .sv-modal .modal-title {
     font-size: 1rem;
@@ -1162,15 +1167,21 @@ $tabUrl = static function (string $key): string {
 
 .sv-modal .form-control,
 .sv-modal .form-select {
-    border: 1px solid var(--sv-line);
+    background-color: var(--sv-surface);
+    min-height: 40px;
+    border: 1px solid var(--pm-line-strong, var(--sv-line));
     border-radius: var(--sv-radius-xs);
     font-size: 0.875rem;
     padding: 0.55rem 0.75rem;
     color: var(--sv-ink);
 }
 
+.sv-modal .form-control::placeholder { color: var(--sv-faint); }
+.sv-modal textarea.form-control { min-height: 84px; resize: vertical; }
+
 .sv-modal .form-control:focus,
 .sv-modal .form-select:focus {
+    background-color: var(--sv-surface);
     border-color: var(--sv-accent);
     box-shadow: 0 0 0 3px rgba(23, 85, 99, 0.12);
 }

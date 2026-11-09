@@ -367,7 +367,8 @@
 .nc-chip-dot--lab         { background: var(--nc-t-lab); }
 .nc-chip-dot--xray        { background: var(--nc-t-xray); }
 .nc-chip-dot--billing,
-.nc-chip-dot--payment     { background: var(--nc-t-billing); }
+.nc-chip-dot--payment,
+.nc-chip-dot--refund      { background: var(--nc-t-billing); }
 .nc-chip-dot--system      { background: var(--nc-t-system); }
 
 /* ---------- List ---------- */
@@ -497,7 +498,8 @@
 .nc-tile--lab         { --tone: var(--nc-t-lab); }
 .nc-tile--xray        { --tone: var(--nc-t-xray); }
 .nc-tile--billing,
-.nc-tile--payment     { --tone: var(--nc-t-billing); }
+.nc-tile--payment,
+.nc-tile--refund      { --tone: var(--nc-t-billing); }
 .nc-tile--system      { --tone: var(--nc-t-system); }
 
 /*

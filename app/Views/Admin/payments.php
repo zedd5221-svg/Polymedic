@@ -13,8 +13,14 @@
         $m = strtolower((string) ($p['payment_method'] ?? ''));
         $s = strtolower((string) ($p['payment_status'] ?? ''));
         if ($m !== '') { $methodCounts[$m] = ($methodCounts[$m] ?? 0) + 1; }
-        if ($s !== '') { $statusCounts[$s] = ($statusCounts[$s] ?? 0) + 1; }
+        // A paid payment on a bill that still has a balance counts as Partial, not Paid.
+        $bill = ($s === 'paid' && ($p['invoice_status'] ?? '') === 'partial') ? 'partial' : $s;
+        if ($bill !== '') { $statusCounts[$bill] = ($statusCounts[$bill] ?? 0) + 1; }
+        if (($p['refund_status'] ?? '') === 'pending') { $statusCounts['refund_pending'] = ($statusCounts['refund_pending'] ?? 0) + 1; }
     }
+
+    $unpaidInvoices = (isset($unpaidInvoices) && is_array($unpaidInvoices)) ? $unpaidInvoices : [];
+    $statusCounts['unpaid'] = count($unpaidInvoices);
 
     $initialsOf = static function ($name) {
         $parts = preg_split('/\s+/', trim((string) $name));
@@ -76,6 +82,12 @@
             'status'   => (string) ($p['payment_status'] ?? 'pending'),
             'date'     => (string) ($p['payment_date'] ?? ''),
             'cashier'  => $receivedBy !== '' ? $receivedBy : \App\Models\PaymentModel::currentCashierName(),
+            'refund_status'       => (string) ($p['refund_status'] ?? ''),
+            'refund_reason'       => (string) ($p['refund_reason'] ?? ''),
+            'refund_requested_by' => (string) ($p['refund_requested_by'] ?? ''),
+            'refund_requested_at' => (string) ($p['refund_requested_at'] ?? ''),
+            'refund_reviewed_by'  => (string) ($p['refund_reviewed_by'] ?? ''),
+            'refund_reviewed_at'  => (string) ($p['refund_reviewed_at'] ?? ''),
         ];
     }
 
@@ -147,27 +159,32 @@
 
         <div class="pm-tabs" role="group" aria-label="Filter by status">
             <button type="button" class="pm-tab is-active" data-status="all" aria-pressed="true">
-                All <span class="pm-tab-count"><?= (int) count($payments) ?></span>
+                All <span class="pm-tab-count"><?= (int) (count($payments) + count($unpaidInvoices)) ?></span>
             </button>
             <button type="button" class="pm-tab" data-status="paid" aria-pressed="false">
                 Paid <span class="pm-tab-count"><?= (int) ($statusCounts['paid'] ?? 0) ?></span>
             </button>
-            <button type="button" class="pm-tab" data-status="pending" aria-pressed="false">
-                Pending <span class="pm-tab-count"><?= (int) ($statusCounts['pending'] ?? 0) ?></span>
+            <button type="button" class="pm-tab" data-status="partial" aria-pressed="false">
+                Partial <span class="pm-tab-count"><?= (int) ($statusCounts['partial'] ?? 0) ?></span>
+            </button>
+            <button type="button" class="pm-tab" data-status="unpaid" aria-pressed="false">
+                Unpaid <span class="pm-tab-count"><?= (int) ($statusCounts['unpaid'] ?? 0) ?></span>
             </button>
             <button type="button" class="pm-tab" data-status="refunded" aria-pressed="false">
                 Refunded <span class="pm-tab-count"><?= (int) ($statusCounts['refunded'] ?? 0) ?></span>
             </button>
-            <button type="button" class="pm-tab" data-status="failed" aria-pressed="false">
-                Failed <span class="pm-tab-count"><?= (int) ($statusCounts['failed'] ?? 0) ?></span>
+
+            <button type="button" class="pm-tab" data-status="refund_pending" aria-pressed="false">
+                Refund requests <span class="pm-tab-count"><?= (int) ($statusCounts['refund_pending'] ?? 0) ?></span>
             </button>
 
             <select class="pm-visually-hidden" id="filterStatus" aria-hidden="true" tabindex="-1">
                 <option value="">All Status</option>
                 <option value="paid">Paid</option>
-                <option value="pending">Pending</option>
+                <option value="partial">Partial</option>
+                <option value="unpaid">Unpaid</option>
                 <option value="refunded">Refunded</option>
-                <option value="failed">Failed</option>
+                <option value="refund_pending">Refund requests</option>
             </select>
         </div>
 
@@ -233,6 +250,8 @@
                                 data-id="<?= $payId ?>"
                                 data-method="<?= esc($method, 'attr') ?>"
                                 data-status="<?= esc($status, 'attr') ?>"
+                                data-refund="<?= esc((string) ($payment['refund_status'] ?? ''), 'attr') ?>"
+                                data-tags="<?= esc(trim((($status === 'paid' && ($payment['invoice_status'] ?? '') === 'partial') ? 'partial' : $status) . (($payment['refund_status'] ?? '') === 'pending' ? ' refund_pending' : '')), 'attr') ?>"
                                 data-date="<?= $dateTs ? esc(date('Y-m-d', $dateTs), 'attr') : '' ?>"
                                 data-amount="<?= esc((string) $paid, 'attr') ?>">
 
@@ -302,9 +321,20 @@
                                 </td>
 
                                 <td data-label="Status">
+                                    <?php if ($status === 'paid' && ($payment['invoice_status'] ?? '') === 'partial'): ?>
+                                        <span class="pm-status pm-status--partial">Partial</span>
+                                        <small class="pm-due">&#8369;<?= number_format((float) ($payment['invoice_balance'] ?? 0), 2) ?> still due</small>
+                                    <?php else: ?>
                                     <span class="pm-status pm-status--<?= esc($status, 'attr') ?>">
                                         <?= esc(ucfirst($status)) ?>
                                     </span>
+                                    <?php endif; ?>
+                                    <?php $rfState = (string) ($payment['refund_status'] ?? ''); ?>
+                                    <?php if ($rfState === 'pending'): ?>
+                                        <span class="rf-row-state rf-row-state--pending"><i class="bi bi-hourglass-split" aria-hidden="true"></i> Refund requested</span>
+                                    <?php elseif ($rfState === 'rejected' && $status === 'paid'): ?>
+                                        <span class="rf-row-state rf-row-state--rejected">Refund rejected</span>
+                                    <?php endif; ?>
                                 </td>
 
                                 <td data-label="Actions" class="pm-c-actions">
@@ -312,13 +342,22 @@
                                         <button type="button" class="pm-icon-btn" onclick="viewPayment(<?= $payId ?>)" title="View details"><i class="bi bi-eye" aria-hidden="true"></i></button>
                                         <button type="button" class="pm-icon-btn" onclick="viewReceipt(<?= $payId ?>)" title="View receipt"><i class="bi bi-receipt" aria-hidden="true"></i></button>
                                         <button type="button" class="pm-icon-btn pm-icon-btn--print" onclick="printReceipt(<?= $payId ?>)" title="Print receipt"><i class="bi bi-printer" aria-hidden="true"></i></button>
-                                        <?php if ($status === 'paid'): ?>
-                                            <button type="button" class="pm-icon-btn pm-icon-btn--refund" onclick="refundPayment(<?= $payId ?>)" title="Refund"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i></button>
+                                        <?php if ($status === 'paid' && ($payment['invoice_status'] ?? '') === 'partial' && !empty($payment['invoice_id'])): ?>
+                                        <a class="pm-icon-btn pm-icon-btn--collect" href="<?= esc(base_url('admin/billing/view/' . (int) $payment['invoice_id']), 'attr') ?>" title="Collect balance" aria-label="Collect the remaining balance"><i class="bi bi-cash-coin" aria-hidden="true"></i></a>
+                                    <?php endif; ?>
+
+                                        <?php if ($status === 'paid' && ($payment['refund_status'] ?? '') === 'pending'): ?>
+                                            <button type="button" class="pm-icon-btn pm-icon-btn--review" onclick="pmRefund.review(<?= $payId ?>)" title="Review refund request" aria-label="Review refund request"><i class="bi bi-clipboard-check" aria-hidden="true"></i></button>
+                                        <?php elseif ($status === 'paid'): ?>
+                                            <button type="button" class="pm-icon-btn pm-icon-btn--refund" onclick="pmRefund.refund(<?= $payId ?>)" title="Refund" aria-label="Refund"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i></button>
                                         <?php endif; ?>
                                     </div>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
+                        <?= view('partials/unpaid_invoice_rows', ['invoices' => $unpaidInvoices, 'prefix' => 'admin', 'initialsOf' => $initialsOf]) ?>
+                    <?php elseif ($unpaidInvoices): ?>
+                        <?= view('partials/unpaid_invoice_rows', ['invoices' => $unpaidInvoices, 'prefix' => 'admin', 'initialsOf' => $initialsOf]) ?>
                     <?php else: ?>
                         <tr class="pm-row-empty">
                             <td colspan="8">
@@ -555,6 +594,14 @@
 .pm-status::before { content:""; width:6px; height:6px; border-radius:50%; background:var(--pm-tone-dot,#94a3b8); }
 .pm-status--paid     { --pm-tone-bg:var(--pm-green-soft); --pm-tone-fg:var(--pm-green); --pm-tone-dot:#10b981; }
 .pm-status--pending  { --pm-tone-bg:var(--pm-orange-soft); --pm-tone-fg:var(--pm-orange); --pm-tone-dot:#f59e0b; }
+/* Bill state: Partial = paid something, balance left; Unpaid = nothing paid yet */
+.pm-status--partial  { --pm-tone-bg:var(--pm-orange-soft); --pm-tone-fg:var(--pm-orange); --pm-tone-dot:#f59e0b; }
+.pm-status--unpaid   { --pm-tone-bg:var(--pm-red-soft); --pm-tone-fg:var(--pm-red); --pm-tone-dot:#ef4444; }
+.pm-due { display:block; margin-top:.15rem; font-size:.72rem; font-weight:600; color:var(--pm-orange); }
+.pm-amount--none { color:var(--py-muted); font-weight:500; }
+.pm-row--unpaid .pm-ref { color:var(--py-text); }
+.pm-icon-btn--collect { color:var(--pm-accent); }
+.pm-icon-btn--collect:hover { background:var(--pm-accent-soft); border-color:var(--pm-accent-line); color:var(--pm-accent); }
 .pm-status--refunded { --pm-tone-bg:var(--pm-red-soft); --pm-tone-fg:var(--pm-red); --pm-tone-dot:#ef4444; }
 .pm-status--failed   { --pm-tone-bg:#f1f5f9; --pm-tone-fg:#64748b; --pm-tone-dot:#94a3b8; }
 
@@ -695,6 +742,16 @@
 .r-stamp--refunded { color:var(--pm-dk-fg-red, #b91c1c); }
 .r-stamp--pending  { color:var(--pm-dk-fg-amber, #b45309); }
 .r-stamp--failed   { color:var(--pm-text-soft); }
+/* Refund section on the receipt (light-only, like the rest of the receipt) */
+.r-refund { margin:14px 0 4px; padding:10px 12px; border:1px dashed #b91c1c; border-radius:6px; }
+.r-refund h2 { margin:0 0 6px; font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#b91c1c; }
+.r-refund--pending { border-color:#b45309; } .r-refund--pending h2 { color:#b45309; }
+.r-refund--rejected { border-color:#64748b; } .r-refund--rejected h2 { color:#475569; }
+.r-refund-reason { margin:0 0 6px; font-size:12.5px; }
+.r-refund-reason span { display:block; font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#64748b; }
+.r-refund dl { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:4px 14px; margin:0; font-size:11.5px; }
+.r-refund dt { font-size:10px; color:#64748b; text-transform:uppercase; letter-spacing:.05em; }
+.r-refund dd { margin:0; }
 .r-signs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:26px; margin-top:30px; }
 .r-sign { border-top:1px solid var(--r-ink); padding-top:4px; font-size:10px; letter-spacing:.06em;
     text-transform:uppercase; color:var(--r-muted); text-align:center; }
@@ -767,7 +824,8 @@
         var vis=0, sum=0;
         rows().forEach(function(row){
             var okS=term===''||row.textContent.toLowerCase().indexOf(term)!==-1;
-            var okSt=status===''||(row.dataset.status||'').toLowerCase()===status;
+            var tags=' '+(row.dataset.tags||row.dataset.status||'').toLowerCase()+' ';
+            var okSt=status===''||tags.indexOf(' '+status+' ')!==-1;
             var okR=inRange(row.dataset.date||'');
             var show=okS&&okSt&&okR;
             row.style.display=show?'':'none';
@@ -789,6 +847,24 @@
     applyFilters();
 
     var printRoot=document.createElement('div'); printRoot.id='pmReceiptPrint'; document.body.appendChild(printRoot);
+
+    /* Refund section on the receipt: the customer's reason, and who
+       requested / approved it (or that it is still waiting / rejected). */
+    function refundBlock(data){
+        var rs=(data.refund_status||'').toLowerCase();
+        if(!rs||!data.refund_reason)return '';
+        var when=function(s){if(!s)return '';var d=new Date(String(s).replace(' ','T'));return isNaN(d.getTime())?s:d.toLocaleString(undefined,{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});};
+        var title=rs==='approved'?'Refunded':(rs==='pending'?'Refund requested \u2014 awaiting approval':'Refund request rejected');
+        var lines='';
+        if(data.refund_requested_by)lines+='<div><dt>Requested by</dt><dd>'+escapeHtml(data.refund_requested_by)+(data.refund_requested_at?' \u00B7 '+escapeHtml(when(data.refund_requested_at)):'')+'</dd></div>';
+        if(rs!=='pending'&&data.refund_reviewed_by)lines+='<div><dt>'+(rs==='approved'?(data.refund_requested_by?'Approved by':'Refunded by'):'Rejected by')+'</dt><dd>'+escapeHtml(data.refund_reviewed_by)+(data.refund_reviewed_at?' \u00B7 '+escapeHtml(when(data.refund_reviewed_at)):'')+'</dd></div>';
+        if(rs==='approved')lines+='<div><dt>Amount refunded</dt><dd>'+peso(data.paid)+'</dd></div>';
+        return '<section class="r-refund r-refund--'+escapeHtml(rs)+'">'
+            +'<h2>'+escapeHtml(title)+'</h2>'
+            +'<p class="r-refund-reason"><span>Reason</span>'+escapeHtml(data.refund_reason)+'</p>'
+            +(lines?'<dl>'+lines+'</dl>':'')
+            +'</section>';
+    }
 
     function buildReceipt(data){
         var when=data.date?new Date(data.date.replace(' ','T')):null;
@@ -830,6 +906,7 @@
                 +(Number(data.change)>0?'<div class="r-total-row is-change"><span>Change</span><span>'+peso(data.change)+'</span></div>':'')
             +'</div>'
             +'<div class="r-words"><span>Amount in words</span>'+escapeHtml(amountInWords(data.total))+'</div>'
+            +refundBlock(data)
             +'<div class="r-signs">'
                 +'<div class="r-sign"><b>'+escapeHtml(cashier)+'</b>Cashier / Received by</div>'
                 +'<div class="r-sign"><b>&nbsp;</b>Patient signature</div>'
@@ -899,6 +976,10 @@
                 +row('Payment method','Cash')
                 +row('Status','<span class="pm-status pm-status--'+escapeHtml(data.status)+'">'+escapeHtml(data.status.charAt(0).toUpperCase()+data.status.slice(1))+'</span>')
                 +row('Date',when&&!isNaN(when.getTime())?escapeHtml(when.toLocaleString()):'\u2014')
+                +(data.refund_status?row('Refund',escapeHtml(({pending:'Waiting for admin approval',approved:'Refunded',rejected:'Request rejected'})[data.refund_status]||data.refund_status)):'')
+                +(data.refund_reason?row('Refund reason',escapeHtml(data.refund_reason)):'')
+                +(data.refund_requested_by?row('Requested by',escapeHtml(data.refund_requested_by)):'')
+                +(data.refund_reviewed_by&&data.refund_status!=='pending'?row(data.refund_status==='approved'?(data.refund_requested_by?'Approved by':'Refunded by'):'Rejected by',escapeHtml(data.refund_reviewed_by)):'')
                 +(data.cashier?row('Received by',escapeHtml(data.cashier)):'')
                 +'</div>'
                 +'<div class="d-flex justify-content-end gap-2 mt-3">'
@@ -924,16 +1005,9 @@
             .catch(function(){content.innerHTML='<div class="alert alert-danger">Could not load payment details.</div>';});
     };
 
-    window.refundPayment=function(id){
-        var data=RECEIPTS[String(id)]||RECEIPTS[id]||{};
-        var label=data.ref?(' '+data.ref+' ('+peso(data.paid)+')'):'';
-        if(!confirm('Refund payment'+label+'? This cannot be undone.'))return;
-        fetch('<?= base_url() ?>admin/refund-payment/'+encodeURIComponent(id),{method:'POST',headers:{'X-Requested-With':'XMLHttpRequest','X-CSRF-TOKEN':'<?= csrf_hash() ?>'}})
-            .then(function(r){return r.json();})
-            .then(function(res){if(res.success)location.reload();else alert('Error: '+(res.message||'Refund failed.'));})
-            .catch(function(){alert('Error processing refund.');});
-    };
 }());
 </script>
+
+<?= view('partials/refund_ui', ['role' => 'admin']) ?>
 
 <?= $this->endSection() ?>

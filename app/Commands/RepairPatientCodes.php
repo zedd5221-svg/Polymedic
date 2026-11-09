@@ -19,7 +19,7 @@ use CodeIgniter\CLI\CLI;
  * a different name, this finds or creates the right patient (same rule as
  * PatientModel::findSamePerson) and moves that request, plus its payments
  * and invoices, onto the right code. It also creates records for approved
- * or completed appointments whose patient was never created.
+ * appointments whose patient was never created.
  *
  *   php spark patients:repair-codes --dry-run   show what would change
  *   php spark patients:repair-codes             apply it
@@ -100,10 +100,10 @@ class RepairPatientCodes extends BaseCommand
             $fixed++;
         }
 
-        // 2. Approved / completed bookings whose patient was never created
+        // 2. Approved bookings whose patient was never created
         $appointments = $db->table('appointments')
             ->select('id, reference_number, full_name, age, gender, email, phone')
-            ->whereIn('status', ['approved', 'completed'])
+            ->where('status', 'approved')
             ->get()->getResultArray();
 
         foreach ($appointments as $a) {

@@ -48,7 +48,6 @@
     $apptRows  = [
         'pending'   => ['Pending',   'amber'],
         'approved'  => ['Approved',  'blue'],
-        'completed' => ['Completed', 'green'],
         'late'      => ['Late',      'red'],
         'cancelled' => ['Cancelled', 'slate'],
     ];

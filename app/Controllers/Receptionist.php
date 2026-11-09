@@ -50,9 +50,9 @@ class Receptionist extends BaseController
             ->where('status', 'pending')
             ->countAllResults();
 
-        $data['today_completed'] = $appointmentModel
-            ->where('appointment_date', $today)
-            ->where('status', 'completed')
+        // Patients checked in today (approval records the arrival time).
+        $data['today_arrived'] = $appointmentModel
+            ->where('DATE(arrival_time)', $today)
             ->countAllResults();
 
         // Requests waiting for the front desk to start (and charge) them.
@@ -125,7 +125,7 @@ class Receptionist extends BaseController
             'patients'    => $patients,
             'today'       => $series('appointments', 'appointment_date', 'COUNT(*)'),
             'pending'     => $series('appointments', 'DATE(created_at)', 'COUNT(*)', ['status' => 'pending']),
-            'completed'   => $series('appointments', 'DATE(updated_at)', 'COUNT(*)', ['status' => 'completed']),
+            'arrived'     => $series('appointments', 'DATE(arrival_time)', 'COUNT(*)'),
             'diagnostics' => $series('diagnostic_requests', 'DATE(created_at)', 'COUNT(*)', ['status' => 'pending']),
             'unpaid'      => $series('invoices', 'DATE(created_at)', 'COUNT(*)', ['status' => ['unpaid', 'partial']]),
             'collections' => $this->getCollectionsSeries($dates),
@@ -363,7 +363,6 @@ class Receptionist extends BaseController
         $data['statusClass'] = [
             'pending'   => 'warning',
             'approved'  => 'primary',
-            'completed' => 'success',
             'cancelled' => 'danger',
             'late'      => 'dark'
         ];
@@ -402,7 +401,7 @@ class Receptionist extends BaseController
                             ->with('error', 'Appointment not found');
         }
 
-        if (in_array($appointment['status'], ['completed', 'cancelled', 'no_show'])) {
+        if (in_array($appointment['status'], ['cancelled', 'no_show'])) {
             return redirect()->to(base_url('receptionist/appointments'))
                             ->with('error', 'This appointment cannot be approved');
         }
@@ -442,9 +441,9 @@ class Receptionist extends BaseController
                             ->with('error', 'Appointment not found');
         }
 
-        if ($appointment['status'] == 'completed') {
+        if ($appointment['status'] === 'cancelled') {
             return redirect()->to(base_url('receptionist/appointments'))
-                            ->with('error', 'Completed appointments cannot be cancelled');
+                            ->with('error', 'This appointment is already cancelled');
         }
 
         $model->update($id, ['status' => 'cancelled']);
@@ -453,29 +452,8 @@ class Receptionist extends BaseController
                         ->with('success', 'Appointment cancelled');
     }
 
-    public function completeAppointment($id)
-    {
-        $redirect = $this->checkAuth();
-        if ($redirect) return $redirect;
-
-        $model = new AppointmentModel();
-        $appointment = $model->find($id);
-
-        if (!$appointment) {
-            return redirect()->to(base_url('receptionist/appointments'))
-                            ->with('error', 'Appointment not found');
-        }
-
-        if ($appointment['status'] != 'approved') {
-            return redirect()->to(base_url('receptionist/appointments'))
-                            ->with('error', 'Only approved appointments can be marked as completed');
-        }
-
-        $model->update($id, ['status' => 'completed']);
-
-        return redirect()->to(base_url('receptionist/appointments'))
-                        ->with('success', 'Appointment completed');
-    }
+    // Appointments have no "completed" status: approval is their last step,
+    // and the work itself is tracked on the diagnostic requests.
 
     public function patients()
     {
@@ -507,9 +485,11 @@ class Receptionist extends BaseController
             ->countAllResults();
 
         $this->attachPatientGender($payments);
+        $this->attachInvoiceState($payments);
 
         return view('Receptionist/payments', [
             'payments'       => $payments,
+            'unpaidInvoices' => $this->openUnpaidBills(),
             'total'          => count($payments),
             // Sum amount_paid — money actually collected — not total_amount.
             'today_total'    => $this->collectedBetween($today, $today),
@@ -1271,8 +1251,28 @@ class Receptionist extends BaseController
         return redirect()->to(base_url('receptionist/billing/receipt/' . (int) $id));
     }
 
-    // Refunds are admin-only: they go through admin/billing or the
-    // admin Payments page, which also recalculate the invoice.
+    /**
+     * Receptionist asks for a refund. Nothing is refunded yet: the request
+     * (with the customer's reason) waits for an administrator, who is
+     * notified and confirms or rejects it.
+     */
+    public function requestRefund($id)
+    {
+        $redirect = $this->checkAuth();
+        if ($redirect) return $redirect;
+
+        if (!$this->refundConfirmed()) {
+            return $this->refundResponse($this->refundNotConfirmed(), base_url('receptionist/payments'));
+        }
+
+        try {
+            $result = (new PaymentModel())->requestRefund((int) $id, (string) $this->request->getPost('reason'));
+            return $this->refundResponse($result, base_url('receptionist/payments'));
+        } catch (\Throwable $e) {
+            log_message('error', 'Refund request error: ' . $e->getMessage());
+            return $this->refundResponse(['ok' => false, 'message' => 'Error sending the refund request.'], base_url('receptionist/payments'));
+        }
+    }
 
     /* ============================================================
        AVAILABILITY + OVERRIDE BOOKING

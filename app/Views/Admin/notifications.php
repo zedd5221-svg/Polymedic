@@ -87,6 +87,64 @@
 .nc-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
 /* =========================================================
+   Refund request: reason + confirm / reject inline
+   ========================================================= */
+.nc-refund-reason {
+    margin: 0.5rem 0 0;
+    padding: 0.55rem 0.8rem;
+    border-left: 3px solid var(--pm-accent);
+    border-radius: 0 10px 10px 0;
+    background: var(--pm-accent-soft);
+    color: var(--pm-text);
+    font-size: 0.86rem;
+    white-space: pre-line;
+}
+.nc-refund-reason span {
+    display: block;
+    margin-bottom: 0.1rem;
+    font-size: 0.66rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--pm-text-muted);
+}
+.nc-refund-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem 1rem;
+    margin-top: 0.7rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid var(--pm-line);
+}
+.nc-refund-check {
+    display: inline-flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--pm-text-soft);
+    cursor: pointer;
+}
+.nc-refund-check input { width: 16px; height: 16px; margin-top: 0.1rem; accent-color: var(--pm-accent); cursor: pointer; }
+.nc-refund-actions { display: inline-flex; gap: 0.4rem; }
+.nc-refund-approve { background: var(--pm-accent); border-color: var(--pm-accent); color: #fff; }
+.nc-refund-approve:hover:not(:disabled) { background: var(--pm-accent-hover); border-color: var(--pm-accent-hover); color: #fff; }
+.nc-refund-reject { color: var(--pm-danger); }
+.nc-refund-reject:hover:not(:disabled) { background: var(--pm-tint-red); border-color: var(--pm-danger); color: var(--pm-danger); }
+.nc-refund-done {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0.6rem 0 0;
+    font-size: 0.8rem;
+    color: var(--pm-text-muted);
+}
+.nc-refund-done--approved i { color: var(--pm-success); }
+.nc-refund-done--rejected i { color: var(--pm-danger); }
+
+/* =========================================================
    Bulk delete review modal
    ========================================================= */
 
@@ -350,6 +408,7 @@ $typeLabels = [
     'lab'         => 'Laboratory',
     'billing'     => 'Billing',
     'payment'     => 'Payments',
+    'refund'      => 'Refunds',
     'system'      => 'System',
 ];
 
@@ -566,7 +625,56 @@ arsort($typeCounts);
                                 <?php endif; ?>
                             </header>
 
-                            <p class="nc-card-message"><?= esc($message) ?></p>
+                            <?php if ($type === 'refund' && ! empty($notif['refund'])): ?>
+                                <?php
+                                    $rf      = $notif['refund'];
+                                    $rfState = (string) ($rf['refund_status'] ?? '');
+                                    $rfPaid  = ($rf['payment_status'] ?? '') === 'paid';
+                                ?>
+                                <p class="nc-card-message">
+                                    <?= esc($rf['refund_requested_by'] ?: 'The front desk') ?> asked to refund
+                                    <strong>&#8369;<?= number_format((float) $rf['amount_paid'], 2) ?></strong> to
+                                    <?= esc($rf['patient_name']) ?> (<?= esc($rf['reference_number']) ?>).
+                                </p>
+                                <blockquote class="nc-refund-reason">
+                                    <span>Reason</span>
+                                    <?= esc($rf['refund_reason'] ?? '') ?>
+                                </blockquote>
+
+                                <?php if ($rfState === 'pending' && $rfPaid): ?>
+                                    <form method="post" class="nc-refund-form" data-refund-form>
+                                        <?= csrf_field() ?>
+                                        <input type="hidden" name="confirmed" value="1">
+                                        <label class="nc-refund-check">
+                                            <input type="checkbox" data-refund-check>
+                                            <span>I have checked this request and the reason above.</span>
+                                        </label>
+                                        <div class="nc-refund-actions">
+                                            <button type="submit" class="nc-btn nc-btn--sm nc-refund-reject" disabled
+                                                    formaction="<?= esc(base_url('admin/refund-reject/' . (int) $rf['id']), 'attr') ?>">
+                                                <i class="bi bi-x-lg" aria-hidden="true"></i><span>Reject</span>
+                                            </button>
+                                            <button type="submit" class="nc-btn nc-btn--sm nc-refund-approve" disabled
+                                                    formaction="<?= esc(base_url('admin/refund-approve/' . (int) $rf['id']), 'attr') ?>">
+                                                <i class="bi bi-check2" aria-hidden="true"></i><span>Confirm refund</span>
+                                            </button>
+                                        </div>
+                                    </form>
+                                <?php else: ?>
+                                    <p class="nc-refund-done nc-refund-done--<?= esc($rfState, 'attr') ?>">
+                                        <i class="bi <?= $rfState === 'rejected' ? 'bi-x-circle' : 'bi-check2-circle' ?>" aria-hidden="true"></i>
+                                        <?php if ($rfState === 'approved'): ?>
+                                            Refunded<?= ! empty($rf['refund_reviewed_by']) ? ' &middot; approved by ' . esc($rf['refund_reviewed_by']) : '' ?><?= ! empty($rf['refund_reviewed_at']) ? ' &middot; ' . esc(date('M j, g:i A', strtotime($rf['refund_reviewed_at']))) : '' ?>
+                                        <?php elseif ($rfState === 'rejected'): ?>
+                                            Rejected<?= ! empty($rf['refund_reviewed_by']) ? ' by ' . esc($rf['refund_reviewed_by']) : '' ?><?= ! empty($rf['refund_reviewed_at']) ? ' &middot; ' . esc(date('M j, g:i A', strtotime($rf['refund_reviewed_at']))) : '' ?>
+                                        <?php else: ?>
+                                            This request is no longer open.
+                                        <?php endif; ?>
+                                    </p>
+                                <?php endif; ?>
+                            <?php else: ?>
+                                <p class="nc-card-message"><?= esc($message) ?></p>
+                            <?php endif; ?>
 
                             <footer class="nc-body-foot">
                                 <?php if (!empty($notif['can_open'])): ?>
@@ -743,7 +851,7 @@ arsort($typeCounts);
        Clicking a real link or button inside the card is left alone. */
     list.addEventListener('click', function (e) {
         if (!isSelecting()) { return; }
-        if (e.target.closest('a, button, input, .nc-body-foot')) { return; }
+        if (e.target.closest('a, button, input, label, .nc-body-foot, .nc-refund-form')) { return; }
 
         var card = e.target.closest('.nc-card');
         if (!card) { return; }
@@ -899,6 +1007,24 @@ arsort($typeCounts);
        ============================================ */
 
     refreshCount();
+})();
+</script>
+
+<script>
+(function () {
+    // Refund requests: Confirm refund / Reject stay disabled until the
+    // "I have checked this request" box is ticked (the server re-checks).
+    document.querySelectorAll('[data-refund-form]').forEach(function (form) {
+        var box  = form.querySelector('[data-refund-check]');
+        var btns = form.querySelectorAll('button[type="submit"]');
+        var sync = function () { btns.forEach(function (b) { b.disabled = !box.checked; }); };
+        box.addEventListener('change', sync);
+        form.addEventListener('submit', function (e) {
+            if (!box.checked) { e.preventDefault(); return; }
+            btns.forEach(function (b) { setTimeout(function () { b.disabled = true; }, 0); });
+        });
+        sync();
+    });
 })();
 </script>
 

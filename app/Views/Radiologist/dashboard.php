@@ -376,7 +376,7 @@ $kpiBoard = [
                         <th scope="col">Accession</th>
                         <th scope="col">Patient</th>
                         <th scope="col">Exam</th>
-                        <th scope="col">Referred by</th>
+                        <th scope="col">Radiologist</th>
                         <th scope="col">Priority</th>
                         <th scope="col">Date</th>
                         <th scope="col">Status</th>
@@ -392,7 +392,7 @@ $kpiBoard = [
                                 $meta      = $statusMeta[$exam['status'] ?? ''] ?? ['label' => ucfirst($statusKey), 'tone' => 'pending'];
                                 $fullName  = (string) ($exam['patient_name'] ?? 'Unknown');
                                 $examType  = trim((string) ($exam['exam_type'] ?? ''));
-                                $doctor    = trim((string) ($exam['doctor_name'] ?? ''));
+                                $handler   = \App\Models\DiagnosticRequestModel::handlerName($exam);
                                 $isStat    = strtolower((string) ($exam['priority'] ?? '')) === 'stat';
                                 $dateTs    = !empty($exam['exam_date']) ? strtotime($exam['exam_date']) : false;
                             ?>
@@ -422,8 +422,8 @@ $kpiBoard = [
                                     <span class="service-tag"><?= esc($examType !== '' ? $examType : '—') ?></span>
                                 </td>
 
-                                <td data-label="Referred by">
-                                    <?= $doctor !== '' ? esc($doctor) : '<span class="muted">&mdash;</span>' ?>
+                                <td data-label="Radiologist">
+                                    <?= $handler !== '' ? esc($handler) : '<span class="muted">Unassigned</span>' ?>
                                 </td>
 
                                 <td data-label="Priority">

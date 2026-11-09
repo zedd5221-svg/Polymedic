@@ -31,6 +31,14 @@ class PaymentModel extends Model
         'voided_at',
         'void_reason',
         'notes',
+        'refund_status',
+        'refund_reason',
+        'refund_requested_by',
+        'refund_requested_by_id',
+        'refund_requested_at',
+        'refund_reviewed_by',
+        'refund_reviewed_by_id',
+        'refund_reviewed_at',
     ];
 
     protected $useTimestamps = true;
@@ -42,6 +50,17 @@ class PaymentModel extends Model
     const STATUS_PENDING  = 'pending';
     const STATUS_REFUNDED = 'refunded';
     const STATUS_FAILED   = 'failed';
+
+    // ── Refund workflow (payments.refund_status) ─────────────────
+    // A receptionist's refund waits for an administrator; an
+    // administrator's goes through at once. While pending, the
+    // payment itself stays "paid".
+    const REFUND_PENDING  = 'pending';
+    const REFUND_APPROVED = 'approved';
+    const REFUND_REJECTED = 'rejected';
+
+    /** Shortest reason accepted for a refund. */
+    const REFUND_REASON_MIN = 5;
 
     // ── Methods (matches the DB enum) ────────────────────────────
     const METHOD_CASH      = 'cash';
@@ -380,12 +399,21 @@ class PaymentModel extends Model
             return false;
         }
 
-        $ok = (bool) $this->update($paymentId, [
-            'payment_status' => self::STATUS_REFUNDED,
-            'voided_by'      => $byName,
-            'voided_at'      => date('Y-m-d H:i:s'),
-            'void_reason'    => $reason,
-            'notes'          => trim(($payment['notes'] ?? '') . ' | Voided: ' . $reason),
+        $now = date('Y-m-d H:i:s');
+        $ok  = (bool) $this->update($paymentId, [
+            'payment_status'        => self::STATUS_REFUNDED,
+            'voided_by'             => $byName,
+            'voided_at'             => $now,
+            'void_reason'           => $reason,
+            'notes'                 => trim(($payment['notes'] ?? '') . ' | Refunded: ' . $reason),
+            'refund_status'         => self::REFUND_APPROVED,
+            'refund_reason'         => $reason,
+            // kept only when this settles a receptionist's request
+            'refund_requested_by'   => ($payment['refund_requested_by'] ?? null) ?: null,
+            'refund_requested_at'   => ($payment['refund_requested_at'] ?? null) ?: null,
+            'refund_reviewed_by'    => $byName,
+            'refund_reviewed_by_id' => self::currentStaffId(),
+            'refund_reviewed_at'    => $now,
         ]);
 
         // Recalculate the affected invoice so its status/balance
@@ -403,5 +431,172 @@ class PaymentModel extends Model
         }
 
         return $ok;
+    }
+
+    // ============================================================
+    // REFUND WORKFLOW
+    // ============================================================
+    //
+    // Each method returns ['ok' => bool, 'message' => string,
+    // 'payment' => ?array] so controllers can answer JSON or redirect.
+    // ============================================================
+
+    /** Why a refund reason is not acceptable, or null when it is. */
+    public static function refundReasonError(string $reason): ?string
+    {
+        $reason = trim($reason);
+        if (mb_strlen($reason) < self::REFUND_REASON_MIN) {
+            return 'Please give the reason for the refund (at least ' . self::REFUND_REASON_MIN . ' characters).';
+        }
+        if (mb_strlen($reason) > 500) {
+            return 'The refund reason is too long (500 characters at most).';
+        }
+        return null;
+    }
+
+    /** A paid payment with no refund in flight can be refunded. */
+    private function refundablePayment(int $id): array
+    {
+        $payment = $this->find($id);
+        if (!$payment) {
+            return [null, 'Payment not found.'];
+        }
+        if (($payment['payment_status'] ?? '') !== self::STATUS_PAID) {
+            return [null, 'Only paid payments can be refunded.'];
+        }
+        return [$payment, null];
+    }
+
+    /**
+     * Receptionist: ask an administrator to refund a payment.
+     * The payment stays paid until an administrator confirms it.
+     */
+    public function requestRefund(int $id, string $reason): array
+    {
+        if ($error = self::refundReasonError($reason)) {
+            return ['ok' => false, 'message' => $error, 'payment' => null];
+        }
+        [$payment, $error] = $this->refundablePayment($id);
+        if ($error) {
+            return ['ok' => false, 'message' => $error, 'payment' => null];
+        }
+        if (($payment['refund_status'] ?? '') === self::REFUND_PENDING) {
+            return ['ok' => false, 'message' => 'A refund for this payment is already waiting for approval.', 'payment' => $payment];
+        }
+
+        $staff = self::currentStaff();
+        $this->update($id, [
+            'refund_status'          => self::REFUND_PENDING,
+            'refund_reason'          => trim($reason),
+            'refund_requested_by'    => $staff['name'],
+            'refund_requested_by_id' => $staff['id'],
+            'refund_requested_at'    => date('Y-m-d H:i:s'),
+            'refund_reviewed_by'     => null,
+            'refund_reviewed_by_id'  => null,
+            'refund_reviewed_at'     => null,
+        ]);
+
+        $payment = $this->find($id);
+        NotificationModel::dispatch(
+            'refund',
+            'Refund request: ' . ($payment['reference_number'] ?? ('#' . $id)),
+            $staff['name'] . ' asked to refund ₱' . number_format((float) $payment['amount_paid'], 2)
+                . ' to ' . $payment['patient_name'] . '. Reason: ' . trim($reason),
+            $id,
+            ['admin' => 'open'],
+            false
+        );
+
+        return ['ok' => true, 'message' => 'Refund request sent. An administrator must confirm it before the money is returned.', 'payment' => $payment];
+    }
+
+    /** Administrator: refund straight away (no approval needed). */
+    public function refundNow(int $id, string $reason): array
+    {
+        if ($error = self::refundReasonError($reason)) {
+            return ['ok' => false, 'message' => $error, 'payment' => null];
+        }
+        [$payment, $error] = $this->refundablePayment($id);
+        if ($error) {
+            return ['ok' => false, 'message' => $error, 'payment' => null];
+        }
+
+        $wasRequest = ($payment['refund_status'] ?? '') === self::REFUND_PENDING;
+        if (!$this->voidPayment($id, trim($reason), self::currentCashierName())) {
+            return ['ok' => false, 'message' => 'The payment could not be refunded.', 'payment' => $payment];
+        }
+        $payment = $this->find($id);
+
+        // An admin refunding a payment that a receptionist had asked about
+        // also settles that request.
+        if ($wasRequest) {
+            $this->notifyRequester($payment, true);
+        }
+
+        return ['ok' => true, 'message' => 'Payment refunded: ₱' . number_format((float) $payment['amount_paid'], 2) . '.', 'payment' => $payment];
+    }
+
+    /** Administrator: confirm a receptionist's pending request. */
+    public function approveRefund(int $id): array
+    {
+        $payment = $this->find($id);
+        if (!$payment || ($payment['refund_status'] ?? '') !== self::REFUND_PENDING) {
+            return ['ok' => false, 'message' => 'This refund request has already been handled.', 'payment' => $payment];
+        }
+        if (($payment['payment_status'] ?? '') !== self::STATUS_PAID) {
+            return ['ok' => false, 'message' => 'Only paid payments can be refunded.', 'payment' => $payment];
+        }
+        if (!$this->voidPayment($id, (string) $payment['refund_reason'], self::currentCashierName())) {
+            return ['ok' => false, 'message' => 'The payment could not be refunded.', 'payment' => $payment];
+        }
+
+        $payment = $this->find($id);
+        $this->notifyRequester($payment, true);
+
+        return ['ok' => true, 'message' => 'Refund confirmed: ₱' . number_format((float) $payment['amount_paid'], 2) . ' to ' . $payment['patient_name'] . '.', 'payment' => $payment];
+    }
+
+    /** Administrator: turn a receptionist's request down. The payment stays paid. */
+    public function rejectRefund(int $id): array
+    {
+        $payment = $this->find($id);
+        if (!$payment || ($payment['refund_status'] ?? '') !== self::REFUND_PENDING) {
+            return ['ok' => false, 'message' => 'This refund request has already been handled.', 'payment' => $payment];
+        }
+
+        $staff = self::currentStaff();
+        $this->update($id, [
+            'refund_status'         => self::REFUND_REJECTED,
+            'refund_reviewed_by'    => $staff['name'],
+            'refund_reviewed_by_id' => $staff['id'],
+            'refund_reviewed_at'    => date('Y-m-d H:i:s'),
+        ]);
+
+        $payment = $this->find($id);
+        $this->notifyRequester($payment, false);
+
+        return ['ok' => true, 'message' => 'Refund request rejected. The payment stays paid.', 'payment' => $payment];
+    }
+
+    /** Tell the receptionist who asked how their request ended. */
+    private function notifyRequester(array $payment, bool $approved): void
+    {
+        $userId = (int) ($payment['refund_requested_by_id'] ?? 0);
+        if ($userId <= 0 || $userId === (int) self::currentStaffId()) {
+            return;
+        }
+
+        $ref = $payment['reference_number'] ?? ('#' . $payment['id']);
+        NotificationModel::dispatchToUser(
+            'refund',
+            ($approved ? 'Refund approved: ' : 'Refund rejected: ') . $ref,
+            ($approved
+                ? 'Refund of ₱' . number_format((float) $payment['amount_paid'], 2) . ' to ' . $payment['patient_name'] . ' was approved by ' . self::currentCashierName() . '.'
+                : 'The refund for ' . $payment['patient_name'] . ' was rejected by ' . self::currentCashierName() . '. The payment stays paid.')
+                . ' Reason given: ' . ($payment['refund_reason'] ?? ''),
+            (int) $payment['id'],
+            $userId,
+            'receptionist'
+        );
     }
 }

@@ -349,6 +349,7 @@ $typeLabels = [
     'lab'         => 'Laboratory',
     'billing'     => 'Billing',
     'payment'     => 'Payments',
+    'refund'      => 'Refunds',
     'system'      => 'System',
 ];
 

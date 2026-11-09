@@ -32,7 +32,6 @@
     $statusMeta = [
         'pending'   => ['Pending',   'pending'],
         'approved'  => ['Approved',  'approved'],
-        'completed' => ['Completed', 'completed'],
         'cancelled' => ['Cancelled', 'cancelled'],
         'late'      => ['Late',      'late'],
         'no_show'   => ['No show',   'cancelled'],
@@ -125,10 +124,6 @@
                         <?php elseif ($statusKey === 'approved'): ?>
                             <a data-post href="<?= base_url($base . '/appointment/cancel/' . $id) ?>" class="av-btn av-btn--quiet"
                                onclick="return confirm('Cancel this appointment?')">Cancel</a>
-                            <a data-post href="<?= base_url($base . '/appointment/complete/' . $id) ?>" class="av-btn av-btn--primary"
-                               onclick="return confirm('Mark this appointment as completed?')">
-                                <i class="bi bi-check2-all" aria-hidden="true"></i>Mark completed
-                            </a>
                         <?php endif; ?>
 
                         <?php if ($isAdmin): ?>
@@ -247,12 +242,11 @@
                             $steps[] = ['Approve to send for tests', null, 'current'];
                         } elseif ($statusKey === 'pending') {
                             $steps[] = ['Awaiting approval', null, 'current'];
-                            $steps[] = ['Visit completed', null, 'upcoming'];
+                            $steps[] = ['Sent for lab / X-ray tests', null, 'upcoming'];
                         } else {
+                            // Approval is the last appointment step; test progress lives on the requests.
                             $steps[] = ['Approved · patient arrived', $fmt($appointment['arrival_time'] ?? null), 'done'];
-                            $steps[] = $statusKey === 'completed'
-                                ? ['Visit completed', $fmt($appointment['updated_at'] ?? null), 'done']
-                                : ['Visit in progress', null, 'current'];
+                            $steps[] = ['Sent for lab / X-ray tests', null, 'done'];
                         }
                     ?>
                     <section class="av-card" aria-labelledby="avActTitle">
@@ -405,7 +399,6 @@
 
 .av-status--pending   { --bg: #FEF6E7; --fg: #93370D; --dot: #DC6803; }
 .av-status--approved  { --bg: #EBF2F4; --fg: #10404B; --dot: #175563; }
-.av-status--completed { --bg: #ECFDF3; --fg: #067647; --dot: #17B26A; }
 .av-status--cancelled { --bg: #F2F4F7; --fg: #475467; --dot: #98A2B3; }
 .av-status--late      { --bg: #FEF3F2; --fg: #B42318; --dot: #F04438; }
 

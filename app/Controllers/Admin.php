@@ -850,7 +850,6 @@ class Admin extends BaseController
         $data['statusClass'] = [
             'pending'   => 'warning',
             'approved'  => 'primary',
-            'completed' => 'success',
             'cancelled' => 'danger',
             'late'      => 'dark'
         ];
@@ -877,7 +876,7 @@ class Admin extends BaseController
                             ->with('error', 'Appointment not found');
         }
 
-        if (in_array($appointment['status'], ['completed', 'cancelled', 'no_show'])) {
+        if (in_array($appointment['status'], ['cancelled', 'no_show'])) {
             return redirect()->to($returnTo)
                             ->with('error', 'This appointment cannot be approved');
         }
@@ -912,9 +911,9 @@ class Admin extends BaseController
                             ->with('error', 'Appointment not found');
         }
 
-        if ($appointment['status'] == 'completed') {
+        if ($appointment['status'] === 'cancelled') {
             return redirect()->to(base_url('admin/appointments'))
-                            ->with('error', 'Completed appointments cannot be cancelled');
+                            ->with('error', 'This appointment is already cancelled');
         }
 
         $model->update($id, ['status' => 'cancelled']);
@@ -923,29 +922,8 @@ class Admin extends BaseController
                         ->with('success', 'Appointment cancelled');
     }
 
-    public function completeAppointment($id)
-    {
-        $redirect = $this->checkAuth();
-        if ($redirect) return $redirect;
-
-        $model = new AppointmentModel();
-        $appointment = $model->find($id);
-
-        if (!$appointment) {
-            return redirect()->to(base_url('admin/appointments'))
-                            ->with('error', 'Appointment not found');
-        }
-
-        if ($appointment['status'] != 'approved') {
-            return redirect()->to(base_url('admin/appointments'))
-                            ->with('error', 'Only approved appointments can be marked as completed');
-        }
-
-        $model->update($id, ['status' => 'completed']);
-
-        return redirect()->to(base_url('admin/appointments'))
-                        ->with('success', 'Appointment completed');
-    }
+    // Appointments have no "completed" status: approval is their last step,
+    // and the work itself is tracked on the diagnostic requests.
 
     public function deleteAppointment($id)
     {
@@ -1541,9 +1519,11 @@ class Admin extends BaseController
             ->countAllResults();
 
         $this->attachPatientGender($payments);
+        $this->attachInvoiceState($payments);
 
         return view('Admin/payments', [
             'payments'       => $payments,
+            'unpaidInvoices' => $this->openUnpaidBills(),
             'total'          => count($payments),
             // Sum amount_paid — the money actually collected — not total_amount.
             'today_total'    => $this->collectedBetween($today, $today),
@@ -1591,36 +1571,64 @@ class Admin extends BaseController
         return redirect()->to(base_url('admin/billing/receipt/' . (int) $id));
     }
 
+    /**
+     * Administrator refunds a payment straight away (no approval needed).
+     * Needs a reason (printed on the receipt) and the confirmation box.
+     */
     public function refundPayment($id)
     {
         $redirect = $this->checkAuth();
         if ($redirect) return $redirect;
 
+        if (!$this->refundConfirmed()) {
+            return $this->refundResponse($this->refundNotConfirmed(), base_url('admin/payments'));
+        }
+
         try {
-            $paymentModel = new PaymentModel();
-            $payment = $paymentModel->find((int) $id);
-
-            if (!$payment) {
-                return $this->response->setJSON(['success' => false, 'message' => 'Payment not found']);
+            $result = (new PaymentModel())->refundNow((int) $id, (string) $this->request->getPost('reason'));
+            if ($result['ok']) {
+                log_message('info', 'Admin refunded payment #' . $id);
             }
-
-            if ($payment['payment_status'] !== PaymentModel::STATUS_PAID) {
-                return $this->response->setJSON(['success' => false, 'message' => 'Only paid payments can be refunded']);
-            }
-
-            // voidPayment() also recalculates the linked invoice, so the
-            // invoice's balance and status follow the refund.
-            if (!$paymentModel->voidPayment((int) $id, 'Refunded from Payments page', PaymentModel::currentCashierName())) {
-                return $this->response->setJSON(['success' => false, 'message' => 'Error refunding payment']);
-            }
-
-            log_message('info', 'Admin refunded payment #' . $id);
-
-            return $this->response->setJSON(['success' => true, 'message' => 'Payment refunded successfully']);
-
+            return $this->refundResponse($result, base_url('admin/payments'));
         } catch (\Throwable $e) {
             log_message('error', 'Admin refund payment error: ' . $e->getMessage());
-            return $this->response->setJSON(['success' => false, 'message' => 'Error refunding payment']);
+            return $this->refundResponse(['ok' => false, 'message' => 'Error refunding payment.'], base_url('admin/payments'));
+        }
+    }
+
+    /** Administrator confirms a receptionist's refund request. */
+    public function approveRefund($id)
+    {
+        $redirect = $this->checkAuth();
+        if ($redirect) return $redirect;
+
+        if (!$this->refundConfirmed()) {
+            return $this->refundResponse($this->refundNotConfirmed(), base_url('admin/payments'));
+        }
+
+        try {
+            return $this->refundResponse((new PaymentModel())->approveRefund((int) $id), base_url('admin/payments'));
+        } catch (\Throwable $e) {
+            log_message('error', 'Approve refund error: ' . $e->getMessage());
+            return $this->refundResponse(['ok' => false, 'message' => 'Error confirming the refund.'], base_url('admin/payments'));
+        }
+    }
+
+    /** Administrator turns a receptionist's refund request down. */
+    public function rejectRefund($id)
+    {
+        $redirect = $this->checkAuth();
+        if ($redirect) return $redirect;
+
+        if (!$this->refundConfirmed()) {
+            return $this->refundResponse($this->refundNotConfirmed(), base_url('admin/payments'));
+        }
+
+        try {
+            return $this->refundResponse((new PaymentModel())->rejectRefund((int) $id), base_url('admin/payments'));
+        } catch (\Throwable $e) {
+            log_message('error', 'Reject refund error: ' . $e->getMessage());
+            return $this->refundResponse(['ok' => false, 'message' => 'Error rejecting the refund.'], base_url('admin/payments'));
         }
     }
 

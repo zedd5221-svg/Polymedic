@@ -196,6 +196,17 @@
         .r-meta { grid-template-columns:1fr; }
         .r-signs { grid-template-columns:1fr; gap:20px; }
     }
+
+    /* Refund section: the customer's reason and who approved it */
+    .r-refund { margin:14px 0 4px; padding:10px 12px; border:1px dashed #b91c1c; border-radius:6px; }
+    .r-refund h2 { margin:0 0 6px; font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#b91c1c; }
+    .r-refund--pending { border-color:#b45309; } .r-refund--pending h2 { color:#b45309; }
+    .r-refund--rejected { border-color:#64748b; } .r-refund--rejected h2 { color:#475569; }
+    .r-refund-reason { margin:0 0 6px; font-size:12.5px; }
+    .r-refund-reason span { display:block; font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#64748b; }
+    .r-refund dl { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:4px 14px; margin:0; font-size:11.5px; }
+    .r-refund dt { font-size:10px; color:#64748b; text-transform:uppercase; letter-spacing:.05em; }
+    .r-refund dd { margin:0; }
 </style>
 </head>
 <body>
@@ -291,6 +302,29 @@ $amountInWords = function ($amount) {
         <span>Amount in words</span>
         <?= esc($amountInWords($total)) ?>
     </div>
+
+    <?php
+    $rfStatus = (string) ($payment['refund_status'] ?? '');
+    $rfReason = trim((string) ($payment['refund_reason'] ?? ''));
+    $rfWhen   = static fn ($v) => $v ? date('M j, Y · g:i A', strtotime($v)) : '';
+    ?>
+    <?php if ($rfStatus !== '' && $rfReason !== ''): ?>
+        <section class="r-refund r-refund--<?= esc($rfStatus, 'attr') ?>">
+            <h2><?= $rfStatus === 'approved' ? 'Refunded' : ($rfStatus === 'pending' ? 'Refund requested — awaiting approval' : 'Refund request rejected') ?></h2>
+            <p class="r-refund-reason"><span>Reason</span><?= esc($rfReason) ?></p>
+            <dl>
+                <?php if (! empty($payment['refund_requested_by'])): ?>
+                    <div><dt>Requested by</dt><dd><?= esc($payment['refund_requested_by']) ?><?= $payment['refund_requested_at'] ? ' · ' . esc($rfWhen($payment['refund_requested_at'])) : '' ?></dd></div>
+                <?php endif; ?>
+                <?php if ($rfStatus !== 'pending' && ! empty($payment['refund_reviewed_by'])): ?>
+                    <div><dt><?= $rfStatus === 'approved' ? (! empty($payment['refund_requested_by']) ? 'Approved by' : 'Refunded by') : 'Rejected by' ?></dt><dd><?= esc($payment['refund_reviewed_by']) ?><?= $payment['refund_reviewed_at'] ? ' · ' . esc($rfWhen($payment['refund_reviewed_at'])) : '' ?></dd></div>
+                <?php endif; ?>
+                <?php if ($rfStatus === 'approved'): ?>
+                    <div><dt>Amount refunded</dt><dd>₱<?= number_format((float) ($payment['amount_paid'] ?? 0), 2) ?></dd></div>
+                <?php endif; ?>
+            </dl>
+        </section>
+    <?php endif; ?>
 
     <div class="r-signs">
         <div class="r-sign"><b><?= esc($payment['received_by'] ?? '') ?></b>Cashier / Received by</div>

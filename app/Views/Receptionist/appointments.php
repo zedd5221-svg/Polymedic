@@ -34,7 +34,6 @@ $initialsOf = static function ($name) {
 $statusMeta = [
     'pending'   => ['label' => 'Pending',   'tone' => 'pending'],
     'approved'  => ['label' => 'Approved',  'tone' => 'approved'],
-    'completed' => ['label' => 'Completed', 'tone' => 'completed'],
     'cancelled' => ['label' => 'Cancelled', 'tone' => 'cancelled'],
     'late'      => ['label' => 'Late',      'tone' => 'late'],
 ];
@@ -50,7 +49,6 @@ $filterTabs = [
     'all'       => ['label' => 'All',       'count' => $statusCounts['all']       ?? 0],
     'pending'   => ['label' => 'Pending',   'count' => $statusCounts['pending']   ?? 0],
     'approved'  => ['label' => 'Approved',  'count' => $statusCounts['approved']  ?? 0],
-    'completed' => ['label' => 'Completed', 'count' => $statusCounts['completed'] ?? 0],
     'cancelled' => ['label' => 'Cancelled', 'count' => $statusCounts['cancelled'] ?? 0],
     'late'      => ['label' => 'Late',      'count' => $statusCounts['late']      ?? 0],
 ];
@@ -164,9 +162,8 @@ foreach ($appointmentList as $appt) {
                     $meta      = $statusMeta[$status] ?? $statusMeta['pending'];
                     $isLate    = $status === 'late';
                     $canApprove  = in_array($status, ['pending', 'late'], true);
-                    $canCancel   = !in_array($status, ['completed', 'cancelled'], true);
+                    $canCancel   = $status !== 'cancelled';
                     $isCancelled = $status === 'cancelled';
-                    $isCompleted = $status === 'completed';
 
                     $isOverride = !empty($appt['is_override']);
 
@@ -328,16 +325,6 @@ foreach ($appointmentList as $appt) {
                                         </li>
                                     <?php endif; ?>
 
-                                    <?php if ($status === 'approved'): ?>
-                                        <li>
-                                            <a class="dropdown-item"
-                                               data-post href="<?= base_url('receptionist/appointment/complete/' . (int) $id) ?>"
-                                               onclick="return confirm('Mark this appointment as completed?')">
-                                                <i class="bi bi-check-all" aria-hidden="true"></i>
-                                                Mark as completed
-                                            </a>
-                                        </li>
-                                    <?php endif; ?>
 
                                     <?php if ($canCancel): ?>
                                         <li>
@@ -350,12 +337,12 @@ foreach ($appointmentList as $appt) {
                                         </li>
                                     <?php endif; ?>
 
-                                    <?php if ($isCancelled || $isCompleted): ?>
+                                    <?php if ($isCancelled): ?>
                                         <li><hr class="dropdown-divider"></li>
                                         <li>
                                             <span class="dropdown-item-text dx-menu-note">
                                                 <i class="bi bi-lock" aria-hidden="true"></i>
-                                                <?= $isCancelled ? 'Cancelled — no further actions' : 'Completed — no further actions' ?>
+                                                Cancelled — no further actions
                                             </span>
                                         </li>
                                     <?php endif; ?>
@@ -1146,7 +1133,6 @@ foreach ($appointmentList as $appt) {
 
 .dx-status--pending   { --tone-bg: #FEF6E7; --tone-fg: #93370D; --tone-dot: #DC6803; }
 .dx-status--approved  { --tone-bg: #EBF2F4; --tone-fg: #10404B; --tone-dot: #175563; }
-.dx-status--completed { --tone-bg: #ECFDF3; --tone-fg: #067647; --tone-dot: #17B26A; }
 .dx-status--cancelled { --tone-bg: var(--pm-subtle); --tone-fg: #475467; --tone-dot: #98A2B3; }
 .dx-status--late      { --tone-bg: #FEF3F2; --tone-fg: #B42318; --tone-dot: #F04438; }
 

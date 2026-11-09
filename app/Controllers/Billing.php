@@ -538,6 +538,21 @@ class Billing extends BaseController
                              ->with('error', 'Payment amount must be greater than zero.');
         }
 
+        // Cash: the money handed over must cover the amount being recorded.
+        // (Recording ₱550 when only ₱300 was tendered would mark the
+        // invoice fully paid while ₱250 is still owed.)
+        $tenderedRaw = trim((string) ($post['cash_tendered'] ?? ''));
+        if ($method === 'cash' && $tenderedRaw !== '') {
+            $tendered = round((float) $tenderedRaw, 2);
+            if ($tendered + 0.005 < $amount) {
+                return redirect()->back()->withInput()
+                                 ->with('error', 'Cash tendered (₱' . number_format($tendered, 2)
+                                     . ') is less than the amount (₱' . number_format($amount, 2)
+                                     . '). Collect ₱' . number_format($amount - $tendered, 2)
+                                     . ' more, or record ₱' . number_format($tendered, 2) . ' as a partial payment.');
+            }
+        }
+
         // Bring the stored balance up to date before comparing against it.
         $invoice = $invoiceModel->recalculate($id) ?? $invoice;
         $balance = round((float) $invoice['balance'], 2);
@@ -652,26 +667,19 @@ class Billing extends BaseController
             return redirect()->back()->with('error', 'Payment not found.');
         }
 
-        $reason = trim((string) $this->request->getPost('reason'));
-        if ($reason === '') {
-            $reason = 'Refunded by admin';
-        }
-
-        $ok = $paymentModel->voidPayment($id, $reason, PaymentModel::currentCashierName());
-
-        if (!$ok) {
-            return redirect()->back()->with('error', 'Payment could not be refunded.');
-        }
-
-        if (!empty($payment['invoice_id'])) {
-            (new InvoiceModel())->recalculate((int) $payment['invoice_id']);
-        }
-
         $to = !empty($payment['invoice_id'])
             ? base_url($this->routeBase() . '/view/' . $payment['invoice_id'])
             : base_url($this->routeBase());
 
-        return redirect()->to($to)->with('success', 'Payment refunded.');
+        if ($this->request->getPost('confirmed') !== '1') {
+            return redirect()->to($to)->with('error', 'Tick the confirmation box before refunding.');
+        }
+
+        // refundNow() requires a reason, records who refunded it and
+        // recalculates the invoice.
+        $result = $paymentModel->refundNow($id, (string) $this->request->getPost('reason'));
+
+        return redirect()->to($to)->with($result['ok'] ? 'success' : 'error', $result['message']);
     }
 
     // =============================================================

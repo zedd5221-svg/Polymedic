@@ -86,7 +86,7 @@ $initialsOf = static function ($name) {
                     $name        = (string) ($exam['patient_name'] ?? 'Unknown');
                     $examType    = trim((string) ($exam['exam_type'] ?? ''));
                     $doctor      = trim((string) ($exam['doctor_name'] ?? ''));
-                    $radiologist = trim((string) ($exam['radiologist_name'] ?? ''));
+                    $radiologist = \App\Models\DiagnosticRequestModel::handlerName($exam);
                     $isStat      = strtolower((string) ($exam['priority'] ?? '')) === 'stat';
                     $dateTs      = !empty($exam['exam_date']) ? strtotime($exam['exam_date']) : false;
                     $createdTs   = !empty($exam['created_at']) ? strtotime($exam['created_at']) : false;
@@ -212,10 +212,6 @@ $initialsOf = static function ($name) {
                             </div>
 
                             <dl class="dx-card-meta">
-                                <div>
-                                    <dt>Referred by</dt>
-                                    <dd title="<?= esc($doctor, 'attr') ?>"><?= $doctor !== '' ? esc($doctor) : '<span class="dx-muted">&mdash;</span>' ?></dd>
-                                </div>
                                 <div>
                                     <dt>Radiologist</dt>
                                     <dd title="<?= esc($radiologist, 'attr') ?>"><?= $radiologist !== '' ? esc($radiologist) : '<span class="dx-muted">Unassigned</span>' ?></dd>
@@ -783,14 +779,17 @@ $initialsOf = static function ($name) {
 /* ---- meta: two quiet columns ---- */
 
 .dx-card-meta {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.75rem;
     margin: 0;
     padding: 0 0.15rem;
 }
 
-.dx-card-meta > div { min-width: 0; }
+.dx-card-meta > div {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    min-width: 0;
+}
+.dx-card-meta > div > dd { flex: 1 1 auto; min-width: 0; }
 
 .dx-card-meta dt {
     font-size: 0.64rem;
@@ -801,7 +800,7 @@ $initialsOf = static function ($name) {
 }
 
 .dx-card-meta dd {
-    margin: 0.15rem 0 0;
+    margin: 0;
     font-size: 0.8rem;
     color: var(--dx-ink);
     white-space: nowrap;

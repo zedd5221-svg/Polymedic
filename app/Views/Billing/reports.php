@@ -919,8 +919,7 @@ $csvRows[] = ['Total outstanding', number_format((float) $outstanding, 2, '.', '
 }
 </style>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
-        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="<?= base_url('assets/vendor/chartjs/chart.umd.min.js') ?>"></script>
 <script>
 (function () {
     'use strict';

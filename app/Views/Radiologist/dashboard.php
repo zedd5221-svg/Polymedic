@@ -1282,7 +1282,7 @@ $kpiBoard = [
 </style>
 
 <!-- Chart.js (pinned so a new major version cannot silently break the chart) -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="<?= base_url('assets/vendor/chartjs/chart.umd.min.js') ?>"></script>
 
 <script>
 (function () {
@@ -1387,7 +1387,7 @@ $kpiBoard = [
         if (typeof Chart !== 'undefined') { buildCharts(); return; }
 
         var tag = document.createElement('script');
-        tag.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
+        tag.src = '<?= base_url('assets/vendor/chartjs/chart.umd.min.js') ?>';
         tag.onload = buildCharts;
         tag.onerror = function () { /* the summary text above the canvas still reads correctly */ };
         document.head.appendChild(tag);

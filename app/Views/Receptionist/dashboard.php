@@ -1470,7 +1470,7 @@ $kpiBoard = [
         if (typeof Chart !== 'undefined') { buildCharts(); return; }
 
         var tag = document.createElement('script');
-        tag.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+        tag.src = '<?= base_url('assets/vendor/chartjs/chart.umd.min.js') ?>';
         tag.onload = buildCharts;
         tag.onerror = function () { /* the empty containers simply stay */ };
         document.head.appendChild(tag);

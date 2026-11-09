@@ -1095,7 +1095,7 @@ $catalog = $serviceCatalog ?? [
 </style>
 
 <!-- Chart.js (pinned so a new major version cannot silently break the chart) -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="<?= base_url('assets/vendor/chartjs/chart.umd.min.js') ?>"></script>
 
 <script>
 (function () {
@@ -1231,7 +1231,7 @@ $catalog = $serviceCatalog ?? [
     function start() {
         if (typeof Chart !== 'undefined') { build('today'); return; }
         var tag = document.createElement('script');
-        tag.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
+        tag.src = '<?= base_url('assets/vendor/chartjs/chart.umd.min.js') ?>';
         tag.onload = function () { build('today'); };
         document.head.appendChild(tag);
     }

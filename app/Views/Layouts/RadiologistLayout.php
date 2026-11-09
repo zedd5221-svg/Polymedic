@@ -8,22 +8,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
     <title>PolyMedic - Radiologist Dashboard</title>
 
-    <!-- The CDN stylesheets below block the first paint; opening the
-         connections early shortens that wait. -->
-    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 
     <!-- Main CSS -->
     <link href="<?= base_url('assets/css/AppointmentStyle.css') ?>" rel="stylesheet">
     <link href="<?= base_url('assets/css/admin.css') ?>" rel="stylesheet">
 
     <!-- Bootstrap -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="<?= base_url('assets/vendor/bootstrap/css/bootstrap.min.css') ?>" rel="stylesheet">
 
     <!-- Bootstrap Icons -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="<?= base_url('assets/vendor/bootstrap-icons/bootstrap-icons.min.css') ?>">
 
     <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="<?= base_url('assets/vendor/chartjs/chart.umd.min.js') ?>"></script>
 
 
     <!-- =====================================================
@@ -1246,9 +1243,7 @@
     </script>
 
     <!-- Theme: loaded last so it wins over the layout and Bootstrap defaults -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="<?= base_url('assets/vendor/fonts/fonts.css') ?>" rel="stylesheet">
     <link href="<?= base_url() ?>assets/css/pm-theme.css?v=<?= @filemtime(FCPATH . 'assets/css/pm-theme.css') ?: '1' ?>" rel="stylesheet">
 
 </head>
@@ -1527,8 +1522,8 @@
 </div>
 
 <!-- Bootstrap -->
-<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js"></script>
+<script src="<?= base_url('assets/vendor/popper/popper.min.js') ?>"></script>
+<script src="<?= base_url('assets/vendor/bootstrap/js/bootstrap.min.js') ?>"></script>
 
 <script>
 (function() {

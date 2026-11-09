@@ -99,8 +99,8 @@ $config = [
     @media print { [data-pdfx], .pdfx-dialog, .pdfx-host { display: none !important; } }
 </style>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+<script src="<?= base_url('assets/vendor/html2canvas/html2canvas.min.js') ?>" defer></script>
+<script src="<?= base_url('assets/vendor/jspdf/jspdf.umd.min.js') ?>" defer></script>
 <script>
 (function () {
     'use strict';
